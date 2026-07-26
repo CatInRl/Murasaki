@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegui/tauri-v2/main/schema.json",
+  "productName": "Murasaki",
+  "version": "0.1.0",
+  "identifier": "com.murasaki.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {}
+}
