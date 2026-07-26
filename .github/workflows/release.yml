@@ -46,21 +46,21 @@ jobs:
           tag_name: ${{ steps.vars.outputs.tag }}
           name: Murasaki ${{ steps.vars.outputs.tag }}
           body: |
-            # murasaki ${{ steps.vars.outputs.tag }}
+            # Murasaki ${{ steps.vars.outputs.tag }}
 
             ## 安装
 
             ### Windows
-            - `murasaki_*_x64-setup.exe` — NSIS 安装包（推荐）
-            - `murasaki_*_x64_en-US.msi` — MSI 安装包
+            - `Murasaki_*_x64-setup.exe` — NSIS 安装包（推荐）
+            - `Murasaki_*_x64_en-US.msi` — MSI 安装包
 
             ### macOS
-            - `murasaki_*_aarch64.dmg` — Apple Silicon
-            - `murasaki_*_x64.dmg` — Intel
+            - `Murasaki_*_aarch64.dmg` — Apple Silicon
+            - `Murasaki_*_x64.dmg` — Intel
 
             ### Linux
-            - `murasaki_*_amd64.deb` — Debian/Ubuntu
-            - `murasaki_*_amd64.AppImage` — 便携版
+            - `Murasaki_*_amd64.deb` — Debian/Ubuntu
+            - `Murasaki_*_amd64.AppImage` — 便携版
 
             ## 校验
             下载后请比对 `*.sig` 签名文件。
