@@ -66,3 +66,6 @@ pnpm-debug.log*
 
 # Test artifacts
 coverage/
+
+# Temp commit message helper
+.commit-msg.txt
