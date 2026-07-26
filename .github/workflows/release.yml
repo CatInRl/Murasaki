@@ -1,0 +1,136 @@
+name: Release
+
+# 触发条件：推送 v*.*.* 格式的 tag 时自动构建并发布 Release
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+  # 支持手动触发（用于测试构建流程）
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write  # 创建 Release 与上传资源所需
+
+jobs:
+  # === 创建 Release 草稿 ===
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release-upload-url: ${{ steps.create-release.outputs.upload_url }}
+      release-id: ${{ steps.create-release.outputs.id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 解析版本号
+        id: vars
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: 创建 Release
+        id: create-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: Murasaki ${{ steps.vars.outputs.tag }}
+          body: |
+            # Murasaki ${{ steps.vars.outputs.tag }}
+
+            ## 安装
+
+            ### Windows
+            - `murasaki_*_x64-setup.exe` — MSI 安装包（推荐）
+            - `murasaki_*_x64_en-US.msi` — 原 MSI 文件
+
+            ### macOS
+            - `murasaki_*_aarch64.dmg` — Apple Silicon
+            - `murasaki_*_x64.dmg` — Intel
+
+            ### Linux
+            - `murasaki_*_amd64.deb` — Debian/Ubuntu
+            - `murasaki_*_amd64.AppImage` — 便携版
+
+            ## 校验
+            下载后请比对 `*.sig` 签名文件。
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # === 多平台构建 ===
+  build:
+    needs: create-release
+    strategy:
+      fail-fast: false  # 单个平台失败不影响其他平台
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ''
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+          - platform: ubuntu-22.04
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: 安装 Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: 安装依赖（Linux 系统库）
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - name: 安装 npm 依赖
+        run: npm ci
+
+      - name: 构建并上传 Tauri 应用
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.release-id }}
+          args: ${{ matrix.args }}
+
+  # === 发布完成通知 ===
+  finalize:
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 发布完成
+        run: |
+          echo "✅ Release ${{ needs.create-release.outputs.release-id }} 已发布"
+          echo "查看: https://github.com/${{ github.repository }}/releases"
