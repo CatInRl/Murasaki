@@ -3,13 +3,12 @@
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 
-$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-
-$mingwBin = "C:\Users\nail1\AppData\Local\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin"
-if (Test-Path $mingwBin) {
-    $env:PATH = "$mingwBin;$env:PATH"
+$cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
+if (Test-Path $cargoBin) {
+    $env:PATH = "$cargoBin;$env:PATH"
 }
 
+# 生产构建仍需重定向 APPDATA，与 dev 保持一致
 $appdataRoaming = Join-Path $projectRoot ".appdata\Roaming"
 $appdataLocal   = Join-Path $projectRoot ".appdata\Local"
 New-Item -ItemType Directory -Force -Path $appdataRoaming, $appdataLocal | Out-Null

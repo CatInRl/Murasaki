@@ -1,28 +1,23 @@
 # Murasaki dev launcher
-# Sets up Rust + MinGW PATH and redirects APPDATA to bypass sandbox
+# 仅做最小必要的 PATH 修补与 APPDATA 重定向，工具链默认走 MSVC
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 
-# Rust toolchain
-$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-
-# MinGW (WinLibs) - provides dlltool/ld for GNU toolchain
-$mingwBin = "C:\Users\nail1\AppData\Local\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin"
-if (Test-Path $mingwBin) {
-    $env:PATH = "$mingwBin;$env:PATH"
-} else {
-    Write-Warning "MinGW bin not found: $mingwBin"
+# Rust 工具链：~/.cargo/bin 在交互式 shell 通常已配置，但子进程可能没有
+$cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
+if (Test-Path $cargoBin) {
+    $env:PATH = "$cargoBin;$env:PATH"
 }
 
-# Redirect APPDATA into workspace to avoid TRAE sandbox blocking app data writes
+# 将 APPDATA 重定向到工作区，避免 TRAE Sandbox 阻止应用数据写入
+# 注意：仅在 TRAE 环境中需要，但保留此行为以保持一致性
 $appdataRoaming = Join-Path $projectRoot ".appdata\Roaming"
 $appdataLocal   = Join-Path $projectRoot ".appdata\Local"
 New-Item -ItemType Directory -Force -Path $appdataRoaming, $appdataLocal | Out-Null
 $env:APPDATA     = $appdataRoaming
 $env:LOCALAPPDATA = $appdataLocal
 
-# Launch tauri dev
 Set-Location $projectRoot
 npx tauri dev
 exit $LASTEXITCODE

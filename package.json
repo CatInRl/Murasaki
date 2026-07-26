@@ -13,6 +13,8 @@
     "tauri": "tauri",
     "tauri:dev": "powershell -ExecutionPolicy Bypass -File scripts/tauri-dev.ps1",
     "tauri:build": "powershell -ExecutionPolicy Bypass -File scripts/tauri-build.ps1",
+    "setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-env.ps1",
+    "setup:install": "powershell -ExecutionPolicy Bypass -File scripts/setup-env.ps1 -InstallMissing",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:rust": "cd src-tauri && cargo test",

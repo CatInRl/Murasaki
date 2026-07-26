@@ -26,10 +26,6 @@ e2e/scripts/*
 !e2e/scripts/check-env.ps1
 !e2e/scripts/install-msedgedriver.ps1
 
-# Local Rust toolchain workarounds (machine-specific)
-src-tauri/.cargo/config.toml
-src-tauri/mingw.specs
-
 # Scratch / debugging scripts (local dev only)
 .sscratch/
 .scratch/
