@@ -1,0 +1,222 @@
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { EditorState, Compartment } from "@codemirror/state";
+import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
+import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { indentOnInput, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { languages } from "@codemirror/language-data";
+import { oneDark } from "@codemirror/theme-one-dark";
+import { searchKeymap, highlightSelectionMatches, openSearchPanel } from "@codemirror/search";
+import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { paragraphKeymap } from "../composables/useEditorCommands";
+
+interface Props {
+  modelValue: string;
+  /** 是否显示行号 */
+  showLineNumbers?: boolean;
+  /** 是否启用软折行 */
+  softWrap?: boolean;
+  /** 是否只读 */
+  readOnly?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  showLineNumbers: true,
+  softWrap: true,
+  readOnly: false,
+});
+
+const emit = defineEmits<{
+  (e: "update:modelValue", value: string): void;
+  (e: "ready", view: EditorView): void;
+  /** 光标位置变化：行（1-indexed）、列（0-indexed） */
+  (e: "cursor-change", payload: { line: number; ch: number }): void;
+}>();
+
+const hostRef = ref<HTMLDivElement | null>(null);
+const viewRef = shallowRef<EditorView | null>(null);
+
+// 标记正在进行外部值同步（避免 dispatch 触发 update:modelValue 污染 dirty 状态）
+let isApplyingExternalValue = false;
+
+// 用 Compartment 让配置可在运行时切换
+const lineNumbersComp = new Compartment();
+const wrapComp = new Compartment();
+const readOnlyComp = new Compartment();
+
+function buildExtensions() {
+  return [
+    history(),
+    drawSelection(),
+    bracketMatching(),
+    closeBrackets(),
+    autocompletion(),
+    indentOnInput(),
+    highlightActiveLine(),
+    highlightSelectionMatches(),
+    EditorView.lineWrapping, // 默认开启软折行（再由 wrapComp 控制）
+    EditorState.allowMultipleSelections.of(true),
+    keymap.of([
+      ...closeBracketsKeymap,
+      ...defaultKeymap,
+      ...searchKeymap,
+      ...historyKeymap,
+      ...foldKeymap,
+      ...completionKeymap,
+      indentWithTab,
+      // 段落快捷键（Ctrl+1-6/0、Ctrl+Shift+K/Q/X/[/]）
+      { key: "Ctrl-f", preventDefault: true, run: openSearchPanel },
+      { key: "Ctrl-h", preventDefault: true, run: openSearchPanel },
+    ]),
+    // 段落格式化快捷键（高优先级，避免被 defaultKeymap 拦截）
+    paragraphKeymap(),
+    markdown({
+      defaultCodeLanguage: markdownLanguage,
+      codeLanguages: languages,
+    }),
+    lineNumbersComp.of(props.showLineNumbers ? lineNumbers() : []),
+    wrapComp.of(props.softWrap ? EditorView.lineWrapping : []),
+    readOnlyComp.of(EditorState.readOnly.of(props.readOnly)),
+    foldGutter({ openText: "▾", closedText: "▸" }),
+    oneDark,
+    EditorView.theme({
+      "&": {
+        height: "100%",
+        fontSize: "14px",
+      },
+      ".cm-gutters": {
+        borderRight: "1px solid #2d2d44",
+      },
+      ".cm-content": {
+        fontFamily: "Consolas, 'Courier New', monospace",
+        padding: "8px 0",
+      },
+      ".cm-scroller": {
+        overflow: "auto",
+      },
+    }),
+    EditorView.updateListener.of((update) => {
+      // 外部值同步（watch 触发的 dispatch）不应回传 update:modelValue，
+      // 否则切换 tab / 打开文件时会把新激活的 tab 错误标记为 dirty
+      if (update.docChanged && !isApplyingExternalValue) {
+        emit("update:modelValue", update.state.doc.toString());
+      }
+      if (update.selectionSet || update.docChanged) {
+        const { head } = update.state.selection.main;
+        const lineObj = update.state.doc.lineAt(head);
+        emit("cursor-change", { line: lineObj.number, ch: head - lineObj.from });
+      }
+    }),
+  ];
+}
+
+onMounted(() => {
+  if (!hostRef.value) return;
+  const view = new EditorView({
+    state: EditorState.create({
+      doc: props.modelValue,
+      extensions: buildExtensions(),
+    }),
+    parent: hostRef.value,
+  });
+  viewRef.value = view;
+  emit("ready", view);
+});
+
+onBeforeUnmount(() => {
+  viewRef.value?.destroy();
+  viewRef.value = null;
+});
+
+// 外部值变更（如打开新文件、切换 tab）→ 同步到编辑器
+// 设置 flag 避免 dispatch 触发的 updateListener 回传 update:modelValue
+// 导致新激活的 tab 被错误标记为 dirty
+watch(
+  () => props.modelValue,
+  (next) => {
+    const view = viewRef.value;
+    if (!view) return;
+    const current = view.state.doc.toString();
+    if (next !== current) {
+      isApplyingExternalValue = true;
+      try {
+        view.dispatch({
+          changes: { from: 0, to: current.length, insert: next },
+        });
+      } finally {
+        isApplyingExternalValue = false;
+      }
+    }
+  }
+);
+
+// 配置项变更 → 重新应用对应 Compartment
+watch(
+  () => props.showLineNumbers,
+  (v) => {
+    viewRef.value?.dispatch({
+      effects: lineNumbersComp.reconfigure(v ? lineNumbers() : []),
+    });
+  }
+);
+watch(
+  () => props.softWrap,
+  (v) => {
+    viewRef.value?.dispatch({
+      effects: wrapComp.reconfigure(v ? EditorView.lineWrapping : []),
+    });
+  }
+);
+watch(
+  () => props.readOnly,
+  (v) => {
+    viewRef.value?.dispatch({
+      effects: readOnlyComp.reconfigure(EditorState.readOnly.of(v)),
+    });
+  }
+);
+
+defineExpose({
+  focus: () => viewRef.value?.focus(),
+  getView: () => viewRef.value,
+  /** 返回 CodeMirror 的滚动容器（.cm-scroller），供滚动同步使用 */
+  getScrollDom: (): HTMLElement | null => {
+    const view = viewRef.value;
+    if (!view) return null;
+    return view.scrollDOM;
+  },
+  /** 滚动到指定行号（1-indexed） */
+  scrollToLine: (line: number) => {
+    const view = viewRef.value;
+    if (!view) return;
+    const total = view.state.doc.lines;
+    const n = Math.max(1, Math.min(line, total));
+    const linePos = view.state.doc.line(n).from;
+    view.dispatch({
+      effects: EditorView.scrollIntoView(linePos, { y: "start" }),
+    });
+  },
+});
+</script>
+
+<template>
+  <div class="source-editor">
+    <div ref="hostRef" class="cm-host"></div>
+  </div>
+</template>
+
+<style scoped>
+.source-editor {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+.cm-host {
+  height: 100%;
+  width: 100%;
+}
+.cm-host :deep(.cm-editor) {
+  height: 100%;
+}
+</style>
