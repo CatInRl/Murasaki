@@ -710,8 +710,8 @@ async function onCloseTabRequest(tabId: string): Promise<void> {
       }
     }
   }
-  // 不保存：直接关闭（草稿会自动写入）
-  await tabsStore.closeTab(tabId);
+  // 不保存：跳过 dirty 检查直接关闭（草稿会自动写入）
+  await tabsStore.doCloseTab(tabId);
 }
 
 /**
