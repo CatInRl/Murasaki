@@ -6,6 +6,8 @@ import { useScrollSync } from "../composables/useScrollSync";
 
 interface Props {
   modelValue: string;
+  /** 当前 tab id（透传给 SourceEditor 用于 per-tab EditorState 缓存） */
+  tabId?: string | null;
   /** 分屏比例（编辑器占比 0-1） */
   splitRatio?: number;
   /** 是否显示行号 */
@@ -21,6 +23,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  tabId: null,
   splitRatio: 0.5,
   showLineNumbers: true,
   softWrap: true,
@@ -186,6 +189,7 @@ defineExpose({
       <SourceEditor
         ref="editorRef"
         :model-value="modelValue"
+        :tab-id="tabId"
         :show-line-numbers="showLineNumbers"
         :soft-wrap="softWrap"
         @update:model-value="onInput"

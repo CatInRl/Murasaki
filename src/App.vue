@@ -43,6 +43,7 @@ import {
   insertTable,
 } from "./composables/useEditorCommands";
 import { exportHtml } from "./composables/useHtmlExport";
+import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import { basename } from "./utils/path";
 import type { SidebarView } from "./types";
 
@@ -264,6 +265,27 @@ onMounted(async () => {
   fileOps.setConflictResolver(askConflict);
 
   initialized.value = true;
+
+  // E2E 测试辅助：暴露 editorRef 到 window
+  // 桌面应用 WebView 内部仅应用代码可访问，无 XSS 风险
+  // 测试通过 window.__editorRef__.getView() 直接调用 CodeMirror API
+  // 注意：editorRef 是 Vue ref，EditorPane 用 v-else 渲染（无 tab 时不挂载）
+  // 所以必须用动态 getter，否则 onMounted 时 editorRef.value 还是 null
+  // 同时暴露 undo/redo：release 构建后浏览器内 dynamic import 路径不可用
+  // @ts-ignore
+  window.__editorRef__ = {
+    getView: () => editorRef.value?.getView() ?? null,
+    scrollToLine: (line: number) => editorRef.value?.scrollToLine(line),
+    focus: () => editorRef.value?.focus(),
+    undo: () => {
+      const view = editorRef.value?.getView();
+      if (view) { view.focus(); cmUndo(view); }
+    },
+    redo: () => {
+      const view = editorRef.value?.getView();
+      if (view) { view.focus(); cmRedo(view); }
+    },
+  };
 });
 
 onBeforeUnmount(() => {
@@ -1039,6 +1061,7 @@ async function exportCurrentHtml(): Promise<void> {
             v-else
             ref="editorRef"
             v-model="activeContent"
+            :tab-id="tabsStore.activeTabId"
             :split-ratio="0.5"
             :show-line-numbers="persistence.settings.showLineNumbers"
             :soft-wrap="persistence.settings.softWrap"
