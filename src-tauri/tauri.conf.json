@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui/tauri-v2/main/schema.json",
-  "productName": "Murasaki",
+  "productName": "murasaki",
   "version": "0.1.0",
   "identifier": "com.murasaki.app",
   "build": {
