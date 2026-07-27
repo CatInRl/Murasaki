@@ -162,7 +162,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let ws = dir.path().to_string_lossy().to_string();
         let bytes = b"\x89PNG\r\n\x1a\nfakepngbytes";
-        let result = save_image_asset(ws.clone(), bytes.to_vec(), "png").unwrap();
+        let result = save_image_asset(ws.clone(), bytes.to_vec(), "png".to_string()).unwrap();
         // assets 目录应自动创建
         assert!(dir.path().join("assets").exists());
         // 文件存在
@@ -180,7 +180,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let ws = dir.path().to_string_lossy().to_string();
         let bytes = b"test";
-        let result = save_image_asset(ws, bytes.to_vec(), "jpg").unwrap();
+        let result = save_image_asset(ws, bytes.to_vec(), "jpg".to_string()).unwrap();
         // 文件名格式：YYYYMMDD-HHmmss-<6hex>.jpg
         let parts: Vec<&str> = result.filename.split('-').collect();
         assert_eq!(parts.len(), 3);

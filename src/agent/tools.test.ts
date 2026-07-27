@@ -1,13 +1,15 @@
 /**
- * Agent 工具注册表单元测试 (Ticket #21)
+ * Agent 工具注册表单元测试 (Ticket #21, #22)
  *
- * 验证 4 个 CM6 状态类工具的元数据、参数校验、执行逻辑、错误处理。
+ * 验证工具的元数据、参数校验、执行逻辑、错误处理。
+ * - Ticket #21: 4 个 CM6 状态类工具
+ * - Ticket #22: 3 个文件类工具
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getToolMetadataList, executeTool } from "./tools";
 import type { ToolContext } from "./tools";
 
-// Mock Tauri invoke（get_outline 用）
+// Mock Tauri invoke（get_outline / 文件类工具用）
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
@@ -32,10 +34,15 @@ function makeEditorView(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeCtx(view: unknown, docPath: string | null = "/test.md"): ToolContext {
+function makeCtx(
+  view: unknown,
+  docPath: string | null = "/test.md",
+  workspacePath: string | null = "/workspace"
+): ToolContext {
   return {
     getEditorView: () => view,
     getDocPath: () => docPath,
+    getWorkspacePath: () => workspacePath,
   };
 }
 
@@ -45,14 +52,19 @@ describe("agent tools registry", () => {
   });
 
   describe("getToolMetadataList", () => {
-    it("返回 4 个 CM6 状态类工具", () => {
+    it("返回 7 个工具（4 CM6 + 3 文件）", () => {
       const list = getToolMetadataList();
-      expect(list).toHaveLength(4);
+      expect(list).toHaveLength(7);
       const names = list.map((t) => t.function.name);
+      // CM6 状态类
       expect(names).toContain("get_current_document");
       expect(names).toContain("get_selection");
       expect(names).toContain("get_visible_range");
       expect(names).toContain("get_outline");
+      // 文件类
+      expect(names).toContain("list_files");
+      expect(names).toContain("read_file");
+      expect(names).toContain("search_across_files");
     });
 
     it("所有工具元数据类型为 function", () => {
@@ -257,6 +269,227 @@ describe("agent tools registry", () => {
       const { result } = await executeTool("get_outline", "{}", ctx);
       expect(result.ok).toBe(false);
       expect(result.error).toBe("network");
+    });
+  });
+
+  // ===== Ticket #22: 文件类工具 =====
+  describe("list_files", () => {
+    it("无工作区时返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", null);
+      const { result, summary } = await executeTool("list_files", "{}", ctx);
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("No workspace open");
+      expect(summary).toContain("✗");
+    });
+
+    it("成功返回文件列表", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue([
+        "intro.md",
+        "sub/deep.md",
+      ]);
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result, summary } = await executeTool("list_files", "{}", ctx);
+      expect(result.ok).toBe(true);
+      const data = result.data as { files: string[] };
+      expect(data.files).toEqual(["intro.md", "sub/deep.md"]);
+      expect(summary).toBe("2 个文件");
+      // 验证 invoke 参数
+      expect(invoke).toHaveBeenCalledWith("agent_list_files", {
+        workspace: "/workspace",
+      });
+    });
+
+    it("invoke 抛错时返回错误结果", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("workspace not exists")
+      );
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/bad");
+      const { result } = await executeTool("list_files", "{}", ctx);
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("workspace not exists");
+    });
+  });
+
+  describe("read_file", () => {
+    it("无工作区时返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", null);
+      const { result } = await executeTool(
+        "read_file",
+        JSON.stringify({ path: "intro.md" }),
+        ctx
+      );
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("No workspace open");
+    });
+
+    it("缺少 path 参数返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result } = await executeTool("read_file", "{}", ctx);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("missing required parameter: path");
+    });
+
+    it("path 类型错误返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result } = await executeTool(
+        "read_file",
+        JSON.stringify({ path: 123 }),
+        ctx
+      );
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("missing required parameter: path");
+    });
+
+    it("成功返回文件内容", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+        docPath: "intro.md",
+        content: "# Intro",
+        contentHash: "abc123",
+        contentLength: 7,
+        truncated: false,
+      });
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result, summary } = await executeTool(
+        "read_file",
+        JSON.stringify({ path: "intro.md" }),
+        ctx
+      );
+      expect(result.ok).toBe(true);
+      const data = result.data as { content: string; truncated: boolean };
+      expect(data.content).toBe("# Intro");
+      expect(data.truncated).toBe(false);
+      expect(summary).toBe("7 字符");
+      expect(invoke).toHaveBeenCalledWith("agent_read_file", {
+        workspace: "/workspace",
+        path: "intro.md",
+      });
+    });
+
+    it("截断文件标记 truncated", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+        docPath: "long.md",
+        content: "x".repeat(100),
+        contentHash: "abc",
+        contentLength: 10000,
+        truncated: true,
+      });
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result, summary } = await executeTool(
+        "read_file",
+        JSON.stringify({ path: "long.md" }),
+        ctx
+      );
+      expect(result.ok).toBe(true);
+      expect(summary).toContain("截断");
+    });
+
+    it("越界路径由后端拒绝", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("path outside workspace")
+      );
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result } = await executeTool(
+        "read_file",
+        JSON.stringify({ path: "../escape.md" }),
+        ctx
+      );
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("path outside workspace");
+    });
+  });
+
+  describe("search_across_files", () => {
+    it("无工作区时返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", null);
+      const { result } = await executeTool(
+        "search_across_files",
+        JSON.stringify({ query: "hello" }),
+        ctx
+      );
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("No workspace open");
+    });
+
+    it("缺少 query 参数返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result } = await executeTool("search_across_files", "{}", ctx);
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("missing required parameter: query");
+    });
+
+    it("成功返回搜索结果", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+        hits: [
+          {
+            filePath: "intro.md",
+            lineNumber: 1,
+            lineContent: "# Hello",
+            contextBefore: [],
+            contextAfter: ["", "World"],
+          },
+        ],
+        totalHits: 1,
+        truncated: false,
+      });
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result, summary } = await executeTool(
+        "search_across_files",
+        JSON.stringify({ query: "Hello" }),
+        ctx
+      );
+      expect(result.ok).toBe(true);
+      const data = result.data as { hits: unknown[]; totalHits: number };
+      expect(data.hits).toHaveLength(1);
+      expect(data.totalHits).toBe(1);
+      expect(summary).toBe("1 命中");
+      expect(invoke).toHaveBeenCalledWith("agent_search_files", {
+        workspace: "/workspace",
+        query: "Hello",
+        isRegex: false,
+      });
+    });
+
+    it("支持 is_regex 参数", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+        hits: [],
+        totalHits: 0,
+        truncated: false,
+      });
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      await executeTool(
+        "search_across_files",
+        JSON.stringify({ query: "Hello.*World", is_regex: true }),
+        ctx
+      );
+      expect(invoke).toHaveBeenCalledWith("agent_search_files", {
+        workspace: "/workspace",
+        query: "Hello.*World",
+        isRegex: true,
+      });
+    });
+
+    it("截断结果标记 truncated", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+        hits: [],
+        totalHits: 100,
+        truncated: true,
+      });
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result, summary } = await executeTool(
+        "search_across_files",
+        JSON.stringify({ query: "a" }),
+        ctx
+      );
+      expect(result.ok).toBe(true);
+      expect(summary).toContain("截断");
     });
   });
 });

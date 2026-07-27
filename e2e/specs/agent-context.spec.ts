@@ -284,6 +284,7 @@ describe("Agent 上下文 + 工具调用可见性", () => {
           const ctx = {
             getEditorView: () => null,
             getDocPath: () => null,
+            getWorkspacePath: () => null,
           };
           mod.executeTool("get_current_document", "{invalid json", ctx)
             .then((res) => done(res))

@@ -213,6 +213,7 @@ ${content}
     const toolCtx = {
       getEditorView: () => bridge.editorView,
       getDocPath: () => bridge.activeDocPath,
+      getWorkspacePath: () => ws.workspacePath,
     };
 
     // 流式 flush 节流

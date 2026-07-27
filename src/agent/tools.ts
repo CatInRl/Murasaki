@@ -31,6 +31,8 @@ export interface ToolContext {
   getEditorView: () => unknown;
   /** 当前文档路径 */
   getDocPath: () => string | null;
+  /** 当前工作区根路径（无工作区时为 null） */
+  getWorkspacePath: () => string | null;
 }
 
 /** 工具结果 */
@@ -254,12 +256,160 @@ const getOutline: ToolDef = {
   },
 };
 
+// ===== list_files (Ticket #22: 文件类工具) =====
+const listFiles: ToolDef = {
+  metadata: {
+    type: "function",
+    function: {
+      name: "list_files",
+      description: "List all Markdown files in the workspace as relative paths (forward slash, excludes assets/ directory). Requires an open workspace.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  async execute(_args: unknown, ctx: ToolContext): Promise<ToolResult> {
+    const workspace = ctx.getWorkspacePath();
+    if (!workspace) {
+      return { ok: false, error: "No workspace open" };
+    }
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const files = await invoke<string[]>("agent_list_files", { workspace });
+      return { ok: true, data: { files } };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  summarize(result: ToolResult): string {
+    if (!result.ok) return `✗ ${result.error}`;
+    const data = result.data as { files?: string[] };
+    return `${data.files?.length ?? 0} 个文件`;
+  },
+};
+
+// ===== read_file (Ticket #22: 文件类工具) =====
+const readFile: ToolDef = {
+  metadata: {
+    type: "function",
+    function: {
+      name: "read_file",
+      description: "Read a Markdown file's content from the workspace. Content is truncated at 4K chars. Path must be relative to the workspace root.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Relative path to the file (e.g., 'intro.md' or 'sub/deep.md'). Must be within the workspace.",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  async execute(args: unknown, ctx: ToolContext): Promise<ToolResult> {
+    const workspace = ctx.getWorkspacePath();
+    if (!workspace) {
+      return { ok: false, error: "No workspace open" };
+    }
+    const { path } = (args || {}) as { path?: string };
+    if (!path || typeof path !== "string") {
+      return { ok: false, error: "missing required parameter: path" };
+    }
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const result = await invoke<{
+        docPath: string;
+        content: string;
+        contentHash: string;
+        contentLength: number;
+        truncated: boolean;
+      }>("agent_read_file", { workspace, path });
+      return { ok: true, data: result };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  summarize(result: ToolResult): string {
+    if (!result.ok) return `✗ ${result.error}`;
+    const data = result.data as { contentLength?: number; truncated?: boolean };
+    const len = data.contentLength ?? 0;
+    return data.truncated ? `${len}+ 字符（截断）` : `${len} 字符`;
+  },
+};
+
+// ===== search_across_files (Ticket #22: 文件类工具) =====
+const searchAcrossFiles: ToolDef = {
+  metadata: {
+    type: "function",
+    function: {
+      name: "search_across_files",
+      description: "Search for a keyword or regex pattern across all Markdown files in the workspace. Case-insensitive by default. Results include line number, matched line, and 2 lines of context before/after. Results are truncated at 4K chars.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Search keyword or regex pattern",
+          },
+          is_regex: {
+            type: "boolean",
+            description: "Whether to treat the query as a regex pattern (default: false)",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  async execute(args: unknown, ctx: ToolContext): Promise<ToolResult> {
+    const workspace = ctx.getWorkspacePath();
+    if (!workspace) {
+      return { ok: false, error: "No workspace open" };
+    }
+    const { query, is_regex } = (args || {}) as { query?: string; is_regex?: boolean };
+    if (!query || typeof query !== "string") {
+      return { ok: false, error: "missing required parameter: query" };
+    }
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const result = await invoke<{
+        hits: Array<{
+          filePath: string;
+          lineNumber: number;
+          lineContent: string;
+          contextBefore: string[];
+          contextAfter: string[];
+        }>;
+        totalHits: number;
+        truncated: boolean;
+      }>("agent_search_files", {
+        workspace,
+        query,
+        isRegex: is_regex ?? false,
+      });
+      return { ok: true, data: result };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  summarize(result: ToolResult): string {
+    if (!result.ok) return `✗ ${result.error}`;
+    const data = result.data as { totalHits?: number; truncated?: boolean };
+    const total = data.totalHits ?? 0;
+    return data.truncated ? `${total}+ 命中（截断）` : `${total} 命中`;
+  },
+};
+
 // ===== 工具注册表 =====
 const TOOL_REGISTRY: Record<string, ToolDef> = {
   get_current_document: getCurrentDocument,
   get_selection: getSelection,
   get_visible_range: getVisibleRange,
   get_outline: getOutline,
+  list_files: listFiles,
+  read_file: readFile,
+  search_across_files: searchAcrossFiles,
 };
 
 /** 获取所有工具元数据（发送给 LLM） */
