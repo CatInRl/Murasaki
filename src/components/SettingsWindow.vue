@@ -489,9 +489,36 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
         <!-- AI -->
         <div v-else-if="activeCategory === 'ai'" class="category-pane ai-pane">
           <h3 class="pane-title">AI 服务配置</h3>
+
+          <!-- 活动 provider 信息卡片（顶部显著展示） -->
+          <div
+            v-if="aiProviders.activeProvider"
+            class="ai-active-card"
+          >
+            <div class="ai-active-label">当前活动 provider</div>
+            <div class="ai-active-name">
+              {{ aiProviders.activeProvider.name }}
+              <NTag size="tiny" type="success" style="margin-left: 6px">
+                {{ aiProviders.activeProvider.type }}
+              </NTag>
+            </div>
+            <NText depth="3" class="ai-active-meta">
+              {{ aiProviders.activeProvider.baseUrl }} · {{ aiProviders.activeProvider.model }}
+            </NText>
+          </div>
+          <NAlert
+            v-else
+            type="warning"
+            :show-icon="true"
+            style="margin-bottom: 12px"
+          >
+            尚未设置活动 provider，请配置并设为活动后 agent 才能使用。
+          </NAlert>
+
           <NAlert type="info" :show-icon="true" style="margin-bottom: 16px">
             API key 通过 Windows DPAPI 加密存储，仅在调用 LLM 时按需解密。
             支持配置多个 provider，选择一个为「活动」。
+            BYOK（自带密钥）：请自行确保 provider 与密钥的合法性与安全性。
           </NAlert>
 
           <div class="ai-layout">
@@ -840,5 +867,33 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
+}
+.ai-active-card {
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border: 1px solid #d4edda;
+  border-radius: 4px;
+  background: rgba(24, 160, 88, 0.06);
+}
+.ai-active-label {
+  font-size: 11px;
+  color: #18a058;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.ai-active-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #24292e;
+  display: flex;
+  align-items: center;
+}
+.ai-active-meta {
+  font-size: 12px;
+  margin-top: 2px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

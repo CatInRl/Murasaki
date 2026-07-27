@@ -26,6 +26,21 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// AI Provider 类型（与前端 AiProvider["type"] 联合类型对齐）
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ProviderType {
+    Deepseek,
+    Openai,
+    Custom,
+}
+
+impl Default for ProviderType {
+    fn default() -> Self {
+        ProviderType::Custom
+    }
+}
+
 /// AI Provider 配置（前端可见，apiKey 字段不返回明文）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,7 +51,7 @@ pub struct AiProvider {
     pub name: String,
     /// Provider 类型（deepseek / openai / custom）
     #[serde(rename = "type")]
-    pub provider_type: String,
+    pub provider_type: ProviderType,
     /// Base URL（如 https://api.deepseek.com）
     pub base_url: String,
     /// 默认模型名
@@ -70,7 +85,6 @@ impl Default for SecretsFile {
 /// 获取 secrets.json 文件路径：%APPDATA%\murasaki\secrets.json
 fn secrets_file_path() -> Result<PathBuf, String> {
     let base = dirs::data_dir()
-        .or_else(|| std::env::var_os("APPDATA").map(PathBuf::from))
         .ok_or_else(|| "无法确定 app data 目录".to_string())?;
     let dir = base.join("murasaki");
     if !dir.exists() {
@@ -100,6 +114,64 @@ fn write_secrets(secrets: &SecretsFile) -> Result<(), String> {
     fs::write(&path, json).map_err(|e| e.to_string())
 }
 
+// ===== base64 编解码（平台无关，避免引入额外依赖） =====
+mod base64 {
+    const B64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    pub fn encode(data: &[u8]) -> String {
+        let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+        let mut i = 0;
+        while i + 2 < data.len() {
+            let n = ((data[i] as u32) << 16) | ((data[i + 1] as u32) << 8) | (data[i + 2] as u32);
+            result.push(B64_CHARS[((n >> 18) & 0x3f) as usize] as char);
+            result.push(B64_CHARS[((n >> 12) & 0x3f) as usize] as char);
+            result.push(B64_CHARS[((n >> 6) & 0x3f) as usize] as char);
+            result.push(B64_CHARS[(n & 0x3f) as usize] as char);
+            i += 3;
+        }
+        let rem = data.len() - i;
+        if rem == 1 {
+            let n = (data[i] as u32) << 16;
+            result.push(B64_CHARS[((n >> 18) & 0x3f) as usize] as char);
+            result.push(B64_CHARS[((n >> 12) & 0x3f) as usize] as char);
+            result.push('=');
+            result.push('=');
+        } else if rem == 2 {
+            let n = ((data[i] as u32) << 16) | ((data[i + 1] as u32) << 8);
+            result.push(B64_CHARS[((n >> 18) & 0x3f) as usize] as char);
+            result.push(B64_CHARS[((n >> 12) & 0x3f) as usize] as char);
+            result.push(B64_CHARS[((n >> 6) & 0x3f) as usize] as char);
+            result.push('=');
+        }
+        result
+    }
+
+    pub fn decode(s: &str) -> Result<Vec<u8>, String> {
+        let s = s.trim_end_matches('=');
+        let mut buf = Vec::with_capacity(s.len() * 3 / 4);
+        let mut n: u32 = 0;
+        let mut bits: u32 = 0;
+        for c in s.bytes() {
+            let v = match c {
+                b'A'..=b'Z' => c - b'A',
+                b'a'..=b'z' => c - b'a' + 26,
+                b'0'..=b'9' => c - b'0' + 52,
+                b'+' => 62,
+                b'/' => 63,
+                _ => return Err(format!("invalid base64 char: {}", c as char)),
+            };
+            n = (n << 6) | (v as u32);
+            bits += 6;
+            if bits >= 8 {
+                bits -= 8;
+                buf.push((n >> bits) as u8);
+                n &= (1 << bits) - 1;
+            }
+        }
+        Ok(buf)
+    }
+}
+
 // ===== Windows DPAPI =====
 //
 // 仅 Windows 平台使用 DPAPI（CryptProtectData / CryptUnprotectData）
@@ -107,6 +179,8 @@ fn write_secrets(secrets: &SecretsFile) -> Result<(), String> {
 
 #[cfg(windows)]
 mod dpapi {
+    use super::base64;
+
     /// Windows API 类型别名
     type DWORD = u32;
     type BOOL = i32;
@@ -169,13 +243,13 @@ mod dpapi {
             }
             let cipher = std::slice::from_raw_parts(data_out.pb_data, data_out.cb_data as usize).to_vec();
             LocalFree(data_out.pb_data as HANDLE);
-            Ok(base64_encode(&cipher))
+            Ok(base64::encode(&cipher))
         }
     }
 
     /// 使用 DPAPI 解密 base64 编码的密文，返回明文
     pub fn decrypt(cipher_b64: &str) -> Result<Vec<u8>, String> {
-        let cipher = base64_decode(cipher_b64)?;
+        let cipher = base64::decode(cipher_b64)?;
         unsafe {
             let data_in = CryptoApiBlob {
                 cb_data: cipher.len() as DWORD,
@@ -204,131 +278,18 @@ mod dpapi {
             Ok(plain)
         }
     }
-
-    // ===== base64 编解码（避免引入额外依赖） =====
-    const B64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    fn base64_encode(data: &[u8]) -> String {
-        let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
-        let mut i = 0;
-        while i + 2 < data.len() {
-            let n = ((data[i] as u32) << 16) | ((data[i + 1] as u32) << 8) | (data[i + 2] as u32);
-            result.push(B64_CHARS[((n >> 18) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[((n >> 12) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[((n >> 6) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[(n & 0x3f) as usize] as char);
-            i += 3;
-        }
-        let rem = data.len() - i;
-        if rem == 1 {
-            let n = (data[i] as u32) << 16;
-            result.push(B64_CHARS[((n >> 18) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[((n >> 12) & 0x3f) as usize] as char);
-            result.push('=');
-            result.push('=');
-        } else if rem == 2 {
-            let n = ((data[i] as u32) << 16) | ((data[i + 1] as u32) << 8);
-            result.push(B64_CHARS[((n >> 18) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[((n >> 12) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[((n >> 6) & 0x3f) as usize] as char);
-            result.push('=');
-        }
-        result
-    }
-
-    fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
-        let s = s.trim_end_matches('=');
-        let mut buf = Vec::with_capacity(s.len() * 3 / 4);
-        let mut n: u32 = 0;
-        let mut bits: u32 = 0;
-        for c in s.bytes() {
-            let v = match c {
-                b'A'..=b'Z' => c - b'A',
-                b'a'..=b'z' => c - b'a' + 26,
-                b'0'..=b'9' => c - b'0' + 52,
-                b'+' => 62,
-                b'/' => 63,
-                _ => return Err(format!("invalid base64 char: {}", c as char)),
-            };
-            n = (n << 6) | (v as u32);
-            bits += 6;
-            if bits >= 8 {
-                bits -= 8;
-                buf.push((n >> bits) as u8);
-                n &= (1 << bits) - 1;
-            }
-        }
-        Ok(buf)
-    }
-
-    // 避免 unused warning
-    #[allow(dead_code)]
-    fn _unused() {}
 }
 
 #[cfg(not(windows))]
 mod dpapi {
+    use super::base64;
+
     /// 非 Windows 平台：简单 base64 编码（仅用于开发测试）
     pub fn encrypt(plaintext: &[u8]) -> Result<String, String> {
-        Ok(base64_encode(plaintext))
+        Ok(base64::encode(plaintext))
     }
     pub fn decrypt(cipher_b64: &str) -> Result<Vec<u8>, String> {
-        base64_decode(cipher_b64)
-    }
-
-    const B64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    fn base64_encode(data: &[u8]) -> String {
-        let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
-        let mut i = 0;
-        while i + 2 < data.len() {
-            let n = ((data[i] as u32) << 16) | ((data[i + 1] as u32) << 8) | (data[i + 2] as u32);
-            result.push(B64_CHARS[((n >> 18) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[((n >> 12) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[((n >> 6) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[(n & 0x3f) as usize] as char);
-            i += 3;
-        }
-        let rem = data.len() - i;
-        if rem == 1 {
-            let n = (data[i] as u32) << 16;
-            result.push(B64_CHARS[((n >> 18) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[((n >> 12) & 0x3f) as usize] as char);
-            result.push('=');
-            result.push('=');
-        } else if rem == 2 {
-            let n = ((data[i] as u32) << 16) | ((data[i + 1] as u32) << 8);
-            result.push(B64_CHARS[((n >> 18) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[((n >> 12) & 0x3f) as usize] as char);
-            result.push(B64_CHARS[((n >> 6) & 0x3f) as usize] as char);
-            result.push('=');
-        }
-        result
-    }
-
-    fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
-        let s = s.trim_end_matches('=');
-        let mut buf = Vec::with_capacity(s.len() * 3 / 4);
-        let mut n: u32 = 0;
-        let mut bits: u32 = 0;
-        for c in s.bytes() {
-            let v = match c {
-                b'A'..=b'Z' => c - b'A',
-                b'a'..=b'z' => c - b'a' + 26,
-                b'0'..=b'9' => c - b'0' + 52,
-                b'+' => 62,
-                b'/' => 63,
-                _ => return Err(format!("invalid base64 char: {}", c as char)),
-            };
-            n = (n << 6) | (v as u32);
-            bits += 6;
-            if bits >= 8 {
-                bits -= 8;
-                buf.push((n >> bits) as u8);
-                n &= (1 << bits) - 1;
-            }
-        }
-        Ok(buf)
+        base64::decode(cipher_b64)
     }
 }
 
@@ -361,18 +322,16 @@ pub fn save_ai_provider(
     if provider.id.is_empty() {
         provider.id = Uuid::new_v4().to_string();
     }
+
+    let mut secrets = read_secrets()?;
+
     // 若传入新 api_key（非空），加密；若为空，保留原密文
     if !api_key.is_empty() {
         provider.api_key_enc = dpapi::encrypt(api_key.as_bytes())?;
-    } else {
-        // 保留原密文：从磁盘读取原 provider
-        let secrets = read_secrets()?;
-        if let Some(existing) = secrets.providers.iter().find(|p| p.id == provider.id) {
-            provider.api_key_enc = existing.api_key_enc.clone();
-        }
+    } else if let Some(existing) = secrets.providers.iter().find(|p| p.id == provider.id) {
+        provider.api_key_enc = existing.api_key_enc.clone();
     }
 
-    let mut secrets = read_secrets()?;
     // 若此 provider 被设为活动，先将其他全部置为非活动
     if provider.is_active {
         for p in secrets.providers.iter_mut() {

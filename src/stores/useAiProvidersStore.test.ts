@@ -345,5 +345,38 @@ describe("useAiProvidersStore", () => {
         "custom",
       ]);
     });
+
+    it("DeepSeek 预设内容正确", () => {
+      const store = useAiProvidersStore();
+      const presets = store.getPresets();
+      const deepseek = presets.find((p) => p.type === "deepseek");
+
+      expect(deepseek).toBeDefined();
+      expect(deepseek?.label).toBe("DeepSeek");
+      expect(deepseek?.baseUrl).toBe("https://api.deepseek.com");
+      expect(deepseek?.model).toBe("deepseek-v4-flash");
+    });
+
+    it("OpenAI 预设内容正确", () => {
+      const store = useAiProvidersStore();
+      const presets = store.getPresets();
+      const openai = presets.find((p) => p.type === "openai");
+
+      expect(openai).toBeDefined();
+      expect(openai?.label).toBe("OpenAI");
+      expect(openai?.baseUrl).toBe("https://api.openai.com");
+      expect(openai?.model).toBe("gpt-4o-mini");
+    });
+
+    it("自定义预设 baseUrl 与 model 为空", () => {
+      const store = useAiProvidersStore();
+      const presets = store.getPresets();
+      const custom = presets.find((p) => p.type === "custom");
+
+      expect(custom).toBeDefined();
+      expect(custom?.label).toBe("自定义");
+      expect(custom?.baseUrl).toBe("");
+      expect(custom?.model).toBe("");
+    });
   });
 });
