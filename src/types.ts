@@ -233,3 +233,38 @@ export interface ToolCallEntry {
  */
 export type AgentStatus = "idle" | "thinking" | "cancelled" | "error";
 
+// ===== 新文件提议（Ticket #24: propose_new_file）=====
+
+/**
+ * 新文件提议
+ *
+ * 与 inline Proposal 不同：
+ * - 不绑定编辑器位置（不进入 CM6 StateField）
+ * - 在 Agent 面板底部以卡片形式展示
+ * - 用户接受后才尝试写文件（冲突时走 T2 dialog）
+ */
+export interface NewFileProposal {
+  id: string;
+  /** 相对工作区的目标路径（如 "notes/new.md"） */
+  path: string;
+  /** 文件内容 */
+  content: string;
+  /** 简短描述（agent 提供） */
+  label: string;
+  /** 行数 */
+  lineCount: number;
+  /** 状态 */
+  status: NewFileProposalStatus;
+  /** 写入后的绝对路径（仅 status === "written" 时有值） */
+  writtenPath?: string;
+  /** 错误信息（status === "error" 时有值） */
+  error?: string;
+}
+
+export type NewFileProposalStatus =
+  | "pending" // 等待用户接受/拒绝
+  | "accepted" // 用户已接受（写入中或已写入）
+  | "rejected" // 用户已拒绝
+  | "written" // 已成功写入磁盘
+  | "error"; // 写入失败（如路径无效、冲突未解决）
+

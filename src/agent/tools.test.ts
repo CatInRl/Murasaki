@@ -52,9 +52,9 @@ describe("agent tools registry", () => {
   });
 
   describe("getToolMetadataList", () => {
-    it("返回 7 个工具（4 CM6 + 3 文件）", () => {
+    it("返回 10 个工具（4 CM6 + 3 文件 + 3 提议）", () => {
       const list = getToolMetadataList();
-      expect(list).toHaveLength(7);
+      expect(list).toHaveLength(10);
       const names = list.map((t) => t.function.name);
       // CM6 状态类
       expect(names).toContain("get_current_document");
@@ -65,6 +65,10 @@ describe("agent tools registry", () => {
       expect(names).toContain("list_files");
       expect(names).toContain("read_file");
       expect(names).toContain("search_across_files");
+      // 提议类
+      expect(names).toContain("propose_insert");
+      expect(names).toContain("propose_replace");
+      expect(names).toContain("propose_new_file");
     });
 
     it("所有工具元数据类型为 function", () => {
@@ -490,6 +494,139 @@ describe("agent tools registry", () => {
       );
       expect(result.ok).toBe(true);
       expect(summary).toContain("截断");
+    });
+  });
+
+  // ===== propose_new_file (Ticket #24) =====
+  describe("propose_new_file", () => {
+    it("无工作区时返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", null);
+      const { result, summary } = await executeTool(
+        "propose_new_file",
+        JSON.stringify({ path: "new.md", content: "# Hi", label: "Create new.md" }),
+        ctx
+      );
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("No workspace open");
+      expect(summary).toContain("✗");
+    });
+
+    it("缺少 path 参数返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result } = await executeTool(
+        "propose_new_file",
+        JSON.stringify({ content: "# Hi", label: "Create" }),
+        ctx
+      );
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("path is required");
+    });
+
+    it("缺少 content 参数返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result } = await executeTool(
+        "propose_new_file",
+        JSON.stringify({ path: "new.md", label: "Create" }),
+        ctx
+      );
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("content must be a string");
+    });
+
+    it("缺少 label 参数返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result } = await executeTool(
+        "propose_new_file",
+        JSON.stringify({ path: "new.md", content: "# Hi" }),
+        ctx
+      );
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("label is required");
+    });
+
+    it("非 Markdown 扩展名返回错误", async () => {
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result } = await executeTool(
+        "propose_new_file",
+        JSON.stringify({ path: "notes.txt", content: "# Hi", label: "Create" }),
+        ctx
+      );
+      expect(result.ok).toBe(false);
+      expect(result.error).toContain("must end with");
+    });
+
+    it("接受 .md/.markdown/.mdown/.mkd 扩展名", async () => {
+      // Mock useProposalsStore 避免触发 Pinia 初始化
+      const addNewFileProposal = vi.fn();
+      vi.doMock("../stores/useProposalsStore", () => ({
+        useProposalsStore: () => ({ addNewFileProposal }),
+      }));
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      for (const ext of ["new.md", "new.markdown", "new.mdown", "new.mkd"]) {
+        addNewFileProposal.mockClear();
+        const { result } = await executeTool(
+          "propose_new_file",
+          JSON.stringify({ path: ext, content: "# Hi", label: "Create" }),
+          ctx
+        );
+        expect(result.ok).toBe(true);
+        expect(addNewFileProposal).toHaveBeenCalledTimes(1);
+      }
+      vi.doUnmock("../stores/useProposalsStore");
+    });
+
+    it("成功创建提议并调用 store.addNewFileProposal", async () => {
+      const addNewFileProposal = vi.fn();
+      vi.doMock("../stores/useProposalsStore", () => ({
+        useProposalsStore: () => ({ addNewFileProposal }),
+      }));
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result, summary } = await executeTool(
+        "propose_new_file",
+        JSON.stringify({
+          path: "notes/today.md",
+          content: "# Today\n\nSome content",
+          label: "创建 today.md",
+        }),
+        ctx
+      );
+      expect(result.ok).toBe(true);
+      const data = result.data as { proposalId: string; path: string; lineCount: number; status: string };
+      expect(data.proposalId).toMatch(/^nf-\w+/);
+      expect(data.path).toBe("notes/today.md");
+      expect(data.lineCount).toBe(3);
+      expect(data.status).toBe("awaiting_user");
+      expect(summary).toContain("notes/today.md");
+      expect(summary).toContain("3 行");
+      expect(addNewFileProposal).toHaveBeenCalledTimes(1);
+      const proposalArg = addNewFileProposal.mock.calls[0][0];
+      expect(proposalArg.path).toBe("notes/today.md");
+      expect(proposalArg.status).toBe("pending");
+      expect(proposalArg.label).toBe("创建 today.md");
+      vi.doUnmock("../stores/useProposalsStore");
+    });
+
+    it("Windows 反斜杠路径转换为正斜杠", async () => {
+      const addNewFileProposal = vi.fn();
+      vi.doMock("../stores/useProposalsStore", () => ({
+        useProposalsStore: () => ({ addNewFileProposal }),
+      }));
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result } = await executeTool(
+        "propose_new_file",
+        JSON.stringify({
+          path: "sub\\deep\\note.md",
+          content: "# Hi",
+          label: "Create",
+        }),
+        ctx
+      );
+      expect(result.ok).toBe(true);
+      const data = result.data as { path: string };
+      expect(data.path).toBe("sub/deep/note.md");
+      const proposalArg = addNewFileProposal.mock.calls[0][0];
+      expect(proposalArg.path).toBe("sub/deep/note.md");
+      vi.doUnmock("../stores/useProposalsStore");
     });
   });
 });

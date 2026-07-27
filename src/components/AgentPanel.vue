@@ -8,10 +8,12 @@ import { ref, computed, watch, nextTick, onMounted } from "vue";
 import { useAgentStore } from "../stores/useAgentStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useAiProvidersStore } from "../stores/useAiProvidersStore";
+import { useProposalsStore } from "../stores/useProposalsStore";
 
 const agent = useAgentStore();
 const workspace = useWorkspaceStore();
 const aiProviders = useAiProvidersStore();
+const proposals = useProposalsStore();
 
 // ===== 输入框 =====
 const inputText = ref("");
@@ -318,6 +320,148 @@ onMounted(() => {
         <!-- 错误信息 -->
         <div v-if="agent.errorMessage" class="agent-error">
           {{ agent.errorMessage }}
+        </div>
+      </div>
+
+      <!-- 提议列表 (Ticket #23) -->
+      <div
+        v-if="proposals.hasProposals"
+        class="agent-proposal-list"
+      >
+        <div class="proposal-list-header">
+          <svg class="proposal-list-icon" viewBox="0 0 24 24" width="12" height="12">
+            <path fill="currentColor" d="M12 2L9.91 8.84 3 9.27l5.46 4.73L6.82 21 12 17.27 17.18 21l-1.64-6.99L21 9.27l-6.91-.43L12 2z"/>
+          </svg>
+          <span class="proposal-list-title">提议 ({{ proposals.pendingProposals.length }})</span>
+        </div>
+        <div
+          v-for="p in proposals.proposals"
+          :key="p.id"
+          class="proposal-item"
+          :class="{
+            'proposal-pending': p.status === 'pending',
+            'proposal-accepted': p.status === 'accepted',
+            'proposal-rejected': p.status === 'rejected',
+            'proposal-expired': p.status === 'expired',
+            'proposal-flash': proposals.flashingId === p.id,
+          }"
+          @click="p.status === 'pending' && proposals.jumpToProposal(p.id)"
+        >
+          <span class="proposal-item-icon">{{ p.type === 'insert' ? '＋' : '↻' }}</span>
+          <span class="proposal-item-label">{{ p.label }}</span>
+          <span class="proposal-item-meta">{{ p.lineCount }} 行</span>
+          <template v-if="p.status === 'pending'">
+            <button
+              class="proposal-item-btn proposal-item-accept"
+              title="接受"
+              @click.stop="proposals.acceptProposal(p.id)"
+            >✓</button>
+            <button
+              class="proposal-item-btn proposal-item-reject"
+              title="拒绝"
+              @click.stop="proposals.rejectProposal(p.id)"
+            >✗</button>
+          </template>
+          <span v-else-if="p.status === 'accepted'" class="proposal-item-status">已接受</span>
+          <span v-else-if="p.status === 'rejected'" class="proposal-item-status">已拒绝</span>
+          <span v-else-if="p.status === 'expired'" class="proposal-item-status">⚠ 已过期</span>
+        </div>
+      </div>
+
+      <!-- 新文件提议卡片 (Ticket #24b: propose_new_file) -->
+      <div
+        v-if="proposals.hasNewFileProposals"
+        class="agent-newfile-list"
+      >
+        <div class="newfile-list-header">
+          <svg class="newfile-list-icon" viewBox="0 0 24 24" width="12" height="12">
+            <path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z M11 11h2v6h-2z M11 9h2v2h-2z"/>
+          </svg>
+          <span class="newfile-list-title">
+            新文件提议 ({{ proposals.pendingNewFileProposals.length }})
+          </span>
+        </div>
+        <div
+          v-for="nf in proposals.newFileProposals"
+          :key="nf.id"
+          class="newfile-card"
+          :class="{
+            'newfile-pending': nf.status === 'pending',
+            'newfile-written': nf.status === 'written',
+            'newfile-rejected': nf.status === 'rejected',
+            'newfile-error': nf.status === 'error',
+          }"
+        >
+          <div class="newfile-card-header">
+            <span class="newfile-card-icon">📄</span>
+            <span class="newfile-card-label" :title="nf.label">{{ nf.label }}</span>
+            <span class="newfile-card-meta">{{ nf.lineCount }} 行</span>
+          </div>
+          <div class="newfile-card-path" :title="nf.path">{{ nf.path }}</div>
+
+          <!-- pending 状态：接受/拒绝按钮 -->
+          <template v-if="nf.status === 'pending'">
+            <div class="newfile-card-actions">
+              <button
+                class="newfile-btn newfile-btn-reject"
+                title="拒绝"
+                @click="proposals.rejectNewFileProposal(nf.id)"
+              >✗ 拒绝</button>
+              <button
+                class="newfile-btn newfile-btn-accept"
+                title="接受并创建文件"
+                @click="proposals.acceptNewFileProposal(nf.id)"
+              >✓ 接受</button>
+            </div>
+          </template>
+
+          <!-- written 状态：显示已写入路径 -->
+          <div v-else-if="nf.status === 'written'" class="newfile-card-status newfile-status-written">
+            ✓ 已创建
+            <span v-if="nf.writtenPath" class="newfile-written-path" :title="nf.writtenPath">
+              {{ nf.writtenPath }}
+            </span>
+          </div>
+
+          <!-- rejected 状态 -->
+          <div v-else-if="nf.status === 'rejected'" class="newfile-card-status newfile-status-rejected">
+            ✗ 已拒绝
+          </div>
+
+          <!-- error 状态：显示错误信息 + 重试按钮 -->
+          <template v-else-if="nf.status === 'error'">
+            <div class="newfile-card-status newfile-status-error" :title="nf.error">
+              ⚠ {{ nf.error }}
+            </div>
+            <div class="newfile-card-actions">
+              <button
+                class="newfile-btn newfile-btn-retry"
+                title="重试"
+                @click="proposals.acceptNewFileProposal(nf.id)"
+              >↻ 重试</button>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- >50 行二次确认对话框 -->
+      <div
+        v-if="proposals.pendingConfirmation"
+        class="proposal-confirmation-overlay"
+      >
+        <div class="proposal-confirmation-dialog">
+          <div class="confirmation-title">确认接受 {{ proposals.pendingConfirmation.lineCount }} 行替换？</div>
+          <div class="confirmation-label">{{ proposals.pendingConfirmation.label }}</div>
+          <div class="confirmation-buttons">
+            <button
+              class="confirmation-btn confirmation-cancel"
+              @click="proposals.cancelConfirmation()"
+            >取消</button>
+            <button
+              class="confirmation-btn confirmation-confirm"
+              @click="proposals.confirmLargeReplace()"
+            >确认替换</button>
+          </div>
         </div>
       </div>
 
@@ -777,5 +921,361 @@ onMounted(() => {
   overflow-y: auto;
   margin: 0;
   color: var(--murasaki-ink, #1f2937);
+}
+
+/* ===== Proposal list (Ticket #23) ===== */
+.agent-proposal-list {
+  flex-shrink: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  border-top: 1px solid var(--murasaki-line, #e5e7eb);
+  padding: 6px 8px;
+  background: var(--murasaki-purple-50, #faf5ff);
+}
+
+.proposal-list-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--murasaki-purple-700, #7e22ce);
+  font-weight: 600;
+}
+
+.proposal-list-icon {
+  color: var(--murasaki-purple-600, #9333ea);
+}
+
+.proposal-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  margin-bottom: 2px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.proposal-pending {
+  background: rgba(168, 85, 247, 0.06);
+}
+
+.proposal-pending:hover {
+  background: rgba(168, 85, 247, 0.12);
+}
+
+.proposal-accepted {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.proposal-rejected {
+  opacity: 0.3;
+  cursor: default;
+  text-decoration: line-through;
+}
+
+.proposal-expired {
+  opacity: 0.4;
+  cursor: default;
+  color: var(--murasaki-state-error, #ef4444);
+}
+
+.proposal-flash {
+  animation: murasaki-proposal-flash 1.5s ease-in-out;
+}
+
+.proposal-item-icon {
+  color: var(--murasaki-purple-600, #9333ea);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.proposal-item-label {
+  flex: 1;
+  color: var(--murasaki-ink-2, #4b5563);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proposal-item-meta {
+  font-size: 10px;
+  color: var(--murasaki-muted, #9ca3af);
+  flex-shrink: 0;
+}
+
+.proposal-item-btn {
+  border: none;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.proposal-item-accept {
+  background: #22c55e;
+  color: white;
+}
+
+.proposal-item-accept:hover {
+  background: #16a34a;
+}
+
+.proposal-item-reject {
+  background: #ef4444;
+  color: white;
+}
+
+.proposal-item-reject:hover {
+  background: #dc2626;
+}
+
+.proposal-item-status {
+  font-size: 10px;
+  color: var(--murasaki-muted, #9ca3af);
+  flex-shrink: 0;
+}
+
+/* ===== >50 line confirmation dialog ===== */
+.proposal-confirmation-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.proposal-confirmation-dialog {
+  background: var(--murasaki-surface, #fff);
+  border-radius: 8px;
+  padding: 16px;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.confirmation-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--murasaki-ink, #1f2937);
+  margin-bottom: 6px;
+}
+
+.confirmation-label {
+  font-size: 11px;
+  color: var(--murasaki-muted, #9ca3af);
+  margin-bottom: 12px;
+}
+
+.confirmation-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.confirmation-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.confirmation-cancel {
+  background: var(--murasaki-neutral-200, #e5e5e5);
+  color: var(--murasaki-ink-2, #4b5563);
+}
+
+.confirmation-cancel:hover {
+  background: var(--murasaki-neutral-300, #d4d4d4);
+}
+
+.confirmation-confirm {
+  background: var(--murasaki-purple-600, #9333ea);
+  color: white;
+}
+
+.confirmation-confirm:hover {
+  background: var(--murasaki-purple-700, #7e22ce);
+}
+
+/* ===== New-file proposal cards (Ticket #24b) ===== */
+.agent-newfile-list {
+  flex-shrink: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border-top: 1px solid var(--murasaki-line, #e5e7eb);
+  padding: 6px 8px;
+  background: var(--murasaki-surface, #fff);
+}
+
+.newfile-list-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--murasaki-purple-700, #7e22ce);
+  font-weight: 600;
+}
+
+.newfile-list-icon {
+  color: var(--murasaki-purple-600, #9333ea);
+}
+
+.newfile-card {
+  border: 1px solid var(--murasaki-line, #e5e7eb);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: var(--murasaki-background, #fafafa);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.newfile-pending {
+  border-color: var(--murasaki-primary, #9333ea);
+  background: rgba(168, 85, 247, 0.04);
+}
+
+.newfile-written {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.newfile-rejected {
+  opacity: 0.5;
+  background: var(--murasaki-background, #fafafa);
+}
+
+.newfile-error {
+  border-color: var(--murasaki-state-error, #dc2626);
+  background: rgba(220, 38, 38, 0.04);
+}
+
+.newfile-card-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.newfile-card-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.newfile-card-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--murasaki-ink, #1f2937);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.newfile-card-meta {
+  font-size: 10px;
+  color: var(--murasaki-muted, #9ca3af);
+  flex-shrink: 0;
+}
+
+.newfile-card-path {
+  font-size: 10px;
+  font-family: Consolas, "Courier New", monospace;
+  color: var(--murasaki-muted, #6b7280);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.newfile-card-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.newfile-btn {
+  border: none;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.newfile-btn-accept {
+  background: #22c55e;
+  color: white;
+}
+
+.newfile-btn-accept:hover {
+  background: #16a34a;
+}
+
+.newfile-btn-reject {
+  background: var(--murasaki-neutral-200, #e5e5e5);
+  color: var(--murasaki-ink-2, #4b5563);
+}
+
+.newfile-btn-reject:hover {
+  background: var(--murasaki-neutral-300, #d4d4d4);
+}
+
+.newfile-btn-retry {
+  background: var(--murasaki-primary, #9333ea);
+  color: white;
+}
+
+.newfile-btn-retry:hover {
+  background: var(--murasaki-purple-700, #7e22ce);
+}
+
+.newfile-card-status {
+  font-size: 11px;
+  padding: 2px 0;
+}
+
+.newfile-status-written {
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.newfile-written-path {
+  font-size: 10px;
+  font-family: Consolas, "Courier New", monospace;
+  color: var(--murasaki-muted, #6b7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.newfile-status-rejected {
+  color: var(--murasaki-muted, #9ca3af);
+}
+
+.newfile-status-error {
+  color: var(--murasaki-state-error, #dc2626);
+  margin-bottom: 4px;
+  word-break: break-word;
 }
 </style>

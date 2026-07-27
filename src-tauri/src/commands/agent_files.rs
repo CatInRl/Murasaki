@@ -163,6 +163,65 @@ pub fn agent_read_file(workspace: String, path: String) -> Result<AgentReadFileR
     })
 }
 
+/// agent_write_file 返回值
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentWriteFileResult {
+    /// 相对工作区的路径
+    pub doc_path: String,
+    /// 绝对路径
+    pub absolute_path: String,
+    /// 内容字符数
+    pub content_length: usize,
+}
+
+/**
+ * 在工作区内写入新文件（Ticket #24: propose_new_file 后端支持）
+ *
+ * 安全性：
+ * - 路径必须为相对路径，resolve 后必须在工作区内
+ * - 若文件已存在，返回 "file exists" 错误（由前端弹冲突对话框）
+ * - 自动创建父目录
+ * - 仅允许 .md/.markdown/.mdown/.mkd 扩展名
+ *
+ * 参数：
+ * - workspace: 工作区根目录绝对路径
+ * - path:      目标相对路径（如 "new-note.md" 或 "sub/notes.md"）
+ * - content:   文件内容
+ */
+#[tauri::command]
+pub fn agent_write_file(
+    workspace: String,
+    path: String,
+    content: String,
+) -> Result<AgentWriteFileResult, String> {
+    let target_path = ensure_within_workspace(&workspace, &path)?;
+
+    // 拒绝已存在的文件（前端负责冲突解决）
+    if target_path.exists() {
+        return Err("file exists".to_string());
+    }
+
+    // 仅允许 Markdown 文件
+    if !is_markdown(&target_path) {
+        return Err("only markdown files are writable".to_string());
+    }
+
+    // 创建父目录（如 sub/ 不存在）
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("create parent dir failed: {}", e))?;
+    }
+
+    fs::write(&target_path, &content).map_err(|e| format!("write failed: {}", e))?;
+
+    let content_length = content.chars().count();
+    Ok(AgentWriteFileResult {
+        doc_path: path.replace('\\', "/"),
+        absolute_path: target_path.to_string_lossy().to_string(),
+        content_length,
+    })
+}
+
 /// agent_search_files 单个命中
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -567,5 +626,107 @@ mod tests {
         // "./intro.md" 应等同于 "intro.md"
         let resolved = ensure_within_workspace(&ws, "./intro.md").unwrap();
         assert!(resolved.ends_with("intro.md"));
+    }
+
+    // ===== agent_write_file tests (Ticket #24) =====
+
+    #[test]
+    fn test_agent_write_file_creates_new_file() {
+        let dir = create_test_workspace();
+        let ws = dir.path().to_string_lossy().to_string();
+        let result = agent_write_file(
+            ws.clone(),
+            "new-note.md".to_string(),
+            "# New Note\n\nContent here.".to_string(),
+        )
+        .unwrap();
+        assert_eq!(result.doc_path, "new-note.md");
+        // 文件确实写入磁盘
+        let written = fs::read_to_string(dir.path().join("new-note.md")).unwrap();
+        assert!(written.contains("# New Note"));
+        assert_eq!(result.content_length, "# New Note\n\nContent here.".chars().count());
+    }
+
+    #[test]
+    fn test_agent_write_file_creates_parent_dirs() {
+        let dir = TempDir::new().unwrap();
+        let ws = dir.path().to_string_lossy().to_string();
+        // 子目录不存在
+        let result = agent_write_file(
+            ws,
+            "sub/deep/nested.md".to_string(),
+            "deep content".to_string(),
+        )
+        .unwrap();
+        assert!(result.doc_path.contains("nested.md"));
+        // 父目录已创建
+        assert!(dir.path().join("sub").join("deep").exists());
+        // 文件已写入
+        let written = fs::read_to_string(dir.path().join("sub").join("deep").join("nested.md")).unwrap();
+        assert_eq!(written, "deep content");
+    }
+
+    #[test]
+    fn test_agent_write_file_rejects_existing_file() {
+        let dir = create_test_workspace();
+        let ws = dir.path().to_string_lossy().to_string();
+        // intro.md 已存在
+        let err = agent_write_file(
+            ws,
+            "intro.md".to_string(),
+            "overwrite attempt".to_string(),
+        )
+        .unwrap_err();
+        assert_eq!(err, "file exists");
+        // 原文件未被覆盖
+        let original = fs::read_to_string(dir.path().join("intro.md")).unwrap();
+        assert!(original.contains("Welcome to Murasaki"));
+        assert!(!original.contains("overwrite attempt"));
+    }
+
+    #[test]
+    fn test_agent_write_file_rejects_non_markdown() {
+        let dir = TempDir::new().unwrap();
+        let ws = dir.path().to_string_lossy().to_string();
+        let err = agent_write_file(
+            ws,
+            "notes.txt".to_string(),
+            "text content".to_string(),
+        )
+        .unwrap_err();
+        assert!(err.contains("only markdown"));
+    }
+
+    #[test]
+    fn test_agent_write_file_rejects_path_outside_workspace() {
+        let dir = create_test_workspace();
+        let ws = dir.path().to_string_lossy().to_string();
+        let err = agent_write_file(
+            ws.clone(),
+            "../outside.md".to_string(),
+            "escape attempt".to_string(),
+        )
+        .unwrap_err();
+        assert_eq!(err, "path outside workspace");
+
+        // 绝对路径也应被拒绝
+        let abs_path = dir.path().join("intro.md").to_string_lossy().to_string();
+        let err = agent_write_file(ws, abs_path, "abs attempt".to_string()).unwrap_err();
+        assert_eq!(err, "path outside workspace");
+    }
+
+    #[test]
+    fn test_agent_write_file_returns_absolute_path() {
+        let dir = create_test_workspace();
+        let ws = dir.path().to_string_lossy().to_string();
+        let result = agent_write_file(
+            ws,
+            "created.md".to_string(),
+            "content".to_string(),
+        )
+        .unwrap();
+        // absolute_path 应指向实际磁盘路径
+        assert!(result.absolute_path.ends_with("created.md"));
+        assert!(PathBuf::from(&result.absolute_path).exists());
     }
 }

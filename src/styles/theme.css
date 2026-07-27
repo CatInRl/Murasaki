@@ -277,3 +277,88 @@ body,
 .murasaki-scale-in { animation: murasaki-scale-in var(--murasaki-duration-base) var(--murasaki-ease-out) both; }
 .murasaki-slide-up { animation: murasaki-slide-up var(--murasaki-duration-base) var(--murasaki-ease-out) both; }
 .murasaki-slide-in-right { animation: murasaki-slide-in-right var(--murasaki-duration-base) var(--murasaki-ease-out) both; }
+
+/* === Agent Proposal Decorations (Ticket #23) === */
+
+/* Insert: green highlight background + left border */
+.cm-proposal-insert {
+  background-color: rgba(34, 197, 94, 0.12);
+  border-left: 3px solid rgba(34, 197, 94, 0.6);
+  padding: 1px 4px;
+  margin-left: -3px;
+  border-radius: 2px;
+  font-family: inherit;
+  white-space: pre-wrap;
+  color: #166534;
+}
+
+/* Replace old: red strikethrough */
+.cm-proposal-replace-old {
+  text-decoration: line-through;
+  text-decoration-color: rgba(239, 68, 68, 0.7);
+  text-decoration-thickness: 2px;
+  color: rgba(127, 29, 29, 0.6);
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
+/* Replace new: green highlight */
+.cm-proposal-replace-new {
+  background-color: rgba(34, 197, 94, 0.12);
+  border-left: 3px solid rgba(34, 197, 94, 0.6);
+  padding: 1px 4px;
+  margin-left: 2px;
+  border-radius: 2px;
+  font-family: inherit;
+  white-space: pre-wrap;
+  color: #166534;
+}
+
+/* Floating ✓/✗ buttons */
+.cm-proposal-buttons {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.cm-proposal-btn {
+  border: none;
+  cursor: pointer;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.cm-proposal-accept {
+  background-color: #22c55e;
+  color: white;
+}
+
+.cm-proposal-accept:hover {
+  background-color: #16a34a;
+}
+
+.cm-proposal-reject {
+  background-color: #ef4444;
+  color: white;
+}
+
+.cm-proposal-reject:hover {
+  background-color: #dc2626;
+}
+
+/* Flash animation for proposal jump */
+@keyframes murasaki-proposal-flash {
+  0%, 100% { background-color: transparent; }
+  25%, 75% { background-color: rgba(168, 85, 247, 0.2); }
+}
+
+.proposal-flash {
+  animation: murasaki-proposal-flash 1.5s ease-in-out;
+}

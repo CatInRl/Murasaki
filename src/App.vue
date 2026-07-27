@@ -32,6 +32,7 @@ import { useSearchStore } from "./stores/useSearchStore";
 import { useFileOpsStore } from "./stores/useFileOpsStore";
 import { useAgentStore } from "./stores/useAgentStore";
 import { useEditorBridgeStore } from "./stores/useEditorBridgeStore";
+import { useProposalsStore } from "./stores/useProposalsStore";
 import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
 import { MARKDOWN_THEMES, DEFAULT_THEME } from "./composables/useTheme";
@@ -55,6 +56,7 @@ const searchStore = useSearchStore();
 const fileOps = useFileOpsStore();
 const agentStore = useAgentStore();
 const editorBridge = useEditorBridgeStore();
+const proposalsStore = useProposalsStore();
 
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
@@ -285,6 +287,12 @@ onMounted(async () => {
   // 9. 注入冲突解决器给 fileOps store（供文件树右键菜单使用）
   fileOps.setConflictResolver(askConflict);
 
+  // 10. 注入新文件提议的冲突解决器（Ticket #24b: propose_new_file 复用 T2 ConflictDialog）
+  //     operation 使用 "save-as"，因为 agent 创建新文件相当于另存为新路径
+  proposalsStore.setNewFileConflictResolver((targetPath: string) =>
+    askConflict(targetPath, "save-as")
+  );
+
   initialized.value = true;
 
   // E2E 测试辅助：暴露 editorRef 到 window
@@ -322,6 +330,7 @@ onBeforeUnmount(() => {
   fileWatcher.stop();
   imagePaste.teardown();
   fileOps.setConflictResolver(null);
+  proposalsStore.setNewFileConflictResolver(null);
 });
 
 // ===== Tab 状态变化时持久化 =====
@@ -356,6 +365,9 @@ watch(sidebarView, (v) => {
 watch(() => workspace.workspacePath, (p) => {
   if (initialized.value) {
     void persistence.updateSettings({ lastWorkspacePath: p });
+    // 工作区切换时清空所有提议（包括新文件提议）
+    // 避免上一个工作区的提议残留导致写入到错误的工作区
+    proposalsStore.clearAllForWorkspace();
   }
 });
 
@@ -714,20 +726,77 @@ function onNewTab(): void {
 }
 
 /**
- * 关闭 tab 请求：若有未保存修改，弹出"保存 / 不保存 / 取消"对话框
+ * 关闭 tab 请求：
+ * - 若 agent 正在运行且关闭的是活动 tab：弹出合并对话框（Ticket #24c）
+ *   - 有未保存修改：Cancel / Close without saving / Save and close
+ *   - 无未保存修改：Cancel / Close anyway
+ *   - 选择关闭时先 abort agent（保留部分回答到对话历史）
+ * - 否则走原有的未保存修改检查
  */
 async function onCloseTabRequest(tabId: string): Promise<void> {
   const tab = tabsStore.tabs.find((t) => t.id === tabId);
   if (!tab) return;
 
-  // 无未保存修改：直接关闭
-  if (!tab.isDirty) {
+  const isActiveTab = tabsStore.activeTabId === tabId;
+  const agentRunning = agentStore.isThinking && isActiveTab;
+  const hasUnsavedChanges = tab.isDirty;
+  const fileName = tab.path ? basename(tab.path) : "未命名";
+
+  // Case 1: Agent 运行中 + 关闭活动 tab + 有未保存修改 → 合并对话框（3 选项）
+  if (agentRunning && hasUnsavedChanges) {
+    const choice = await askCloseRunningTabMerged(fileName);
+    if (choice === "cancel") return;
+
+    // 中断 agent（cancel() 会保留部分回答到对话历史）
+    agentStore.cancel();
+
+    if (choice === "save") {
+      // 保存后关闭
+      if (tab.path) {
+        try {
+          await tabsStore.saveTab(tabId);
+        } catch (err) {
+          alert(`保存失败: ${err}`);
+          return;
+        }
+      } else {
+        const selected = await saveDialog({
+          filters: [{ name: "Markdown", extensions: ["md"] }],
+          title: "另存为",
+          defaultPath: workspace.workspacePath ?? undefined,
+        });
+        if (typeof selected !== "string" || !selected) return;
+        try {
+          await tabsStore.saveTabAs(tabId, selected);
+        } catch (err) {
+          alert(`另存为失败: ${err}`);
+          return;
+        }
+      }
+    }
+    // 不保存：跳过 dirty 检查直接关闭（草稿会自动写入）
+    await tabsStore.doCloseTab(tabId);
+    return;
+  }
+
+  // Case 2: Agent 运行中 + 关闭活动 tab + 无未保存修改 → 简单对话框（2 选项）
+  if (agentRunning) {
+    const choice = await askCloseRunningTabSimple(fileName);
+    if (choice === "cancel") return;
+
+    // 中断 agent
+    agentStore.cancel();
+    await tabsStore.doCloseTab(tabId);
+    return;
+  }
+
+  // Case 3: 无 agent 运行 → 原有 dirty 检查
+  if (!hasUnsavedChanges) {
     await tabsStore.closeTab(tabId);
     return;
   }
 
   // 有未保存修改：弹出三选一对话框
-  const fileName = tab.path ? basename(tab.path) : "未命名";
   const choice = await askCloseTabConfirm(fileName);
   if (choice === "cancel") return;
 
@@ -788,6 +857,55 @@ function onCloseConfirmChoice(
   closeConfirmState.value = {
     visible: false,
     fileName: "",
+    resolver: null,
+  };
+  if (resolver) resolver(choice);
+}
+
+// ===== Agent 运行中关闭 tab 的合并对话框 (Ticket #24c) =====
+const closeRunningState = ref<{
+  visible: boolean;
+  fileName: string;
+  mode: "merged" | "simple"; // merged: 有未保存修改；simple: 无未保存修改
+  resolver: ((res: "save" | "close" | "cancel") => void) | null;
+}>({ visible: false, fileName: "", mode: "simple", resolver: null });
+
+/** 有未保存修改 + agent 运行：3 选项 (cancel / close without saving / save and close) */
+function askCloseRunningTabMerged(
+  fileName: string
+): Promise<"save" | "close" | "cancel"> {
+  return new Promise((resolve) => {
+    closeRunningState.value = {
+      visible: true,
+      fileName,
+      mode: "merged",
+      resolver: resolve,
+    };
+  });
+}
+
+/** 无未保存修改 + agent 运行：2 选项 (cancel / close anyway) */
+function askCloseRunningTabSimple(
+  fileName: string
+): Promise<"close" | "cancel"> {
+  return new Promise((resolve) => {
+    closeRunningState.value = {
+      visible: true,
+      fileName,
+      mode: "simple",
+      resolver: resolve as (res: "save" | "close" | "cancel") => void,
+    };
+  });
+}
+
+function onCloseRunningChoice(
+  choice: "save" | "close" | "cancel"
+): void {
+  const resolver = closeRunningState.value.resolver;
+  closeRunningState.value = {
+    visible: false,
+    fileName: "",
+    mode: "simple",
     resolver: null,
   };
   if (resolver) resolver(choice);
@@ -1217,6 +1335,55 @@ async function exportCurrentHtml(): Promise<void> {
             @click="onCloseConfirmChoice('save')"
           >
             保存
+          </NButton>
+        </NSpace>
+      </template>
+    </NModal>
+
+    <!-- Agent 运行中关闭 tab 合并对话框 (Ticket #24c) -->
+    <NModal
+      :show="closeRunningState.visible"
+      :mask-closable="false"
+      :close-on-esc="false"
+      preset="card"
+      :title="closeRunningState.mode === 'merged' ? 'Agent 运行中 · 未保存的修改' : 'Agent 运行中'"
+      style="width: 480px; max-width: 92vw"
+    >
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <NText depth="2">
+          Agent 正在为 "{{ closeRunningState.fileName }}" 处理请求。
+        </NText>
+        <template v-if="closeRunningState.mode === 'merged'">
+          <NText depth="3" style="font-size: 12px">
+            该文件有未保存的修改。关闭 tab 将中断 Agent 并保留已生成的部分回答到对话历史。
+          </NText>
+        </template>
+        <template v-else>
+          <NText depth="3" style="font-size: 12px">
+            关闭 tab 将中断 Agent 并保留已生成的部分回答到对话历史。
+          </NText>
+        </template>
+      </div>
+      <template #footer>
+        <NSpace justify="end" :size="8">
+          <NButton @click="onCloseRunningChoice('cancel')">取消</NButton>
+          <template v-if="closeRunningState.mode === 'merged'">
+            <NButton @click="onCloseRunningChoice('close')">
+              不保存关闭
+            </NButton>
+            <NButton
+              type="primary"
+              @click="onCloseRunningChoice('save')"
+            >
+              保存并关闭
+            </NButton>
+          </template>
+          <NButton
+            v-else
+            type="warning"
+            @click="onCloseRunningChoice('close')"
+          >
+            强制关闭
           </NButton>
         </NSpace>
       </template>

@@ -11,6 +11,14 @@ import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } 
 import { tags as t } from "@lezer/highlight";
 import { paragraphKeymap } from "../composables/useEditorCommands";
 import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
+import {
+  proposalField,
+  proposalActionEffect,
+  addProposalEffect,
+  removeProposalEffect,
+  expireAllProposalsEffect,
+} from "../agent/proposals";
+import { useProposalsStore } from "../stores/useProposalsStore";
 
 /**
  * Murasaki light syntax theme — purple-tinted, writing-first.
@@ -258,6 +266,8 @@ function buildExtensions() {
     foldGutter({ openText: "▾", closedText: "▸" }),
     murasakiTheme,
     syntaxHighlighting(murasakiHighlightStyle),
+    // Agent proposal decorations (Ticket #23)
+    proposalField,
     EditorView.updateListener.of((update) => {
       // 外部值同步（watch 触发的 dispatch）不应回传 update:modelValue，
       // 否则切换 tab / 打开文件时会把新激活的 tab 错误标记为 dirty
@@ -268,6 +278,19 @@ function buildExtensions() {
         const { head } = update.state.selection.main;
         const lineObj = update.state.doc.lineAt(head);
         emit("cursor-change", { line: lineObj.number, ch: head - lineObj.from });
+      }
+      // Sync proposal store when proposals change (e.g., strict invalidation expires them)
+      const hasProposalEffect = update.transactions.some((tr) =>
+        tr.effects.some((e) =>
+          e.is(addProposalEffect) ||
+          e.is(removeProposalEffect) ||
+          e.is(expireAllProposalsEffect) ||
+          e.is(proposalActionEffect)
+        )
+      );
+      if (update.docChanged || hasProposalEffect) {
+        const proposalsStore = useProposalsStore();
+        proposalsStore.syncFromEditor();
       }
     }),
   ];

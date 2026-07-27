@@ -401,6 +401,281 @@ const searchAcrossFiles: ToolDef = {
   },
 };
 
+// ===== propose_insert (Ticket #23: 提议类工具) =====
+const proposeInsert: ToolDef = {
+  metadata: {
+    type: "function",
+    function: {
+      name: "propose_insert",
+      description: "Propose inserting text at a specific position in the current document. The user can accept or reject the proposal. Position is a character offset from the start of the document.",
+      parameters: {
+        type: "object",
+        properties: {
+          from: {
+            type: "number",
+            description: "Character offset where to insert the text (0 = beginning of document)",
+          },
+          content: {
+            type: "string",
+            description: "The text content to insert",
+          },
+          label: {
+            type: "string",
+            description: "Short label for the proposal (e.g., '插入段落' or 'Add import')",
+          },
+        },
+        required: ["from", "content", "label"],
+      },
+    },
+  },
+  async execute(args: unknown, ctx: ToolContext): Promise<ToolResult> {
+    const view = ctx.getEditorView() as {
+      state: { doc: { length: number } };
+    } | null;
+    if (!view) {
+      return { ok: false, error: "No active editor" };
+    }
+    const { from, content, label } = (args || {}) as {
+      from?: number;
+      content?: string;
+      label?: string;
+    };
+    if (typeof from !== "number" || from < 0) {
+      return { ok: false, error: "invalid parameter: from must be a non-negative number" };
+    }
+    if (typeof content !== "string") {
+      return { ok: false, error: "invalid parameter: content must be a string" };
+    }
+    if (typeof label !== "string" || !label.trim()) {
+      return { ok: false, error: "invalid parameter: label is required" };
+    }
+    if (from > view.state.doc.length) {
+      return { ok: false, error: `from (${from}) exceeds document length (${view.state.doc.length})` };
+    }
+    try {
+      // Dynamically import to avoid circular dependency
+      type Proposal = import("./proposals").Proposal;
+      const { useProposalsStore } = await import("../stores/useProposalsStore");
+      const proposalId = `prop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const lineCount = content.split("\n").length;
+      const proposal: Proposal = {
+        id: proposalId,
+        type: "insert",
+        from,
+        to: from,
+        content,
+        status: "pending",
+        lineCount,
+        label,
+      };
+      const proposalsStore = useProposalsStore();
+      proposalsStore.addProposal(proposal);
+      return { ok: true, data: { proposalId, type: "insert", from, lineCount } };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  summarize(result: ToolResult): string {
+    if (!result.ok) return `✗ ${result.error}`;
+    const data = result.data as { lineCount?: number };
+    return `插入 ${data.lineCount ?? 0} 行`;
+  },
+};
+
+// ===== propose_replace (Ticket #23: 提议类工具) =====
+const proposeReplace: ToolDef = {
+  metadata: {
+    type: "function",
+    function: {
+      name: "propose_replace",
+      description: "Propose replacing a range of text in the current document. The user can accept or reject the proposal. Positions are character offsets from the start of the document. If the replacement is >50 lines, the user will be asked for secondary confirmation before accepting.",
+      parameters: {
+        type: "object",
+        properties: {
+          from: {
+            type: "number",
+            description: "Character offset where the replacement starts (inclusive)",
+          },
+          to: {
+            type: "number",
+            description: "Character offset where the replacement ends (exclusive)",
+          },
+          content: {
+            type: "string",
+            description: "The new text content to replace the old range with",
+          },
+          label: {
+            type: "string",
+            description: "Short label for the proposal (e.g., '重写段落' or 'Fix typo')",
+          },
+        },
+        required: ["from", "to", "content", "label"],
+      },
+    },
+  },
+  async execute(args: unknown, ctx: ToolContext): Promise<ToolResult> {
+    const view = ctx.getEditorView() as {
+      state: { doc: { length: number } };
+    } | null;
+    if (!view) {
+      return { ok: false, error: "No active editor" };
+    }
+    const { from, to, content, label } = (args || {}) as {
+      from?: number;
+      to?: number;
+      content?: string;
+      label?: string;
+    };
+    if (typeof from !== "number" || from < 0) {
+      return { ok: false, error: "invalid parameter: from must be a non-negative number" };
+    }
+    if (typeof to !== "number" || to < from) {
+      return { ok: false, error: "invalid parameter: to must be >= from" };
+    }
+    if (typeof content !== "string") {
+      return { ok: false, error: "invalid parameter: content must be a string" };
+    }
+    if (typeof label !== "string" || !label.trim()) {
+      return { ok: false, error: "invalid parameter: label is required" };
+    }
+    if (to > view.state.doc.length) {
+      return { ok: false, error: `to (${to}) exceeds document length (${view.state.doc.length})` };
+    }
+    try {
+      type Proposal = import("./proposals").Proposal;
+      const { useProposalsStore } = await import("../stores/useProposalsStore");
+      const proposalId = `prop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const lineCount = content.split("\n").length;
+      const proposal: Proposal = {
+        id: proposalId,
+        type: "replace",
+        from,
+        to,
+        content,
+        status: "pending",
+        lineCount,
+        label,
+      };
+      const proposalsStore = useProposalsStore();
+      proposalsStore.addProposal(proposal);
+      return {
+        ok: true,
+        data: {
+          proposalId,
+          type: "replace",
+          from,
+          to,
+          lineCount,
+          requiresConfirmation: lineCount > 50,
+        },
+      };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  summarize(result: ToolResult): string {
+    if (!result.ok) return `✗ ${result.error}`;
+    const data = result.data as { lineCount?: number; requiresConfirmation?: boolean };
+    const lines = data.lineCount ?? 0;
+    if (data.requiresConfirmation) {
+      return `替换 ${lines} 行（需二次确认）`;
+    }
+    return `替换 ${lines} 行`;
+  },
+};
+
+// ===== propose_new_file (Ticket #24: 新文件提议) =====
+const proposeNewFile: ToolDef = {
+  metadata: {
+    type: "function",
+    function: {
+      name: "propose_new_file",
+      description:
+        "Propose creating a new Markdown file in the workspace. The user can accept or reject the proposal. The path must be relative to the workspace root and use forward slashes (e.g., 'notes/new.md'). If the file already exists, the user will be asked to overwrite, rename, or cancel.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              "Relative path for the new file (e.g., 'notes/today.md'). Must end with .md/.markdown/.mdown/.mkd.",
+          },
+          content: {
+            type: "string",
+            description: "The full content of the new file",
+          },
+          label: {
+            type: "string",
+            description:
+              "Short label for the proposal (e.g., '创建 meeting-notes.md' or 'Add README')",
+          },
+        },
+        required: ["path", "content", "label"],
+      },
+    },
+  },
+  async execute(args: unknown, ctx: ToolContext): Promise<ToolResult> {
+    const workspace = ctx.getWorkspacePath();
+    if (!workspace) {
+      return { ok: false, error: "No workspace open" };
+    }
+    const { path, content, label } = (args || {}) as {
+      path?: string;
+      content?: string;
+      label?: string;
+    };
+    if (typeof path !== "string" || !path.trim()) {
+      return { ok: false, error: "invalid parameter: path is required" };
+    }
+    if (typeof content !== "string") {
+      return { ok: false, error: "invalid parameter: content must be a string" };
+    }
+    if (typeof label !== "string" || !label.trim()) {
+      return { ok: false, error: "invalid parameter: label is required" };
+    }
+    // 简单扩展名校验（Rust 侧会再次校验）
+    const lowerPath = path.toLowerCase();
+    if (
+      !lowerPath.endsWith(".md") &&
+      !lowerPath.endsWith(".markdown") &&
+      !lowerPath.endsWith(".mdown") &&
+      !lowerPath.endsWith(".mkd")
+    ) {
+      return { ok: false, error: "path must end with .md, .markdown, .mdown, or .mkd" };
+    }
+    try {
+      const { useProposalsStore } = await import("../stores/useProposalsStore");
+      const proposalsStore = useProposalsStore();
+      const proposalId = `nf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const lineCount = content.split("\n").length;
+      proposalsStore.addNewFileProposal({
+        id: proposalId,
+        path: path.replace(/\\/g, "/"),
+        content,
+        label,
+        lineCount,
+        status: "pending",
+      });
+      return {
+        ok: true,
+        data: {
+          proposalId,
+          path: path.replace(/\\/g, "/"),
+          lineCount,
+          status: "awaiting_user",
+        },
+      };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  summarize(result: ToolResult): string {
+    if (!result.ok) return `✗ ${result.error}`;
+    const data = result.data as { path?: string; lineCount?: number };
+    return `提议新文件 ${data.path ?? ""} (${data.lineCount ?? 0} 行)`;
+  },
+};
+
 // ===== 工具注册表 =====
 const TOOL_REGISTRY: Record<string, ToolDef> = {
   get_current_document: getCurrentDocument,
@@ -410,6 +685,9 @@ const TOOL_REGISTRY: Record<string, ToolDef> = {
   list_files: listFiles,
   read_file: readFile,
   search_across_files: searchAcrossFiles,
+  propose_insert: proposeInsert,
+  propose_replace: proposeReplace,
+  propose_new_file: proposeNewFile,
 };
 
 /** 获取所有工具元数据（发送给 LLM） */

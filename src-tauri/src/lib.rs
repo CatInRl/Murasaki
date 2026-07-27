@@ -94,6 +94,7 @@ pub fn run() {
             agent_files::agent_list_files,
             agent_files::agent_read_file,
             agent_files::agent_search_files,
+            agent_files::agent_write_file,
         ])
         .setup(|app| {
             // 手动创建主窗口（tauri.conf.json 中 windows 数组为空）
