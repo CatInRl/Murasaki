@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useAgentStore } from "./useAgentStore";
 import { useWorkspaceStore } from "./useWorkspaceStore";
+import { useEditorBridgeStore } from "./useEditorBridgeStore";
 
 // Mock Tauri invoke
 vi.mock("@tauri-apps/api/core", () => ({
@@ -12,7 +13,18 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("../agent/OpenAICompatibleProvider", () => ({
   OpenAICompatibleProvider: vi.fn().mockImplementation(() => ({
     streamChat: vi.fn(),
+    streamChatWithTools: vi.fn().mockResolvedValue({
+      hasToolCalls: false,
+      toolCalls: [],
+      usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
+    }),
   })),
+}));
+
+// Mock agent tools - 工具调用测试用
+vi.mock("../agent/tools", () => ({
+  getToolMetadataList: () => [],
+  executeTool: vi.fn(),
 }));
 
 describe("useAgentStore", () => {
@@ -88,6 +100,68 @@ describe("useAgentStore", () => {
       store.setScrollPosition(false, true);
       expect(store.isAtBottom).toBe(false);
       // hasNewContent 仅在非底部且有新内容时为 true
+    });
+  });
+
+  describe("上下文管理 (Ticket #21)", () => {
+    it("contextRemoved 默认为 false", () => {
+      const store = useAgentStore();
+      expect(store.contextRemoved).toBe(false);
+    });
+
+    it("removeContext 设置 contextRemoved 为 true（仅本轮）", () => {
+      const store = useAgentStore();
+      store.removeContext();
+      expect(store.contextRemoved).toBe(true);
+      expect(store.hasContext).toBe(false);
+    });
+
+    it("clearConversation 重置 contextRemoved", () => {
+      const store = useAgentStore();
+      store.removeContext();
+      store.clearConversation();
+      expect(store.contextRemoved).toBe(false);
+    });
+
+    it("hasContext 在无文档路径时为 false", () => {
+      const store = useAgentStore();
+      const bridge = useEditorBridgeStore();
+      bridge.activeDocPath = null;
+      expect(store.hasContext).toBe(false);
+    });
+
+    it("hasContext 在有文档路径且未移除时为 true", () => {
+      const store = useAgentStore();
+      const bridge = useEditorBridgeStore();
+      bridge.activeDocPath = "/test/doc.md";
+      expect(store.hasContext).toBe(true);
+    });
+
+    it("hasContext 在有文档路径但已移除时为 false", () => {
+      const store = useAgentStore();
+      const bridge = useEditorBridgeStore();
+      bridge.activeDocPath = "/test/doc.md";
+      store.removeContext();
+      expect(store.hasContext).toBe(false);
+    });
+
+    it("contextDocPath 跟随 editor bridge 的 activeDocPath", () => {
+      const store = useAgentStore();
+      const bridge = useEditorBridgeStore();
+      bridge.activeDocPath = "/path/to/file.md";
+      expect(store.contextDocPath).toBe("/path/to/file.md");
+      bridge.activeDocPath = "/another/path.md";
+      expect(store.contextDocPath).toBe("/another/path.md");
+    });
+  });
+
+  describe("markNewContentRead", () => {
+    it("标记新内容已读后 hasNewContent 为 false", () => {
+      const store = useAgentStore();
+      store.setScrollPosition(false, true);
+      store.markNewContentRead();
+      expect(store.hasNewContent).toBe(false);
+      expect(store.isAtBottom).toBe(true);
     });
   });
 });

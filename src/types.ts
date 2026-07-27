@@ -199,6 +199,33 @@ export interface ChatMessage {
   interrupted?: boolean;
   /** 创建时间戳（ms） */
   createdAt: number;
+  /** 该 user 消息发送时的文档上下文快照 */
+  contextSnapshot?: ContextSnapshot;
+  /** assistant 消息的工具调用列表 */
+  toolCalls?: ToolCallEntry[];
+}
+
+/** 文档上下文快照（每条 user 消息发送时捕获） */
+export interface ContextSnapshot {
+  docPath: string | null;
+  cursor: { line: number; ch: number } | null;
+  selection: { from: number; to: number; text: string } | null;
+}
+
+/** 工具调用条目（UI 可见） */
+export interface ToolCallEntry {
+  id: string;
+  name: string;
+  /** 调用参数（原始 JSON 字符串） */
+  arguments: string;
+  /** 调用状态 */
+  status: "calling" | "done" | "error";
+  /** 摘要（如「已获取 286 字符」「L15-17」） */
+  summary?: string;
+  /** 工具结果（结构化 {ok, data|error}） */
+  result?: { ok: boolean; data?: unknown; error?: string };
+  /** 摘要参数（展开时显示） */
+  parsedArgs?: unknown;
 }
 
 /**

@@ -3,13 +3,182 @@ import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { EditorState, Compartment, Transaction } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { indentOnInput, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
+import { indentOnInput, bracketMatching, foldGutter, foldKeymap, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
-import { oneDark } from "@codemirror/theme-one-dark";
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from "@codemirror/search";
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { tags as t } from "@lezer/highlight";
 import { paragraphKeymap } from "../composables/useEditorCommands";
+import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
+
+/**
+ * Murasaki light syntax theme — purple-tinted, writing-first.
+ * Inspired by the design draft: purple headings/markers, ink-2 body,
+ * colored code tokens that read well on a white background.
+ */
+const murasakiHighlightStyle = HighlightStyle.define([
+  // Headings: purple-700, bold
+  { tag: t.heading1, color: "#7e22ce", fontWeight: "700", fontSize: "1.25em" },
+  { tag: t.heading2, color: "#7e22ce", fontWeight: "700", fontSize: "1.15em" },
+  { tag: t.heading3, color: "#9333ea", fontWeight: "600", fontSize: "1.05em" },
+  { tag: [t.heading4, t.heading5, t.heading6], color: "#9333ea", fontWeight: "600" },
+  // ATX heading markers (#, ##): purple-400
+  { tag: t.heading, color: "#c084fc" },
+  // Emphasis
+  { tag: t.strong, color: "#171717", fontWeight: "700" },
+  { tag: t.emphasis, color: "#525252", fontStyle: "italic" },
+  { tag: t.strikethrough, color: "#a3a3a3", textDecoration: "line-through" },
+  // Links
+  { tag: t.link, color: "#7e22ce", textDecoration: "underline" },
+  { tag: t.url, color: "#2563eb" },
+  // Inline code & code blocks
+  { tag: t.monospace, color: "#6b21a8", backgroundColor: "rgba(147, 51, 234, 0.08)" },
+  // Lists: purple marker
+  { tag: t.list, color: "#9333ea" },
+  // Quotes: purple-600 italic
+  { tag: t.quote, color: "#9333ea", fontStyle: "italic" },
+  // HR
+  { tag: t.separator, color: "#d4d4d4" },
+  // URLs in angle brackets
+  { tag: t.angleBracket, color: "#a3a3a3" },
+  // YAML frontmatter
+  { tag: t.meta, color: "#737373" },
+  // Code block keywords
+  { tag: t.keyword, color: "#7e22ce", fontWeight: "600" },
+  { tag: t.atom, color: "#2563eb" },
+  { tag: t.bool, color: "#2563eb" },
+  { tag: t.number, color: "#2563eb" },
+  { tag: t.string, color: "#16a34a" },
+  { tag: t.escape, color: "#d97706" },
+  { tag: t.comment, color: "#a3a3a3", fontStyle: "italic" },
+  { tag: t.tagName, color: "#7e22ce" },
+  { tag: t.attributeName, color: "#9333ea" },
+  { tag: t.attributeValue, color: "#16a34a" },
+  { tag: t.definitionOperator, color: "#7e22ce" },
+  { tag: t.operator, color: "#525252" },
+  { tag: t.variableName, color: "#171717" },
+  { tag: t.propertyName, color: "#9333ea" },
+  { tag: t.typeName, color: "#2563eb" },
+  { tag: t.className, color: "#7e22ce" },
+  { tag: t.function(t.variableName), color: "#2563eb" },
+  { tag: t.labelName, color: "#9333ea" },
+]);
+
+const murasakiTheme = EditorView.theme({
+  "&": {
+    height: "100%",
+    backgroundColor: "var(--murasaki-background)",
+    color: "var(--murasaki-ink)",
+  },
+  ".cm-gutters": {
+    backgroundColor: "var(--murasaki-surface)",
+    color: "var(--murasaki-ink-3)",
+    borderRight: "1px solid var(--murasaki-line)",
+    border: "none",
+  },
+  ".cm-activeLineGutter": {
+    backgroundColor: "transparent",
+    color: "var(--murasaki-primary)",
+    fontWeight: "500",
+  },
+  ".cm-content": {
+    fontFamily: "var(--murasaki-font-mono)",
+    fontSize: "13px",
+    lineHeight: "1.65",
+    padding: "12px 0",
+    caretColor: "var(--murasaki-primary)",
+  },
+  ".cm-line": {
+    padding: "0 16px",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "rgba(147, 51, 234, 0.05)",
+    boxShadow: "inset 2px 0 0 var(--murasaki-primary)",
+  },
+  ".cm-selectionBackground, ::selection": {
+    backgroundColor: "var(--murasaki-purple-200) !important",
+  },
+  ".cm-cursor, .cm-dropCursor": {
+    borderLeftColor: "var(--murasaki-primary)",
+    borderLeftWidth: "2px",
+  },
+  ".cm-matchingBracket, .cm-nonmatchingBracket": {
+    color: "inherit",
+    backgroundColor: "rgba(147, 51, 234, 0.12)",
+    outline: "1px solid var(--murasaki-purple-300)",
+  },
+  ".cm-foldPlaceholder": {
+    backgroundColor: "var(--murasaki-purple-100)",
+    border: "1px solid var(--murasaki-purple-200)",
+    color: "var(--murasaki-primary)",
+    borderRadius: "3px",
+    fontSize: "11px",
+    padding: "0 6px",
+  },
+  ".cm-foldGutter .cm-gutterElement": {
+    cursor: "pointer",
+    color: "var(--murasaki-ink-3)",
+  },
+  ".cm-foldGutter .cm-gutterElement:hover": {
+    color: "var(--murasaki-primary)",
+  },
+  ".cm-scroller": {
+    overflow: "auto",
+    fontFamily: "var(--murasaki-font-mono)",
+  },
+  ".cm-searchMatch": {
+    backgroundColor: "rgba(192, 132, 252, 0.25)",
+    outline: "1px solid var(--murasaki-purple-300)",
+  },
+  ".cm-searchMatch-selected": {
+    backgroundColor: "var(--murasaki-purple-300)",
+    color: "#fff",
+  },
+  ".cm-panels": {
+    backgroundColor: "var(--murasaki-surface-2)",
+    color: "var(--murasaki-ink)",
+    borderTop: "1px solid var(--murasaki-line)",
+  },
+  ".cm-panels input": {
+    border: "1px solid var(--murasaki-border)",
+    borderRadius: "var(--murasaki-radius-sm)",
+    padding: "2px 6px",
+    fontSize: "12px",
+  },
+  ".cm-textfield": {
+    backgroundColor: "var(--murasaki-background)",
+  },
+  ".cm-button": {
+    backgroundColor: "var(--murasaki-background)",
+    border: "1px solid var(--murasaki-border)",
+    borderRadius: "var(--murasaki-radius-sm)",
+    color: "var(--murasaki-ink-2)",
+    fontSize: "12px",
+  },
+  ".cm-button:hover": {
+    backgroundColor: "var(--murasaki-purple-50)",
+    borderColor: "var(--murasaki-primary)",
+    color: "var(--murasaki-primary)",
+  },
+  "&.cm-focused": {
+    outline: "none",
+  },
+  ".cm-tooltip": {
+    backgroundColor: "var(--murasaki-popover)",
+    border: "1px solid var(--murasaki-border)",
+    borderRadius: "var(--murasaki-radius-sm)",
+    boxShadow: "var(--murasaki-shadow-md)",
+    fontSize: "12px",
+  },
+  ".cm-tooltip-autocomplete li": {
+    padding: "3px 8px",
+  },
+  ".cm-tooltip-autocomplete li[aria-selected]": {
+    backgroundColor: "var(--murasaki-purple-100)",
+    color: "var(--murasaki-primary)",
+  },
+});
 
 interface Props {
   modelValue: string;
@@ -87,23 +256,8 @@ function buildExtensions() {
     wrapComp.of(props.softWrap ? EditorView.lineWrapping : []),
     readOnlyComp.of(EditorState.readOnly.of(props.readOnly)),
     foldGutter({ openText: "▾", closedText: "▸" }),
-    oneDark,
-    EditorView.theme({
-      "&": {
-        height: "100%",
-        fontSize: "14px",
-      },
-      ".cm-gutters": {
-        borderRight: "1px solid #2d2d44",
-      },
-      ".cm-content": {
-        fontFamily: "Consolas, 'Courier New', monospace",
-        padding: "8px 0",
-      },
-      ".cm-scroller": {
-        overflow: "auto",
-      },
-    }),
+    murasakiTheme,
+    syntaxHighlighting(murasakiHighlightStyle),
     EditorView.updateListener.of((update) => {
       // 外部值同步（watch 触发的 dispatch）不应回传 update:modelValue，
       // 否则切换 tab / 打开文件时会把新激活的 tab 错误标记为 dirty
@@ -135,9 +289,14 @@ onMounted(() => {
     stateCache.set(props.tabId, view.state);
   }
   emit("ready", view);
+  // 注册到 editor bridge（供 agent 工具使用）
+  useEditorBridgeStore().registerView(view, null);
 });
 
 onBeforeUnmount(() => {
+  if (viewRef.value) {
+    useEditorBridgeStore().unregisterView(viewRef.value);
+  }
   viewRef.value?.destroy();
   viewRef.value = null;
   stateCache.clear();
@@ -275,6 +434,7 @@ defineExpose({
   height: 100%;
   width: 100%;
   overflow: hidden;
+  background: var(--murasaki-background);
 }
 .cm-host {
   height: 100%;
@@ -282,5 +442,31 @@ defineExpose({
 }
 .cm-host :deep(.cm-editor) {
   height: 100%;
+  background: var(--murasaki-background);
+}
+.cm-host :deep(.cm-editor.cm-focused) {
+  outline: none;
+}
+/* 滚动条样式（来自全局变量） */
+.cm-host :deep(.cm-scroller)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.cm-host :deep(.cm-scroller)::-webkit-scrollbar-thumb {
+  background: var(--murasaki-neutral-300);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.cm-host :deep(.cm-scroller)::-webkit-scrollbar-thumb:hover {
+  background: var(--murasaki-neutral-400);
+  background-clip: padding-box;
+}
+
+/* 触屏：放大 gutter 触摸区 */
+@media (pointer: coarse) {
+  .cm-host :deep(.cm-gutters) {
+    min-width: 48px;
+  }
 }
 </style>

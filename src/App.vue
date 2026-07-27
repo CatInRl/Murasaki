@@ -31,6 +31,7 @@ import { usePersistenceStore } from "./stores/usePersistenceStore";
 import { useSearchStore } from "./stores/useSearchStore";
 import { useFileOpsStore } from "./stores/useFileOpsStore";
 import { useAgentStore } from "./stores/useAgentStore";
+import { useEditorBridgeStore } from "./stores/useEditorBridgeStore";
 import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
 import { MARKDOWN_THEMES, DEFAULT_THEME } from "./composables/useTheme";
@@ -53,6 +54,7 @@ const persistence = usePersistenceStore();
 const searchStore = useSearchStore();
 const fileOps = useFileOpsStore();
 const agentStore = useAgentStore();
+const editorBridge = useEditorBridgeStore();
 
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
@@ -76,6 +78,11 @@ const activeContent = computed({
 });
 
 const currentFilePath = computed(() => activeTab.value?.path ?? null);
+
+// 切 tab 时更新 editor bridge 的文档路径（供 agent 工具使用）
+watch(currentFilePath, (path) => {
+  editorBridge.updateDocPath(path);
+});
 
 // ===== 侧栏视图（受控） =====
 const sidebarView = ref<SidebarView>("files");

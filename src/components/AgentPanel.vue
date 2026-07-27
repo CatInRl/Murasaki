@@ -17,6 +17,17 @@ const aiProviders = useAiProvidersStore();
 const inputText = ref("");
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 
+// ===== 工具调用展开状态 =====
+const expandedToolCalls = ref<Set<string>>(new Set());
+
+function toggleToolCall(id: string): void {
+  if (expandedToolCalls.value.has(id)) {
+    expandedToolCalls.value.delete(id);
+  } else {
+    expandedToolCalls.value.add(id);
+  }
+}
+
 // ===== 滚动 =====
 const conversationRef = ref<HTMLDivElement | null>(null);
 
@@ -140,6 +151,24 @@ onMounted(() => {
       </button>
     </div>
 
+    <!-- 上下文卡片（显示当前文档 + token 数 + × 移除） -->
+    <div
+      v-if="agent.hasContext && agent.contextDocPath"
+      class="agent-context-card"
+    >
+      <svg class="agent-context-icon" viewBox="0 0 24 24" width="12" height="12">
+        <path
+          fill="currentColor"
+          d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"
+        />
+      </svg>
+      <span class="agent-context-path">{{ agent.contextDocPath }}</span>
+      <span class="agent-context-tokens">≈ {{ agent.contextTokens }} tokens</span>
+      <button class="agent-context-remove" title="移除当前文档上下文" @click="agent.removeContext()">
+        ×
+      </button>
+    </div>
+
     <!-- 空状态：无工作区 -->
     <div v-if="showNoWorkspace" class="agent-empty-state">
       <svg viewBox="0 0 24 24" width="40" height="40" class="empty-icon">
@@ -211,6 +240,42 @@ onMounted(() => {
             <span v-if="msg.interrupted" class="agent-interrupted-tag">
               ⚠ 已中断
             </span>
+          </div>
+
+          <!-- 工具调用条目（assistant 消息下） -->
+          <div
+            v-if="msg.toolCalls && msg.toolCalls.length > 0"
+            class="agent-tool-calls"
+          >
+            <div
+              v-for="tc in msg.toolCalls"
+              :key="tc.id"
+              class="tool-call-entry"
+              :class="{
+                'tool-call-calling': tc.status === 'calling',
+                'tool-call-done': tc.status === 'done',
+                'tool-call-error': tc.status === 'error',
+              }"
+              @click="toggleToolCall(tc.id)"
+            >
+              <div class="tool-call-header">
+                <span class="tool-call-icon">🔧</span>
+                <span class="tool-call-name">{{ tc.name }}</span>
+                <span class="tool-call-summary">
+                  {{ tc.status === "calling" ? "调用中..." : tc.summary }}
+                </span>
+              </div>
+              <div v-if="expandedToolCalls.has(tc.id)" class="tool-call-detail">
+                <div class="tool-call-section">
+                  <span class="tool-call-label">参数:</span>
+                  <pre class="tool-call-pre">{{ JSON.stringify(tc.parsedArgs, null, 2) }}</pre>
+                </div>
+                <div v-if="tc.result" class="tool-call-section">
+                  <span class="tool-call-label">结果:</span>
+                  <pre class="tool-call-pre">{{ JSON.stringify(tc.result, null, 2).slice(0, 500) }}</pre>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -597,5 +662,120 @@ onMounted(() => {
 }
 .agent-send-btn-stop:hover {
   background: #b91c1c;
+}
+
+/* 上下文卡片 */
+.agent-context-card {
+  margin: 8px 10px 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--murasaki-line, #e5e7eb);
+  border-radius: 8px;
+  background: var(--murasaki-background, #fafafa);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--murasaki-muted, #6b7280);
+}
+.agent-context-icon {
+  color: var(--murasaki-muted, #9ca3af);
+  flex-shrink: 0;
+}
+.agent-context-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--murasaki-ink-2, #4b5563);
+}
+.agent-context-tokens {
+  flex-shrink: 0;
+  color: var(--murasaki-muted, #9ca3af);
+}
+.agent-context-remove {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--murasaki-muted, #9ca3af);
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.agent-context-remove:hover {
+  background: var(--murasaki-hover, #f3f4f6);
+  color: var(--murasaki-state-error, #dc2626);
+}
+
+/* 工具调用条目 */
+.agent-tool-calls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  width: 100%;
+}
+.tool-call-entry {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--murasaki-background, #fafafa);
+  border: 1px solid var(--murasaki-line, #e5e7eb);
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+.tool-call-entry:hover {
+  background: var(--murasaki-hover, #f3f4f6);
+}
+.tool-call-calling {
+  border-color: var(--murasaki-primary, #9333ea);
+}
+.tool-call-error {
+  border-color: var(--murasaki-state-error, #dc2626);
+  background: rgba(220, 38, 38, 0.04);
+}
+.tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tool-call-icon {
+  font-size: 10px;
+}
+.tool-call-name {
+  font-weight: 500;
+  color: var(--murasaki-ink-2, #4b5563);
+}
+.tool-call-summary {
+  color: var(--murasaki-muted, #9ca3af);
+  margin-left: auto;
+}
+.tool-call-detail {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--murasaki-line, #e5e7eb);
+}
+.tool-call-section {
+  margin-bottom: 4px;
+}
+.tool-call-label {
+  font-size: 10px;
+  color: var(--murasaki-muted, #9ca3af);
+  display: block;
+  margin-bottom: 2px;
+}
+.tool-call-pre {
+  font-size: 10px;
+  font-family: monospace;
+  background: var(--murasaki-surface, #fff);
+  padding: 4px;
+  border-radius: 3px;
+  overflow-x: auto;
+  max-height: 120px;
+  overflow-y: auto;
+  margin: 0;
+  color: var(--murasaki-ink, #1f2937);
 }
 </style>
