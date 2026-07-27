@@ -108,6 +108,13 @@ function onCollapse(): void {
   emit("collapse");
 }
 
+// ===== 清空对话 =====
+async function onClearConversation(): Promise<void> {
+  if (agent.messages.length === 0) return;
+  if (!confirm("确定要清空当前工作区的对话吗？此操作不可撤销。")) return;
+  await agent.clearConversation();
+}
+
 // ===== 空状态判断 =====
 const showNoWorkspace = computed(() => !workspace.hasWorkspace);
 const showNoProvider = computed(
@@ -143,14 +150,29 @@ onMounted(() => {
         </svg>
         <span class="agent-header-title">Agent</span>
       </div>
-      <button class="agent-collapse-btn" title="收起面板" @click="onCollapse">
-        <svg viewBox="0 0 24 24" width="14" height="14">
-          <path
-            fill="currentColor"
-            d="M9.29 6.71a1 1 0 000 1.41L13.17 12l-3.88 3.88a1 1 0 101.41 1.41l4.59-4.59a1 1 0 000-1.41L10.7 6.7a1 1 0 00-1.41.01z"
-          />
-        </svg>
-      </button>
+      <div class="agent-header-right">
+        <button
+          v-if="agent.messages.length > 0"
+          class="agent-clear-btn"
+          title="清空当前工作区的对话"
+          @click="onClearConversation"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path
+              fill="currentColor"
+              d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+            />
+          </svg>
+        </button>
+        <button class="agent-collapse-btn" title="收起面板" @click="onCollapse">
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path
+              fill="currentColor"
+              d="M9.29 6.71a1 1 0 000 1.41L13.17 12l-3.88 3.88a1 1 0 101.41 1.41l4.59-4.59a1 1 0 000-1.41L10.7 6.7a1 1 0 00-1.41.01z"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- 上下文卡片（显示当前文档 + token 数 + × 移除） -->
@@ -547,6 +569,12 @@ onMounted(() => {
   font-size: 13px;
   font-weight: 600;
 }
+.agent-header-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.agent-clear-btn,
 .agent-collapse-btn {
   width: 24px;
   height: 24px;
@@ -559,8 +587,10 @@ onMounted(() => {
   justify-content: center;
   color: var(--murasaki-muted, #6b7280);
 }
+.agent-clear-btn:hover,
 .agent-collapse-btn:hover {
   background: var(--murasaki-hover, #f3f4f6);
+  color: var(--murasaki-error, #dc2626);
 }
 
 /* 空状态 */

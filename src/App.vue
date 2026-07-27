@@ -230,6 +230,7 @@ function askConflict(
 // ===== 启动初始化 =====
 let unlistenMenu: UnlistenFn | null = null;
 let unlistenRecentOpen: UnlistenFn | null = null;
+let unlistenSingleInstance: UnlistenFn | null = null;
 let initialized = ref(false);
 
 onMounted(async () => {
@@ -272,6 +273,17 @@ onMounted(async () => {
     }
   );
 
+  // 4b. 监听单实例事件：第二个实例启动时携带工作区路径，在当前实例中打开
+  unlistenSingleInstance = await listen<string>(
+    "single-instance-open-workspace",
+    (event) => {
+      const workspacePath = event.payload;
+      if (workspacePath) {
+        void workspace.openWorkspace(workspacePath);
+      }
+    }
+  );
+
   // 5. 同步最近打开菜单到原生菜单
   await syncRecentMenu();
 
@@ -292,6 +304,17 @@ onMounted(async () => {
   proposalsStore.setNewFileConflictResolver((targetPath: string) =>
     askConflict(targetPath, "save-as")
   );
+
+  // 11. 检测孤儿对话（Ticket #25: workspace 已删除但对话文件残留）
+  //     若存在孤儿，在控制台提示（后续可扩展到状态栏提示 + 一键清理）
+  try {
+    const orphanCount = await agentStore.checkOrphanChats();
+    if (orphanCount > 0) {
+      console.warn(`[Murasaki] 检测到 ${orphanCount} 个孤儿对话，可通过状态栏手动清理`);
+    }
+  } catch (err) {
+    console.warn("检测孤儿对话失败:", err);
+  }
 
   initialized.value = true;
 
@@ -326,11 +349,17 @@ onBeforeUnmount(() => {
     unlistenRecentOpen();
     unlistenRecentOpen = null;
   }
+  if (unlistenSingleInstance) {
+    unlistenSingleInstance();
+    unlistenSingleInstance = null;
+  }
   window.removeEventListener("keydown", onKeyDown);
   fileWatcher.stop();
   imagePaste.teardown();
   fileOps.setConflictResolver(null);
   proposalsStore.setNewFileConflictResolver(null);
+  // 刷新待保存的对话到磁盘（Ticket #25）
+  void agentStore.saveChatDebounced.flush();
 });
 
 // ===== Tab 状态变化时持久化 =====

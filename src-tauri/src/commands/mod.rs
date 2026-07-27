@@ -1,6 +1,7 @@
 pub mod agent_files;
 pub mod ai_providers;
 pub mod assets;
+pub mod chats;
 pub mod drafts;
 pub mod files;
 pub mod menu;

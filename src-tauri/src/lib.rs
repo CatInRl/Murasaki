@@ -4,6 +4,7 @@ use tauri::{Emitter, Manager, WebviewWindowBuilder};
 use commands::agent_files;
 use commands::ai_providers;
 use commands::assets;
+use commands::chats;
 use commands::drafts;
 use commands::files;
 use commands::menu::{self, RecentMenuState};
@@ -55,6 +56,22 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // 单实例回调：第二个实例启动时，聚焦现有窗口
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+            // 若 argv 携带工作区路径（非 --flag 参数），通知前端打开该工作区
+            // argv[0] 是 exe 路径，argv[1] 可能是用户拖入或命令行传入的工作区路径
+            if let Some(arg) = argv.get(1) {
+                if !arg.starts_with("--") && !arg.is_empty() {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.emit("single-instance-open-workspace", arg.clone());
+                    }
+                }
+            }
+        }))
         .manage(WatcherState::default())
         .manage(RecentMenuState::default())
         .invoke_handler(tauri::generate_handler![
@@ -95,6 +112,12 @@ pub fn run() {
             agent_files::agent_read_file,
             agent_files::agent_search_files,
             agent_files::agent_write_file,
+            chats::save_chat,
+            chats::load_chat,
+            chats::delete_chat,
+            chats::list_chats,
+            chats::check_orphan_chats,
+            chats::cleanup_orphan_chats,
         ])
         .setup(|app| {
             // 手动创建主窗口（tauri.conf.json 中 windows 数组为空）

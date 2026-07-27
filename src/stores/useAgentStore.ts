@@ -3,9 +3,10 @@
  *
  * Ticket #20: 面板 + 循环骨架 + 单轮对话 + 流式 + 取消
  * Ticket #21: 默认上下文 + CM6 状态工具(4个) + 工具调用可见性
+ * Ticket #25: 对话持久化（按工作区隔离 + gzip + 500ms debounce）
  */
 import { defineStore } from "pinia";
-import { ref, computed, shallowRef } from "vue";
+import { ref, computed, shallowRef, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { useAiProvidersStore } from "./useAiProvidersStore";
@@ -40,6 +41,57 @@ function truncate(text: string, max: number): string {
   return text.slice(0, max) + "\n... [truncated]";
 }
 
+/** 简单 debounce 工具（含 flush 方法） */
+function debounce<T extends (...args: any[]) => Promise<void>>(
+  fn: T,
+  delay: number
+): T & { flush: () => Promise<void>; cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let pendingPromise: Promise<void> | null = null;
+  let lastArgs: any[] | null = null;
+
+  const wrapped = ((...args: any[]) => {
+    lastArgs = args;
+    if (timer) clearTimeout(timer);
+    return new Promise<void>((resolve) => {
+      timer = setTimeout(async () => {
+        timer = null;
+        if (lastArgs) {
+          pendingPromise = fn(...lastArgs);
+          await pendingPromise;
+          pendingPromise = null;
+        }
+        resolve();
+      }, delay);
+    });
+  }) as T & { flush: () => Promise<void>; cancel: () => void };
+
+  wrapped.flush = async () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    if (pendingPromise) {
+      await pendingPromise;
+    }
+    if (lastArgs) {
+      pendingPromise = fn(...lastArgs);
+      await pendingPromise;
+      pendingPromise = null;
+    }
+  };
+
+  wrapped.cancel = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    lastArgs = null;
+  };
+
+  return wrapped;
+}
+
 export const useAgentStore = defineStore("agent", () => {
   // ===== State =====
   const messages = ref<ChatMessage[]>([]);
@@ -54,12 +106,113 @@ export const useAgentStore = defineStore("agent", () => {
   /** 上下文 token 估算 */
   const contextTokens = ref(0);
 
+  /** 正在从磁盘加载对话（防止加载时触发保存覆盖） */
+  const isLoading = ref(false);
+
   /** AbortController */
   let abortController: AbortController | null = null;
 
   /** 流式 flush 节流 */
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
   let pendingTokens = "";
+
+  // ===== 对话持久化 (Ticket #25) =====
+
+  /** 保存对话到磁盘（防抖 500ms） */
+  const saveChatDebounced = debounce(async () => {
+    const ws = useWorkspaceStore();
+    const workspacePath = ws.workspacePath;
+    if (!workspacePath || messages.value.length === 0 || isLoading.value) return;
+    try {
+      const messagesJson = JSON.stringify(messages.value);
+      await invoke("save_chat", { workspace: workspacePath, messagesJson });
+    } catch (err) {
+      console.error("保存对话失败:", err);
+    }
+  }, 500);
+
+  /** 从磁盘加载对话 */
+  async function loadChatFromDisk(workspacePath: string): Promise<void> {
+    if (!workspacePath) {
+      messages.value = [];
+      return;
+    }
+    isLoading.value = true;
+    try {
+      const result = await invoke<{ messages_json: string; message_count: number }>(
+        "load_chat",
+        { workspace: workspacePath }
+      );
+      const loaded = JSON.parse(result.messages_json) as ChatMessage[];
+      messages.value = loaded;
+    } catch (err) {
+      console.error("加载对话失败:", err);
+      messages.value = [];
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /** 删除对话文件（清空对话时调用） */
+  async function deleteChatFromDisk(workspacePath: string): Promise<void> {
+    if (!workspacePath) return;
+    try {
+      await invoke("delete_chat", { workspace: workspacePath });
+    } catch (err) {
+      console.error("删除对话文件失败:", err);
+    }
+  }
+
+  /** 检测孤儿对话数量（启动时调用，用于状态栏提示） */
+  async function checkOrphanChats(): Promise<number> {
+    try {
+      const result = await invoke<{ orphan_count: number }>("check_orphan_chats");
+      return result.orphan_count;
+    } catch (err) {
+      console.error("检测孤儿对话失败:", err);
+      return 0;
+    }
+  }
+
+  /** 清理孤儿对话 */
+  async function cleanupOrphanChats(): Promise<number> {
+    try {
+      const cleaned = await invoke<number>("cleanup_orphan_chats");
+      return cleaned;
+    } catch (err) {
+      console.error("清理孤儿对话失败:", err);
+      return 0;
+    }
+  }
+
+  // 监听消息变化自动保存（deep watch，防抖 500ms）
+  watch(
+    () => messages.value,
+    () => {
+      if (!isLoading.value) {
+        void saveChatDebounced();
+      }
+    },
+    { deep: true }
+  );
+
+  // 监听工作区变化：保存旧对话 + 加载新对话
+  watch(
+    () => useWorkspaceStore().workspacePath,
+    async (newPath, oldPath) => {
+      // 保存旧工作区对话（flush 确保不丢失）
+      if (oldPath && messages.value.length > 0) {
+        await saveChatDebounced.flush();
+      }
+      // 加载新工作区对话
+      if (newPath) {
+        await loadChatFromDisk(newPath);
+      } else {
+        // 无工作区，清空对话
+        messages.value = [];
+      }
+    }
+  );
 
   // ===== Computed =====
   const canSend = computed(() => {
@@ -420,11 +573,18 @@ ${content}
     status.value = "cancelled";
   }
 
-  /** 清空对话 */
-  function clearConversation(): void {
+  /** 清空对话（同时删除磁盘对话文件） */
+  async function clearConversation(): Promise<void> {
     if (abortController) {
       abortController.abort();
       abortController = null;
+    }
+    // 取消未保存的 debounce
+    saveChatDebounced.cancel();
+    // 删除磁盘对话文件
+    const ws = useWorkspaceStore();
+    if (ws.workspacePath) {
+      await deleteChatFromDisk(ws.workspacePath);
     }
     messages.value = [];
     streamingContent.value = "";
@@ -465,6 +625,7 @@ ${content}
     hasNewContent,
     contextRemoved,
     contextTokens,
+    isLoading,
     // Computed
     canSend,
     isThinking,
@@ -477,5 +638,10 @@ ${content}
     removeContext,
     setScrollPosition,
     markNewContentRead,
+    // 对话持久化 (Ticket #25)
+    loadChatFromDisk,
+    checkOrphanChats,
+    cleanupOrphanChats,
+    saveChatDebounced,
   };
 });

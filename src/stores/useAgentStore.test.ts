@@ -6,7 +6,25 @@ import { useEditorBridgeStore } from "./useEditorBridgeStore";
 
 // Mock Tauri invoke
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
+  invoke: vi.fn().mockImplementation((cmd: string) => {
+    // 对话持久化命令的默认返回值
+    if (cmd === "load_chat") {
+      return Promise.resolve({ messages_json: "[]", message_count: 0 });
+    }
+    if (cmd === "save_chat") {
+      return Promise.resolve({ hash: "test", message_count: 0, file_size: 0 });
+    }
+    if (cmd === "delete_chat") {
+      return Promise.resolve(true);
+    }
+    if (cmd === "check_orphan_chats") {
+      return Promise.resolve({ orphan_count: 0, orphans: [] });
+    }
+    if (cmd === "cleanup_orphan_chats") {
+      return Promise.resolve(0);
+    }
+    return Promise.resolve(undefined);
+  }),
 }));
 
 // Mock OpenAICompatibleProvider
