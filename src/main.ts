@@ -1,6 +1,7 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import "katex/dist/katex.min.css";
+import "./styles/theme.css";
 import App from "./App.vue";
 
 const app = createApp(App);

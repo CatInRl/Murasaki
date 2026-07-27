@@ -1,0 +1,279 @@
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+
+  /* Layout Metrics */
+  --murasaki-tabbar-height: 36px;
+  --murasaki-statusbar-height: 24px;
+  --murasaki-sidebar-width: 260px;
+  --murasaki-topbar-height: 36px;
+
+  /* Typography */
+  --murasaki-font-ui: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --murasaki-font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+
+  /* Motion */
+  --murasaki-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --murasaki-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --murasaki-duration-fast: 120ms;
+  --murasaki-duration-base: 200ms;
+  --murasaki-duration-slow: 320ms;
+
+  /* Shadows */
+  --murasaki-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --murasaki-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --murasaki-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --murasaki-shadow-purple: 0 8px 24px rgba(147, 51, 234, 0.18);
+}
+
+/* Dark mode tokens (auto-applied when system is dark OR [data-theme="dark"]) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --murasaki-background: #0f0f14;
+    --murasaki-foreground: #e5e7eb;
+    --murasaki-card: #18181f;
+    --murasaki-card-foreground: #e5e7eb;
+    --murasaki-popover: #1c1c24;
+    --murasaki-popover-foreground: #e5e7eb;
+    --murasaki-muted: #1f1f28;
+    --murasaki-muted-foreground: #9ca3af;
+    --murasaki-border: #2a2a35;
+    --murasaki-input: #2a2a35;
+
+    --murasaki-surface: #16161d;
+    --murasaki-surface-2: #1c1c24;
+    --murasaki-ink: #e5e7eb;
+    --murasaki-ink-2: #b3b3c0;
+    --murasaki-ink-3: #6b6b7c;
+    --murasaki-line: #2a2a35;
+  }
+}
+
+:root[data-theme="dark"] {
+  --murasaki-background: #0f0f14;
+  --murasaki-foreground: #e5e7eb;
+  --murasaki-card: #18181f;
+  --murasaki-card-foreground: #e5e7eb;
+  --murasaki-popover: #1c1c24;
+  --murasaki-popover-foreground: #e5e7eb;
+  --murasaki-muted: #1f1f28;
+  --murasaki-muted-foreground: #9ca3af;
+  --murasaki-border: #2a2a35;
+  --murasaki-input: #2a2a35;
+
+  --murasaki-surface: #16161d;
+  --murasaki-surface-2: #1c1c24;
+  --murasaki-ink: #e5e7eb;
+  --murasaki-ink-2: #b3b3c0;
+  --murasaki-ink-3: #6b6b7c;
+  --murasaki-line: #2a2a35;
+}
+
+/* Global reset & base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--murasaki-font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--murasaki-background);
+  color: var(--murasaki-foreground);
+}
+
+/* Scrollbar styling — slim, themed */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--murasaki-neutral-300);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--murasaki-neutral-400);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* Selection */
+::selection {
+  background: var(--murasaki-purple-200);
+  color: var(--murasaki-purple-900);
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--murasaki-ring);
+  outline-offset: 2px;
+  border-radius: var(--murasaki-radius-sm);
+}
+
+/* === Brand utility classes === */
+.murasaki-brand {
+  color: var(--murasaki-primary);
+  letter-spacing: -0.02em;
+}
+
+/* === Compact-density adaptation (smaller viewports) === */
+/* Triggers when window width < 980px (typical portrait monitor / tablet landscape) */
+@media (max-width: 980px) {
+  :root {
+    --murasaki-sidebar-width: 220px;
+    --murasaki-tabbar-height: 32px;
+    --murasaki-statusbar-height: 22px;
+    --murasaki-topbar-height: 32px;
+  }
+}
+
+/* === Narrow viewport (portrait tablet / large phone) === */
+@media (max-width: 720px) {
+  :root {
+    --murasaki-sidebar-width: 200px;
+    --murasaki-topbar-height: 36px;
+    --murasaki-radius-md: 6px;
+    --murasaki-radius-lg: 12px;
+  }
+}
+
+/* === Touch / coarse-pointer adaptation === */
+@media (pointer: coarse) {
+  :root {
+    --murasaki-touch-target: 36px;
+  }
+  /* Larger tap targets for tab close / tree nodes on touch devices */
+  .tab-item .close-btn,
+  .sidebar-tab,
+  .tree-node .node-row {
+    min-height: var(--murasaki-touch-target, 36px);
+  }
+}
+
+/* === High-DPI font smoothing === */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  body {
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+}
+
+/* === Reduced motion === */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* === Animations library === */
+@keyframes murasaki-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes murasaki-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes murasaki-slide-in-right {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes murasaki-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes murasaki-pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes murasaki-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes murasaki-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+
+.murasaki-fade-in { animation: murasaki-fade-in var(--murasaki-duration-base) var(--murasaki-ease-out) both; }
+.murasaki-scale-in { animation: murasaki-scale-in var(--murasaki-duration-base) var(--murasaki-ease-out) both; }
+.murasaki-slide-up { animation: murasaki-slide-up var(--murasaki-duration-base) var(--murasaki-ease-out) both; }
+.murasaki-slide-in-right { animation: murasaki-slide-in-right var(--murasaki-duration-base) var(--murasaki-ease-out) both; }

@@ -226,6 +226,7 @@ defineExpose({
   min-height: 0;
   overflow: hidden;
   position: relative;
+  background: var(--murasaki-background);
 }
 .pane-left {
   height: 100%;
@@ -240,26 +241,54 @@ defineExpose({
   min-height: 0;
 }
 .splitter {
-  width: 6px;
+  width: 1px;
   height: 100%;
-  background: #e0e0e6;
+  background: var(--murasaki-line);
   cursor: col-resize;
   position: relative;
   flex-shrink: 0;
   user-select: none;
-  transition: background 0.15s;
+  transition: background var(--murasaki-duration-fast) var(--murasaki-ease);
 }
-.splitter:hover, .splitter.dragging {
-  background: #18a058;
+/* 拖拽热区比视觉宽度更宽，便于抓取 */
+.splitter::before {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
 }
-.splitter-handle {
+.splitter::after {
+  content: '';
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 2px;
-  height: 32px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 1px;
+  width: 7px;
+  height: 36px;
+  border-radius: 4px;
+  background: transparent;
+  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
+              opacity var(--murasaki-duration-fast) var(--murasaki-ease);
+  pointer-events: none;
+}
+.splitter:hover::after,
+.splitter.dragging::after {
+  background: var(--murasaki-primary);
+  opacity: 0.18;
+}
+.splitter.dragging {
+  background: var(--murasaki-purple-200);
+}
+.splitter-handle {
+  display: none;
+}
+
+/* 触屏：增加热区宽度 */
+@media (pointer: coarse) {
+  .splitter {
+    width: 3px;
+  }
+  .splitter::before {
+    inset: 0 -8px;
+  }
 }
 </style>

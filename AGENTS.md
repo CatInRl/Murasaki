@@ -41,6 +41,14 @@
    - 引入 `src-tauri/mingw.specs` 文件
    - 把 MinGW 路径硬编码到任何脚本
 
+6. **优先使用 PowerShell 7 (`pwsh`)**，不要用系统自带的 Windows PowerShell 5.1 (`powershell`)：
+   - 已通过 `winget install Microsoft.PowerShell` 安装到 `C:\Program Files\PowerShell\7\`
+   - 命令别名位于 `%LOCALAPPDATA%\Microsoft\WindowsApps\pwsh.exe`
+   - 新开会话后 `pwsh` 即可直接调用；当前会话 PATH 未刷新时可使用完整路径
+   - 编写/执行 `.ps1` 脚本、调试命令、运行构建辅助脚本（如 [scripts/](scripts/)）时统一用 `pwsh`
+   - 优势：跨平台、性能更好、支持 `??` `&&` `?:` 等现代语法、错误显示更友好
+   - 仅当遇到依赖 .NET Framework 的旧 Windows 专属模块时才回退到 `powershell`
+
 ### 之前的 GNU workaround（已废弃，不要恢复）
 
 历史会话曾经使用过这些 workaround，**它们都已删除且不应该重新引入**：

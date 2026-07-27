@@ -339,7 +339,7 @@ function cancelCreating(): void {
         'is-image': isImageFile(node.name),
         'is-drop-target': isDropTarget,
       }"
-      :style="{ paddingLeft: level * 12 + 8 + 'px' }"
+      :style="{ paddingLeft: level * 14 + 8 + 'px' }"
       :draggable="(node.type === 'file') || (node.type === 'directory')"
       @click="onClick"
       @contextmenu="onContextMenu"
@@ -348,16 +348,47 @@ function cancelCreating(): void {
       @dragleave="onDragLeave"
       @drop="onDrop"
     >
-      <span class="node-icon">
-        <template v-if="node.type === 'directory'">
-          {{ expanded ? "▾" : "▸" }}
-        </template>
-        <template v-else>
-          <span v-if="isMarkdownFile(node.name)" class="md-icon">M</span>
-          <span v-else-if="isImageFile(node.name)" class="img-icon">🖼</span>
-          <span v-else class="file-dot">·</span>
-        </template>
-      </span>
+      <!-- 目录：折叠箭头 + 文件夹图标 -->
+      <svg
+        v-if="node.type === 'directory'"
+        class="node-arrow"
+        :class="{ 'is-expanded': expanded }"
+        width="12" height="12" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+      >
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+      <svg
+        v-if="node.type === 'directory'"
+        class="node-folder-icon"
+        width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      >
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+      </svg>
+      <!-- 文件：Markdown 用 M 徽标，图片用图片图标，其他用 · -->
+      <template v-else>
+        <span v-if="isMarkdownFile(node.name)" class="md-badge">M</span>
+        <svg
+          v-else-if="isImageFile(node.name)"
+          class="node-file-icon"
+          width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <svg
+          v-else
+          class="node-file-icon"
+          width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        >
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+      </template>
       <span class="node-name" :title="node.path">{{ node.name }}</span>
     </div>
 
@@ -365,17 +396,27 @@ function cancelCreating(): void {
     <div
       v-else
       class="node-row rename-row"
-      :style="{ paddingLeft: level * 12 + 8 + 'px' }"
+      :style="{ paddingLeft: level * 14 + 8 + 'px' }"
     >
-      <span class="node-icon">
-        <template v-if="node.type === 'directory'">
-          {{ expanded ? "▾" : "▸" }}
-        </template>
-        <template v-else>
-          <span v-if="isMarkdownFile(node.name)" class="md-icon">M</span>
-          <span v-else class="file-dot">·</span>
-        </template>
-      </span>
+      <svg
+        v-if="node.type === 'directory'"
+        class="node-arrow"
+        :class="{ 'is-expanded': expanded }"
+        width="12" height="12" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+      >
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+      <span v-if="isMarkdownFile(node.name)" class="md-badge">M</span>
+      <svg
+        v-else
+        class="node-file-icon"
+        width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      >
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
       <NInput
         v-model:value="renameValue"
         size="tiny"
@@ -391,11 +432,25 @@ function cancelCreating(): void {
     <div
       v-if="creating && node.type === 'directory'"
       class="node-row creating-row"
-      :style="{ paddingLeft: (level + 1) * 12 + 8 + 'px' }"
+      :style="{ paddingLeft: (level + 1) * 14 + 8 + 'px' }"
     >
-      <span class="node-icon">
-        {{ creatingType === "file" ? "·" : "▸" }}
-      </span>
+      <svg
+        v-if="creatingType === 'directory'"
+        class="node-folder-icon"
+        width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      >
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+      </svg>
+      <svg
+        v-else
+        class="node-file-icon"
+        width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      >
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
       <NInput
         v-model:value="creatingName"
         size="tiny"
@@ -443,52 +498,34 @@ export default { name: "TreeNode" };
 .node-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   height: 26px;
   padding-right: 8px;
   cursor: pointer;
   user-select: none;
   font-size: 13px;
-  color: #333;
+  color: var(--murasaki-ink-2);
   border-radius: 3px;
-  transition: background 0.1s;
+  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
+              color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .node-row:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--murasaki-neutral-200);
 }
 .node-row.is-selected {
-  background: rgba(24, 160, 88, 0.12);
-  color: #18a058;
+  background: var(--murasaki-purple-50);
+  color: var(--murasaki-primary);
+}
+.node-row.is-selected .md-badge {
+  background: var(--murasaki-primary);
+  color: #fff;
+}
+.node-row.is-selected .node-file-icon,
+.node-row.is-selected .node-folder-icon {
+  color: var(--murasaki-primary);
 }
 .node-row.is-file:not(.is-md) {
-  color: #999;
-  cursor: default;
-}
-.node-row.is-file:not(.is-md):hover {
-  background: transparent;
-}
-.rename-row,
-.creating-row {
-  background: rgba(24, 160, 88, 0.06);
-}
-.node-icon {
-  width: 16px;
-  text-align: center;
-  font-size: 12px;
-  flex-shrink: 0;
-  color: #666;
-}
-.md-icon {
-  color: #18a058;
-  font-weight: bold;
-  font-size: 11px;
-}
-.img-icon {
-  font-size: 12px;
-  filter: grayscale(0.2);
-}
-.file-dot {
-  color: #ccc;
+  color: var(--murasaki-ink-3);
 }
 .node-row.is-image {
   cursor: grab;
@@ -498,18 +535,85 @@ export default { name: "TreeNode" };
 }
 .node-row.is-directory {
   cursor: pointer;
+  font-weight: 500;
+  color: var(--murasaki-ink);
 }
 .node-row.is-drop-target {
-  background: rgba(24, 160, 88, 0.18);
-  outline: 1px dashed #18a058;
+  background: rgba(147, 51, 234, 0.12);
+  outline: 1px dashed var(--murasaki-primary);
   outline-offset: -1px;
 }
+.rename-row,
+.creating-row {
+  background: var(--murasaki-purple-50);
+}
+
+/* 折叠箭头：默认朝右，展开时旋转 90° */
+.node-arrow {
+  flex-shrink: 0;
+  color: var(--murasaki-ink-3);
+  transition: transform var(--murasaki-duration-fast) var(--murasaki-ease);
+}
+.node-arrow.is-expanded {
+  transform: rotate(90deg);
+}
+
+.node-folder-icon {
+  flex-shrink: 0;
+  color: var(--murasaki-primary);
+}
+
+.node-file-icon {
+  flex-shrink: 0;
+  color: var(--murasaki-ink-3);
+}
+
+/* Markdown 文件徽标：紫色圆角矩形里的 M */
+.md-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--murasaki-radius-sm);
+  background: var(--murasaki-purple-100);
+  color: var(--murasaki-purple-700);
+  font-family: var(--murasaki-font-mono);
+  font-weight: 700;
+  font-size: 10px;
+  flex-shrink: 0;
+  letter-spacing: 0;
+}
+
 .node-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 .node-children {
   /* 子节点容器无需额外样式，缩进由 paddingLeft 处理 */
+}
+
+/* 触屏：放大行高 */
+@media (pointer: coarse) {
+  .node-row {
+    height: 34px;
+    font-size: 14px;
+  }
+  .md-badge {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+  }
+}
+
+/* 紧凑窗口 */
+@media (max-width: 980px) {
+  .node-row {
+    height: 24px;
+    font-size: 12px;
+  }
 }
 </style>
