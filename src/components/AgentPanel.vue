@@ -193,6 +193,40 @@ onMounted(() => {
       </button>
     </div>
 
+    <!-- 累计 token 警告 (Ticket #26) -->
+    <div
+      v-if="agent.isOverTokenLimit"
+      class="agent-token-warning agent-token-danger"
+      title="累计 prompt token 已超过软限制，建议清空对话"
+    >
+      <span class="token-warning-icon">⚠</span>
+      <span class="token-warning-text">
+        累计 {{ agent.cumulativeTokens }} / {{ agent.tokenLimit }} tokens，已超限
+      </span>
+    </div>
+    <div
+      v-else-if="agent.isApproachingTokenLimit"
+      class="agent-token-warning agent-token-caution"
+      title="累计 prompt token 接近软限制"
+    >
+      <span class="token-warning-icon">!</span>
+      <span class="token-warning-text">
+        累计 {{ agent.cumulativeTokens }} / {{ agent.tokenLimit }} tokens
+      </span>
+    </div>
+    <!-- 压缩提示（仅在最近一次请求触发了压缩时显示） -->
+    <div
+      v-if="agent.lastCompression"
+      class="agent-compression-badge"
+      title="已应用上下文压缩"
+    >
+      <span>🗜</span>
+      <span v-if="agent.lastCompression.layer1Applied">L1·</span>
+      <span v-if="agent.lastCompression.layer2Applied">L2·</span>
+      <span v-if="agent.lastCompression.truncated">截断·</span>
+      <span>{{ agent.lastCompression.compressedTokens }}/{{ agent.lastCompression.originalTokens }} tok</span>
+    </div>
+
     <!-- 空状态：无工作区 -->
     <div v-if="showNoWorkspace" class="agent-empty-state">
       <svg viewBox="0 0 24 24" width="40" height="40" class="empty-icon">
@@ -881,6 +915,50 @@ onMounted(() => {
 .agent-context-remove:hover {
   background: var(--murasaki-hover, #f3f4f6);
   color: var(--murasaki-state-error, #dc2626);
+}
+
+/* Ticket #26: 累计 token 警告 */
+.agent-token-warning {
+  margin: 4px 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.agent-token-caution {
+  background: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.agent-token-danger {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+}
+.token-warning-icon {
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.token-warning-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 压缩提示徽章 */
+.agent-compression-badge {
+  margin: 2px 10px 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: rgba(147, 51, 234, 0.08);
+  color: var(--murasaki-primary, #9333ea);
+  border: 1px solid rgba(147, 51, 234, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 /* 工具调用条目 */

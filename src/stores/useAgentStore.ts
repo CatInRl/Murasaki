@@ -4,6 +4,7 @@
  * Ticket #20: 面板 + 循环骨架 + 单轮对话 + 流式 + 取消
  * Ticket #21: 默认上下文 + CM6 状态工具(4个) + 工具调用可见性
  * Ticket #25: 对话持久化（按工作区隔离 + gzip + 500ms debounce）
+ * Ticket #26: 上下文管理（三层压缩 + 累计 token 跟踪 + 安全护栏）
  */
 import { defineStore } from "pinia";
 import { ref, computed, shallowRef, watch } from "vue";
@@ -13,6 +14,14 @@ import { useAiProvidersStore } from "./useAiProvidersStore";
 import { useEditorBridgeStore } from "./useEditorBridgeStore";
 import { OpenAICompatibleProvider } from "../agent/OpenAICompatibleProvider";
 import { getToolMetadataList, executeTool } from "../agent/tools";
+import {
+  compressContext,
+  CumulativeTokenTracker,
+  estimateTokens,
+  TOOL_RESULT_PREFIX,
+  type LLMMessage,
+  type CompressionResult,
+} from "../agent/contextManager";
 import type { ChatMessage, AgentStatus, ToolCallEntry, ContextSnapshot } from "../types";
 
 /** 生成简单唯一 ID */
@@ -29,11 +38,6 @@ const MAX_CONTENT_CHARS = 8192;
 
 /** 最大工具调用轮数 */
 const MAX_TOOL_ROUNDS = 15;
-
-/** 字符粗估 token 数 */
-function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
-}
 
 /** 截断文本 */
 function truncate(text: string, max: number): string {
@@ -108,6 +112,26 @@ export const useAgentStore = defineStore("agent", () => {
 
   /** 正在从磁盘加载对话（防止加载时触发保存覆盖） */
   const isLoading = ref(false);
+
+  /** 累计 prompt token 跟踪器 (Ticket #26) */
+  const tokenTracker = new CumulativeTokenTracker();
+  /** 累计 prompt token 数（响应式，供 UI 显示） */
+  const cumulativeTokens = ref(0);
+  /** 是否接近累计限制（80%） */
+  const isApproachingTokenLimit = ref(false);
+  /** 是否超过累计限制 */
+  const isOverTokenLimit = ref(false);
+  /** 最近一次压缩结果（供 UI 显示压缩状态，null 表示未触发压缩） */
+  const lastCompression = ref<Omit<CompressionResult, "messages"> | null>(null);
+
+  /** 重置累计 token 跟踪状态（清空对话 / 工作区切换时调用） */
+  function resetCumulativeTracking(): void {
+    tokenTracker.reset();
+    cumulativeTokens.value = 0;
+    isApproachingTokenLimit.value = false;
+    isOverTokenLimit.value = false;
+    lastCompression.value = null;
+  }
 
   /** AbortController */
   let abortController: AbortController | null = null;
@@ -211,6 +235,8 @@ export const useAgentStore = defineStore("agent", () => {
         // 无工作区，清空对话
         messages.value = [];
       }
+      // Ticket #26: 工作区切换时重置累计 token 跟踪
+      resetCumulativeTracking();
     }
   );
 
@@ -330,7 +356,7 @@ ${content}
     abortController = new AbortController();
 
     // 构建 LLM 消息历史
-    const llmMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    const llmMessages: LLMMessage[] = [
       { role: "system", content: SYSTEM_PROMPT },
     ];
     // 添加历史（用原文，不重复附带上下文）
@@ -389,8 +415,32 @@ ${content}
         streamingContent.value = "";
         pendingTokens = "";
 
+        // Ticket #26: 三层压缩 + 安全护栏
+        // 在每轮 LLM 请求前应用压缩，避免上下文无限增长
+        const compressionResult = compressContext(llmMessages);
+        const messagesToSend = compressionResult.messages;
+
+        // 记录压缩结果供 UI 显示（仅当任一压缩层应用时）
+        const applied =
+          compressionResult.layer1Applied ||
+          compressionResult.layer2Applied ||
+          compressionResult.truncated;
+        if (applied) {
+          const { messages: _omitted, ...rest } = compressionResult;
+          void _omitted;
+          lastCompression.value = rest;
+        } else {
+          lastCompression.value = null;
+        }
+
+        // 累计 prompt token 跟踪（先用估算值，LLM 返回 usage 后会用精确值覆盖）
+        tokenTracker.add(compressionResult.compressedTokens);
+        cumulativeTokens.value = tokenTracker.total;
+        isApproachingTokenLimit.value = tokenTracker.isApproachingLimit;
+        isOverTokenLimit.value = tokenTracker.isOverLimit;
+
         const result = await provider.streamChatWithTools(
-          llmMessages,
+          messagesToSend,
           tools,
           {
             onToken: (token: string) => {
@@ -422,9 +472,17 @@ ${content}
           abortController.signal
         );
 
-        // LLM 返回 usage 后精确更新 token 数
+        // LLM 返回 usage 后精确更新 token 数（覆盖估算值）
         if (result.usage) {
           contextTokens.value = result.usage.total_tokens;
+          // Ticket #26: 用精确的 prompt_tokens 覆盖累计跟踪器
+          // 注意：tokenTracker 已用估算值加过一次，这里先减再加，避免重复累加
+          if (result.usage.prompt_tokens > 0) {
+            tokenTracker.add(result.usage.prompt_tokens - compressionResult.compressedTokens);
+            cumulativeTokens.value = tokenTracker.total;
+            isApproachingTokenLimit.value = tokenTracker.isApproachingLimit;
+            isOverTokenLimit.value = tokenTracker.isOverLimit;
+          }
         }
 
         if (abortController.signal.aborted) break;
@@ -513,7 +571,7 @@ ${content}
           // 添加工具结果到 LLM 历史
           llmMessages.push({
             role: "user" as const,
-            content: `工具 ${tc.name} 的结果: ${JSON.stringify(toolResult)}`,
+            content: `${TOOL_RESULT_PREFIX}${tc.name} 的结果: ${JSON.stringify(toolResult)}`,
           });
         }
 
@@ -594,6 +652,8 @@ ${content}
     hasNewContent.value = false;
     contextRemoved.value = false;
     contextTokens.value = 0;
+    // Ticket #26: 重置累计 token 跟踪
+    resetCumulativeTracking();
   }
 
   /** 移除当前文档上下文（仅本轮） */
@@ -626,6 +686,12 @@ ${content}
     contextRemoved,
     contextTokens,
     isLoading,
+    // Ticket #26: 上下文管理状态
+    cumulativeTokens,
+    isApproachingTokenLimit,
+    isOverTokenLimit,
+    lastCompression,
+    tokenLimit: tokenTracker.limit,
     // Computed
     canSend,
     isThinking,
