@@ -230,6 +230,14 @@ onMounted(async () => {
   if (persistence.settings.sidebarView) {
     sidebarView.value = persistence.settings.sidebarView;
   }
+  // 恢复上次打开的工作区
+  if (persistence.settings.lastWorkspacePath) {
+    try {
+      await workspace.openWorkspace(persistence.settings.lastWorkspacePath);
+    } catch (err) {
+      console.warn("恢复工作区失败:", err);
+    }
+  }
 
   // 2. 恢复上次打开的 tabs
   await tabsStore.restore();
@@ -328,6 +336,13 @@ watch(() => persistence.recentEntries, scheduleSyncRecentMenu, { deep: true });
 watch(sidebarView, (v) => {
   if (initialized.value) {
     void persistence.updateSettings({ sidebarView: v });
+  }
+});
+
+// 工作区变化时保存（关闭工作区或切换工作区）
+watch(() => workspace.workspacePath, (p) => {
+  if (initialized.value) {
+    void persistence.updateSettings({ lastWorkspacePath: p });
   }
 });
 

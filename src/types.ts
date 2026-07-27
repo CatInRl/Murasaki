@@ -116,6 +116,8 @@ export interface SettingsState {
   showHiddenFiles: boolean;
   markdownTheme: string;
   sidebarView: SidebarView;
+  /** 上次打开的工作区路径（启动时恢复） */
+  lastWorkspacePath: string | null;
 }
 
 /**
@@ -129,4 +131,5 @@ export const DEFAULT_SETTINGS: SettingsState = {
   showHiddenFiles: false,
   markdownTheme: "github",
   sidebarView: "files",
+  lastWorkspacePath: null,
 };
