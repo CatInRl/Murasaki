@@ -118,6 +118,8 @@ export interface SettingsState {
   sidebarView: SidebarView;
   /** 上次打开的工作区路径（启动时恢复） */
   lastWorkspacePath: string | null;
+  /** 是否显示 Agent 面板（默认开） */
+  showAgentPanel: boolean;
 }
 
 /**
@@ -132,6 +134,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   markdownTheme: "github",
   sidebarView: "files",
   lastWorkspacePath: null,
+  showAgentPanel: true,
 };
 
 /**
@@ -181,3 +184,25 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     model: "",
   },
 ];
+
+// ===== Agent 对话类型 =====
+
+/**
+ * Agent 对话消息
+ * 后续 ticket 会扩展 contextSnapshot / toolCalls / toolResult 字段
+ */
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  /** 是否被中断（AbortController.abort 触发） */
+  interrupted?: boolean;
+  /** 创建时间戳（ms） */
+  createdAt: number;
+}
+
+/**
+ * Agent 状态机
+ */
+export type AgentStatus = "idle" | "thinking" | "cancelled" | "error";
+

@@ -2,8 +2,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import {
   NConfigProvider,
-  NLayout,
-  NLayoutSider,
   NSelect,
   NModal,
   NButton,
@@ -26,11 +24,13 @@ import TableInsertDialog from "./components/TableInsertDialog.vue";
 import SettingsWindow from "./components/SettingsWindow.vue";
 import CompareWindow from "./components/CompareWindow.vue";
 import ImagePreviewModal from "./components/ImagePreviewModal.vue";
+import AgentPanel from "./components/AgentPanel.vue";
 import { useWorkspaceStore } from "./stores/useWorkspaceStore";
 import { useTabsStore } from "./stores/useTabsStore";
 import { usePersistenceStore } from "./stores/usePersistenceStore";
 import { useSearchStore } from "./stores/useSearchStore";
 import { useFileOpsStore } from "./stores/useFileOpsStore";
+import { useAgentStore } from "./stores/useAgentStore";
 import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
 import { MARKDOWN_THEMES, DEFAULT_THEME } from "./composables/useTheme";
@@ -45,13 +45,14 @@ import {
 import { exportHtml } from "./composables/useHtmlExport";
 import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import { basename } from "./utils/path";
-import type { SidebarView } from "./types";
+import type { SidebarView, SettingsState } from "./types";
 
 const workspace = useWorkspaceStore();
 const tabsStore = useTabsStore();
 const persistence = usePersistenceStore();
 const searchStore = useSearchStore();
 const fileOps = useFileOpsStore();
+const agentStore = useAgentStore();
 
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
@@ -125,6 +126,11 @@ const imagePreviewPath = ref<string | null>(null);
 function onPreviewImage(path: string): void {
   imagePreviewPath.value = path;
   imagePreviewVisible.value = true;
+}
+
+// ===== 收起 Agent 面板 =====
+async function onCollapseAgentPanel(): Promise<void> {
+  await persistence.updateSettings({ showAgentPanel: false } as Partial<SettingsState>);
 }
 
 // ===== 对比窗口（外部修改合并） =====
@@ -1016,15 +1022,11 @@ async function exportCurrentHtml(): Promise<void> {
 
 <template>
   <NConfigProvider :theme="lightTheme" :locale="null" :date-locale="null">
-    <NLayout style="height: 100vh" has-sider>
+    <div class="murasaki-shell" :class="{ 'has-sidebar': workspace.hasWorkspace || tabsStore.hasTabs }">
       <!-- Sidebar: 文件树 / 大纲 -->
-      <NLayoutSider
+      <aside
         v-if="workspace.hasWorkspace || tabsStore.hasTabs"
-        bordered
-        :width="260"
-        :collapsed-width="0"
-        :native-scrollbar="false"
-        show-trigger="bar"
+        class="murasaki-sidebar"
       >
         <Sidebar
           :current-file-path="currentFilePath"
@@ -1035,7 +1037,7 @@ async function exportCurrentHtml(): Promise<void> {
           @preview-image="onPreviewImage"
           @update:active-view="(v) => (sidebarView = v)"
         />
-      </NLayoutSider>
+      </aside>
 
       <!-- 主区域 -->
       <div class="main-area">
@@ -1048,6 +1050,7 @@ async function exportCurrentHtml(): Promise<void> {
             @close-tab="onCloseTabRequest"
           />
           <div v-else class="top-bar-title">
+            <span class="app-brand-dot"></span>
             <span class="app-name">Murasaki</span>
           </div>
           <NSelect
@@ -1102,9 +1105,18 @@ async function exportCurrentHtml(): Promise<void> {
           :cursor-col="cursorCol"
           :char-count="charCount"
           :word-count="wordCount"
+          :agent-running="agentStore.isThinking"
         />
       </div>
-    </NLayout>
+
+      <!-- Agent 面板 -->
+      <AgentPanel
+        v-if="persistence.settings.showAgentPanel"
+        @collapse="onCollapseAgentPanel"
+        @open-folder-dialog="onOpenFolder"
+        @open-settings="settingsWindowVisible = true"
+      />
+    </div>
 
     <!-- 冲突对话框 -->
     <ConflictDialog
@@ -1206,18 +1218,22 @@ async function exportCurrentHtml(): Promise<void> {
 </template>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* === Murasaki App Shell Layout === */
+.murasaki-shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--murasaki-background);
 }
 
-html,
-body,
-#app {
-  height: 100%;
+.murasaki-shell.has-sidebar .murasaki-sidebar {
+  width: var(--murasaki-sidebar-width);
+  flex-shrink: 0;
+  border-right: 1px solid var(--murasaki-line);
+  background: var(--murasaki-surface);
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  transition: width var(--murasaki-duration-base) var(--murasaki-ease);
 }
 
 .main-area {
@@ -1228,6 +1244,7 @@ body,
   min-height: 0;
   height: 100%;
   overflow: hidden;
+  background: var(--murasaki-background);
 }
 
 .content-area {
@@ -1236,39 +1253,99 @@ body,
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
 }
 
 .search-panel-slot {
   height: 240px;
   flex-shrink: 0;
-  border-top: 1px solid #e0e0e6;
+  border-top: 1px solid var(--murasaki-line);
+  animation: murasaki-slide-up var(--murasaki-duration-base) var(--murasaki-ease-out);
+}
+
+@keyframes murasaki-slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .top-bar {
-  height: 36px;
-  padding: 0 8px;
-  border-bottom: 1px solid var(--n-border-color, #e0e0e6);
+  height: var(--murasaki-topbar-height);
+  padding: 0 10px;
+  border-bottom: 1px solid var(--murasaki-line);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
+  background: var(--murasaki-surface);
+  user-select: none;
 }
 
 .tab-bar-slot {
   flex: 1;
   min-width: 0;
+  height: 100%;
+  transition: opacity var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 
 .top-bar-title {
   flex: 1;
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 0 4px;
+}
+
+.app-brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--murasaki-purple-400), var(--murasaki-purple-700));
+  box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.12);
+  flex-shrink: 0;
+  animation: murasaki-pulse-soft 3.2s ease-in-out infinite;
 }
 
 .app-name {
   font-size: 13px;
   font-weight: 600;
-  color: #666;
+  color: var(--murasaki-primary);
+  letter-spacing: -0.01em;
+}
+
+/* === Naive UI overrides for purple brand === */
+:deep(.n-base-selection) .n-base-selection__border,
+:deep(.n-base-selection) .n-base-selection__state-border {
+  --n-border: 1px solid var(--murasaki-border) !important;
+}
+
+/* === Multi-end adaptation === */
+/* 紧凑密度：窄窗口 */
+@media (max-width: 980px) {
+  .top-bar {
+    padding: 0 6px;
+    gap: 4px;
+  }
+}
+
+/* 极窄窗口：进一步压缩 */
+@media (max-width: 720px) {
+  .top-bar {
+    padding: 0 4px;
+    gap: 2px;
+  }
+}
+
+/* 触屏：放大顶栏 */
+@media (pointer: coarse) {
+  .top-bar {
+    height: 40px;
+  }
+}
+
+/* 高 DPI 字体优化 */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .app-name {
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
 }
 </style>

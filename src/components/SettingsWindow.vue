@@ -112,7 +112,8 @@ const isDirty = computed(() => {
     a.softWrap !== b.softWrap ||
     a.showHiddenFiles !== b.showHiddenFiles ||
     a.markdownTheme !== b.markdownTheme ||
-    a.sidebarView !== b.sidebarView
+    a.sidebarView !== b.sidebarView ||
+    a.showAgentPanel !== b.showAgentPanel
   );
 });
 
@@ -159,6 +160,10 @@ async function onShowHiddenFilesChange(value: boolean): Promise<void> {
 
 async function onMarkdownThemeChange(value: string): Promise<void> {
   await applyField("markdownTheme", value);
+}
+
+async function onShowAgentPanelChange(value: boolean): Promise<void> {
+  await applyField("showAgentPanel", value);
 }
 
 // ===== 关闭 =====
@@ -406,6 +411,21 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
                   </NRadio>
                 </NSpace>
               </NRadioGroup>
+            </NFormItem>
+            <NDivider />
+            <NFormItem label="显示 Agent 面板">
+              <NSwitch
+                :value="draft.showAgentPanel"
+                @update:value="(v: boolean) => onShowAgentPanelChange(v)"
+              />
+              <NTag
+                v-if="isFieldDirty('showAgentPanel')"
+                size="small"
+                type="warning"
+                style="margin-left: 12px"
+              >
+                已修改
+              </NTag>
             </NFormItem>
           </NForm>
         </div>
