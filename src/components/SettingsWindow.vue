@@ -13,10 +13,15 @@ import {
   NTag,
   NDivider,
   NAlert,
+  NInput,
+  NSelect,
+  NSpin,
 } from "naive-ui";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
+import { useAiProvidersStore } from "../stores/useAiProvidersStore";
 import { MARKDOWN_THEMES } from "../composables/useTheme";
-import type { SettingsState } from "../types";
+import type { SettingsState, AiProvider, AiProviderPreset } from "../types";
+import { AI_PROVIDER_PRESETS } from "../types";
 
 interface Props {
   visible: boolean;
@@ -31,6 +36,7 @@ const emit = defineEmits<{
 }>();
 
 const persistence = usePersistenceStore();
+const aiProviders = useAiProvidersStore();
 
 /**
  * 当前编辑中的设置（本地副本，取消时不回写）
@@ -44,12 +50,16 @@ watch(
     if (v) {
       draft.value = { ...persistence.settings };
       activeCategory.value = "appearance";
+      // 加载 AI providers（若尚未加载）
+      if (!aiProviders.loaded) {
+        aiProviders.load();
+      }
     }
   }
 );
 
 // ===== 分类导航 =====
-type Category = "appearance" | "editor" | "files";
+type Category = "appearance" | "editor" | "files" | "ai";
 
 const activeCategory = ref<Category>("appearance");
 
@@ -57,6 +67,7 @@ const categories: Array<{ key: Category; label: string; icon: string }> = [
   { key: "appearance", label: "外观", icon: "🎨" },
   { key: "editor", label: "编辑", icon: "✏️" },
   { key: "files", label: "文件", icon: "📁" },
+  { key: "ai", label: "AI", icon: "🤖" },
 ];
 
 // ===== 主题选项 =====
@@ -162,6 +173,171 @@ const uiModeNotice = computed(() => {
   }
   return "";
 });
+
+// ===== AI Provider 管理 =====
+/** 当前选中的 provider id（用于左侧列表高亮 + 右侧编辑） */
+const selectedProviderId = ref<string | null>(null);
+/** 编辑中的 provider 副本 */
+const editingProvider = ref<AiProvider | null>(null);
+/** 编辑中的 API key（明文，仅在保存时传给后端） */
+const editingApiKey = ref<string>("");
+/** API key 显示切换 */
+const showApiKey = ref<boolean>(false);
+/** 保存中状态 */
+const savingProvider = ref<boolean>(false);
+/** 错误信息 */
+const providerError = ref<string>("");
+
+/** 选中某个 provider 进行编辑 */
+function selectProvider(id: string): void {
+  const p = aiProviders.providers.find((p) => p.id === id);
+  if (!p) return;
+  selectedProviderId.value = id;
+  editingProvider.value = { ...p };
+  editingApiKey.value = ""; // 编辑时不显示原 key，用户输入新 key 才更新
+  showApiKey.value = false;
+  providerError.value = "";
+  aiProviders.resetTestStatus();
+}
+
+/** 新建 provider（基于预设） */
+function newProvider(preset?: AiProviderPreset): void {
+  const p = preset ?? AI_PROVIDER_PRESETS[0];
+  editingProvider.value = {
+    id: "",
+    name: p.label,
+    type: p.type,
+    baseUrl: p.baseUrl,
+    model: p.model,
+    isActive: aiProviders.providers.length === 0, // 首个自动设为活动
+  };
+  selectedProviderId.value = null;
+  editingApiKey.value = "";
+  showApiKey.value = false;
+  providerError.value = "";
+  aiProviders.resetTestStatus();
+}
+
+/** 保存当前编辑的 provider */
+async function saveCurrentProvider(): Promise<void> {
+  if (!editingProvider.value) return;
+  if (!editingProvider.value.name.trim()) {
+    providerError.value = "名称不能为空";
+    return;
+  }
+  if (!editingProvider.value.baseUrl.trim()) {
+    providerError.value = "URL 不能为空";
+    return;
+  }
+  if (!editingProvider.value.model.trim()) {
+    providerError.value = "Model 不能为空";
+    return;
+  }
+  // 新增时必须填 API key
+  const isNew = !editingProvider.value.id;
+  if (isNew && !editingApiKey.value.trim()) {
+    providerError.value = "新增 provider 必须填写 API key";
+    return;
+  }
+  savingProvider.value = true;
+  providerError.value = "";
+  try {
+    const saved = await aiProviders.saveProvider(
+      editingProvider.value,
+      editingApiKey.value
+    );
+    selectedProviderId.value = saved.id;
+    editingProvider.value = { ...saved };
+    editingApiKey.value = ""; // 清空明文
+  } catch (err) {
+    providerError.value = String(err);
+  } finally {
+    savingProvider.value = false;
+  }
+}
+
+/** 删除当前选中的 provider */
+async function deleteCurrentProvider(): Promise<void> {
+  if (!selectedProviderId.value) return;
+  try {
+    await aiProviders.deleteProvider(selectedProviderId.value);
+    editingProvider.value = null;
+    selectedProviderId.value = null;
+    editingApiKey.value = "";
+  } catch (err) {
+    providerError.value = String(err);
+  }
+}
+
+/** 设为活动 provider */
+async function makeActive(): Promise<void> {
+  if (!editingProvider.value || !editingProvider.value.id) return;
+  try {
+    await aiProviders.setActive(editingProvider.value.id);
+    editingProvider.value = { ...editingProvider.value, isActive: true };
+  } catch (err) {
+    providerError.value = String(err);
+  }
+}
+
+/** 测试连接 */
+async function testCurrentProvider(): Promise<void> {
+  if (!editingProvider.value) return;
+  // 新增未保存时用编辑中的 key，已存在但 key 为空时提示需要先填 key
+  let apiKey = editingApiKey.value;
+  if (!apiKey && editingProvider.value.id) {
+    // 已保存但未输入新 key，尝试从后端取
+    try {
+      apiKey = await aiProviders.getApiKey(editingProvider.value.id);
+    } catch {
+      providerError.value = "无法获取 API key，请重新输入";
+      return;
+    }
+  }
+  if (!apiKey) {
+    providerError.value = "请先填写 API key";
+    return;
+  }
+  try {
+    await aiProviders.testConnection(
+      editingProvider.value.baseUrl,
+      apiKey,
+      editingProvider.value.model
+    );
+  } catch (err) {
+    providerError.value = String(err);
+  }
+}
+
+/** Provider 类型选项 */
+const providerTypeOptions = AI_PROVIDER_PRESETS.map((p) => ({
+  label: p.label,
+  value: p.type,
+}));
+
+/** 类型变更时自动填充预设 URL/Model（仅当字段为空或与旧预设一致时） */
+function onProviderTypeChange(newType: AiProvider["type"]): void {
+  if (!editingProvider.value) return;
+  const preset = AI_PROVIDER_PRESETS.find((p) => p.type === newType);
+  if (!preset) return;
+  const oldPreset = AI_PROVIDER_PRESETS.find(
+    (p) => p.type === editingProvider.value!.type
+  );
+  // 若当前 URL/Model 为空或等于旧预设，则更新为新预设
+  if (
+    !editingProvider.value.baseUrl ||
+    editingProvider.value.baseUrl === oldPreset?.baseUrl
+  ) {
+    editingProvider.value.baseUrl = preset.baseUrl;
+  }
+  if (
+    !editingProvider.value.model ||
+    editingProvider.value.model === oldPreset?.model
+  ) {
+    editingProvider.value.model = preset.model;
+  }
+  editingProvider.value.type = newType;
+}
 </script>
 
 <template>
@@ -309,6 +485,193 @@ const uiModeNotice = computed(() => {
             切换此选项后请刷新文件树（点击文件树顶部 ↻ 按钮或右键 → 刷新）以应用变更。
           </NAlert>
         </div>
+
+        <!-- AI -->
+        <div v-else-if="activeCategory === 'ai'" class="category-pane ai-pane">
+          <h3 class="pane-title">AI 服务配置</h3>
+          <NAlert type="info" :show-icon="true" style="margin-bottom: 16px">
+            API key 通过 Windows DPAPI 加密存储，仅在调用 LLM 时按需解密。
+            支持配置多个 provider，选择一个为「活动」。
+          </NAlert>
+
+          <div class="ai-layout">
+            <!-- 左侧 provider 列表 -->
+            <div class="ai-list">
+              <div class="ai-list-header">
+                <NText depth="2" style="font-size: 12px; font-weight: 500">
+                  Provider 列表
+                </NText>
+                <NButton
+                  size="tiny"
+                  type="primary"
+                  ghost
+                  @click="newProvider()"
+                >
+                  + 新增
+                </NButton>
+              </div>
+              <div v-if="aiProviders.providers.length === 0" class="ai-list-empty">
+                <NText depth="3" style="font-size: 12px">
+                  暂无 provider，点击「新增」配置
+                </NText>
+              </div>
+              <div
+                v-for="p in aiProviders.providers"
+                :key="p.id"
+                class="ai-list-item"
+                :class="{ active: selectedProviderId === p.id }"
+                @click="selectProvider(p.id)"
+              >
+                <div class="ai-list-item-name">
+                  {{ p.name }}
+                  <NTag
+                    v-if="p.isActive"
+                    size="tiny"
+                    type="success"
+                    style="margin-left: 4px"
+                  >
+                    活动
+                  </NTag>
+                </div>
+                <NText depth="3" class="ai-list-item-url">
+                  {{ p.baseUrl }}
+                </NText>
+              </div>
+            </div>
+
+            <!-- 右侧编辑区 -->
+            <div class="ai-editor">
+              <div v-if="!editingProvider" class="ai-editor-empty">
+                <NText depth="3">
+                  选择左侧 provider 编辑，或点击「新增」配置
+                </NText>
+              </div>
+              <NSpin v-else :show="savingProvider">
+                <NForm label-placement="top">
+                  <NFormItem label="类型">
+                    <NSelect
+                      :value="editingProvider.type"
+                      :options="providerTypeOptions"
+                      @update:value="onProviderTypeChange"
+                    />
+                  </NFormItem>
+                  <NFormItem label="名称">
+                    <NInput
+                      v-model:value="editingProvider.name"
+                      placeholder="如 DeepSeek 主力"
+                    />
+                  </NFormItem>
+                  <NFormItem label="Base URL">
+                    <NInput
+                      v-model:value="editingProvider.baseUrl"
+                      placeholder="https://api.deepseek.com"
+                    />
+                  </NFormItem>
+                  <NFormItem label="Model">
+                    <NInput
+                      v-model:value="editingProvider.model"
+                      placeholder="deepseek-v4-flash"
+                    />
+                  </NFormItem>
+                  <NFormItem label="API Key">
+                    <NInput
+                      v-model:value="editingApiKey"
+                      :type="showApiKey ? 'text' : 'password'"
+                      placeholder="新增时必填，编辑时留空表示保留原 key"
+                    />
+                    <NButton
+                      size="small"
+                      quaternary
+                      style="margin-left: 8px"
+                      @click="showApiKey = !showApiKey"
+                    >
+                      {{ showApiKey ? "隐藏" : "显示" }}
+                    </NButton>
+                  </NFormItem>
+
+                  <NSpace>
+                    <NButton
+                      type="primary"
+                      :loading="savingProvider"
+                      @click="saveCurrentProvider"
+                    >
+                      保存
+                    </NButton>
+                    <NButton
+                      v-if="editingProvider.id && !editingProvider.isActive"
+                      @click="makeActive"
+                    >
+                      设为活动
+                    </NButton>
+                    <NButton
+                      :loading="aiProviders.testStatus === 'testing'"
+                      @click="testCurrentProvider"
+                    >
+                      测试连接
+                    </NButton>
+                    <NButton
+                      v-if="selectedProviderId"
+                      quaternary
+                      type="error"
+                      @click="deleteCurrentProvider"
+                    >
+                      删除
+                    </NButton>
+                  </NSpace>
+
+                  <!-- 测试连接结果 -->
+                  <NAlert
+                    v-if="aiProviders.testStatus === 'success'"
+                    type="success"
+                    :show-icon="true"
+                    style="margin-top: 12px"
+                  >
+                    {{ aiProviders.testMessage }}
+                    <div
+                      v-if="aiProviders.testModels.length > 0"
+                      class="ai-models-list"
+                    >
+                      <NText depth="3" style="font-size: 11px">可用模型：</NText>
+                      <NTag
+                        v-for="m in aiProviders.testModels.slice(0, 10)"
+                        :key="m"
+                        size="tiny"
+                        style="margin: 2px"
+                      >
+                        {{ m }}
+                      </NTag>
+                      <NText
+                        v-if="aiProviders.testModels.length > 10"
+                        depth="3"
+                        style="font-size: 11px"
+                      >
+                        ...等 {{ aiProviders.testModels.length }} 个
+                      </NText>
+                    </div>
+                  </NAlert>
+                  <NAlert
+                    v-if="aiProviders.testStatus === 'error'"
+                    type="error"
+                    :show-icon="true"
+                    style="margin-top: 12px"
+                  >
+                    {{ aiProviders.testMessage }}
+                  </NAlert>
+
+                  <!-- 错误信息 -->
+                  <NAlert
+                    v-if="providerError"
+                    type="error"
+                    :show-icon="true"
+                    style="margin-top: 12px"
+                  >
+                    {{ providerError }}
+                  </NAlert>
+                </NForm>
+              </NSpin>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -401,5 +764,81 @@ const uiModeNotice = computed(() => {
   font-size: 11px;
   font-style: italic;
   margin-right: auto;
+}
+
+/* AI 分类面板 */
+.ai-pane .ai-layout {
+  display: flex;
+  gap: 16px;
+  min-height: 320px;
+}
+.ai-pane .ai-list {
+  width: 200px;
+  flex-shrink: 0;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 50vh;
+}
+.ai-pane .ai-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+.ai-pane .ai-list-empty {
+  padding: 16px 10px;
+  text-align: center;
+}
+.ai-pane .ai-list-item {
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #f5f5f5;
+  transition: background 0.15s;
+}
+.ai-pane .ai-list-item:hover {
+  background: #f9f9f9;
+}
+.ai-pane .ai-list-item.active {
+  background: rgba(24, 160, 88, 0.08);
+}
+.ai-pane .ai-list-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #24292e;
+  display: flex;
+  align-items: center;
+}
+.ai-pane .ai-list-item-url {
+  font-size: 11px;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+.ai-pane .ai-editor {
+  flex: 1;
+  min-width: 0;
+}
+.ai-pane .ai-editor-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  border: 1px dashed #e8e8e8;
+  border-radius: 4px;
+}
+.ai-pane .ai-models-list {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
 }
 </style>

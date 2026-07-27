@@ -133,3 +133,51 @@ export const DEFAULT_SETTINGS: SettingsState = {
   sidebarView: "files",
   lastWorkspacePath: null,
 };
+
+/**
+ * AI Provider 配置（与 Rust 端 AiProvider 对齐）
+ * 注意：apiKey 明文不在前端持久化，仅通过 get_api_key 命令按需获取
+ */
+export interface AiProvider {
+  id: string;
+  name: string;
+  type: "deepseek" | "openai" | "custom";
+  baseUrl: string;
+  model: string;
+  /** 是否为活动 provider（仅一个可为 true） */
+  isActive: boolean;
+}
+
+/**
+ * AI Provider 预设（用于一键填充）
+ */
+export interface AiProviderPreset {
+  type: AiProvider["type"];
+  label: string;
+  baseUrl: string;
+  model: string;
+}
+
+/**
+ * DeepSeek / OpenAI 默认预设
+ */
+export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
+  {
+    type: "deepseek",
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com",
+    model: "deepseek-v4-flash",
+  },
+  {
+    type: "openai",
+    label: "OpenAI",
+    baseUrl: "https://api.openai.com",
+    model: "gpt-4o-mini",
+  },
+  {
+    type: "custom",
+    label: "自定义",
+    baseUrl: "",
+    model: "",
+  },
+];

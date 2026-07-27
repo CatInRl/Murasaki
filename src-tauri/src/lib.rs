@@ -1,6 +1,7 @@
 pub mod commands;
 
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
+use commands::ai_providers;
 use commands::assets;
 use commands::drafts;
 use commands::files;
@@ -83,6 +84,12 @@ pub fn run() {
             watcher::stop_watching,
             watcher::stop_all_watching,
             menu::update_recent_menu,
+            ai_providers::get_ai_providers,
+            ai_providers::save_ai_provider,
+            ai_providers::delete_ai_provider,
+            ai_providers::set_active_provider,
+            ai_providers::get_api_key,
+            ai_providers::test_provider_connection,
         ])
         .setup(|app| {
             // 手动创建主窗口（tauri.conf.json 中 windows 数组为空）

@@ -1,3 +1,4 @@
+pub mod ai_providers;
 pub mod assets;
 pub mod drafts;
 pub mod files;
