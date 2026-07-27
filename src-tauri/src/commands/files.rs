@@ -71,13 +71,21 @@ fn sort_tree_nodes(nodes: &mut Vec<TreeNode>) {
         if da != db {
             return db.cmp(&da);
         }
-        // 2. 字符类别分组
+        // 2. 同类型（文件）：Markdown 优先
+        if !da {
+            let a_md = is_markdown(&a.name);
+            let b_md = is_markdown(&b.name);
+            if a_md != b_md {
+                return b_md.cmp(&a_md);
+            }
+        }
+        // 3. 字符类别分组
         let ca = category_of(&a.name);
         let cb = category_of(&b.name);
         if ca != cb {
             return ca.cmp(&cb);
         }
-        // 3. 组内排序
+        // 4. 组内排序
         match ca {
             0 => natural_lexical_cmp(&a.name, &b.name),        // 数字自然序
             1 => a.name.to_lowercase().cmp(&b.name.to_lowercase()), // 英文字母序（大小写不敏感）
@@ -85,6 +93,11 @@ fn sort_tree_nodes(nodes: &mut Vec<TreeNode>) {
             _ => a.name.cmp(&b.name),                          // 其他 Unicode 码点序
         }
     });
+}
+
+fn is_markdown(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    lower.ends_with(".md") || lower.ends_with(".markdown") || lower.ends_with(".mdown") || lower.ends_with(".mkd")
 }
 
 /// 递归遍历目录生成文件树

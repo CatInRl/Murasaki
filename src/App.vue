@@ -507,20 +507,16 @@ function onKeyDown(e: KeyboardEvent): void {
     void saveCurrentFile();
     return;
   }
-  // Ctrl+Shift+E：切换到文件树
+  // Ctrl+Shift+E：切换到文件树（无工作区时切换到大纲）
   if (ctrl && e.shiftKey && (e.key === "E" || e.key === "e")) {
     e.preventDefault();
-    if (workspace.hasWorkspace) {
-      sidebarView.value = "files";
-    }
+    sidebarView.value = workspace.hasWorkspace ? "files" : "outline";
     return;
   }
   // Ctrl+Shift+M：切换到大纲
   if (ctrl && e.shiftKey && (e.key === "M" || e.key === "m")) {
     e.preventDefault();
-    if (workspace.hasWorkspace) {
-      sidebarView.value = "outline";
-    }
+    sidebarView.value = "outline";
     return;
   }
   // Ctrl+Shift+F：在文件中查找（打开搜索面板）
@@ -958,7 +954,7 @@ async function handleMenuEvent(menuId: string): Promise<void> {
     case "docs": {
       try {
         const { open } = await import("@tauri-apps/plugin-shell");
-        await open("https://github.com/your-org/murasaki");
+        await open("https://github.com/CatInRl/Murasaki");
       } catch {
         alert("文档暂未在线发布");
       }
@@ -1023,7 +1019,7 @@ async function exportCurrentHtml(): Promise<void> {
     <NLayout style="height: 100vh" has-sider>
       <!-- Sidebar: 文件树 / 大纲 -->
       <NLayoutSider
-        v-if="workspace.hasWorkspace"
+        v-if="workspace.hasWorkspace || tabsStore.hasTabs"
         bordered
         :width="260"
         :collapsed-width="0"
@@ -1033,6 +1029,7 @@ async function exportCurrentHtml(): Promise<void> {
         <Sidebar
           :current-file-path="currentFilePath"
           :active-view="sidebarView"
+          :has-workspace="workspace.hasWorkspace"
           @select-file="openFile"
           @jump-to-line="onJumpToLine"
           @preview-image="onPreviewImage"

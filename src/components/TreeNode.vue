@@ -26,7 +26,7 @@ const emit = defineEmits<{
 
 const fileOps = useFileOpsStore();
 
-const expanded = ref(props.level === 0); // 顶层默认展开
+const expanded = ref(false); // 默认收起所有子文件夹
 
 // ===== 右键菜单状态 =====
 const menuVisible = ref(false);

@@ -11,11 +11,14 @@ interface Props {
   currentFilePath?: string | null;
   /** 侧栏当前视图（受控） */
   activeView?: SidebarView;
+  /** 是否已打开工作区（控制"文件树"按钮可见性） */
+  hasWorkspace?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   currentFilePath: null,
   activeView: "files",
+  hasWorkspace: false,
 });
 
 const emit = defineEmits<{
@@ -40,6 +43,7 @@ const { outline: outlineItems, loading: outlineLoading } = useOutline(filePathRe
     <div class="sidebar-tabs">
       <NButtonGroup size="small">
         <NButton
+          v-if="hasWorkspace"
           :type="activeView === 'files' ? 'primary' : 'default'"
           title="文件树 (Ctrl+Shift+E)"
           @click="setView('files')"
