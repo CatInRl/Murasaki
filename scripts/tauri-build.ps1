@@ -33,5 +33,8 @@ $env:APPDATA     = $appdataRoaming
 $env:LOCALAPPDATA = $appdataLocal
 
 Set-Location $projectRoot
+# Tauri CLI 2.11+ 要求 CI 环境变量为 "true"/"false"，而非 "1"
+# TRAE Sandbox 环境默认设置 CI=1，这里覆盖为 true
+if ($env:CI -eq "1") { $env:CI = "true" }
 npx tauri build
 exit $LASTEXITCODE
