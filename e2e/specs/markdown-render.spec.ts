@@ -24,7 +24,7 @@ import { openWorkspace, closeWorkspace, openFileInTab, getTabsState } from "../h
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
-const WS1 = "C:\\workspace\\md-test-1";
+const WS1 = resolve(process.cwd(), "e2e/.workspace-render");
 
 // 测试专用 fixture：每个用例独立文件，避免互相干扰
 const FIXTURES: Record<string, string> = {

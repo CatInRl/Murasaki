@@ -368,7 +368,7 @@ const searchAcrossFiles: ToolDef = {
       return { ok: false, error: "No workspace open" };
     }
     const { query, is_regex } = (args || {}) as { query?: string; is_regex?: boolean };
-    if (!query || typeof query !== "string") {
+    if (query == null || typeof query !== "string") {
       return { ok: false, error: "missing required parameter: query" };
     }
     try {

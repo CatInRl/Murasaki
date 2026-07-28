@@ -11,9 +11,9 @@ import { openWorkspace, closeWorkspace, openFileInTab, getTabsState } from "../h
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
-// ===== 测试用 fixture 目录 =====
-const WS1 = "C:\\workspace\\md-test-1";
-const WS2 = "C:\\workspace\\md-test-2";
+// ===== 测试用 fixture 目录（项目内路径，避免 TRAE Sandbox 限制） =====
+const WS1 = resolve(process.cwd(), "e2e/.workspace-detailed-1");
+const WS2 = resolve(process.cwd(), "e2e/.workspace-detailed-2");
 
 // 备份原始内容，测试后恢复
 const backup = new Map<string, string>();

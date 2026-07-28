@@ -426,6 +426,24 @@ describe("agent tools registry", () => {
       expect(result.error).toContain("missing required parameter: query");
     });
 
+    it("空 query 字符串返回空结果（不报错）", async () => {
+      const { invoke } = await import("@tauri-apps/api/core");
+      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+        hits: [],
+        totalHits: 0,
+        truncated: false,
+      });
+      const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
+      const { result, summary } = await executeTool(
+        "search_across_files",
+        JSON.stringify({ query: "" }),
+        ctx
+      );
+      expect(result.ok).toBe(true);
+      expect((result.data as { totalHits: number }).totalHits).toBe(0);
+      expect(summary).toBe("0 命中");
+    });
+
     it("成功返回搜索结果", async () => {
       const { invoke } = await import("@tauri-apps/api/core");
       (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
