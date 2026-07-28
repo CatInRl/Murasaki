@@ -274,22 +274,15 @@ describe("Agent 上下文 + 工具调用可见性", () => {
     const result = await browser.executeAsync(
       (done: (res: unknown) => void) => {
         // @ts-ignore
-        Promise.all([
-          import("/src/agent/tools.ts"),
-        ]).then(([mod]: [{ executeTool: (name: string, args: string, ctx: unknown) => Promise<{
-          result: { ok: boolean; error?: string };
-          summary: string;
-          parsedArgs: unknown;
-        }> }]) => {
-          const ctx = {
-            getEditorView: () => null,
-            getDocPath: () => null,
-            getWorkspacePath: () => null,
-          };
-          mod.executeTool("get_current_document", "{invalid json", ctx)
-            .then((res) => done(res))
-            .catch((err: unknown) => done({ error: String(err) }));
-        });
+        const agentTools = window.__agentTools__;
+        const ctx = {
+          getEditorView: () => null,
+          getDocPath: () => null,
+          getWorkspacePath: () => null,
+        };
+        agentTools.executeTool("get_current_document", "{invalid json", ctx)
+          .then((res) => done(res))
+          .catch((err: unknown) => done({ error: String(err) }));
       }
     ) as { result: { ok: boolean; error?: string }; summary: string; parsedArgs: { _error: string } };
 

@@ -4,9 +4,10 @@
  * - 应用窗口能启动并显示标题
  * - 欢迎页可见，包含核心入口按钮
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
+import { closeWorkspace, closeAllTabs } from "../helpers/store";
 
 let browser: Browser;
 
@@ -17,6 +18,18 @@ describe("Murasaki 启动 smoke 测试", () => {
 
   afterAll(async () => {
     if (browser) await closeSession(browser);
+  });
+
+  beforeEach(async () => {
+    // 全量 E2E 跑时，前序 spec 持久化了 lastWorkspacePath/tabs，
+    // 新 session 启动时会恢复，导致 smoke 不是欢迎页。
+    // 这里清理 workspace + tabs，确保回到欢迎页。
+    try {
+      await closeAllTabs(browser);
+      await closeWorkspace(browser);
+    } catch {
+      // ignore
+    }
   });
 
   it("窗口标题为 Murasaki", async () => {

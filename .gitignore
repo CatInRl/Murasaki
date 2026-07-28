@@ -21,6 +21,12 @@ e2e/.workspace/
 e2e/.diag-source.html
 e2e/.test-log.txt
 
+# E2E one-off diagnostic spec (manual debugging only)
+e2e/specs/inspect.spec.ts
+
+# tauri-driver runtime PID file
+tauri-driver.pid
+
 # E2E one-off debug scripts (keep only env-check + installer)
 e2e/scripts/*
 !e2e/scripts/check-env.ps1

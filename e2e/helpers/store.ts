@@ -48,6 +48,20 @@ export async function closeWorkspace(browser: Browser): Promise<void> {
   });
 }
 
+/** 关闭所有 tabs（测试隔离用，避免前序测试的 tab 残留导致 sidebar 不消失）
+ *  用 doCloseTab 强制关闭，绕过 dirty tab 的 needsConfirm 弹窗 */
+export async function closeAllTabs(browser: Browser): Promise<void> {
+  await browser.executeAsync((done: (res: unknown) => void) => {
+    // @ts-ignore
+    const pinia = window.__pinia__;
+    const tabs = pinia._s.get("tabs");
+    const ids = tabs.tabs.map((t: any) => t.id);
+    Promise.all(ids.map((id: string) => Promise.resolve(tabs.doCloseTab(id))))
+      .then(() => done(null))
+      .catch((err: unknown) => done(err ? String(err) : null));
+  });
+}
+
 /** 通过 tabs store 打开文件到新 tab（绕过文件树点击） */
 export async function openFileInTab(
   browser: Browser,

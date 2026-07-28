@@ -142,8 +142,8 @@ describe("多 Tab 管理", () => {
       if (tabs.activeTab) tabs.updateContent(tabs.activeTab.id, content);
     }, "# 修改后的内容\n");
 
-    // 等待 dirty-mark 出现
-    const dirtyMark = await browser.$(".tab-bar-container .tab-item.active .dirty-mark");
+    // 等待 dirty-dot 出现（TabBar.vue 用 .dirty-dot 不是 .dirty-mark）
+    const dirtyMark = await browser.$(".tab-bar-container .tab-item.active .dirty-dot");
     await dirtyMark.waitForExist({ timeout: 3000 });
     expect(await dirtyMark.isDisplayed()).toBe(true);
 

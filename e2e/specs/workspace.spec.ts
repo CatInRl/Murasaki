@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace } from "../helpers/store";
+import { openWorkspace, closeWorkspace, closeAllTabs } from "../helpers/store";
 
 let browser: Browser;
 
@@ -24,9 +24,11 @@ describe("工作区 + 文件树", () => {
   });
 
   beforeEach(async () => {
-    // 每个测试前重置工作区并关闭已打开的工作区
+    // 每个测试前重置工作区并关闭已打开的工作区和 tabs
+    // 避免前序测试的 tab 残留导致 sidebar 不消失（App.vue v-if="hasWorkspace || hasTabs"）
     resetWorkspace(defaultFixtureFiles());
     try {
+      await closeAllTabs(browser);
       await closeWorkspace(browser);
     } catch {
       // 首次启动无工作区，忽略
@@ -50,8 +52,8 @@ describe("工作区 + 文件树", () => {
     await title.waitForExist({ timeout: 10000 });
     const text = (await title.getText()).trim();
     expect(text.length).toBeGreaterThan(0);
-    // 工作区目录名应出现在标题中
-    expect(text).toContain("workspace");
+    // 工作区目录名应出现在标题中（fixture 目录名 .workspace 被 UI 大写显示为 .WORKSPACE）
+    expect(text.toLowerCase()).toContain("workspace");
   });
 
   it("文件树列出所有 .md 文件（含子目录）", async () => {

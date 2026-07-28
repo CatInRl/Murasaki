@@ -47,15 +47,27 @@ describe("AI Provider 配置", () => {
 
   beforeEach(async () => {
     // 每个测试前清空 provider 列表（磁盘 + 内存）
-    cleanSecrets();
+    // 注意：cleanSecrets() 通过 rmSync 删除 %APPDATA%\murasaki\，但在 TRAE Sandbox
+    // 中该路径被限制（rmSync 静默失败）。改用 Tauri command 逐个删除。
     await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const store = pinia._s.get("aiProviders");
-      // 重置内存状态
-      store.providers = [];
-      store.loaded = false;
-      done(null);
+      Promise.resolve(store.load())
+        .then(() => {
+          const ids = store.providers.map((p: any) => p.id);
+          return Promise.all(ids.map((id: string) => Promise.resolve(store.deleteProvider(id))));
+        })
+        .then(() => {
+          // 重置内存状态
+          store.providers = [];
+          store.loaded = false;
+          done(null);
+        })
+        .catch(() => {
+          // ignore
+          done(null);
+        });
     });
   });
 

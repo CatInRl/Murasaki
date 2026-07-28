@@ -39,16 +39,15 @@ describe("Agent 文件类工具", () => {
     const result = await browser.executeAsync(
       (done: (res: unknown) => void) => {
         // @ts-ignore
-        import("/src/agent/tools.ts").then((mod: { executeTool: (name: string, args: string, ctx: unknown) => Promise<{ result: { ok: boolean; error?: string }; summary: string }> }) => {
-          const ctx = {
-            getEditorView: () => null,
-            getDocPath: () => null,
-            getWorkspacePath: () => null,
-          };
-          mod.executeTool("list_files", "{}", ctx)
-            .then((res) => done(res))
-            .catch((err: unknown) => done({ error: String(err) }));
-        });
+        const agentTools = window.__agentTools__;
+        const ctx = {
+          getEditorView: () => null,
+          getDocPath: () => null,
+          getWorkspacePath: () => null,
+        };
+        agentTools.executeTool("list_files", "{}", ctx)
+          .then((res) => done(res))
+          .catch((err: unknown) => done({ error: String(err) }));
       }
     ) as { result: { ok: boolean; error?: string }; summary: string };
 
@@ -65,16 +64,16 @@ describe("Agent 文件类工具", () => {
         // @ts-ignore
         const pinia = window.__pinia__;
         const workspace = pinia._s.get("workspace");
-        import("/src/agent/tools.ts").then((mod: { executeTool: (name: string, args: string, ctx: unknown) => Promise<{ result: { ok: boolean; data?: { files?: string[] } } }> }) => {
-          const ctx = {
-            getEditorView: () => null,
-            getDocPath: () => null,
-            getWorkspacePath: () => workspace.workspacePath,
-          };
-          mod.executeTool("list_files", "{}", ctx)
-            .then((res) => done(res))
-            .catch((err: unknown) => done({ error: String(err) }));
-        });
+        // @ts-ignore
+        const agentTools = window.__agentTools__;
+        const ctx = {
+          getEditorView: () => null,
+          getDocPath: () => null,
+          getWorkspacePath: () => workspace.workspacePath,
+        };
+        agentTools.executeTool("list_files", "{}", ctx)
+          .then((res) => done(res))
+          .catch((err: unknown) => done({ error: String(err) }));
       }
     ) as { result: { ok: boolean; data?: { files?: string[] } } };
 
@@ -94,16 +93,16 @@ describe("Agent 文件类工具", () => {
         // @ts-ignore
         const pinia = window.__pinia__;
         const workspace = pinia._s.get("workspace");
-        import("/src/agent/tools.ts").then((mod: { executeTool: (name: string, args: string, ctx: unknown) => Promise<{ result: { ok: boolean; data?: { docPath?: string; content?: string; contentHash?: string; contentLength?: number; truncated?: boolean } } }> }) => {
-          const ctx = {
-            getEditorView: () => null,
-            getDocPath: () => null,
-            getWorkspacePath: () => workspace.workspacePath,
-          };
-          mod.executeTool("read_file", JSON.stringify({ path: "intro.md" }), ctx)
-            .then((res) => done(res))
-            .catch((err: unknown) => done({ error: String(err) }));
-        });
+        // @ts-ignore
+        const agentTools = window.__agentTools__;
+        const ctx = {
+          getEditorView: () => null,
+          getDocPath: () => null,
+          getWorkspacePath: () => workspace.workspacePath,
+        };
+        agentTools.executeTool("read_file", JSON.stringify({ path: "intro.md" }), ctx)
+          .then((res) => done(res))
+          .catch((err: unknown) => done({ error: String(err) }));
       }
     ) as { result: { ok: boolean; data?: { docPath?: string; content?: string; contentHash?: string; contentLength?: number; truncated?: boolean } } };
 
@@ -123,16 +122,16 @@ describe("Agent 文件类工具", () => {
         // @ts-ignore
         const pinia = window.__pinia__;
         const workspace = pinia._s.get("workspace");
-        import("/src/agent/tools.ts").then((mod: { executeTool: (name: string, args: string, ctx: unknown) => Promise<{ result: { ok: boolean; error?: string } }> }) => {
-          const ctx = {
-            getEditorView: () => null,
-            getDocPath: () => null,
-            getWorkspacePath: () => workspace.workspacePath,
-          };
-          mod.executeTool("read_file", JSON.stringify({ path: "../escape.md" }), ctx)
-            .then((res) => done(res))
-            .catch((err: unknown) => done({ error: String(err) }));
-        });
+        // @ts-ignore
+        const agentTools = window.__agentTools__;
+        const ctx = {
+          getEditorView: () => null,
+          getDocPath: () => null,
+          getWorkspacePath: () => workspace.workspacePath,
+        };
+        agentTools.executeTool("read_file", JSON.stringify({ path: "../escape.md" }), ctx)
+          .then((res) => done(res))
+          .catch((err: unknown) => done({ error: String(err) }));
       }
     ) as { result: { ok: boolean; error?: string } };
 
@@ -149,18 +148,18 @@ describe("Agent 文件类工具", () => {
         // @ts-ignore
         const pinia = window.__pinia__;
         const workspace = pinia._s.get("workspace");
-        import("/src/agent/tools.ts").then((mod: { executeTool: (name: string, args: string, ctx: unknown) => Promise<{ result: { ok: boolean; error?: string } }> }) => {
-          const ctx = {
-            getEditorView: () => null,
-            getDocPath: () => null,
-            getWorkspacePath: () => workspace.workspacePath,
-          };
-          // 尝试用绝对路径访问工作区内文件
-          const absPath = wsPath.replace(/\//g, "\\") + "\\intro.md";
-          mod.executeTool("read_file", JSON.stringify({ path: absPath }), ctx)
-            .then((res) => done(res))
-            .catch((err: unknown) => done({ error: String(err) }));
-        });
+        // @ts-ignore
+        const agentTools = window.__agentTools__;
+        const ctx = {
+          getEditorView: () => null,
+          getDocPath: () => null,
+          getWorkspacePath: () => workspace.workspacePath,
+        };
+        // 尝试用绝对路径访问工作区内文件
+        const absPath = wsPath.replace(/\//g, "\\") + "\\intro.md";
+        agentTools.executeTool("read_file", JSON.stringify({ path: absPath }), ctx)
+          .then((res) => done(res))
+          .catch((err: unknown) => done({ error: String(err) }));
       },
       wsPath
     ) as { result: { ok: boolean; error?: string } };
@@ -178,16 +177,16 @@ describe("Agent 文件类工具", () => {
         // @ts-ignore
         const pinia = window.__pinia__;
         const workspace = pinia._s.get("workspace");
-        import("/src/agent/tools.ts").then((mod: { executeTool: (name: string, args: string, ctx: unknown) => Promise<{ result: { ok: boolean; data?: { hits?: unknown[]; totalHits?: number; truncated?: boolean } } }> }) => {
-          const ctx = {
-            getEditorView: () => null,
-            getDocPath: () => null,
-            getWorkspacePath: () => workspace.workspacePath,
-          };
-          mod.executeTool("search_across_files", JSON.stringify({ query: "Murasaki" }), ctx)
-            .then((res) => done(res))
-            .catch((err: unknown) => done({ error: String(err) }));
-        });
+        // @ts-ignore
+        const agentTools = window.__agentTools__;
+        const ctx = {
+          getEditorView: () => null,
+          getDocPath: () => null,
+          getWorkspacePath: () => workspace.workspacePath,
+        };
+        agentTools.executeTool("search_across_files", JSON.stringify({ query: "Murasaki" }), ctx)
+          .then((res) => done(res))
+          .catch((err: unknown) => done({ error: String(err) }));
       }
     ) as { result: { ok: boolean; data?: { hits?: Array<{ filePath?: string }>; totalHits?: number; truncated?: boolean } } };
 
@@ -207,16 +206,16 @@ describe("Agent 文件类工具", () => {
         // @ts-ignore
         const pinia = window.__pinia__;
         const workspace = pinia._s.get("workspace");
-        import("/src/agent/tools.ts").then((mod: { executeTool: (name: string, args: string, ctx: unknown) => Promise<{ result: { ok: boolean; data?: { totalHits?: number } } }> }) => {
-          const ctx = {
-            getEditorView: () => null,
-            getDocPath: () => null,
-            getWorkspacePath: () => workspace.workspacePath,
-          };
-          mod.executeTool("search_across_files", JSON.stringify({ query: "Mura.*编辑器", is_regex: true }), ctx)
-            .then((res) => done(res))
-            .catch((err: unknown) => done({ error: String(err) }));
-        });
+        // @ts-ignore
+        const agentTools = window.__agentTools__;
+        const ctx = {
+          getEditorView: () => null,
+          getDocPath: () => null,
+          getWorkspacePath: () => workspace.workspacePath,
+        };
+        agentTools.executeTool("search_across_files", JSON.stringify({ query: "Mura.*编辑器", is_regex: true }), ctx)
+          .then((res) => done(res))
+          .catch((err: unknown) => done({ error: String(err) }));
       }
     ) as { result: { ok: boolean; data?: { totalHits?: number } } };
 
@@ -234,16 +233,16 @@ describe("Agent 文件类工具", () => {
         // @ts-ignore
         const pinia = window.__pinia__;
         const workspace = pinia._s.get("workspace");
-        import("/src/agent/tools.ts").then((mod: { executeTool: (name: string, args: string, ctx: unknown) => Promise<{ result: { ok: boolean; data?: { totalHits?: number; hits?: unknown[] } } }> }) => {
-          const ctx = {
-            getEditorView: () => null,
-            getDocPath: () => null,
-            getWorkspacePath: () => workspace.workspacePath,
-          };
-          mod.executeTool("search_across_files", JSON.stringify({ query: "" }), ctx)
-            .then((res) => done(res))
-            .catch((err: unknown) => done({ error: String(err) }));
-        });
+        // @ts-ignore
+        const agentTools = window.__agentTools__;
+        const ctx = {
+          getEditorView: () => null,
+          getDocPath: () => null,
+          getWorkspacePath: () => workspace.workspacePath,
+        };
+        agentTools.executeTool("search_across_files", JSON.stringify({ query: "" }), ctx)
+          .then((res) => done(res))
+          .catch((err: unknown) => done({ error: String(err) }));
       }
     ) as { result: { ok: boolean; data?: { totalHits?: number; hits?: unknown[] } } };
 
