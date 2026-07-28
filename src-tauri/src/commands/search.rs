@@ -182,9 +182,11 @@ mod tests {
     fn create_test_workspace() -> TempDir {
         let dir = TempDir::new().expect("创建临时目录失败");
         // 创建测试文件
+        // intro.md: "Murasaki" 和 "editor" 在同一行（供 regex 测试），
+        // "Welcome" 后有 2 行内容（供 context_lines 测试）
         fs::write(
             dir.path().join("intro.md"),
-            "# Introduction\n\nWelcome to Murasaki.\nIt is a markdown editor.\n",
+            "# Introduction\n\nWelcome to Murasaki, a markdown editor.\nIt supports search and more.\nAdditional context line.\n",
         )
         .unwrap();
         fs::write(
@@ -339,7 +341,8 @@ mod tests {
         assert_eq!(m.context_before[1], "");
         // context_after: 后 2 行
         assert_eq!(m.context_after.len(), 2);
-        assert_eq!(m.context_after[0], "It is a markdown editor.");
+        assert_eq!(m.context_after[0], "It supports search and more.");
+        assert_eq!(m.context_after[1], "Additional context line.");
     }
 
     #[test]
