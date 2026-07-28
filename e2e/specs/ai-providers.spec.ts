@@ -16,7 +16,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { existsSync, rmSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { createSession } from "../helpers/driver";
+import { createSession, closeSession } from "../helpers/driver";
 
 /** 真实 %APPDATA%\murasaki\ 目录（dirs::data_dir() 不尊重 env 重定向） */
 function secretsDir(): string {
@@ -41,7 +41,7 @@ describe("AI Provider 配置", () => {
   }, 60000);
 
   afterAll(async () => {
-    if (browser) await browser.deleteSession();
+    if (browser) await closeSession(browser);
     cleanSecrets();
   });
 
@@ -330,7 +330,7 @@ describe("AI Provider 配置", () => {
     );
 
     // 关闭当前 session
-    await browser.deleteSession();
+    await closeSession(browser);
 
     // 重建 session（模拟重启）
     browser = await createSession();

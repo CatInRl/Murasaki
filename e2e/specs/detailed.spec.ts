@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import type { Browser } from "webdriverio";
-import { createSession } from "../helpers/driver";
+import { createSession, closeSession } from "../helpers/driver";
 import { openWorkspace, closeWorkspace, openFileInTab, getTabsState } from "../helpers/store";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
@@ -71,7 +71,7 @@ beforeAll(async () => {
 }, 60000);
 
 afterAll(async () => {
-  if (browser) await browser.deleteSession();
+  if (browser) await closeSession(browser);
   // 恢复原始文件
   restoreFiles();
 });

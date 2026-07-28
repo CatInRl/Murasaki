@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
-import { createSession } from "../helpers/driver";
+import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace } from "../helpers/store";
 
@@ -20,7 +20,7 @@ describe("工作区 + 文件树", () => {
   }, 60000);
 
   afterAll(async () => {
-    if (browser) await browser.deleteSession();
+    if (browser) await closeSession(browser);
   });
 
   beforeEach(async () => {

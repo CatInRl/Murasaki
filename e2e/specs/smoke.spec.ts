@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Browser } from "webdriverio";
-import { createSession } from "../helpers/driver";
+import { createSession, closeSession } from "../helpers/driver";
 
 let browser: Browser;
 
@@ -16,7 +16,7 @@ describe("Murasaki 启动 smoke 测试", () => {
   }, 60000);
 
   afterAll(async () => {
-    if (browser) await browser.deleteSession();
+    if (browser) await closeSession(browser);
   });
 
   it("窗口标题为 Murasaki", async () => {
@@ -31,22 +31,23 @@ describe("Murasaki 启动 smoke 测试", () => {
   });
 
   it("欢迎页包含 'Murasaki' 标题文本", async () => {
-    const titleEl = await browser.$(".welcome-page .title");
+    const titleEl = await browser.$(".welcome-page .brand-title");
     await titleEl.waitForExist({ timeout: 10000 });
     const text = (await titleEl.getText()).trim();
     expect(text).toBe("Murasaki");
   });
 
   it("欢迎页提供'打开文件夹'入口", async () => {
-    // NButton 渲染为 <button>，通过文本定位
-    const btn = await browser.$("button=打开文件夹");
-    await btn.waitForExist({ timeout: 10000 });
-    expect(await btn.isDisplayed()).toBe(true);
+    // WelcomePage 用 .action-card > .action-label 结构渲染按钮
+    // button=TEXT 选择器只匹配直接文本节点，不匹配嵌套 span，所以用 .action-label
+    const label = await browser.$(".action-label=打开文件夹");
+    await label.waitForExist({ timeout: 10000 });
+    expect(await label.isDisplayed()).toBe(true);
   });
 
   it("欢迎页提供'打开文件'和'新建文件'入口", async () => {
-    const openFile = await browser.$("button=打开文件");
-    const newFile = await browser.$("button=新建文件");
+    const openFile = await browser.$(".action-label=打开文件");
+    const newFile = await browser.$(".action-label=新建文件");
     await openFile.waitForExist({ timeout: 10000 });
     await newFile.waitForExist({ timeout: 10000 });
     expect(await openFile.isDisplayed()).toBe(true);
