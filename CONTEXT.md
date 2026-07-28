@@ -458,6 +458,36 @@ LaTeX 语法的数学公式支持，使用 KaTeX 渲染（轻量、快速）。
 - PDF 导出（使用浏览器打印 API 或外部工具，当前不做，用户可用 HTML 在浏览器中自助打印）。
 - 复制为富文本（粘贴到 Word/飞书时保留格式，留到后续版本）。
 
+## Agent (Agent Capability)
+
+应用内置的 AI 助手能力，帮助用户编辑和管理 Markdown 文档。MVP 阶段不支持无工作区的独立文件（agent 在无工作区时整体禁用）。
+
+### Agent 能力分层
+
+为避免测试与讨论中的"全功能"语义漂移，约定 agent 能力分为以下七层，每层独立可测：
+
+- **A. 上下文 UI 层** —— 上下文卡片显示、token 估算、× 移除、切 tab 跟随、工具调用条目（calling/done/error）的可见性与展开。
+- **B. 工具后端集成层** —— 10 个工具（4 CM6 状态 + 3 文件 + 3 提议）通过 `executeTool` 直接调用的行为正确性，与 LLM 无关。
+- **C. 真实 LLM 调用循环层** —— `sendMessage` 入口：provider 解析 → API key 获取 → 上下文拼装 → 流式请求 → 工具调用循环 → 收尾。
+- **D. 提议渲染与接受层** —— CM6 装饰渲染 propose_insert / propose_replace / propose_new_file，✓/✗ 按钮，>50 行二次确认，严格失效。
+- **E. 对话持久化与隔离层** —— `chats/{sha1(workspacePath)}.json.gz` + `chats/index.json`，500ms 防抖保存，工作区隔离，单实例锁，孤儿清理。
+- **F. 上下文压缩与护栏层** —— 三层压缩（工具结果省略 → 滑窗+摘要 → 单请求截断），累计 token 跟踪与软上限。
+- **G. 取消/中断与并发层** —— AbortController 中断、partial answer 保留、"⚠ 已中断"标记、关闭运行中 tab 合并弹窗、tab 切换后台继续。
+
+### 全功能 E2E (Full-Stack Agent E2E)
+
+指覆盖 A–G 全部七层的端到端测试集合。单测/集成测试不算"全功能 E2E"。当前现有 E2E 仅覆盖 A、B 两层（绕过 LLM），C–G 全部为零覆盖。
+
+**API key 注入方式**：通过环境变量 `MURASAKI_E2E_API_KEY` 传入，不在任何文件落盘。
+
+### Agent UX 遗留问题 (Agent UX Follow-ups)
+
+全功能 E2E 测试中发现的 Agent 相关 UI/UX 不符合预期的问题（包括设置界面 UX 设计），记录为 GitHub issue 并标记 `agent-ux` 标签，待后续修复后由对应 E2E 测试回归验证。
+
+### WYSIWYG 模式 (WYSIWYG Mode)
+
+所见即所得编辑模式——用户直接在渲染结果上编辑，与 Agent 功能协同（proposal 在 WYSIWYG 下的渲染与接受行为需单独适配）。当前为计划阶段，待分屏模式稳定后实施。切回分屏模式入口为系统设置 → 编辑分类。
+
 ## 搜索 (Search)
 
 应用支持两个层次的搜索：

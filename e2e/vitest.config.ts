@@ -10,6 +10,7 @@ const e2eRoot = dirname(fileURLToPath(import.meta.url));
  * - 超时放宽到 60s（应用冷启动慢）
  * - 通过 globalSetup 启动 tauri-driver，由各测试文件自行创建 session
  * - root 指向 e2e/ 目录，使 include/specs 相对解析
+ * - env 注入 MURASAKI_E2E_API_KEY 供 agent 全功能测试使用
  */
 export default defineConfig({
   test: {
@@ -23,6 +24,10 @@ export default defineConfig({
     hookTimeout: 60000,
     globalSetup: resolve(e2eRoot, "setup.ts"),
     globals: true,
-    isolate: false
+    isolate: false,
+    env: {
+      // 从父进程继承 MURASAKI_E2E_API_KEY（若未设置则为空字符串，agent LLM 测试将跳过）
+      MURASAKI_E2E_API_KEY: process.env.MURASAKI_E2E_API_KEY ?? "",
+    },
   }
 });

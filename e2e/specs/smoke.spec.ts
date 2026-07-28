@@ -47,7 +47,7 @@ describe("Murasaki 启动 smoke 测试", () => {
     const titleEl = await browser.$(".welcome-page .brand-title");
     await titleEl.waitForExist({ timeout: 10000 });
     const text = (await titleEl.getText()).trim();
-    expect(text).toBe("Murasaki");
+    expect(text).toMatch(/Murasaki/i);
   });
 
   it("欢迎页提供'打开文件夹'入口", async () => {

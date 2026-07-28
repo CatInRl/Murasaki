@@ -387,3 +387,107 @@ describe("AI Provider 配置", () => {
     expect(state.hasActive).toBe(true);
   }, 120000);
 });
+
+describe("AI Provider UI 配置", () => {
+  it("通过设置页面 UI 配置 DeepSeek provider 完整流程", async () => {
+    const apiKey = process.env.MURASAKI_E2E_API_KEY ?? "";
+    if (!apiKey) {
+      console.warn("跳过：未设置 MURASAKI_E2E_API_KEY");
+      return;
+    }
+
+    // 打开设置窗口
+    await browser.executeAsync((done: (res: unknown) => void) => {
+      // @ts-ignore
+      window.__pinia__._s.get("app")?.openSettings?.();
+      // 如果 app store 没有 openSettings，尝试直接触发
+      const event = new CustomEvent("open-settings");
+      window.dispatchEvent(event);
+      setTimeout(() => done(null), 500);
+    });
+
+    // 等待设置窗口出现
+    await browser.pause(1000);
+    const settingsLayout = await browser.$(".settings-layout");
+    
+    // 如果设置窗口没出现，尝试通过 WelcomePage 的 settings-link 打开
+    if (!(await settingsLayout.isExisting())) {
+      // 关闭所有 tab 回到欢迎页
+      await closeAllTabs(browser);
+      await browser.pause(500);
+      const settingsLink = await browser.$(".settings-link");
+      if (await settingsLink.isExisting()) {
+        await settingsLink.click();
+        await browser.pause(1000);
+      }
+    }
+
+    // 点击 AI 导航项
+    const aiNavItem = await browser.$(".nav-item:nth-child(4)"); // AI is 4th nav item
+    await aiNavItem.waitForExist({ timeout: 10000 });
+    await aiNavItem.click();
+    await browser.pause(500);
+
+    // 验证 AI 面板可见
+    const aiPane = await browser.$(".category-pane.ai-pane");
+    expect(await aiPane.isDisplayed()).toBe(true);
+
+    // 点击 "+ 新增" 按钮
+    const addBtn = await browser.$("button=N新增");
+    // Naive UI NButton text may be "+ 新增" - try exact match
+    const addButtons = await browser.$$("button");
+    let found = false;
+    for (const btn of addButtons) {
+      const text = (await btn.getText()).trim();
+      if (text.includes("新增")) {
+        await btn.click();
+        found = true;
+        break;
+      }
+    }
+    expect(found).toBe(true);
+    await browser.pause(500);
+
+    // 填充表单 - API Key
+    const inputs = await browser.$$(".ai-pane input");
+    // NInput renders: type select (not input), name, baseUrl, model, apiKey
+    // Find the API Key input (password type)
+    const apiKeyInput = await browser.$('.ai-pane input[type="password"]');
+    if (await apiKeyInput.isExisting()) {
+      await apiKeyInput.setValue(apiKey);
+    }
+
+    // Fill name if needed
+    const nameInput = await browser.$('.ai-pane input[placeholder="如 DeepSeek 主力"]');
+    if (await nameInput.isExisting()) {
+      const val = await nameInput.getValue();
+      if (!val || val.trim() === "") {
+        await nameInput.setValue("E2E UI Test");
+      }
+    }
+
+    // 点击保存
+    const saveBtn = await browser.$("button=保存");
+    await saveBtn.waitForExist({ timeout: 5000 });
+    await saveBtn.click();
+    await browser.pause(1000);
+
+    // 点击测试连接
+    const testBtn = await browser.$("button=测试连接");
+    await testBtn.waitForExist({ timeout: 5000 });
+    await testBtn.click();
+    // 等待测试结果（可能较慢）
+    await browser.pause(3000);
+
+    // 验证成功提示（.n-alert--success-type 或其他成功元素）
+    const successAlert = await browser.$(".n-alert--success-type");
+    const hasSuccess = await successAlert.isExisting();
+    
+    // 验证 provider 出现在左侧列表中
+    const listItems = await browser.$$(".ai-list-item");
+    const listTexts = await Promise.all(listItems.map((el) => el.getText()));
+    const hasProvider = listTexts.some((t) => t.includes("E2E UI Test"));
+    
+    expect(hasSuccess || hasProvider).toBe(true);
+  }, 45000);
+});
