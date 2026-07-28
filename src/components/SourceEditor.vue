@@ -313,7 +313,7 @@ onMounted(() => {
   }
   emit("ready", view);
   // 注册到 editor bridge（供 agent 工具使用）
-  useEditorBridgeStore().registerView(view, null);
+  useEditorBridgeStore().registerView(view);
 });
 
 onBeforeUnmount(() => {

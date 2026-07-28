@@ -82,9 +82,12 @@ const activeContent = computed({
 const currentFilePath = computed(() => activeTab.value?.path ?? null);
 
 // 切 tab 时更新 editor bridge 的文档路径（供 agent 工具使用）
+// 用 flush: 'post' 确保在 SourceEditor.onMounted（registerView(view, null)）之后触发，
+// 否则首次打开 tab 时 EditorPane 挂载会重置 activeDocPath 为 null，
+// 导致 agent.hasContext 为 false、上下文卡片不显示。
 watch(currentFilePath, (path) => {
   editorBridge.updateDocPath(path);
-});
+}, { flush: 'post' });
 
 // ===== 侧栏视图（受控） =====
 const sidebarView = ref<SidebarView>("files");

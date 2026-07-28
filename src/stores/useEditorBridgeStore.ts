@@ -14,10 +14,9 @@ export const useEditorBridgeStore = defineStore("editorBridge", () => {
   /** 当前活跃 tab 的文件路径 */
   const activeDocPath = ref<string | null>(null);
 
-  /** 注册 EditorView */
-  function registerView(view: EditorView, docPath: string | null): void {
+  /** 注册 EditorView（不重置 activeDocPath —— 由 App.vue 的 watch 管理） */
+  function registerView(view: EditorView): void {
     editorView.value = view;
-    activeDocPath.value = docPath;
   }
 
   /** 注销 EditorView */
