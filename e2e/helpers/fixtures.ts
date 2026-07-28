@@ -39,26 +39,25 @@ export async function setupActiveProvider(
   baseUrl = "https://api.deepseek.com",
   model = "deepseek-v4-flash"
 ): Promise<{ id: string; name: string }> {
-  return browser.executeAsync(
+  const result = await browser.executeAsync(
     (key: string, url: string, mdl: string, done: (res: unknown) => void) => {
-      // @ts-ignore
-      const store = window.__pinia__._s.get("aiProviders");
+      const pinia = (window as any).__pinia__;
+      const store = pinia._s.get("aiProviders");
       const newProvider = {
-        id: "",
-        name: "E2E Test",
-        type: "deepseek",
-        baseUrl: url,
-        model: mdl,
-        isActive: true,
+        id: "", name: "E2E Test", type: "deepseek",
+        baseUrl: url, model: mdl, isActive: true,
       };
-      Promise.resolve(store.saveProvider(newProvider, key))
+      store.saveProvider(newProvider, key)
         .then((saved: any) => done({ id: saved.id, name: saved.name }))
-        .catch((err: unknown) => done({ error: String(err) }));
+        .catch((err: unknown) => done({ error: `saveProvider failed: ${String(err)}` }));
     },
-    apiKey,
-    baseUrl,
-    model
+    apiKey, baseUrl, model
   );
+
+  if ((result as any)?.error) {
+    throw new Error(`setupActiveProvider failed: ${(result as any).error}`);
+  }
+  return result as { id: string; name: string };
 }
 
 /** 清理活动 provider（测试隔离） */
