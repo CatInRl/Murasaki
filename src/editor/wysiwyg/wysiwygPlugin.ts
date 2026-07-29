@@ -111,7 +111,13 @@ class WysiwygPluginValue {
   }
 
   update(u: ViewUpdate): void {
-    if (!u.docChanged && !u.selectionSet && !u.viewportChanged) return;
+    if (!u.docChanged && !u.selectionSet && !u.viewportChanged) {
+      // 提案变化（新增/接受/拒绝/过期）也需重算：提案覆盖范围的标记要保持可见，
+      // 提案解决后恢复隐藏。比较 proposalField 前后引用是否变化来检测（Ticket #79 / T7.4）。
+      if (u.startState.field(proposalField, false) === u.state.field(proposalField, false)) {
+        return;
+      }
+    }
     // 防抖 50ms：合并连续光标移动 / 输入，避免每次按键都重算语法树遍历。
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = setTimeout(() => {
