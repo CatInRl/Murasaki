@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import { NModal, NButton, NSpace, NText, NSpin } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
 import { basename, extname } from "../utils/path";
+import { useDialogStore } from "../stores/useDialogStore";
 
 interface Props {
   visible: boolean;
@@ -17,6 +18,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: "close"): void;
 }>();
+
+const dialog = useDialogStore();
 
 const dataUrl = ref<string>("");
 const loading = ref(false);
@@ -123,7 +126,7 @@ async function revealInExplorer(): Promise<void> {
   try {
     await invoke("reveal_in_explorer", { path: props.path });
   } catch (err) {
-    alert(`无法在资源管理器中显示: ${err}`);
+    dialog.alert({ message: `无法在资源管理器中显示: ${err}`, variant: "error" });
   }
 }
 </script>

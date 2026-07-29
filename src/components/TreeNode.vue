@@ -4,6 +4,7 @@ import { Pencil, Scissors, Copy, Clipboard, Trash2, FolderOpen } from "lucide-vu
 import { NDropdown, NInput } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
+import { useDialogStore } from "../stores/useDialogStore";
 import type { TreeNode } from "../types";
 
 interface Props {
@@ -26,6 +27,7 @@ const emit = defineEmits<{
 }>();
 
 const fileOps = useFileOpsStore();
+const dialog = useDialogStore();
 
 const expanded = ref(false); // 默认收起所有子文件夹
 
@@ -126,7 +128,7 @@ async function onDrop(e: DragEvent): Promise<void> {
     try {
       await fileOps.moveInto(internalPath, targetDir);
     } catch (err) {
-      alert(`移动失败: ${err}`);
+      dialog.alert({ message: `移动失败: ${err}`, variant: "error" });
     }
     return;
   }
@@ -140,7 +142,7 @@ async function onDrop(e: DragEvent): Promise<void> {
       try {
         await fileOps.copyInto(externalPath, targetDir);
       } catch (err) {
-        alert(`复制失败: ${err}`);
+        dialog.alert({ message: `复制失败: ${err}`, variant: "error" });
       }
     }
   }
@@ -238,29 +240,29 @@ async function onMenuSelect(key: string): Promise<void> {
       try {
         await fileOps.paste(node.path);
       } catch (err) {
-        alert(`粘贴失败: ${err}`);
+        dialog.alert({ message: `粘贴失败: ${err}`, variant: "error" });
       }
       break;
     case "copy-path":
       try {
         await fileOps.copyAbsolutePath(node.path);
       } catch (err) {
-        alert(`复制路径失败: ${err}`);
+        dialog.alert({ message: `复制路径失败: ${err}`, variant: "error" });
       }
       break;
     case "copy-rel-path":
       try {
         await fileOps.copyRelativePath(node.path);
       } catch (err) {
-        alert(`复制相对路径失败: ${err}`);
+        dialog.alert({ message: `复制相对路径失败: ${err}`, variant: "error" });
       }
       break;
     case "delete":
-      if (confirm(`确定要删除 "${node.name}" 吗？（移至回收站）`)) {
+      if (await dialog.confirm({ message: `确定要删除 "${node.name}" 吗？（移至回收站）`, danger: true })) {
         try {
           await fileOps.deletePath(node.path);
         } catch (err) {
-          alert(`删除失败: ${err}`);
+          dialog.alert({ message: `删除失败: ${err}`, variant: "error" });
         }
       }
       break;
@@ -268,7 +270,7 @@ async function onMenuSelect(key: string): Promise<void> {
       try {
         await fileOps.revealInExplorer(node.path);
       } catch (err) {
-        alert(`无法在资源管理器中显示: ${err}`);
+        dialog.alert({ message: `无法在资源管理器中显示: ${err}`, variant: "error" });
       }
       break;
   }
@@ -284,7 +286,7 @@ async function submitRename(): Promise<void> {
   try {
     await fileOps.renamePath(props.node.path, newName);
   } catch (err) {
-    alert(`重命名失败: ${err}`);
+    dialog.alert({ message: `重命名失败: ${err}`, variant: "error" });
   } finally {
     renaming.value = false;
   }
@@ -313,7 +315,7 @@ async function submitCreating(): Promise<void> {
       expanded.value = true;
     }
   } catch (err) {
-    alert(`新建失败: ${err}`);
+    dialog.alert({ message: `新建失败: ${err}`, variant: "error" });
   } finally {
     creating.value = false;
     creatingName.value = "";
