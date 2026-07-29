@@ -511,11 +511,12 @@ export default { name: "TreeNode" };
               color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .node-row:hover {
-  background: var(--murasaki-neutral-200);
+  background: var(--murasaki-muted);
 }
 .node-row.is-selected {
-  background: var(--murasaki-purple-50);
+  background: rgba(147, 51, 234, 0.1);
   color: var(--murasaki-primary);
+  font-weight: 500;
 }
 .node-row.is-selected .md-badge {
   background: var(--murasaki-primary);
