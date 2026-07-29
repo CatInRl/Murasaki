@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from "vue";
+import { FileText } from "lucide-vue-next";
 import { NInput, NCheckbox, NButton, NScrollbar, NSpin, NEmpty } from "naive-ui";
 import { useSearchStore } from "../stores/useSearchStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
@@ -288,7 +289,7 @@ watch(
               :title="item.filePath"
               @click="onSelectFilename(item.filePath)"
             >
-              <span class="filename-icon" aria-hidden="true">📄</span>
+              <FileText :size="14" class="filename-icon" aria-hidden="true" />
               <span class="filename-name">
                 <template
                   v-for="(seg, sIdx) in highlightFilename(item.fileName)"

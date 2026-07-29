@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { RotateCw } from "lucide-vue-next";
 import { NScrollbar, NSpin, NEmpty, NButton, NDropdown, NInput } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
@@ -95,7 +96,7 @@ function cancelRootCreating(): void {
         :loading="workspace.loading"
         @click="workspace.refreshTree()"
       >
-        <span style="font-size: 14px">↻</span>
+        <RotateCw :size="14" />
       </NButton>
     </div>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { BookOpen } from "lucide-vue-next";
 import { NEmpty } from "naive-ui";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
 import { basename, dirname } from "../utils/path";
@@ -49,18 +50,7 @@ function onAction(key: string) {
       <!-- Logo / 标题区 -->
       <header class="welcome-header">
         <div class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 32 32" width="36" height="36" fill="none">
-            <defs>
-              <linearGradient id="msk-grad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#c084fc"/>
-                <stop offset="100%" stop-color="#7e22ce"/>
-              </linearGradient>
-            </defs>
-            <path d="M6 4h14l6 6v18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
-                  fill="url(#msk-grad)"/>
-            <path d="M20 4l6 6h-6z" fill="#f3e8ff" opacity="0.85"/>
-            <path d="M10 16h12M10 20h12M10 24h7" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
-          </svg>
+          <BookOpen :size="36" />
         </div>
         <h1 class="brand-title">Murasaki</h1>
         <p class="brand-tagline">紫式部 · 轻量级本地 Markdown 编辑器</p>
@@ -255,6 +245,7 @@ function onAction(key: string) {
   animation-delay: 60ms;
 }
 .brand-mark {
+  color: var(--murasaki-purple-700);
   display: inline-flex;
   align-items: center;
   justify-content: center;

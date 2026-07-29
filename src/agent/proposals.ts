@@ -2,8 +2,8 @@
  * CM6 Proposal Extension (Ticket #23)
  *
  * StateField + StateEffect + Decorations for agent proposals.
- * - propose_insert: green widget at position + ✓/✗ buttons
- * - propose_replace: red strikethrough on [from,to] + green widget with new content + ✓/✗ buttons
+ * - propose_insert: green widget at position + accept/reject buttons
+ * - propose_replace: red strikethrough on [from,to] + green widget with new content + accept/reject buttons
  *
  * Strict invalidation: any docChanged transaction not annotated as proposal-accept
  * expires all pending proposals.
@@ -51,7 +51,7 @@ export const expireAllProposalsEffect = StateEffect.define<null>();
 
 // ===== WidgetTypes =====
 
-/** Floating ✓/✗ buttons widget */
+/** Floating accept/reject buttons widget */
 class ProposalButtonsWidget extends WidgetType {
   constructor(
     readonly proposalId: string,
@@ -71,7 +71,7 @@ class ProposalButtonsWidget extends WidgetType {
 
     const accept = document.createElement("button");
     accept.className = "cm-proposal-btn cm-proposal-accept";
-    accept.textContent = "✓";
+    accept.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
     accept.title = this.lineCount > 50 ? `接受 ${this.lineCount} 行替换` : "接受";
     accept.addEventListener("mousedown", (e) => {
       e.preventDefault();
@@ -82,7 +82,7 @@ class ProposalButtonsWidget extends WidgetType {
 
     const reject = document.createElement("button");
     reject.className = "cm-proposal-btn cm-proposal-reject";
-    reject.textContent = "✗";
+    reject.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="M6 6 18 18"/></svg>';
     reject.title = "拒绝";
     reject.addEventListener("mousedown", (e) => {
       e.preventDefault();
@@ -146,7 +146,7 @@ class ReplaceContentWidget extends WidgetType {
   }
 }
 
-// ===== Action effect (user clicks ✓/✗) =====
+// ===== Action effect (user clicks accept/reject) =====
 
 export const proposalActionEffect = StateEffect.define<{
   id: string;

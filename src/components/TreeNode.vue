@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, h } from "vue";
+import { Pencil, Scissors, Copy, Clipboard, Trash2, FolderOpen } from "lucide-vue-next";
 import { NDropdown, NInput } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
@@ -183,12 +184,12 @@ const menuOptions = computed<DropdownOption[]>(() => {
 
   options.push({ type: "divider", key: "d0" });
 
-  options.push({ label: "重命名", key: "rename" });
-  options.push({ label: "剪切", key: "cut" });
-  options.push({ label: "复制", key: "copy" });
+  options.push({ label: "重命名", key: "rename", icon: () => h(Pencil, { size: 14 }) });
+  options.push({ label: "剪切", key: "cut", icon: () => h(Scissors, { size: 14 }) });
+  options.push({ label: "复制", key: "copy", icon: () => h(Copy, { size: 14 }) });
 
   if (isDir && fileOps.hasClipboard()) {
-    options.push({ label: "粘贴", key: "paste" });
+    options.push({ label: "粘贴", key: "paste", icon: () => h(Clipboard, { size: 14 }) });
   }
 
   options.push({ type: "divider", key: "d1" });
@@ -196,8 +197,8 @@ const menuOptions = computed<DropdownOption[]>(() => {
   options.push({ label: "复制相对路径", key: "copy-rel-path" });
 
   options.push({ type: "divider", key: "d2" });
-  options.push({ label: "删除", key: "delete" });
-  options.push({ label: "在资源管理器中显示", key: "reveal" });
+  options.push({ label: "删除", key: "delete", icon: () => h(Trash2, { size: 14 }) });
+  options.push({ label: "在资源管理器中显示", key: "reveal", icon: () => h(FolderOpen, { size: 14 }) });
 
   return options;
 });

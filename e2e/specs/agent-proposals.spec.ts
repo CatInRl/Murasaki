@@ -3,8 +3,8 @@
  *
  * 验收标准：
  * - sendMessage 触发 propose_insert / propose_replace
- * - CM6 装饰渲染 ✓/✗ 按钮
- * - 点 ✓ 接受后编辑器内容变化
+ * - CM6 装饰渲染 accept/reject 按钮
+ * - 点 accept 按钮接受后编辑器内容变化
  *
  * 需要有效的 MURASAKI_E2E_API_KEY 环境变量。
  */
@@ -70,7 +70,7 @@ describe("Agent Proposals 渲染与接受", () => {
     
     // 如果 LLM 没有产生 proposal（非确定性），也接受（structure 验证）
     if (proposalCount > 0) {
-      // 验证 ✓ 按钮存在
+      // 验证 accept 按钮存在
       const acceptBtn = await browser.$(".cm-proposal-accept");
       expect(await acceptBtn.isExisting()).toBe(true);
     } else {
@@ -83,7 +83,7 @@ describe("Agent Proposals 渲染与接受", () => {
     }
   }, 60000);
 
-  it("点 ✓ 接受 proposal 后编辑器内容更新", async () => {
+  it("点 accept 按钮接受 proposal 后编辑器内容更新", async () => {
     if (!API_KEY) {
       console.warn("跳过：未设置 MURASAKI_E2E_API_KEY");
       return;
