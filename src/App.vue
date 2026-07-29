@@ -7,7 +7,6 @@ import {
   NButton,
   NSpace,
   NText,
-  lightTheme,
 } from "naive-ui";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
@@ -36,6 +35,7 @@ import { useProposalsStore } from "./stores/useProposalsStore";
 import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
 import { MARKDOWN_THEMES, DEFAULT_THEME } from "./composables/useTheme";
+import { useNaiveTheme } from "./composables/useNaiveTheme";
 import {
   setHeading,
   toggleList,
@@ -64,6 +64,12 @@ const themeOptions = MARKDOWN_THEMES.map((t) => ({
   label: t.label,
   value: t.name,
 }));
+
+// ===== naive-ui 主题对齐 --murasaki-* token（ADR-0005）=====
+// 浅色/深色切换时 naive-ui 组件颜色/圆角/字体跟随 --murasaki-* token 变化
+const { theme: naiveTheme, themeOverrides: naiveThemeOverrides } = useNaiveTheme(
+  computed(() => persistence.settings.uiMode)
+);
 
 // ===== 编辑器引用 =====
 const editorRef = ref<InstanceType<typeof EditorPane> | null>(null);
@@ -1178,7 +1184,7 @@ async function exportCurrentHtml(): Promise<void> {
 </script>
 
 <template>
-  <NConfigProvider :theme="lightTheme" :locale="null" :date-locale="null">
+  <NConfigProvider :theme="naiveTheme" :theme-overrides="naiveThemeOverrides" :locale="null" :date-locale="null">
     <div class="murasaki-shell" :class="{ 'has-sidebar': workspace.hasWorkspace || tabsStore.hasTabs }">
       <!-- Sidebar: 文件树 / 大纲 -->
       <aside
