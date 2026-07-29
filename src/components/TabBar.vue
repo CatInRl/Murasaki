@@ -1,13 +1,28 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { X, Copy, FolderOpen } from "lucide-vue-next";
 import { useTabsStore } from "../stores/useTabsStore";
+import { useFileOpsStore } from "../stores/useFileOpsStore";
+import { useContextMenuStore } from "../stores/useContextMenuStore";
+import type { MenuItem } from "../stores/useContextMenuStore";
+import type { Tab } from "../types";
 
 const tabsStore = useTabsStore();
+const fileOps = useFileOpsStore();
+const contextMenu = useContextMenuStore();
 
 const emit = defineEmits<{
   (e: "new-tab"): void;
   /** 关闭 tab 请求（父组件负责处理未保存提示） */
   (e: "close-tab", tabId: string): void;
+  /** 关闭其他 tab（父组件批量处理） */
+  (e: "close-others", tabId: string): void;
+  /** 关闭右侧 tab */
+  (e: "close-right", tabId: string): void;
+  /** 关闭左侧 tab */
+  (e: "close-left", tabId: string): void;
+  /** 关闭所有 tab */
+  (e: "close-all"): void;
 }>();
 
 const tabs = computed(() => tabsStore.tabs);
@@ -46,6 +61,49 @@ function onCloseTab(e: MouseEvent, tabId: string): void {
 function onNewTab(): void {
   emit("new-tab");
 }
+
+// ===== 右键菜单 =====
+function onContextMenu(e: MouseEvent, tab: Tab): void {
+  // 先切换到右键的 tab，让批量操作的目标更直观
+  tabsStore.switchTo(tab.id);
+
+  const hasPath = !!tab.path;
+  const items: MenuItem[] = [
+    { label: "关闭", icon: X, shortcut: "Ctrl+W", action: () => emit("close-tab", tab.id) },
+    { label: "关闭其他", action: () => emit("close-others", tab.id) },
+    { label: "关闭右侧", action: () => emit("close-right", tab.id) },
+    { label: "关闭左侧", action: () => emit("close-left", tab.id) },
+    { label: "关闭所有", action: () => emit("close-all") },
+    { separator: true },
+    {
+      label: "复制路径",
+      icon: Copy,
+      disabled: !hasPath,
+      action: async () => {
+        if (!tab.path) return;
+        try {
+          await fileOps.copyAbsolutePath(tab.path);
+        } catch (err) {
+          alert(`复制路径失败: ${err}`);
+        }
+      },
+    },
+    {
+      label: "在文件资源管理器中显示",
+      icon: FolderOpen,
+      disabled: !hasPath,
+      action: async () => {
+        if (!tab.path) return;
+        try {
+          await fileOps.revealInExplorer(tab.path);
+        } catch (err) {
+          alert(`无法在资源管理器中显示: ${err}`);
+        }
+      },
+    },
+  ];
+  contextMenu.show(e, items);
+}
 </script>
 
 <template>
@@ -60,6 +118,7 @@ function onNewTab(): void {
         :title="tab.path ?? '未保存的文件'"
         @click="onClick(tab.id)"
         @mousedown="onMiddleClick($event, tab.id)"
+        @contextmenu="onContextMenu($event, tab)"
       >
         <!-- 文件图标 -->
         <svg

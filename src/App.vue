@@ -23,6 +23,7 @@ import SettingsWindow from "./components/SettingsWindow.vue";
 import CompareWindow from "./components/CompareWindow.vue";
 import ImagePreviewModal from "./components/ImagePreviewModal.vue";
 import AgentPanel from "./components/AgentPanel.vue";
+import ContextMenuContainer from "./components/ContextMenuContainer.vue";
 import { useWorkspaceStore } from "./stores/useWorkspaceStore";
 import { useTabsStore } from "./stores/useTabsStore";
 import { usePersistenceStore } from "./stores/usePersistenceStore";
@@ -764,6 +765,77 @@ function onSettingsChange(
   }
 }
 
+// ===== TabBar 批量关闭（右键菜单触发）=====
+// 批量关闭使用 doCloseTab：未保存修改自动写入草稿，避免连续弹多个确认框
+async function onCloseOthers(tabId: string): Promise<void> {
+  const idx = tabsStore.tabs.findIndex((t) => t.id === tabId);
+  if (idx < 0) return;
+  const toClose = tabsStore.tabs.filter((_, i) => i !== idx).map((t) => t.id);
+  for (const id of toClose) {
+    await tabsStore.doCloseTab(id);
+  }
+}
+
+async function onCloseRight(tabId: string): Promise<void> {
+  const idx = tabsStore.tabs.findIndex((t) => t.id === tabId);
+  if (idx < 0) return;
+  const toClose = tabsStore.tabs.filter((_, i) => i > idx).map((t) => t.id);
+  for (const id of toClose) {
+    await tabsStore.doCloseTab(id);
+  }
+}
+
+async function onCloseLeft(tabId: string): Promise<void> {
+  const idx = tabsStore.tabs.findIndex((t) => t.id === tabId);
+  if (idx < 0) return;
+  const toClose = tabsStore.tabs.filter((_, i) => i < idx).map((t) => t.id);
+  for (const id of toClose) {
+    await tabsStore.doCloseTab(id);
+  }
+}
+
+async function onCloseAllTabs(): Promise<void> {
+  const toClose = tabsStore.tabs.map((t) => t.id);
+  for (const id of toClose) {
+    await tabsStore.doCloseTab(id);
+  }
+}
+
+// ===== 编辑器右键菜单高级操作（由 SourceEditor 触发）=====
+async function onEditorContextAction(
+  action: "insert-table" | "insert-link" | "insert-image"
+): Promise<void> {
+  if (action === "insert-table") {
+    tableDialogVisible.value = true;
+    return;
+  }
+  if (action === "insert-link") {
+    const url = prompt("链接地址：");
+    if (!url) return;
+    const text = prompt("链接文字：", "") ?? "";
+    insertMarkdownAtCursor(`[${text}](${url})`);
+    return;
+  }
+  if (action === "insert-image") {
+    const url = prompt("图片地址：");
+    if (!url) return;
+    const alt = prompt("替代文字（可选）：", "") ?? "";
+    insertMarkdownAtCursor(`![${alt}](${url})`);
+    return;
+  }
+}
+
+function insertMarkdownAtCursor(text: string): void {
+  const view = editorRef.value?.getView();
+  if (!view) return;
+  view.focus();
+  const sel = view.state.selection.main;
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert: text },
+    selection: { anchor: sel.from + text.length },
+    userEvent: "input.insert",
+  });
+}
 // ===== TabBar 事件 =====
 function onNewTab(): void {
   tabsStore.newTab("");
@@ -1217,6 +1289,10 @@ async function exportCurrentHtml(): Promise<void> {
             class="tab-bar-slot"
             @new-tab="onNewTab"
             @close-tab="onCloseTabRequest"
+            @close-others="onCloseOthers"
+            @close-right="onCloseRight"
+            @close-left="onCloseLeft"
+            @close-all="onCloseAllTabs"
           />
           <div v-else class="top-bar-title">
             <span class="app-brand-dot"></span>
@@ -1248,6 +1324,7 @@ async function exportCurrentHtml(): Promise<void> {
             @cursor-change="onCursorChange"
             @open-internal="openFile"
             @drop-image-path="onDropImagePath"
+            @context-action="onEditorContextAction"
           />
 
           <!-- 底部：跨文件搜索面板 -->
@@ -1279,6 +1356,9 @@ async function exportCurrentHtml(): Promise<void> {
         @open-settings="settingsWindowVisible = true"
       />
     </div>
+
+    <!-- 右键菜单容器（全局唯一，数据驱动） -->
+    <ContextMenuContainer />
 
     <!-- 冲突对话框 -->
     <ConflictDialog

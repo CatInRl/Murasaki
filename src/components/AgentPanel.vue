@@ -14,16 +14,25 @@ import {
   RotateCw,
   Check,
   X,
+  Copy,
+  Code,
+  CornerDownLeft,
 } from "lucide-vue-next";
 import { useAgentStore } from "../stores/useAgentStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useAiProvidersStore } from "../stores/useAiProvidersStore";
 import { useProposalsStore } from "../stores/useProposalsStore";
+import { useContextMenuStore } from "../stores/useContextMenuStore";
+import type { MenuItem } from "../stores/useContextMenuStore";
+import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
+import type { ChatMessage } from "../types";
 
 const agent = useAgentStore();
 const workspace = useWorkspaceStore();
 const aiProviders = useAiProvidersStore();
 const proposals = useProposalsStore();
+const contextMenu = useContextMenuStore();
+const editorBridge = useEditorBridgeStore();
 
 // ===== 输入框 =====
 const inputText = ref("");
@@ -139,6 +148,77 @@ function onOpenSettings(): void {
   emit("open-settings");
 }
 
+// ===== 消息右键菜单 =====
+function onMessageContextMenu(e: MouseEvent, msg: ChatMessage): void {
+  const items: MenuItem[] = [
+    {
+      label: "复制",
+      icon: Copy,
+      action: () => copyToClipboard(msg.content),
+    },
+    {
+      label: "复制 Markdown 源码",
+      icon: Code,
+      action: () => copyToClipboard(msg.content),
+    },
+    {
+      label: "插入到编辑器",
+      icon: CornerDownLeft,
+      action: () => insertIntoEditor(msg.content),
+    },
+    {
+      label: "从当前消息重新生成",
+      icon: RotateCw,
+      disabled: agent.isThinking,
+      action: () => regenerateFromMessage(msg),
+    },
+  ];
+  contextMenu.show(e, items);
+}
+
+function copyToClipboard(text: string): void {
+  navigator.clipboard.writeText(text).catch((err) => {
+    console.warn("复制失败:", err);
+  });
+}
+
+function insertIntoEditor(text: string): void {
+  const view = editorBridge.editorView;
+  if (!view) {
+    alert("请先打开一个文件");
+    return;
+  }
+  view.focus();
+  const sel = view.state.selection.main;
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert: text },
+    selection: { anchor: sel.from + text.length },
+    userEvent: "input.paste",
+  });
+}
+
+function regenerateFromMessage(msg: ChatMessage): void {
+  if (agent.isThinking) return;
+  const idx = agent.messages.findIndex((m) => m.id === msg.id);
+  if (idx < 0) return;
+  let userIdx = -1;
+  let userText = "";
+  if (msg.role === "user") {
+    userIdx = idx;
+    userText = msg.content;
+  } else {
+    for (let i = idx; i >= 0; i--) {
+      if (agent.messages[i].role === "user") {
+        userIdx = i;
+        userText = agent.messages[i].content;
+        break;
+      }
+    }
+  }
+  if (userIdx < 0 || !userText) return;
+  agent.messages.splice(userIdx);
+  void agent.sendMessage(userText);
+}
 // ===== 加载 AI providers =====
 onMounted(() => {
   if (!aiProviders.loaded) {
@@ -303,6 +383,7 @@ onMounted(() => {
               'agent-message-bubble-user': msg.role === 'user',
               'agent-message-bubble-assistant': msg.role === 'assistant',
             }"
+            @contextmenu="onMessageContextMenu($event, msg)"
           >
             {{ msg.content }}
             <span v-if="msg.interrupted" class="agent-interrupted-tag">

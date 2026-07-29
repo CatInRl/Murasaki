@@ -1,9 +1,23 @@
 <script setup lang="ts">
-import { ref, computed, h } from "vue";
-import { Pencil, Scissors, Copy, Clipboard, Trash2, FolderOpen } from "lucide-vue-next";
-import { NDropdown, NInput } from "naive-ui";
-import type { DropdownOption } from "naive-ui";
+import { ref } from "vue";
+import {
+  Pencil,
+  Scissors,
+  Copy,
+  Clipboard,
+  Trash2,
+  FolderOpen,
+  FilePlus,
+  FolderPlus,
+  Link2,
+  Link,
+  FileText,
+  Image as ImageIcon,
+} from "lucide-vue-next";
+import { NInput } from "naive-ui";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
+import { useContextMenuStore } from "../stores/useContextMenuStore";
+import type { MenuItem } from "../stores/useContextMenuStore";
 import type { TreeNode } from "../types";
 
 interface Props {
@@ -26,13 +40,9 @@ const emit = defineEmits<{
 }>();
 
 const fileOps = useFileOpsStore();
+const contextMenu = useContextMenuStore();
 
 const expanded = ref(false); // 默认收起所有子文件夹
-
-// ===== 右键菜单状态 =====
-const menuVisible = ref(false);
-const menuX = ref(0);
-const menuY = ref(0);
 
 // ===== 重命名状态 =====
 const renaming = ref(false);
@@ -150,128 +160,141 @@ function isSelected(): boolean {
   return props.selectedPath === props.node.path;
 }
 
-// ===== 右键菜单 =====
+// ===== 右键菜单（数据驱动，替换原 NDropdown）=====
 function onContextMenu(e: MouseEvent): void {
-  e.preventDefault();
-  e.stopPropagation();
-  menuX.value = e.clientX;
-  menuY.value = e.clientY;
-  menuVisible.value = true;
+  contextMenu.show(e, buildMenuItems());
 }
 
-function closeMenu(): void {
-  menuVisible.value = false;
-}
-
-const menuOptions = computed<DropdownOption[]>(() => {
+function buildMenuItems(): MenuItem[] {
   const isDir = props.node.type === "directory";
   const isFile = props.node.type === "file";
-  const options: DropdownOption[] = [];
+  const items: MenuItem[] = [];
 
   // 文件类型专属：打开 / 预览
   if (isFile) {
     if (isMarkdownFile(props.node.name)) {
-      options.push({ label: "打开", key: "open" });
+      items.push({
+        label: "打开",
+        icon: FileText,
+        action: () => emit("select-file", props.node.path),
+      });
     } else if (isImageFile(props.node.name)) {
-      options.push({ label: "预览", key: "preview" });
+      items.push({
+        label: "预览",
+        icon: ImageIcon,
+        action: () => emit("preview-image", props.node.path),
+      });
     }
   }
 
   if (isDir) {
-    options.push({ label: "新建文件", key: "new-file" });
-    options.push({ label: "新建文件夹", key: "new-folder" });
+    items.push({
+      label: "新建文件",
+      icon: FilePlus,
+      action: () => {
+        creatingType.value = "file";
+        creatingName.value = "";
+        creating.value = true;
+      },
+    });
+    items.push({
+      label: "新建文件夹",
+      icon: FolderPlus,
+      action: () => {
+        creatingType.value = "directory";
+        creatingName.value = "";
+        creating.value = true;
+      },
+    });
   }
 
-  options.push({ type: "divider", key: "d0" });
+  if (items.length > 0) items.push({ separator: true });
 
-  options.push({ label: "重命名", key: "rename", icon: () => h(Pencil, { size: 14 }) });
-  options.push({ label: "剪切", key: "cut", icon: () => h(Scissors, { size: 14 }) });
-  options.push({ label: "复制", key: "copy", icon: () => h(Copy, { size: 14 }) });
+  items.push({
+    label: "重命名",
+    icon: Pencil,
+    action: () => {
+      renameValue.value = props.node.name;
+      renaming.value = true;
+    },
+  });
+  items.push({
+    label: "剪切",
+    icon: Scissors,
+    action: () => fileOps.cut(props.node.path),
+  });
+  items.push({
+    label: "复制",
+    icon: Copy,
+    action: () => fileOps.copy(props.node.path),
+  });
 
   if (isDir && fileOps.hasClipboard()) {
-    options.push({ label: "粘贴", key: "paste", icon: () => h(Clipboard, { size: 14 }) });
+    items.push({
+      label: "粘贴",
+      icon: Clipboard,
+      action: async () => {
+        try {
+          await fileOps.paste(props.node.path);
+        } catch (err) {
+          alert(`粘贴失败: ${err}`);
+        }
+      },
+    });
   }
 
-  options.push({ type: "divider", key: "d1" });
-  options.push({ label: "复制路径", key: "copy-path" });
-  options.push({ label: "复制相对路径", key: "copy-rel-path" });
-
-  options.push({ type: "divider", key: "d2" });
-  options.push({ label: "删除", key: "delete", icon: () => h(Trash2, { size: 14 }) });
-  options.push({ label: "在资源管理器中显示", key: "reveal", icon: () => h(FolderOpen, { size: 14 }) });
-
-  return options;
-});
-
-async function onMenuSelect(key: string): Promise<void> {
-  closeMenu();
-  const node = props.node;
-
-  switch (key) {
-    case "open":
-      emit("select-file", node.path);
-      break;
-    case "preview":
-      emit("preview-image", node.path);
-      break;
-    case "new-file":
-      creatingType.value = "file";
-      creatingName.value = "";
-      creating.value = true;
-      break;
-    case "new-folder":
-      creatingType.value = "directory";
-      creatingName.value = "";
-      creating.value = true;
-      break;
-    case "rename":
-      renameValue.value = node.name;
-      renaming.value = true;
-      break;
-    case "cut":
-      fileOps.cut(node.path);
-      break;
-    case "copy":
-      fileOps.copy(node.path);
-      break;
-    case "paste":
+  items.push({ separator: true });
+  items.push({
+    label: "复制路径",
+    icon: Link2,
+    action: async () => {
       try {
-        await fileOps.paste(node.path);
-      } catch (err) {
-        alert(`粘贴失败: ${err}`);
-      }
-      break;
-    case "copy-path":
-      try {
-        await fileOps.copyAbsolutePath(node.path);
+        await fileOps.copyAbsolutePath(props.node.path);
       } catch (err) {
         alert(`复制路径失败: ${err}`);
       }
-      break;
-    case "copy-rel-path":
+    },
+  });
+  items.push({
+    label: "复制相对路径",
+    icon: Link,
+    action: async () => {
       try {
-        await fileOps.copyRelativePath(node.path);
+        await fileOps.copyRelativePath(props.node.path);
       } catch (err) {
         alert(`复制相对路径失败: ${err}`);
       }
-      break;
-    case "delete":
-      if (confirm(`确定要删除 "${node.name}" 吗？（移至回收站）`)) {
+    },
+  });
+
+  items.push({ separator: true });
+  items.push({
+    label: "删除",
+    icon: Trash2,
+    danger: true,
+    action: async () => {
+      if (confirm(`确定要删除 "${props.node.name}" 吗？（移至回收站）`)) {
         try {
-          await fileOps.deletePath(node.path);
+          await fileOps.deletePath(props.node.path);
         } catch (err) {
           alert(`删除失败: ${err}`);
         }
       }
-      break;
-    case "reveal":
+    },
+  });
+  items.push({
+    label: "在文件资源管理器中显示",
+    icon: FolderOpen,
+    action: async () => {
       try {
-        await fileOps.revealInExplorer(node.path);
+        await fileOps.revealInExplorer(props.node.path);
       } catch (err) {
         alert(`无法在资源管理器中显示: ${err}`);
       }
-      break;
-  }
+    },
+  });
+
+  return items;
 }
 
 // ===== 提交重命名 =====
@@ -475,18 +498,6 @@ function cancelCreating(): void {
         @preview-image="(p) => emit('preview-image', p)"
       />
     </div>
-
-    <!-- 右键下拉菜单 -->
-    <NDropdown
-      placement="bottom-start"
-      trigger="manual"
-      :x="menuX"
-      :y="menuY"
-      :options="menuOptions"
-      :show="menuVisible"
-      :on-clickoutside="closeMenu"
-      @select="onMenuSelect"
-    />
   </div>
 </template>
 

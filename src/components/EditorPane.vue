@@ -39,6 +39,8 @@ const emit = defineEmits<{
   (e: "open-internal", path: string): void;
   /** 从文件树拖入图片：要求父组件插入相对路径引用 */
   (e: "drop-image-path", path: string): void;
+  /** 编辑器右键菜单高级操作（插入表格/链接/图片） */
+  (e: "context-action", action: "insert-table" | "insert-link" | "insert-image"): void;
 }>();
 
 const editorRef = ref<InstanceType<typeof SourceEditor> | null>(null);
@@ -194,6 +196,7 @@ defineExpose({
         :soft-wrap="softWrap"
         @update:model-value="onInput"
         @cursor-change="onCursorChange"
+        @context-action="(a) => emit('context-action', a)"
       />
     </div>
     <div
