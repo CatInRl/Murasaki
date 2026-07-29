@@ -43,6 +43,7 @@ function makeCtx(
     getEditorView: () => view,
     getDocPath: () => docPath,
     getWorkspacePath: () => workspacePath,
+    getProposeReplaceConfirmThreshold: () => 50,
   };
 }
 

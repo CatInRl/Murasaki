@@ -171,6 +171,19 @@ describe("contextManager", () => {
       );
       expect(truncationMsg).toBeDefined();
     });
+
+    it("compressContext 支持自定义 singleRequestLimit（从 SettingsState 读取）", () => {
+      const messages: LLMMessage[] = [
+        { role: "system", content: "system" },
+        { role: "user", content: "x".repeat(100000) }, // ~25K tokens
+      ];
+      // 默认 16384 会截断
+      const defaultResult = compressContext(messages);
+      expect(defaultResult.truncated).toBe(true);
+      // 提高限制到 30000 后不截断
+      const customResult = compressContext(messages, { singleRequestLimit: 30000 });
+      expect(customResult.truncated).toBe(false);
+    });
   });
 
   // ===== 无需压缩的情况 =====
@@ -211,14 +224,14 @@ describe("contextManager", () => {
 
     it("接近限制时 isApproachingLimit 为 true", () => {
       const tracker = new CumulativeTokenTracker();
-      tracker.add(42000); // > 50K * 0.8 = 40K
+      tracker.add(42000); // > 51200 * 0.8 = 40960
       expect(tracker.isApproachingLimit).toBe(true);
       expect(tracker.isOverLimit).toBe(false);
     });
 
     it("超过限制时 isOverLimit 为 true", () => {
       const tracker = new CumulativeTokenTracker();
-      tracker.add(51000);
+      tracker.add(52000); // 默认 51200
       expect(tracker.isOverLimit).toBe(true);
     });
 
@@ -230,9 +243,20 @@ describe("contextManager", () => {
       expect(tracker.isOverLimit).toBe(false);
     });
 
-    it("limit 返回 50000", () => {
+    it("limit 返回默认 51200", () => {
       const tracker = new CumulativeTokenTracker();
-      expect(tracker.limit).toBe(50000);
+      expect(tracker.limit).toBe(51200);
+    });
+
+    it("支持自定义 limit getter（从 SettingsState 读取）", () => {
+      const tracker = new CumulativeTokenTracker(() => 10000);
+      expect(tracker.limit).toBe(10000);
+      tracker.add(8000);
+      expect(tracker.isApproachingLimit).toBe(false); // 8000 > 8000 == false
+      tracker.add(1);
+      expect(tracker.isApproachingLimit).toBe(true); // 8001 > 8000
+      tracker.add(2000);
+      expect(tracker.isOverLimit).toBe(true); // 10001 > 10000
     });
   });
 });

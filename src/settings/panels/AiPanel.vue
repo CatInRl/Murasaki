@@ -9,15 +9,18 @@
  * API Key 不在前端持久化，仅通过 get_api_key 按需获取（本面板不预填）。
  *
  * T8.2 范围：表单显示与编辑（保存即生效）。
- * 不包含：测试连接（T8.4）、高级参数可编辑（T8.5 — 硬编码常量，只读展示）。
+ * 不包含：测试连接（T8.4）。
+ * T8.5：高级参数可编辑（存 SettingsState，所有 provider 共用）。
  * 移除 Azure OpenAI 选项（spec 决策：统一使用 OpenAICompatibleProvider）。
  */
 import { ref, computed, watch } from "vue";
 import { Plus, Trash2, Plug, ChevronDown, Eye, EyeOff } from "lucide-vue-next";
 import { useAiProvidersStore } from "../../stores/useAiProvidersStore";
+import { usePersistenceStore } from "../../stores/usePersistenceStore";
 import { AI_PROVIDER_PRESETS, type AiProvider } from "../../types";
 
 const store = useAiProvidersStore();
+const persistence = usePersistenceStore();
 
 /** 当前选中编辑的 provider id */
 const selectedId = ref<string | null>(null);
@@ -42,13 +45,31 @@ const selectedProvider = computed<AiProvider | null>(() =>
   store.providers.find((p) => p.id === selectedId.value) ?? null
 );
 
-/** 高级参数硬编码常量（只读展示，spec 决策不放入设置） */
-const ADVANCED_PARAMS = [
-  { label: "Agent 循环轮数上限", value: 15, min: 1, max: 50 },
-  { label: "单次请求 token 上限", value: 16384, min: 1024, step: 1024 },
-  { label: "累计 token 软上限", value: 51200, min: 1024, step: 1024 },
-  { label: "propose_replace 二次确认阈值", value: 50, min: 1 },
-] as const;
+/** 高级参数（存 SettingsState，所有 provider 共用，T8.5） */
+const aiAgentMaxRounds = computed({
+  get: () => persistence.settings.aiAgentMaxRounds,
+  set: (v: number) => {
+    if (Number.isFinite(v)) void persistence.updateSettings({ aiAgentMaxRounds: v });
+  },
+});
+const aiSingleRequestTokenLimit = computed({
+  get: () => persistence.settings.aiSingleRequestTokenLimit,
+  set: (v: number) => {
+    if (Number.isFinite(v)) void persistence.updateSettings({ aiSingleRequestTokenLimit: v });
+  },
+});
+const aiCumulativeTokenSoftLimit = computed({
+  get: () => persistence.settings.aiCumulativeTokenSoftLimit,
+  set: (v: number) => {
+    if (Number.isFinite(v)) void persistence.updateSettings({ aiCumulativeTokenSoftLimit: v });
+  },
+});
+const aiProposeReplaceConfirmThreshold = computed({
+  get: () => persistence.settings.aiProposeReplaceConfirmThreshold,
+  set: (v: number) => {
+    if (Number.isFinite(v)) void persistence.updateSettings({ aiProposeReplaceConfirmThreshold: v });
+  },
+});
 
 /** 初始化：选中第一个 provider 或活动 provider */
 function initSelection(): void {
@@ -334,32 +355,74 @@ function typeLabel(type: AiProvider["type"]): string {
       </div>
     </section>
 
-    <!-- 高级参数（只读，硬编码常量） -->
+    <!-- 高级参数（可编辑，存 SettingsState，T8.5） -->
     <section class="settings-section">
       <details class="advanced-params">
         <summary class="advanced-params-summary">
           <ChevronDown :size="16" class="advanced-params-chevron" />
           <span class="advanced-params-title">高级参数</span>
-          <span class="advanced-params-hint">硬编码常量，不可编辑（Agent 循环、token 上限与提案确认阈值）</span>
+          <span class="advanced-params-hint">所有 Provider 共用（Agent 循环、token 上限与提案确认阈值）</span>
         </summary>
         <div class="advanced-params-body">
-          <div
-            v-for="param in ADVANCED_PARAMS"
-            :key="param.label"
-            class="setting-row"
-          >
+          <div class="setting-row">
             <div class="setting-label-column">
-              <label class="setting-label">{{ param.label }}</label>
+              <label class="setting-label">Agent 循环轮数上限</label>
+              <span class="setting-description">单次对话中工具调用循环的最大轮数</span>
             </div>
             <div class="setting-control-column">
               <input
-                class="setting-input number-readonly"
+                v-model.number="aiAgentMaxRounds"
+                class="setting-input number-input"
                 type="number"
-                :value="param.value"
-                :min="'min' in param ? param.min : undefined"
-                :max="'max' in param ? param.max : undefined"
-                :step="'step' in param ? param.step : undefined"
-                readonly
+                min="1"
+                max="50"
+              />
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label-column">
+              <label class="setting-label">单次请求 token 上限</label>
+              <span class="setting-description">超出后截断较旧消息（软限制）</span>
+            </div>
+            <div class="setting-control-column">
+              <input
+                v-model.number="aiSingleRequestTokenLimit"
+                class="setting-input number-input"
+                type="number"
+                min="1024"
+                step="1024"
+              />
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label-column">
+              <label class="setting-label">累计 token 软上限</label>
+              <span class="setting-description">超出后发出软警告（不阻塞对话）</span>
+            </div>
+            <div class="setting-control-column">
+              <input
+                v-model.number="aiCumulativeTokenSoftLimit"
+                class="setting-input number-input"
+                type="number"
+                min="1024"
+                step="1024"
+              />
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label-column">
+              <label class="setting-label">propose_replace 二次确认阈值</label>
+              <span class="setting-description">替换行数超过该值时需用户二次确认</span>
+            </div>
+            <div class="setting-control-column">
+              <input
+                v-model.number="aiProposeReplaceConfirmThreshold"
+                class="setting-input number-input"
+                type="number"
+                min="1"
               />
             </div>
           </div>
@@ -647,10 +710,7 @@ function typeLabel(type: AiProvider["type"]): string {
   padding: 0 16px 8px;
   background: var(--murasaki-background);
 }
-.number-readonly {
-  width: 100px;
-  background: var(--murasaki-muted);
-  color: var(--murasaki-ink-2);
-  cursor: not-allowed;
+.number-input {
+  width: 120px;
 }
 </style>

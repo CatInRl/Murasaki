@@ -33,6 +33,8 @@ export interface ToolContext {
   getDocPath: () => string | null;
   /** 当前工作区根路径（无工作区时为 null） */
   getWorkspacePath: () => string | null;
+  /** propose_replace 二次确认阈值（来自 SettingsState.aiProposeReplaceConfirmThreshold） */
+  getProposeReplaceConfirmThreshold: () => number;
 }
 
 /** 工具结果 */
@@ -488,7 +490,7 @@ const proposeReplace: ToolDef = {
     type: "function",
     function: {
       name: "propose_replace",
-      description: "Propose replacing a range of text in the current document. The user can accept or reject the proposal. Positions are character offsets from the start of the document. If the replacement is >50 lines, the user will be asked for secondary confirmation before accepting.",
+      description: "Propose replacing a range of text in the current document. The user can accept or reject the proposal. Positions are character offsets from the start of the document. If the replacement exceeds the configured line threshold (default 50, set via AI advanced params), the user will be asked for secondary confirmation before accepting.",
       parameters: {
         type: "object",
         properties: {
@@ -566,7 +568,7 @@ const proposeReplace: ToolDef = {
           from,
           to,
           lineCount,
-          requiresConfirmation: lineCount > 50,
+          requiresConfirmation: lineCount > ctx.getProposeReplaceConfirmThreshold(),
         },
       };
     } catch (err) {

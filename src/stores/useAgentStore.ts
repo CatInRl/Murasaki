@@ -11,6 +11,7 @@ import { ref, computed, shallowRef, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { useAiProvidersStore } from "./useAiProvidersStore";
+import { usePersistenceStore } from "./usePersistenceStore";
 import { useEditorBridgeStore } from "./useEditorBridgeStore";
 import { OpenAICompatibleProvider } from "../agent/OpenAICompatibleProvider";
 import { getToolMetadataList, executeTool } from "../agent/tools";
@@ -35,9 +36,6 @@ const SYSTEM_PROMPT =
 
 /** 8K 字符截断阈值 */
 const MAX_CONTENT_CHARS = 8192;
-
-/** 最大工具调用轮数 */
-const MAX_TOOL_ROUNDS = 15;
 
 /** 截断文本 */
 function truncate(text: string, max: number): string {
@@ -113,8 +111,10 @@ export const useAgentStore = defineStore("agent", () => {
   /** 正在从磁盘加载对话（防止加载时触发保存覆盖） */
   const isLoading = ref(false);
 
-  /** 累计 prompt token 跟踪器 (Ticket #26) */
-  const tokenTracker = new CumulativeTokenTracker();
+  /** 累计 prompt token 跟踪器 (Ticket #26)；限制从 SettingsState 读取，随设置变化生效 */
+  const tokenTracker = new CumulativeTokenTracker(
+    () => usePersistenceStore().settings.aiCumulativeTokenSoftLimit
+  );
   /** 累计 prompt token 数（响应式，供 UI 显示） */
   const cumulativeTokens = ref(0);
   /** 是否接近累计限制（80%） */
@@ -393,6 +393,8 @@ ${content}
       getEditorView: () => bridge.editorView,
       getDocPath: () => bridge.activeDocPath,
       getWorkspacePath: () => ws.workspacePath,
+      getProposeReplaceConfirmThreshold: () =>
+        usePersistenceStore().settings.aiProposeReplaceConfirmThreshold,
     };
 
     // 流式 flush 节流
@@ -403,11 +405,15 @@ ${content}
       }
     };
 
+    const persistence = usePersistenceStore();
+    const maxToolRounds = persistence.settings.aiAgentMaxRounds;
+    const singleRequestLimit = persistence.settings.aiSingleRequestTokenLimit;
+
     let round = 0;
     let lastError: string | null = null;
 
     try {
-      while (round < MAX_TOOL_ROUNDS) {
+      while (round < maxToolRounds) {
         if (abortController.signal.aborted) break;
         round++;
 
@@ -417,7 +423,9 @@ ${content}
 
         // Ticket #26: 三层压缩 + 安全护栏
         // 在每轮 LLM 请求前应用压缩，避免上下文无限增长
-        const compressionResult = compressContext(llmMessages);
+        const compressionResult = compressContext(llmMessages, {
+          singleRequestLimit,
+        });
         const messagesToSend = compressionResult.messages;
 
         // 记录压缩结果供 UI 显示（仅当任一压缩层应用时）
@@ -691,7 +699,7 @@ ${content}
     isApproachingTokenLimit,
     isOverTokenLimit,
     lastCompression,
-    tokenLimit: tokenTracker.limit,
+    tokenLimit: computed(() => tokenTracker.limit),
     // Computed
     canSend,
     isThinking,
