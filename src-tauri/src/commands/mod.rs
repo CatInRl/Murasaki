@@ -7,4 +7,5 @@ pub mod files;
 pub mod menu;
 pub mod outline;
 pub mod search;
+pub mod settings;
 pub mod watcher;
