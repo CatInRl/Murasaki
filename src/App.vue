@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import {
   NConfigProvider,
-  NSelect,
   NModal,
   NButton,
   NSpace,
@@ -35,7 +34,7 @@ import { useEditorBridgeStore } from "./stores/useEditorBridgeStore";
 import { useProposalsStore } from "./stores/useProposalsStore";
 import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
-import { MARKDOWN_THEMES, DEFAULT_THEME } from "./composables/useTheme";
+import { DEFAULT_THEME } from "./composables/useTheme";
 import {
   setHeading,
   toggleList,
@@ -60,10 +59,6 @@ const proposalsStore = useProposalsStore();
 
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
-const themeOptions = MARKDOWN_THEMES.map((t) => ({
-  label: t.label,
-  value: t.name,
-}));
 
 // ===== 编辑器引用 =====
 const editorRef = ref<InstanceType<typeof EditorPane> | null>(null);
@@ -1198,7 +1193,7 @@ async function exportCurrentHtml(): Promise<void> {
 
       <!-- 主区域 -->
       <div class="main-area">
-        <!-- 顶部：Tab 栏 + 主题选择 -->
+        <!-- 顶部：Tab 栏 -->
         <div class="top-bar">
           <TabBar
             v-if="tabsStore.hasTabs"
@@ -1210,13 +1205,6 @@ async function exportCurrentHtml(): Promise<void> {
             <span class="app-brand-dot"></span>
             <span class="app-name">Murasaki</span>
           </div>
-          <NSelect
-            v-model:value="currentTheme"
-            :options="themeOptions"
-            size="small"
-            style="width: 130px; flex-shrink: 0"
-            placeholder="主题"
-          />
         </div>
 
         <!-- 内容区：欢迎页 或 编辑器 + 底部搜索面板 -->
