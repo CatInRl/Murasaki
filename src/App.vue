@@ -235,6 +235,7 @@ function askConflict(
 let unlistenMenu: UnlistenFn | null = null;
 let unlistenRecentOpen: UnlistenFn | null = null;
 let unlistenSingleInstance: UnlistenFn | null = null;
+let unlistenSettingsSaved: UnlistenFn | null = null;
 let initialized = ref(false);
 
 onMounted(async () => {
@@ -287,6 +288,12 @@ onMounted(async () => {
       }
     }
   );
+
+  // 4c. 监听设置窗口的保存事件（多窗口通信，见 ADR-0009）
+  // 设置变更的副作用由 T8.2/T8.3 实现，此处先用 console.log 占位
+  unlistenSettingsSaved = await listen<unknown>("settings://saved", (event) => {
+    console.log("[settings] 收到设置保存事件:", event.payload);
+  });
 
   // 5. 同步最近打开菜单到原生菜单
   await syncRecentMenu();
@@ -356,6 +363,10 @@ onBeforeUnmount(() => {
   if (unlistenSingleInstance) {
     unlistenSingleInstance();
     unlistenSingleInstance = null;
+  }
+  if (unlistenSettingsSaved) {
+    unlistenSettingsSaved();
+    unlistenSettingsSaved = null;
   }
   window.removeEventListener("keydown", onKeyDown);
   fileWatcher.stop();

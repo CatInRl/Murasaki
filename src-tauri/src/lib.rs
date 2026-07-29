@@ -9,6 +9,7 @@ use commands::drafts;
 use commands::files;
 use commands::menu::{self, RecentMenuState};
 use commands::outline;
+use commands::settings;
 use commands::watcher::{self, WatcherState};
 
 /// E2E 测试模式标志：msedgedriver 启动 murasaki.exe 时会附加 `--remote-debugging-port=PORT`
@@ -283,6 +284,7 @@ pub fn run() {
             watcher::stop_watching,
             watcher::stop_all_watching,
             menu::update_recent_menu,
+            settings::open_settings,
             ai_providers::get_ai_providers,
             ai_providers::save_ai_provider,
             ai_providers::delete_ai_provider,
@@ -356,6 +358,14 @@ pub fn run() {
                         "type": kind.as_str(),
                     });
                     let _ = win.emit("recent-open", payload);
+                }
+                return;
+            }
+
+            // 设置菜单：打开独立的设置窗口（Tauri 多窗口形态，见 ADR-0009）
+            if menu_id == "settings" {
+                if let Err(e) = settings::show_settings_window(app) {
+                    eprintln!("[murasaki] 打开设置窗口失败: {}", e);
                 }
                 return;
             }
