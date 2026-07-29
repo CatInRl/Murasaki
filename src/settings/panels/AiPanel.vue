@@ -9,15 +9,19 @@
  * API Key 不在前端持久化，仅通过 get_api_key 按需获取（本面板不预填）。
  *
  * T8.2 范围：表单显示与编辑（保存即生效）。
- * 不包含：测试连接（T8.4）、高级参数可编辑（T8.5 — 硬编码常量，只读展示）。
+ * T8.4 范围：测试连接（testProvider + localStorage 状态指示器）、删除二次确认。
+ * 不包含：高级参数可编辑（T8.5 — 硬编码常量，只读展示）。
  * 移除 Azure OpenAI 选项（spec 决策：统一使用 OpenAICompatibleProvider）。
  */
 import { ref, computed, watch } from "vue";
-import { Plus, Trash2, Plug, ChevronDown, Eye, EyeOff } from "lucide-vue-next";
-import { useAiProvidersStore } from "../../stores/useAiProvidersStore";
+import { Plus, Trash2, Plug, ChevronDown, Eye, EyeOff, Check, X } from "lucide-vue-next";
+import { useAiProvidersStore, type TestConnectionResult } from "../../stores/useAiProvidersStore";
+import { useDialogStore } from "../../stores/useDialogStore";
+import DialogContainer from "../../components/DialogContainer.vue";
 import { AI_PROVIDER_PRESETS, type AiProvider } from "../../types";
 
 const store = useAiProvidersStore();
+const dialog = useDialogStore();
 
 /** 当前选中编辑的 provider id */
 const selectedId = ref<string | null>(null);
@@ -38,9 +42,31 @@ const showApiKey = ref(false);
 const testStatus = ref<"idle" | "testing" | "success" | "error">("idle");
 const testMessage = ref("");
 
+/** 上次测试结果（从 localStorage 读取，切换 provider 时刷新） */
+const lastTestResult = ref<TestConnectionResult | null>(null);
+
 const selectedProvider = computed<AiProvider | null>(() =>
   store.providers.find((p) => p.id === selectedId.value) ?? null
 );
+
+/** 状态指示器显示状态：优先当前测试状态，idle 时回退到 localStorage 上次结果 */
+const displayStatus = computed<"idle" | "testing" | "success" | "error">(() => {
+  if (testStatus.value === "testing") return "testing";
+  if (testStatus.value === "success" || testStatus.value === "error") return testStatus.value;
+  if (lastTestResult.value) {
+    return lastTestResult.value.success ? "success" : "error";
+  }
+  return "idle";
+});
+
+const displayMessage = computed(() => {
+  if (testStatus.value === "testing") return "测试中…";
+  if (testStatus.value === "success" || testStatus.value === "error") return testMessage.value;
+  if (lastTestResult.value) {
+    return lastTestResult.value.message ?? (lastTestResult.value.success ? "连接成功" : "连接失败");
+  }
+  return "";
+});
 
 /** 高级参数硬编码常量（只读展示，spec 决策不放入设置） */
 const ADVANCED_PARAMS = [
@@ -74,6 +100,7 @@ function syncForm(): void {
   const p = selectedProvider.value;
   if (!p) {
     form.value = { name: "", type: "custom", baseUrl: "", model: "", apiKey: "" };
+    lastTestResult.value = null;
     return;
   }
   form.value = {
@@ -86,6 +113,8 @@ function syncForm(): void {
   showApiKey.value = false;
   testStatus.value = "idle";
   testMessage.value = "";
+  // 从 localStorage 读取上次测试结果
+  lastTestResult.value = store.getTestResult(p.id);
 }
 
 function selectProvider(id: string): void {
@@ -111,9 +140,17 @@ async function handleAddProvider(): Promise<void> {
 }
 
 async function handleDeleteProvider(): Promise<void> {
-  if (!selectedProvider.value) return;
-  const id = selectedProvider.value.id;
-  await store.deleteProvider(id);
+  const provider = selectedProvider.value;
+  if (!provider) return;
+  const confirmed = await dialog.confirm({
+    title: "删除 Provider",
+    message: `确定删除 Provider "${provider.name}"？此操作不可撤销。`,
+    danger: true,
+    confirmText: "删除",
+  });
+  if (!confirmed) return;
+  await store.deleteProvider(provider.id);
+  lastTestResult.value = null;
   initSelection();
 }
 
@@ -133,20 +170,18 @@ async function handleSaveProvider(): Promise<void> {
 }
 
 async function handleTestConnection(): Promise<void> {
-  if (!selectedProvider.value || !form.value.apiKey) {
-    testStatus.value = "error";
-    testMessage.value = "请先输入 API Key";
-    return;
-  }
+  if (!selectedProvider.value) return;
   testStatus.value = "testing";
   testMessage.value = "测试中…";
   try {
-    await store.testConnection(form.value.baseUrl, form.value.apiKey, form.value.model);
-    testStatus.value = store.testStatus;
-    testMessage.value = store.testMessage;
+    const result = await store.testProvider(selectedProvider.value.id);
+    testStatus.value = result.success ? "success" : "error";
+    testMessage.value = result.message ?? (result.success ? "连接成功" : "连接失败");
+    lastTestResult.value = result;
   } catch {
+    // testProvider 不抛出异常，此处为防御性处理
     testStatus.value = "error";
-    testMessage.value = store.testMessage;
+    testMessage.value = "测试失败";
   }
 }
 
@@ -312,16 +347,22 @@ function typeLabel(type: AiProvider["type"]): string {
                 测试连接
               </button>
               <button type="submit" class="primary-button">保存 Provider</button>
-              <div v-if="testStatus !== 'idle'" class="provider-status">
+              <div v-if="displayStatus !== 'idle'" class="provider-status">
+                <Check
+                  v-if="displayStatus === 'success'"
+                  :size="14"
+                  class="status-icon success"
+                />
+                <X
+                  v-else-if="displayStatus === 'error'"
+                  :size="14"
+                  class="status-icon error"
+                />
                 <span
-                  class="provider-status-dot"
-                  :class="{
-                    success: testStatus === 'success',
-                    error: testStatus === 'error',
-                    testing: testStatus === 'testing',
-                  }"
+                  v-else
+                  class="provider-status-dot testing"
                 ></span>
-                <span class="provider-status-text">{{ testMessage }}</span>
+                <span class="provider-status-text">{{ displayMessage }}</span>
               </div>
             </div>
           </form>
@@ -366,6 +407,9 @@ function typeLabel(type: AiProvider["type"]): string {
         </div>
       </details>
     </section>
+
+    <!-- 对话框容器（设置窗口独立挂载，用于删除二次确认） -->
+    <DialogContainer />
   </div>
 </template>
 
@@ -549,21 +593,25 @@ function typeLabel(type: AiProvider["type"]): string {
 .provider-status {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--murasaki-ink-2);
   font-size: var(--murasaki-text-xs);
+}
+.status-icon {
+  flex-shrink: 0;
+}
+.status-icon.success {
+  color: var(--murasaki-state-success);
+}
+.status-icon.error {
+  color: var(--murasaki-state-error);
 }
 .provider-status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--murasaki-neutral-400);
-}
-.provider-status-dot.success {
-  background: var(--murasaki-state-success);
-}
-.provider-status-dot.error {
-  background: var(--murasaki-state-error);
+  flex-shrink: 0;
 }
 .provider-status-dot.testing {
   background: var(--murasaki-state-warning);
