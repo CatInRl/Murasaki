@@ -64,10 +64,22 @@
   --murasaki-statusbar-height: 24px;
   --murasaki-sidebar-width: 260px;
   --murasaki-topbar-height: 36px;
+  /* Design reference only — Murasaki keeps the OS native menu bar, this token
+     exists so design specs and future in-app layouts can reference a single
+     source of truth for the 32px menu-bar height. (Ticket #60) */
+  --murasaki-menubar-height: 32px;
 
   /* Typography */
   --murasaki-font-ui: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --murasaki-font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+
+  /* Font Size Tokens — visual hierarchy for secondary/base/heading text (Ticket #60) */
+  --murasaki-text-xs: 12px;
+  --murasaki-text-sm: 13px;
+  --murasaki-text-base: 14px;
+  --murasaki-text-lg: 16px;
+  --murasaki-text-xl: 20px;
+  --murasaki-text-2xl: 24px;
 
   /* Motion */
   --murasaki-ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -75,12 +87,18 @@
   --murasaki-duration-fast: 120ms;
   --murasaki-duration-base: 200ms;
   --murasaki-duration-slow: 320ms;
+  /* Transition shorthand token — use directly in `transition:` declarations (Ticket #60) */
+  --murasaki-transition-fast: 120ms ease;
 
   /* Shadows */
   --murasaki-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
   --murasaki-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
   --murasaki-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
   --murasaki-shadow-purple: 0 8px 24px rgba(147, 51, 234, 0.18);
+  /* Floating-layer shadow for popovers / dialogs / context menus (Ticket #60).
+     Two-layer shadow mirrors the design-spec `.shadow-2` utility and adapts to
+     the active theme via the overrides in the dark-mode blocks below. */
+  --murasaki-shadow-2: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
 }
 
 /* Dark mode tokens (auto-applied when system is dark OR [data-theme="dark"]) */
@@ -103,6 +121,10 @@
     --murasaki-ink-2: #b3b3c0;
     --murasaki-ink-3: #6b6b7c;
     --murasaki-line: #2a2a35;
+
+    /* Dark-mode floating-layer shadow — soft light glow on dark surfaces
+       (mirrors design-spec `rgb(from var(--murasaki-foreground) r g b / 0.08)`). */
+    --murasaki-shadow-2: 0 20px 25px -5px rgba(229, 231, 235, 0.08), 0 8px 10px -6px rgba(229, 231, 235, 0.08);
   }
 }
 
@@ -124,6 +146,9 @@
   --murasaki-ink-2: #b3b3c0;
   --murasaki-ink-3: #6b6b7c;
   --murasaki-line: #2a2a35;
+
+  /* Dark-mode floating-layer shadow — soft light glow on dark surfaces. */
+  --murasaki-shadow-2: 0 20px 25px -5px rgba(229, 231, 235, 0.08), 0 8px 10px -6px rgba(229, 231, 235, 0.08);
 }
 
 /* Global reset & base */
