@@ -42,11 +42,11 @@ const SLIDING_WINDOW_THRESHOLD = 40000;
 /** Layer 2 激进窗口阈值：60K tokens */
 const AGGRESSIVE_WINDOW_THRESHOLD = 60000;
 
-/** 单次请求软限制：16K tokens（超出后截断 oldest） */
-const SINGLE_REQUEST_LIMIT = 16000;
+/** 单次请求软限制默认值：16384 tokens（超出后截断 oldest，可通过 SettingsState.aiSingleRequestTokenLimit 覆盖） */
+const DEFAULT_SINGLE_REQUEST_LIMIT = 16384;
 
-/** 累计 prompt 软限制：50K tokens */
-const CUMULATIVE_SOFT_LIMIT = 50000;
+/** 累计 prompt 软限制默认值：51200 tokens（可通过 SettingsState.aiCumulativeTokenSoftLimit 覆盖） */
+const DEFAULT_CUMULATIVE_SOFT_LIMIT = 51200;
 
 /** 工具结果触发省略的字符阈值（超过则截断为摘要） */
 const TOOL_RESULT_OMIT_CHARS = 800;
@@ -186,7 +186,11 @@ function applySingleRequestTruncation(messages: LLMMessage[], limit: number): LL
  * @param messages 原始 LLM 消息列表
  * @returns 压缩结果
  */
-export function compressContext(messages: LLMMessage[]): CompressionResult {
+export function compressContext(
+  messages: LLMMessage[],
+  options?: { singleRequestLimit?: number; cumulativeSoftLimit?: number }
+): CompressionResult {
+  const singleRequestLimit = options?.singleRequestLimit ?? DEFAULT_SINGLE_REQUEST_LIMIT;
   const originalTokens = estimateMessagesTokens(messages);
   let compressed = [...messages];
   let layer1Applied = false;
@@ -209,10 +213,10 @@ export function compressContext(messages: LLMMessage[]): CompressionResult {
     layer2Applied = true;
   }
 
-  // 单次请求截断（16K 硬限制）
+  // 单次请求截断（默认 16384，可由 SettingsState.aiSingleRequestTokenLimit 覆盖）
   currentTokens = estimateMessagesTokens(compressed);
-  if (currentTokens > SINGLE_REQUEST_LIMIT) {
-    compressed = applySingleRequestTruncation(compressed, SINGLE_REQUEST_LIMIT);
+  if (currentTokens > singleRequestLimit) {
+    compressed = applySingleRequestTruncation(compressed, singleRequestLimit);
     truncated = true;
   }
 
@@ -239,6 +243,10 @@ export function compressContext(messages: LLMMessage[]): CompressionResult {
 export class CumulativeTokenTracker {
   private _total = 0;
 
+  constructor(
+    private readonly _limitGetter: () => number = () => DEFAULT_CUMULATIVE_SOFT_LIMIT
+  ) {}
+
   /** 添加一次请求的 prompt token 数（优先使用 LLM 返回的 usage 精确值） */
   add(tokens: number): void {
     if (tokens > 0) {
@@ -253,17 +261,17 @@ export class CumulativeTokenTracker {
 
   /** 是否接近限制（80%） */
   get isApproachingLimit(): boolean {
-    return this._total > CUMULATIVE_SOFT_LIMIT * 0.8;
+    return this._total > this._limitGetter() * 0.8;
   }
 
   /** 是否超过限制 */
   get isOverLimit(): boolean {
-    return this._total > CUMULATIVE_SOFT_LIMIT;
+    return this._total > this._limitGetter();
   }
 
-  /** 限制值 */
+  /** 限制值（从 SettingsState 读取，随设置变化生效） */
   get limit(): number {
-    return CUMULATIVE_SOFT_LIMIT;
+    return this._limitGetter();
   }
 
   /** 重置（清空对话时调用） */

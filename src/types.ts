@@ -128,6 +128,14 @@ export interface SettingsState {
   editorFontFamily: string;
   /** 粘贴图片时默认保存的相对目录 */
   defaultImageDir: string;
+  /** Agent 循环轮数上限（默认 15） */
+  aiAgentMaxRounds: number;
+  /** 单次请求 token 上限（默认 16384） */
+  aiSingleRequestTokenLimit: number;
+  /** 累计 token 软上限（默认 51200） */
+  aiCumulativeTokenSoftLimit: number;
+  /** propose_replace 二次确认阈值（默认 50 行） */
+  aiProposeReplaceConfirmThreshold: number;
 }
 
 /**
@@ -147,6 +155,10 @@ export const DEFAULT_SETTINGS: SettingsState = {
   editorLineHeight: 1.6,
   editorFontFamily: "JetBrains Mono",
   defaultImageDir: "assets/images",
+  aiAgentMaxRounds: 15,
+  aiSingleRequestTokenLimit: 16384,
+  aiCumulativeTokenSoftLimit: 51200,
+  aiProposeReplaceConfirmThreshold: 50,
 };
 
 /**
