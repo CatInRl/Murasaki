@@ -18,18 +18,19 @@ const API_KEY = process.env.MURASAKI_E2E_API_KEY ?? "";
 
 let browser: Browser;
 
-describe("Agent Proposals 渲染与接受", () => {
-  beforeAll(async () => {
-    if (!API_KEY) return;
-    browser = await createSession();
-  }, 60000);
+// 共享 session 生命周期：确定性模式测试不需要 API_KEY，也要创建 session
+beforeAll(async () => {
+  browser = await createSession();
+}, 60000);
 
-  afterAll(async () => {
-    if (browser) {
-      await teardownActiveProvider(browser);
-      await closeSession(browser);
-    }
-  });
+afterAll(async () => {
+  if (browser) {
+    await teardownActiveProvider(browser);
+    await closeSession(browser);
+  }
+});
+
+describe("Agent Proposals 渲染与接受", () => {
 
   beforeEach(async () => {
     if (!API_KEY) return;
@@ -126,4 +127,92 @@ describe("Agent Proposals 渲染与接受", () => {
     // LLM 没有产生 proposal 也算通过（非确定性），已验证链路通畅
     expect(true).toBe(true);
   }, 60000);
+});
+
+describe("三种模式下 Agent 提案渲染（确定性注入，不依赖 LLM）", () => {
+  beforeEach(async () => {
+    resetWorkspace(defaultFixtureFiles());
+    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    await browser.execute(() => {
+      // @ts-ignore
+      const proposals = window.__pinia__._s.get("proposals");
+      if (proposals) proposals.clearAll();
+    });
+  });
+
+  it.each(["source", "split", "wysiwyg"] as const)(
+    "editorMode=%s 下注入 proposal → 渲染 accept 按钮 → 接受后内容更新",
+    async (mode) => {
+      const wsPath = resetWorkspace(defaultFixtureFiles());
+      // 设置 editorMode（T7.3 合并后将真正切换编辑器扩展；当前为前向兼容验证）
+      await browser.execute((m: string) => {
+        const pinia = (window as any).__pinia__;
+        const persistence = pinia._s.get("persistence");
+        persistence.settings.editorMode = m;
+      }, mode);
+
+      await openWorkspace(browser, wsPath);
+      await openFileInTab(browser, `${wsPath}\\intro.md`);
+      await browser.$(".cm-editor").waitForExist({ timeout: 10000 });
+
+      // 等待 SourceEditor 挂载并注册 EditorView 到 bridge
+      await browser.waitUntil(
+        async () =>
+          await browser.execute(() => {
+            const bridge = (window as any).__pinia__._s.get("editorBridge");
+            return !!bridge?.editorView;
+          }),
+        { timeout: 10000, timeoutMsg: "EditorView 未在时限内注册" }
+      );
+
+      // 确定性注入 proposal（不依赖 LLM）
+      const injected = await browser.executeAsync((done: (res: unknown) => void) => {
+        const pinia = (window as any).__pinia__;
+        const bridge = pinia._s.get("editorBridge");
+        const proposals = pinia._s.get("proposals");
+        const view = bridge.editorView;
+        if (!view) return done({ error: "no editor view" });
+        const docLen = view.state.doc.length;
+        const id = "e2e-" + Math.random().toString(36).slice(2);
+        proposals.addProposal({
+          id,
+          type: "insert",
+          from: docLen,
+          to: docLen,
+          content: "\n## 确定性注入标题\n",
+          status: "pending",
+          lineCount: 1,
+          label: "e2e deterministic insert",
+        });
+        done({ id });
+      });
+      expect(injected && !(injected as any).error).toBe(true);
+      const proposalId = (injected as any).id as string;
+
+      // 验证提案装饰渲染
+      const btns = await browser.$$(".cm-proposal-buttons");
+      expect(btns.length).toBeGreaterThanOrEqual(1);
+
+      // 接受提案（走 useProposalsStore.acceptProposal → applyProposalAcceptance，真正写入文档）
+      await browser.executeAsync((pid: string, done: (res: unknown) => void) => {
+        const pinia = (window as any).__pinia__;
+        const proposals = pinia._s.get("proposals");
+        try {
+          proposals.acceptProposal(pid);
+          done(null);
+        } catch (err) {
+          done({ error: String(err) });
+        }
+      }, proposalId);
+      await browser.pause(400);
+
+      // 验证编辑器内容已更新
+      const content = await browser.execute(() => {
+        const tabs = (window as any).__pinia__._s.get("tabs");
+        return tabs.activeTab?.content ?? "";
+      });
+      expect(content).toContain("确定性注入标题");
+    },
+    60000
+  );
 });
