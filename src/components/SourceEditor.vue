@@ -2,15 +2,28 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { EditorState, Compartment, Transaction } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, selectAll } from "@codemirror/commands";
 import { indentOnInput, bracketMatching, foldGutter, foldKeymap, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from "@codemirror/search";
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { tags as t } from "@lezer/highlight";
+import {
+  Scissors,
+  Copy,
+  ClipboardPaste,
+  TextSelect,
+  Search,
+  Table,
+  Link as LinkIcon,
+  Image as ImageIcon,
+  Clipboard,
+} from "lucide-vue-next";
 import { paragraphKeymap } from "../composables/useEditorCommands";
 import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
+import { useContextMenuStore } from "../stores/useContextMenuStore";
+import type { MenuItem } from "../stores/useContextMenuStore";
 import {
   proposalField,
   proposalActionEffect,
@@ -212,10 +225,14 @@ const emit = defineEmits<{
   (e: "ready", view: EditorView): void;
   /** 光标位置变化：行（1-indexed）、列（0-indexed） */
   (e: "cursor-change", payload: { line: number; ch: number }): void;
+  /** 右键菜单高级操作（插入表格/链接/图片），由父组件处理 */
+  (e: "context-action", action: "insert-table" | "insert-link" | "insert-image"): void;
 }>();
 
 const hostRef = ref<HTMLDivElement | null>(null);
 const viewRef = shallowRef<EditorView | null>(null);
+
+const contextMenu = useContextMenuStore();
 
 // 标记正在进行外部值同步（避免 dispatch 触发 update:modelValue 污染 dirty 状态）
 let isApplyingExternalValue = false;
@@ -423,6 +440,72 @@ watch(
   }
 );
 
+// ===== 右键菜单 =====
+function onContextMenu(e: MouseEvent): void {
+  const view = viewRef.value;
+  if (!view) return;
+  contextMenu.show(e, buildEditorMenuItems());
+}
+
+function buildEditorMenuItems(): MenuItem[] {
+  return [
+    { label: "剪切", icon: Scissors, shortcut: "Ctrl+X", action: () => runExecCommand("cut") },
+    { label: "复制", icon: Copy, shortcut: "Ctrl+C", action: () => runExecCommand("copy") },
+    { label: "粘贴", icon: ClipboardPaste, shortcut: "Ctrl+V", action: () => runExecCommand("paste") },
+    { label: "全选", icon: TextSelect, shortcut: "Ctrl+A", action: () => runSelectAll() },
+    { separator: true },
+    { label: "查找替换", icon: Search, shortcut: "Ctrl+F", action: () => runFindReplace() },
+    { label: "插入表格", icon: Table, action: () => emit("context-action", "insert-table") },
+    { label: "链接", icon: LinkIcon, action: () => emit("context-action", "insert-link") },
+    { label: "图片", icon: ImageIcon, action: () => emit("context-action", "insert-image") },
+    { label: "粘贴为纯文本", icon: Clipboard, action: () => runPastePlainText() },
+  ];
+}
+
+function runExecCommand(cmd: "cut" | "copy" | "paste"): void {
+  const view = viewRef.value;
+  if (!view) return;
+  view.focus();
+  // Tauri WebView 支持原生 execCommand；CM 监听对应的 cut/copy/paste 事件
+  try {
+    document.execCommand(cmd);
+  } catch (err) {
+    console.warn(`${cmd} 失败:`, err);
+  }
+}
+
+function runSelectAll(): void {
+  const view = viewRef.value;
+  if (!view) return;
+  view.focus();
+  selectAll(view);
+}
+
+function runFindReplace(): void {
+  const view = viewRef.value;
+  if (!view) return;
+  view.focus();
+  openSearchPanel(view);
+}
+
+async function runPastePlainText(): Promise<void> {
+  const view = viewRef.value;
+  if (!view) return;
+  view.focus();
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) return;
+    const sel = view.state.selection.main;
+    view.dispatch({
+      changes: { from: sel.from, to: sel.to, insert: text },
+      selection: { anchor: sel.from + text.length },
+      userEvent: "input.paste",
+    });
+  } catch (err) {
+    console.warn("粘贴纯文本失败:", err);
+  }
+}
+
 defineExpose({
   focus: () => viewRef.value?.focus(),
   getView: () => viewRef.value,
@@ -447,7 +530,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="source-editor">
+  <div class="source-editor" @contextmenu="onContextMenu">
     <div ref="hostRef" class="cm-host"></div>
   </div>
 </template>

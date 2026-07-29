@@ -28,6 +28,9 @@ import {
   FileText,
   FolderOpen,
   ListChecks,
+  Copy,
+  Code,
+  CornerDownLeft,
 } from "lucide-vue-next";
 import EmptyState from "./EmptyState.vue";
 import { useAgentStore } from "../stores/useAgentStore";
@@ -35,8 +38,11 @@ import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useAiProvidersStore } from "../stores/useAiProvidersStore";
 import { useProposalsStore } from "../stores/useProposalsStore";
 import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
-import type { ToolCallEntry } from "../types";
 import { useDialogStore } from "../stores/useDialogStore";
+import { useContextMenuStore } from "../stores/useContextMenuStore";
+import type { MenuItem } from "../stores/useContextMenuStore";
+import type { ToolCallEntry } from "../types";
+import type { ChatMessage } from "../types";
 
 const agent = useAgentStore();
 const workspace = useWorkspaceStore();
@@ -44,6 +50,7 @@ const aiProviders = useAiProvidersStore();
 const proposals = useProposalsStore();
 const editorBridge = useEditorBridgeStore();
 const dialog = useDialogStore();
+const contextMenu = useContextMenuStore();
 
 // ===== 输入框 =====
 const inputText = ref("");
@@ -184,6 +191,77 @@ function onOpenSettings(): void {
   emit("open-settings");
 }
 
+// ===== 消息右键菜单 =====
+function onMessageContextMenu(e: MouseEvent, msg: ChatMessage): void {
+  const items: MenuItem[] = [
+    {
+      label: "复制",
+      icon: Copy,
+      action: () => copyToClipboard(msg.content),
+    },
+    {
+      label: "复制 Markdown 源码",
+      icon: Code,
+      action: () => copyToClipboard(msg.content),
+    },
+    {
+      label: "插入到编辑器",
+      icon: CornerDownLeft,
+      action: () => insertIntoEditor(msg.content),
+    },
+    {
+      label: "从当前消息重新生成",
+      icon: RotateCw,
+      disabled: agent.isThinking,
+      action: () => regenerateFromMessage(msg),
+    },
+  ];
+  contextMenu.show(e, items);
+}
+
+function copyToClipboard(text: string): void {
+  navigator.clipboard.writeText(text).catch((err) => {
+    console.warn("复制失败:", err);
+  });
+}
+
+function insertIntoEditor(text: string): void {
+  const view = editorBridge.editorView;
+  if (!view) {
+    dialog.alert({ message: "请先打开一个文件", variant: "warning" });
+    return;
+  }
+  view.focus();
+  const sel = view.state.selection.main;
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert: text },
+    selection: { anchor: sel.from + text.length },
+    userEvent: "input.paste",
+  });
+}
+
+function regenerateFromMessage(msg: ChatMessage): void {
+  if (agent.isThinking) return;
+  const idx = agent.messages.findIndex((m) => m.id === msg.id);
+  if (idx < 0) return;
+  let userIdx = -1;
+  let userText = "";
+  if (msg.role === "user") {
+    userIdx = idx;
+    userText = msg.content;
+  } else {
+    for (let i = idx; i >= 0; i--) {
+      if (agent.messages[i].role === "user") {
+        userIdx = i;
+        userText = agent.messages[i].content;
+        break;
+      }
+    }
+  }
+  if (userIdx < 0 || !userText) return;
+  agent.messages.splice(userIdx);
+  void agent.sendMessage(userText);
+}
 // ===== 加载 AI providers =====
 onMounted(() => {
   if (!aiProviders.loaded) {
@@ -298,7 +376,10 @@ onMounted(() => {
         <template v-for="msg in agent.messages" :key="msg.id">
           <!-- 用户消息：右对齐 bg-primary + User 图标 -->
           <div v-if="msg.role === 'user'" class="agent-message agent-message-user">
-            <div class="agent-message-bubble agent-message-bubble-user">
+            <div
+              class="agent-message-bubble agent-message-bubble-user"
+              @contextmenu="onMessageContextMenu($event, msg)"
+            >
               {{ msg.content }}
             </div>
             <div class="agent-avatar agent-avatar-user">
@@ -316,6 +397,7 @@ onMounted(() => {
               <div
                 v-if="msg.content"
                 class="agent-message-bubble agent-message-bubble-assistant"
+                @contextmenu="onMessageContextMenu($event, msg)"
               >
                 {{ msg.content }}
                 <span v-if="msg.interrupted" class="agent-interrupted-tag">
