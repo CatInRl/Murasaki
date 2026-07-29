@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-07-28
+## [0.2.0] - 2026-07-29
 
 本版本引入完整的 Agent 能力（基于 OpenAI 兼容端点的 BYOK 助手），并刷新整体视觉风格以匹配 Murasaki 品牌。
 
@@ -18,6 +18,7 @@
 - **上下文管理三层压缩 + 安全护栏（#26）**：Layer 1 工具结果省略 → Layer 2 滑动窗口 + 摘要（40K / 60K 阈值）→ 单请求 16K 截断 + 累计 50K 软提示；循环 15 轮上限；token 流式追踪通过 `result.usage.prompt_tokens` 精确累计。
 - **Provider 配置 + DPAPI 加密（#19）**：系统设置内管理 AI Provider，支持新增 / 编辑 / 删除 / 设为活跃 / 测试连接；API Key 通过 Windows DPAPI 加密存储于 `%APPDATA%\murasaki\secrets.json`；DeepSeek 为默认预设；AI 面板顶部显示活跃 Provider 信息卡片与 BYOK 责任提示。
 - AI Provider 配置 E2E 测试用例（#19）。
+- Agent 全功能 E2E 测试覆盖 A–G 七层：Provider 配置（#19）、LLM 调用循环（C 层）、Proposals 渲染与接受（D 层）、对话持久化（E 层）、上下文压缩与护栏（F 层）、取消/中断（G 层），共 137/143 通过，剩余失败为 A 层测试隔离问题。
 
 ### Changed
 
@@ -25,6 +26,9 @@
 
 ### Fixed
 
+- **修复 `OpenAICompatibleProvider.streamChatWithTools` 在 Tauri WebView2 中 hang 的问题**：openai npm 包的 `for await...of` 流迭代器在 WebView2 中无法推进，导致 Agent 发送消息后无响应。改用原生 `fetch` + `ReadableStream` + SSE 行解析替代，恢复流式输出与工具调用累积。
+- **修复 Agent 上下文卡片首次打开 tab 时不渲染的问题**：`SourceEditor.onMounted` 调用 `registerView(view, null)` 会把 `activeDocPath` 重置为 `null`，覆盖 App.vue 中 watch 设置的值，导致 `agent.hasContext` 始终为 false。重构 `registerView` 不再管理 `activeDocPath`（改由 App.vue 的 watch 独占管理），并添加 `{ flush: 'post' }` 确保触发顺序。
+- 修复 `search_across_files` 工具错误拒绝空 query 字符串：前端校验 `!query` 将空字符串视为参数缺失返回 "missing required parameter"，改为 `query == null` 仅拒绝 undefined/null，与 Rust 后端行为对齐。
 - 修复 `search.rs` 存量测试失败：`test_search_regex` 因测试数据中 "Murasaki" 与 "editor" 不在同一行导致 0 vs 1 断言失败；`test_search_context_lines` 上下文行数断言与测试数据不匹配，已更新 `intro.md` 测试数据并修正断言。
 - 修复 Tauri CLI 2.11+ 要求 `CI` 环境变量为 `"true"`/`"false"` 而 TRAE Sandbox 默认 `CI=1` 导致生产构建失败的问题，在 [tauri-build.ps1](scripts/tauri-build.ps1) 中覆盖为 `"true"`。
 
