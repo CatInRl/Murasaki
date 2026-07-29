@@ -3,6 +3,7 @@
  * Agent 面板 — 右侧 380px 固定面板
  *
  * Ticket #20: 面板 + 循环骨架 + 单轮对话 + 流式 + 取消 + 无工作区禁用
+ * Ticket #69 (T4.1): 全量视觉对齐设计规范
  */
 import { ref, computed, watch, nextTick, onMounted } from "vue";
 import {
@@ -15,37 +16,77 @@ import {
   Check,
   X,
   MessageSquare,
+  ChevronDown,
+  ChevronRight,
+  User,
+  Bot,
+  Sparkles,
+  Send,
+  Square,
+  Trash2,
+  PanelRightClose,
+  FileText,
+  FolderOpen,
+  ListChecks,
 } from "lucide-vue-next";
 import EmptyState from "./EmptyState.vue";
 import { useAgentStore } from "../stores/useAgentStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useAiProvidersStore } from "../stores/useAiProvidersStore";
 import { useProposalsStore } from "../stores/useProposalsStore";
+import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
+import type { ToolCallEntry } from "../types";
 
 const agent = useAgentStore();
 const workspace = useWorkspaceStore();
 const aiProviders = useAiProvidersStore();
 const proposals = useProposalsStore();
+const editorBridge = useEditorBridgeStore();
 
 // ===== 输入框 =====
 const inputText = ref("");
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 
-// ===== 工具调用展开状态 =====
+// ===== 工具调用折叠卡片展开状态（按消息 ID 跟踪） =====
 const expandedToolCalls = ref<Set<string>>(new Set());
 
-function toggleToolCall(id: string): void {
-  if (expandedToolCalls.value.has(id)) {
-    expandedToolCalls.value.delete(id);
+function toggleToolCallCard(msgId: string): void {
+  if (expandedToolCalls.value.has(msgId)) {
+    expandedToolCalls.value.delete(msgId);
   } else {
-    expandedToolCalls.value.add(id);
+    expandedToolCalls.value.add(msgId);
+  }
+}
+
+/** 工具调用摘要文本 */
+function toolCallsSummary(toolCalls: ToolCallEntry[]): string {
+  const total = toolCalls.length;
+  const calling = toolCalls.filter((t) => t.status === "calling").length;
+  const error = toolCalls.filter((t) => t.status === "error").length;
+  if (calling > 0) return `${calling}/${total} 调用中`;
+  if (error > 0) return `${total} 个工具 · ${error} 失败`;
+  return `${total} 个工具`;
+}
+
+// ===== 提案行号范围 =====
+function proposalLineRange(from: number, to: number): string {
+  const view = editorBridge.editorView;
+  if (!view) return "";
+  try {
+    const docLen = view.state.doc.length;
+    const fromLine = view.state.doc.lineAt(Math.min(from, docLen)).number;
+    const toLine = view.state.doc.lineAt(Math.min(to, docLen)).number;
+    if (fromLine === toLine) return `L${fromLine}`;
+    return `L${fromLine}-${toLine}`;
+  } catch {
+    return "";
   }
 }
 
 // ===== 滚动 =====
 const conversationRef = ref<HTMLDivElement | null>(null);
 
-/** 滀动到底部 */
+/** 滚动到底部 */
 function scrollToBottom(): void {
   if (conversationRef.value) {
     conversationRef.value.scrollTop = conversationRef.value.scrollHeight;
@@ -154,12 +195,7 @@ onMounted(() => {
     <!-- Header -->
     <div class="agent-header">
       <div class="agent-header-left">
-        <svg class="agent-header-icon" viewBox="0 0 24 24" width="15" height="15">
-          <path
-            fill="currentColor"
-            d="M12 2L9.5 8.5L3 11l6.5 2.5L12 20l2.5-6.5L21 11l-6.5-2.5L12 2z"
-          />
-        </svg>
+        <Bot :size="15" class="agent-header-icon" />
         <span class="agent-header-title">Agent</span>
       </div>
       <div class="agent-header-right">
@@ -169,20 +205,10 @@ onMounted(() => {
           title="清空当前工作区的对话"
           @click="onClearConversation"
         >
-          <svg viewBox="0 0 24 24" width="14" height="14">
-            <path
-              fill="currentColor"
-              d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-            />
-          </svg>
+          <Trash2 :size="14" />
         </button>
         <button class="agent-collapse-btn" title="收起面板" @click="onCollapse">
-          <svg viewBox="0 0 24 24" width="14" height="14">
-            <path
-              fill="currentColor"
-              d="M9.29 6.71a1 1 0 000 1.41L13.17 12l-3.88 3.88a1 1 0 101.41 1.41l4.59-4.59a1 1 0 000-1.41L10.7 6.7a1 1 0 00-1.41.01z"
-            />
-          </svg>
+          <PanelRightClose :size="14" />
         </button>
       </div>
     </div>
@@ -192,16 +218,11 @@ onMounted(() => {
       v-if="agent.hasContext && agent.contextDocPath"
       class="agent-context-card"
     >
-      <svg class="agent-context-icon" viewBox="0 0 24 24" width="12" height="12">
-        <path
-          fill="currentColor"
-          d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"
-        />
-      </svg>
+      <FileText :size="12" class="agent-context-icon" />
       <span class="agent-context-path">{{ agent.contextDocPath }}</span>
       <span class="agent-context-tokens">≈ {{ agent.contextTokens }} tokens</span>
       <button class="agent-context-remove" title="移除当前文档上下文" @click="agent.removeContext()">
-        ×
+        <X :size="11" />
       </button>
     </div>
 
@@ -241,12 +262,7 @@ onMounted(() => {
 
     <!-- 空状态：无工作区 -->
     <div v-if="showNoWorkspace" class="agent-empty-state">
-      <svg viewBox="0 0 24 24" width="40" height="40" class="empty-icon">
-        <path
-          fill="currentColor"
-          d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
-        />
-      </svg>
+      <FolderOpen :size="40" class="empty-icon" />
       <p class="empty-title">打开工作区后启用 Agent</p>
       <p class="empty-desc">Agent 需要工作区上下文才能辅助编辑</p>
       <button class="empty-action" @click="onOpenWorkspace">打开工作区</button>
@@ -254,13 +270,7 @@ onMounted(() => {
 
     <!-- 空状态：未配置 provider -->
     <div v-else-if="showNoProvider" class="agent-empty-state">
-      <svg viewBox="0 0 24 24" width="40" height="40" class="empty-icon">
-        <path
-          fill="currentColor"
-          d="M12 2L9.5 8.5L3 11l6.5 2.5L12 20l2.5-6.5L21 11l-6.5-2.5L12 2z"
-          opacity="0.4"
-        />
-      </svg>
+      <Sparkles :size="40" class="empty-icon empty-icon-dim" />
       <p class="empty-title">未配置 AI 服务</p>
       <p class="empty-desc">请在设置中配置 AI Provider</p>
       <button class="empty-action" @click="onOpenSettings">打开设置</button>
@@ -283,90 +293,109 @@ onMounted(() => {
         />
 
         <!-- 消息列表 -->
-        <div
-          v-for="msg in agent.messages"
-          :key="msg.id"
-          class="agent-message"
-          :class="{
-            'agent-message-user': msg.role === 'user',
-            'agent-message-assistant': msg.role === 'assistant',
-          }"
-        >
-          <!-- assistant 头像 -->
-          <div v-if="msg.role === 'assistant'" class="agent-avatar">
-            <svg viewBox="0 0 24 24" width="13" height="13">
-              <path
-                fill="currentColor"
-                d="M12 2L9.5 8.5L3 11l6.5 2.5L12 20l2.5-6.5L21 11l-6.5-2.5L12 2z"
-              />
-            </svg>
-          </div>
-          <!-- 气泡 -->
-          <div
-            class="agent-message-bubble"
-            :class="{
-              'agent-message-bubble-user': msg.role === 'user',
-              'agent-message-bubble-assistant': msg.role === 'assistant',
-            }"
-          >
-            {{ msg.content }}
-            <span v-if="msg.interrupted" class="agent-interrupted-tag">
-              <AlertTriangle :size="11" /> 已中断
-            </span>
+        <template v-for="msg in agent.messages" :key="msg.id">
+          <!-- 用户消息：右对齐 bg-primary + User 图标 -->
+          <div v-if="msg.role === 'user'" class="agent-message agent-message-user">
+            <div class="agent-message-bubble agent-message-bubble-user">
+              {{ msg.content }}
+            </div>
+            <div class="agent-avatar agent-avatar-user">
+              <User :size="13" />
+            </div>
           </div>
 
-          <!-- 工具调用条目（assistant 消息下） -->
-          <div
-            v-if="msg.toolCalls && msg.toolCalls.length > 0"
-            class="agent-tool-calls"
-          >
-            <div
-              v-for="tc in msg.toolCalls"
-              :key="tc.id"
-              class="tool-call-entry"
-              :class="{
-                'tool-call-calling': tc.status === 'calling',
-                'tool-call-done': tc.status === 'done',
-                'tool-call-error': tc.status === 'error',
-              }"
-              @click="toggleToolCall(tc.id)"
-            >
-              <div class="tool-call-header">
-                <Wrench :size="10" class="tool-call-icon" />
-                <span class="tool-call-name">{{ tc.name }}</span>
-                <span class="tool-call-summary">
-                  {{ tc.status === "calling" ? "调用中..." : tc.summary }}
+          <!-- 助手消息：左对齐 bg-muted/30 + Bot 图标 -->
+          <div v-else-if="msg.role === 'assistant'" class="agent-message agent-message-assistant">
+            <div class="agent-avatar agent-avatar-assistant">
+              <Bot :size="13" />
+            </div>
+            <div class="agent-message-content">
+              <!-- 气泡 -->
+              <div
+                v-if="msg.content"
+                class="agent-message-bubble agent-message-bubble-assistant"
+              >
+                {{ msg.content }}
+                <span v-if="msg.interrupted" class="agent-interrupted-tag">
+                  <AlertTriangle :size="11" /> 已中断
                 </span>
               </div>
-              <div v-if="expandedToolCalls.has(tc.id)" class="tool-call-detail">
-                <div class="tool-call-section">
-                  <span class="tool-call-label">参数:</span>
-                  <pre class="tool-call-pre">{{ JSON.stringify(tc.parsedArgs, null, 2) }}</pre>
+
+              <!-- 工具调用折叠卡片 (T4.1) -->
+              <div
+                v-if="msg.toolCalls && msg.toolCalls.length > 0"
+                class="tool-call-card"
+              >
+                <!-- 折叠态：单行 Wrench + "工具·{summary}" + ChevronDown -->
+                <div
+                  class="tool-call-card-header"
+                  @click="toggleToolCallCard(msg.id)"
+                >
+                  <Wrench :size="12" class="tool-call-card-icon" />
+                  <span class="tool-call-card-title">工具 · {{ toolCallsSummary(msg.toolCalls) }}</span>
+                  <ChevronDown
+                    v-if="expandedToolCalls.has(msg.id)"
+                    :size="12"
+                    class="tool-call-card-chevron"
+                  />
+                  <ChevronRight
+                    v-else
+                    :size="12"
+                    class="tool-call-card-chevron"
+                  />
                 </div>
-                <div v-if="tc.result" class="tool-call-section">
-                  <span class="tool-call-label">结果:</span>
-                  <pre class="tool-call-pre">{{ JSON.stringify(tc.result, null, 2).slice(0, 500) }}</pre>
+                <!-- 展开态：列出每个工具调用（图标+名称+参数摘要+状态色+结果预览），逐个出现 -->
+                <div
+                  v-if="expandedToolCalls.has(msg.id)"
+                  class="tool-call-card-body"
+                >
+                  <div
+                    v-for="(tc, idx) in msg.toolCalls"
+                    :key="tc.id"
+                    class="tool-call-item tool-call-entry"
+                    :class="{
+                      'tool-call-calling tool-call-item-calling': tc.status === 'calling',
+                      'tool-call-done tool-call-item-done': tc.status === 'done',
+                      'tool-call-error tool-call-item-error': tc.status === 'error',
+                    }"
+                    :style="{ animationDelay: `${idx * 60}ms` }"
+                  >
+                    <div class="tool-call-item-row">
+                      <Wrench :size="10" class="tool-call-item-icon" />
+                      <span class="tool-call-item-name">{{ tc.name }}</span>
+                      <span class="tool-call-summary tool-call-item-summary">
+                        {{ tc.status === "calling" ? "调用中..." : tc.summary }}
+                      </span>
+                    </div>
+                    <div class="tool-call-detail">
+                      <div v-if="tc.parsedArgs" class="tool-call-section">
+                        <span class="tool-call-label">参数:</span>
+                        <pre class="tool-call-pre">{{ JSON.stringify(tc.parsedArgs, null, 2) }}</pre>
+                      </div>
+                      <div v-if="tc.result" class="tool-call-section">
+                        <span class="tool-call-label">结果:</span>
+                        <pre class="tool-call-pre">{{ JSON.stringify(tc.result, null, 2).slice(0, 500) }}</pre>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </template>
 
         <!-- 流式中的消息 -->
         <div
           v-if="agent.isThinking && agent.streamingContent"
           class="agent-message agent-message-assistant"
         >
-          <div class="agent-avatar">
-            <svg viewBox="0 0 24 24" width="13" height="13">
-              <path
-                fill="currentColor"
-                d="M12 2L9.5 8.5L3 11l6.5 2.5L12 20l2.5-6.5L21 11l-6.5-2.5L12 2z"
-              />
-            </svg>
+          <div class="agent-avatar agent-avatar-assistant">
+            <Bot :size="13" />
           </div>
-          <div class="agent-message-bubble agent-message-bubble-assistant">
-            {{ agent.streamingContent }}<span class="streaming-cursor"></span>
+          <div class="agent-message-content">
+            <div class="agent-message-bubble agent-message-bubble-assistant">
+              {{ agent.streamingContent }}<span class="streaming-cursor"></span>
+            </div>
           </div>
         </div>
 
@@ -375,16 +404,13 @@ onMounted(() => {
           v-if="agent.isThinking && !agent.streamingContent"
           class="agent-message agent-message-assistant"
         >
-          <div class="agent-avatar">
-            <svg viewBox="0 0 24 24" width="13" height="13">
-              <path
-                fill="currentColor"
-                d="M12 2L9.5 8.5L3 11l6.5 2.5L12 20l2.5-6.5L21 11l-6.5-2.5L12 2z"
-              />
-            </svg>
+          <div class="agent-avatar agent-avatar-assistant">
+            <Bot :size="13" />
           </div>
-          <div class="agent-message-bubble agent-message-bubble-assistant">
-            <span class="agent-thinking-dots">思考中...</span>
+          <div class="agent-message-content">
+            <div class="agent-message-bubble agent-message-bubble-assistant">
+              <span class="agent-thinking-dots">思考中...</span>
+            </div>
           </div>
         </div>
 
@@ -394,15 +420,13 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 提议列表 (Ticket #23) -->
+      <!-- 提议列表卡片 (T4.1: 独立卡片，每行含文件名+行号范围+类型图标+接受/拒绝状态) -->
       <div
         v-if="proposals.hasProposals"
         class="agent-proposal-list"
       >
         <div class="proposal-list-header">
-          <svg class="proposal-list-icon" viewBox="0 0 24 24" width="12" height="12">
-            <path fill="currentColor" d="M12 2L9.91 8.84 3 9.27l5.46 4.73L6.82 21 12 17.27 17.18 21l-1.64-6.99L21 9.27l-6.91-.43L12 2z"/>
-          </svg>
+          <ListChecks :size="12" class="proposal-list-icon" />
           <span class="proposal-list-title">提议 ({{ proposals.pendingProposals.length }})</span>
         </div>
         <div
@@ -420,7 +444,7 @@ onMounted(() => {
         >
           <span class="proposal-item-icon"><Plus v-if="p.type === 'insert'" :size="11" /><RotateCw v-else :size="11" /></span>
           <span class="proposal-item-label">{{ p.label }}</span>
-          <span class="proposal-item-meta">{{ p.lineCount }} 行</span>
+          <span class="proposal-item-lines">{{ proposalLineRange(p.from, p.to) || `${p.lineCount} 行` }}</span>
           <template v-if="p.status === 'pending'">
             <button
               class="proposal-item-btn proposal-item-accept"
@@ -445,9 +469,7 @@ onMounted(() => {
         class="agent-newfile-list"
       >
         <div class="newfile-list-header">
-          <svg class="newfile-list-icon" viewBox="0 0 24 24" width="12" height="12">
-            <path fill="currentColor" d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z M11 11h2v6h-2z M11 9h2v2h-2z"/>
-          </svg>
+          <FilePlus :size="12" class="newfile-list-icon" />
           <span class="newfile-list-title">
             新文件提议 ({{ proposals.pendingNewFileProposals.length }})
           </span>
@@ -515,7 +537,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- >50 行二次确认对话框 -->
+      <!-- >50 行二次确认对话框 (T4.1: Check 绿色 + X 红色图标按钮) -->
       <div
         v-if="proposals.pendingConfirmation"
         class="proposal-confirmation-overlay"
@@ -526,12 +548,14 @@ onMounted(() => {
           <div class="confirmation-buttons">
             <button
               class="confirmation-btn confirmation-cancel"
+              title="取消"
               @click="proposals.cancelConfirmation()"
-            >取消</button>
+            ><X :size="14" /></button>
             <button
               class="confirmation-btn confirmation-confirm"
+              title="确认替换"
               @click="proposals.confirmLargeReplace()"
-            >确认替换</button>
+            ><Check :size="14" /></button>
           </div>
         </div>
       </div>
@@ -543,6 +567,12 @@ onMounted(() => {
         @click="onClickNewContent"
       >
         ↓ 新内容
+      </div>
+
+      <!-- Provider chip (T4.1: bg-primary/10 text-primary + Sparkles 图标 + provider 名) -->
+      <div v-if="aiProviders.activeProvider" class="provider-chip">
+        <Sparkles :size="11" />
+        <span>{{ aiProviders.activeProvider.name }}</span>
       </div>
 
       <!-- 输入区 -->
@@ -564,12 +594,7 @@ onMounted(() => {
           :disabled="!inputText.trim()"
           @click="onSend"
         >
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path
-              fill="currentColor"
-              d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"
-            />
-          </svg>
+          <Send :size="16" />
         </button>
         <button
           v-else
@@ -577,9 +602,7 @@ onMounted(() => {
           @click="onStop"
           title="停止"
         >
-          <svg viewBox="0 0 24 24" width="14" height="14">
-            <path fill="currentColor" d="M6 6h12v12H6z" />
-          </svg>
+          <Square :size="14" />
         </button>
       </div>
     </template>
@@ -595,6 +618,7 @@ onMounted(() => {
   background: var(--murasaki-surface, #ffffff);
   border-left: 1px solid var(--murasaki-line, #e5e7eb);
   overflow: hidden;
+  position: relative;
 }
 
 /* Header */
@@ -634,12 +658,17 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--murasaki-muted, #6b7280);
+  color: var(--murasaki-muted-foreground, #737373);
+  transition: background var(--murasaki-transition-fast, 120ms ease),
+    color var(--murasaki-transition-fast, 120ms ease);
 }
-.agent-clear-btn:hover,
+.agent-clear-btn:hover {
+  background: var(--murasaki-muted, #f5f5f5);
+  color: var(--murasaki-state-error, #dc2626);
+}
 .agent-collapse-btn:hover {
-  background: var(--murasaki-hover, #f3f4f6);
-  color: var(--murasaki-error, #dc2626);
+  background: var(--murasaki-muted, #f5f5f5);
+  color: var(--murasaki-ink, #171717);
 }
 
 /* 空状态 */
@@ -654,18 +683,21 @@ onMounted(() => {
   gap: 8px;
 }
 .empty-icon {
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-muted-foreground, #a3a3a3);
   margin-bottom: 8px;
+}
+.empty-icon-dim {
+  opacity: 0.4;
 }
 .empty-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--murasaki-ink, #1f2937);
+  color: var(--murasaki-ink, #171717);
   margin: 0;
 }
 .empty-desc {
   font-size: 12px;
-  color: var(--murasaki-muted, #6b7280);
+  color: var(--murasaki-muted-foreground, #737373);
   margin: 0 0 12px;
 }
 .empty-action {
@@ -677,9 +709,10 @@ onMounted(() => {
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
+  transition: background var(--murasaki-transition-fast, 120ms ease);
 }
 .empty-action:hover {
-  background: var(--murasaki-purple-50, rgba(147, 51, 234, 0.06));
+  background: color-mix(in srgb, var(--murasaki-primary, #9333ea) 6%, transparent);
 }
 
 /* 对话区 */
@@ -699,38 +732,61 @@ onMounted(() => {
   border-radius: 3px;
 }
 
+/* 空对话欢迎 */
+.agent-welcome {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--murasaki-muted-foreground, #a3a3a3);
+  font-size: 12px;
+}
 
-/* 消息 */
+/* ===== 消息 (T4.1: 用户/助手消息气泡区分) ===== */
 .agent-message {
   display: flex;
-  flex-direction: column;
-}
-.agent-message-user {
-  align-items: flex-end;
-}
-.agent-message-assistant {
-  align-items: flex-start;
   flex-direction: row;
+  align-items: flex-start;
   gap: 6px;
 }
+.agent-message-user {
+  justify-content: flex-end;
+}
+.agent-message-assistant {
+  justify-content: flex-start;
+}
 
-/* 头像 */
+/* 助手消息内容列（气泡 + 工具调用卡片） */
+.agent-message-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* 头像 (T4.1: User + Bot 图标) */
 .agent-avatar {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--murasaki-purple-100, rgba(147, 51, 234, 0.12));
-  color: var(--murasaki-primary, #9333ea);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   margin-top: 2px;
 }
+.agent-avatar-user {
+  background: var(--murasaki-muted, #f5f5f5);
+  color: var(--murasaki-muted-foreground, #737373);
+}
+.agent-avatar-assistant {
+  background: var(--murasaki-primary, #9333ea);
+  color: var(--murasaki-primary-foreground, #ffffff);
+}
 
-/* 气泡 */
+/* 气泡 (T4.1: 用户 bg-primary text-primary-foreground / 助手 bg-muted/30) */
 .agent-message-bubble {
-  max-width: calc(100% - 28px);
   padding: 8px 12px;
   font-size: 13px;
   line-height: 1.55;
@@ -739,24 +795,27 @@ onMounted(() => {
   white-space: pre-wrap;
 }
 .agent-message-bubble-user {
-  background: var(--murasaki-purple-100, rgba(147, 51, 234, 0.12));
-  color: var(--murasaki-purple-900, #581c87);
+  background: var(--murasaki-primary, #9333ea);
+  color: var(--murasaki-primary-foreground, #ffffff);
   border-bottom-right-radius: 4px;
+  max-width: 80%;
 }
 .agent-message-bubble-assistant {
-  background: var(--murasaki-background, #fafafa);
-  color: var(--murasaki-ink, #1f2937);
-  border: 1px solid var(--murasaki-line, #e5e7eb);
+  background: color-mix(in srgb, var(--murasaki-muted, #f5f5f5) 30%, transparent);
+  color: var(--murasaki-ink, #171717);
   border-bottom-left-radius: 4px;
+  max-width: 85%;
 }
 
-/* 中断标签 */
+/* 中断标签 (T4.1: AlertTriangle + text-state-warning) */
 .agent-interrupted-tag {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   margin-left: 4px;
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-state-warning, #d97706);
   font-size: 11px;
-  font-style: italic;
+  font-weight: 500;
 }
 
 /* 流式光标 */
@@ -782,7 +841,7 @@ onMounted(() => {
 
 /* 思考中 */
 .agent-thinking-dots {
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-muted-foreground, #a3a3a3);
   font-style: italic;
 }
 
@@ -808,6 +867,21 @@ onMounted(() => {
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   z-index: 10;
+}
+
+/* ===== Provider chip (T4.1: bg-primary/10 text-primary + Sparkles) ===== */
+.provider-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin: 4px 10px 0;
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--murasaki-primary, #9333ea) 10%, transparent);
+  color: var(--murasaki-primary, #9333ea);
+  border-radius: var(--murasaki-radius-sm, 4px);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 /* 输入区 */
@@ -840,14 +914,14 @@ onMounted(() => {
   line-height: 1.5;
   font-family: inherit;
   background: transparent;
-  color: var(--murasaki-ink, #1f2937);
+  color: var(--murasaki-ink, #171717);
 }
 .agent-input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* 发送 / 停止按钮 */
+/* 发送 / 停止按钮 (T4.1: Send / Square lucide 图标) */
 .agent-send-btn {
   width: 30px;
   height: 30px;
@@ -889,10 +963,10 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: var(--murasaki-muted, #6b7280);
+  color: var(--murasaki-muted-foreground, #737373);
 }
 .agent-context-icon {
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-muted-foreground, #a3a3a3);
   flex-shrink: 0;
 }
 .agent-context-path {
@@ -900,11 +974,11 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--murasaki-ink-2, #4b5563);
+  color: var(--murasaki-ink-2, #525252);
 }
 .agent-context-tokens {
   flex-shrink: 0;
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-muted-foreground, #a3a3a3);
 }
 .agent-context-remove {
   width: 18px;
@@ -912,14 +986,15 @@ onMounted(() => {
   border: none;
   background: transparent;
   cursor: pointer;
-  color: var(--murasaki-muted, #9ca3af);
-  font-size: 14px;
-  line-height: 1;
+  color: var(--murasaki-muted-foreground, #a3a3a3);
   border-radius: 3px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .agent-context-remove:hover {
-  background: var(--murasaki-hover, #f3f4f6);
+  background: var(--murasaki-muted, #f5f5f5);
   color: var(--murasaki-state-error, #dc2626);
 }
 
@@ -967,84 +1042,129 @@ onMounted(() => {
   gap: 2px;
 }
 
-/* 工具调用条目 */
-.agent-tool-calls {
+/* ===== 工具调用折叠卡片 (T4.1) ===== */
+.tool-call-card {
+  border: 1px solid var(--murasaki-line, #e5e5e5);
+  border-radius: 6px;
+  background: var(--murasaki-surface, #f9fafb);
+  overflow: hidden;
+  max-width: 85%;
+}
+.tool-call-card-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--murasaki-ink-2, #525252);
+  transition: background var(--murasaki-transition-fast, 120ms ease);
+  user-select: none;
+}
+.tool-call-card-header:hover {
+  background: var(--murasaki-muted, #f5f5f5);
+}
+.tool-call-card-icon {
+  color: var(--murasaki-muted-foreground, #737373);
+  flex-shrink: 0;
+}
+.tool-call-card-title {
+  flex: 1;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tool-call-card-chevron {
+  color: var(--murasaki-muted-foreground, #737373);
+  flex-shrink: 0;
+}
+.tool-call-card-body {
+  padding: 4px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 4px;
-  width: 100%;
+  border-top: 1px solid var(--murasaki-line, #e5e5e5);
 }
-.tool-call-entry {
-  padding: 4px 8px;
+
+/* 单个工具调用条目（展开态，逐个出现） */
+.tool-call-item {
+  padding: 4px 6px;
   border-radius: 4px;
-  background: var(--murasaki-background, #fafafa);
-  border: 1px solid var(--murasaki-line, #e5e7eb);
-  cursor: pointer;
+  background: var(--murasaki-background, #ffffff);
+  border-left: 2px solid var(--murasaki-line, #e5e5e5);
   font-size: 11px;
-  transition: background 0.15s;
+  animation: murasaki-fade-in 200ms ease-out both;
 }
-.tool-call-entry:hover {
-  background: var(--murasaki-hover, #f3f4f6);
+.tool-call-item-calling {
+  border-left-color: var(--murasaki-primary, #9333ea);
 }
-.tool-call-calling {
-  border-color: var(--murasaki-primary, #9333ea);
+.tool-call-item-done {
+  border-left-color: var(--murasaki-state-success, #16a34a);
 }
-.tool-call-error {
-  border-color: var(--murasaki-state-error, #dc2626);
+.tool-call-item-error {
+  border-left-color: var(--murasaki-state-error, #dc2626);
   background: rgba(220, 38, 38, 0.04);
 }
-.tool-call-header {
+.tool-call-item-row {
   display: flex;
   align-items: center;
   gap: 4px;
 }
-.tool-call-icon {
-  font-size: 10px;
+.tool-call-item-icon {
+  color: var(--murasaki-muted-foreground, #737373);
+  flex-shrink: 0;
 }
-.tool-call-name {
+.tool-call-item-name {
   font-weight: 500;
-  color: var(--murasaki-ink-2, #4b5563);
+  color: var(--murasaki-ink-2, #525252);
 }
-.tool-call-summary {
-  color: var(--murasaki-muted, #9ca3af);
+.tool-call-item-summary {
+  color: var(--murasaki-muted-foreground, #737373);
   margin-left: auto;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 }
 .tool-call-detail {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid var(--murasaki-line, #e5e7eb);
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--murasaki-line, #e5e5e5);
 }
 .tool-call-section {
   margin-bottom: 4px;
 }
 .tool-call-label {
   font-size: 10px;
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-muted-foreground, #737373);
   display: block;
   margin-bottom: 2px;
 }
 .tool-call-pre {
   font-size: 10px;
-  font-family: monospace;
-  background: var(--murasaki-surface, #fff);
+  font-family: var(--murasaki-font-mono, monospace);
+  background: var(--murasaki-surface-2, #f3f4f6);
   padding: 4px;
   border-radius: 3px;
   overflow-x: auto;
-  max-height: 120px;
+  max-height: 100px;
   overflow-y: auto;
   margin: 0;
-  color: var(--murasaki-ink, #1f2937);
+  color: var(--murasaki-ink, #171717);
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
-/* ===== Proposal list (Ticket #23) ===== */
+/* ===== Proposal list (T4.1: 独立卡片，文件名+行号范围+类型图标+接受/拒绝) ===== */
 .agent-proposal-list {
   flex-shrink: 0;
   max-height: 200px;
   overflow-y: auto;
   border-top: 1px solid var(--murasaki-line, #e5e7eb);
   padding: 6px 8px;
-  background: var(--murasaki-purple-50, #faf5ff);
+  background: color-mix(in srgb, var(--murasaki-primary, #9333ea) 3%, var(--murasaki-surface, #fff));
 }
 
 .proposal-list-header {
@@ -1106,6 +1226,8 @@ onMounted(() => {
   color: var(--murasaki-purple-600, #9333ea);
   font-weight: 700;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
 }
 
 .proposal-item-label {
@@ -1116,10 +1238,11 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.proposal-item-meta {
+.proposal-item-lines {
   font-size: 10px;
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-muted-foreground, #a3a3a3);
   flex-shrink: 0;
+  font-family: var(--murasaki-font-mono, monospace);
 }
 
 .proposal-item-btn {
@@ -1138,30 +1261,33 @@ onMounted(() => {
 }
 
 .proposal-item-accept {
-  background: #22c55e;
+  background: var(--murasaki-state-success, #16a34a);
   color: white;
 }
 
 .proposal-item-accept:hover {
-  background: #16a34a;
+  background: #15803d;
 }
 
 .proposal-item-reject {
-  background: #ef4444;
+  background: var(--murasaki-state-error, #dc2626);
   color: white;
 }
 
 .proposal-item-reject:hover {
-  background: #dc2626;
+  background: #b91c1c;
 }
 
 .proposal-item-status {
   font-size: 10px;
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-muted-foreground, #a3a3a3);
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
-/* ===== >50 line confirmation dialog ===== */
+/* ===== >50 line confirmation dialog (T4.1: Check 绿色 + X 红色图标按钮) ===== */
 .proposal-confirmation-overlay {
   position: absolute;
   inset: 0;
@@ -1183,13 +1309,13 @@ onMounted(() => {
 .confirmation-title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--murasaki-ink, #1f2937);
+  color: var(--murasaki-ink, #171717);
   margin-bottom: 6px;
 }
 
 .confirmation-label {
   font-size: 11px;
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-muted-foreground, #a3a3a3);
   margin-bottom: 12px;
 }
 
@@ -1202,28 +1328,30 @@ onMounted(() => {
 .confirmation-btn {
   border: none;
   border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 12px;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
-  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: background 0.15s;
 }
 
 .confirmation-cancel {
-  background: var(--murasaki-neutral-200, #e5e5e5);
-  color: var(--murasaki-ink-2, #4b5563);
+  background: var(--murasaki-state-error, #dc2626);
 }
 
 .confirmation-cancel:hover {
-  background: var(--murasaki-neutral-300, #d4d4d4);
+  background: #b91c1c;
 }
 
 .confirmation-confirm {
-  background: var(--murasaki-purple-600, #9333ea);
-  color: white;
+  background: var(--murasaki-state-success, #16a34a);
 }
 
 .confirmation-confirm:hover {
-  background: var(--murasaki-purple-700, #7e22ce);
+  background: #15803d;
 }
 
 /* ===== New-file proposal cards (Ticket #24b) ===== */
@@ -1265,8 +1393,8 @@ onMounted(() => {
 }
 
 .newfile-written {
-  border-color: #22c55e;
-  background: rgba(34, 197, 94, 0.05);
+  border-color: var(--murasaki-state-success, #16a34a);
+  background: rgba(22, 163, 74, 0.05);
 }
 
 .newfile-rejected {
@@ -1295,7 +1423,7 @@ onMounted(() => {
   flex: 1;
   font-size: 12px;
   font-weight: 500;
-  color: var(--murasaki-ink, #1f2937);
+  color: var(--murasaki-ink, #171717);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1303,14 +1431,14 @@ onMounted(() => {
 
 .newfile-card-meta {
   font-size: 10px;
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-muted-foreground, #a3a3a3);
   flex-shrink: 0;
 }
 
 .newfile-card-path {
   font-size: 10px;
-  font-family: Consolas, "Courier New", monospace;
-  color: var(--murasaki-muted, #6b7280);
+  font-family: var(--murasaki-font-mono, monospace);
+  color: var(--murasaki-muted-foreground, #737373);
   margin-bottom: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1331,20 +1459,23 @@ onMounted(() => {
   cursor: pointer;
   font-weight: 500;
   transition: background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .newfile-btn-accept {
-  background: #22c55e;
+  background: var(--murasaki-state-success, #16a34a);
   color: white;
 }
 
 .newfile-btn-accept:hover {
-  background: #16a34a;
+  background: #15803d;
 }
 
 .newfile-btn-reject {
   background: var(--murasaki-neutral-200, #e5e5e5);
-  color: var(--murasaki-ink-2, #4b5563);
+  color: var(--murasaki-ink-2, #525252);
 }
 
 .newfile-btn-reject:hover {
@@ -1366,7 +1497,7 @@ onMounted(() => {
 }
 
 .newfile-status-written {
-  color: #16a34a;
+  color: var(--murasaki-state-success, #16a34a);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1375,8 +1506,8 @@ onMounted(() => {
 
 .newfile-written-path {
   font-size: 10px;
-  font-family: Consolas, "Courier New", monospace;
-  color: var(--murasaki-muted, #6b7280);
+  font-family: var(--murasaki-font-mono, monospace);
+  color: var(--murasaki-muted-foreground, #737373);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1384,7 +1515,7 @@ onMounted(() => {
 }
 
 .newfile-status-rejected {
-  color: var(--murasaki-muted, #9ca3af);
+  color: var(--murasaki-muted-foreground, #a3a3a3);
 }
 
 .newfile-status-error {
