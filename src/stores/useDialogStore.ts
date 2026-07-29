@@ -7,6 +7,9 @@ import { ref, computed, reactive } from "vue";
  * 全局 Pinia store + Promise/数据驱动 API，替换全仓 35 处原生
  * alert()/confirm()/prompt()。4 类型：alert / confirm / prompt / conflict。
  *
+ * T8.3（Ticket #80）新增第 5 类 unsaved：三按钮（取消 / 不保存 / 保存），
+ * 用于设置窗口关闭未保存确认。
+ *
  * 模态栈：同时只显示一个对话框，新对话框入队等待，当前对话框 resolve 后
  * 自动显示下一个。
  *
@@ -60,9 +63,24 @@ export interface ConflictDialogResult {
   newName?: string;
 }
 
+/** T8.3：未保存改动确认对话框选项 */
+export interface UnsavedChangesDialogOptions {
+  title?: string;
+  message?: string;
+  /** 保存按钮文本，默认 "保存" */
+  saveText?: string;
+  /** 不保存按钮文本，默认 "不保存" */
+  discardText?: string;
+  /** 取消按钮文本，默认 "取消" */
+  cancelText?: string;
+}
+
+/** T8.3：未保存改动确认对话框结果 */
+export type UnsavedChangesResult = "save" | "discard" | "cancel";
+
 // ===== 内部状态类型 =====
 
-type DialogKind = "alert" | "confirm" | "prompt" | "conflict";
+type DialogKind = "alert" | "confirm" | "prompt" | "conflict" | "unsaved";
 
 interface DialogState {
   id: number;
@@ -74,6 +92,8 @@ interface DialogState {
   /** 按钮文本 */
   confirmText: string;
   cancelText: string;
+  /** unsaved：中间按钮（不保存）文本 */
+  neutralText: string;
   /** confirm 危险变体 */
   danger: boolean;
   /** prompt 输入相关 */
@@ -120,7 +140,7 @@ export const useDialogStore = defineStore("dialog", () => {
     }
   }
 
-  // ===== Public API：4 类对话框 =====
+  // ===== Public API：5 类对话框 =====
 
   /** alert：单按钮，info/warning/error 变体 */
   function alert(options: AlertDialogOptions): Promise<void> {
@@ -133,6 +153,7 @@ export const useDialogStore = defineStore("dialog", () => {
         variant,
         confirmText: options.confirmText ?? "确定",
         cancelText: "",
+        neutralText: "",
         danger: false,
         placeholder: "",
         inputValue: "",
@@ -156,6 +177,7 @@ export const useDialogStore = defineStore("dialog", () => {
         variant: "info",
         confirmText: options.confirmText ?? "确定",
         cancelText: options.cancelText ?? "取消",
+        neutralText: "",
         danger: options.danger ?? false,
         placeholder: "",
         inputValue: "",
@@ -179,6 +201,7 @@ export const useDialogStore = defineStore("dialog", () => {
         variant: "info",
         confirmText: options.confirmText ?? "确定",
         cancelText: options.cancelText ?? "取消",
+        neutralText: "",
         danger: false,
         placeholder: options.placeholder ?? "",
         inputValue: options.defaultValue ?? "",
@@ -203,6 +226,7 @@ export const useDialogStore = defineStore("dialog", () => {
         variant: "warning",
         confirmText: "覆盖",
         cancelText: "取消",
+        neutralText: "",
         danger: true,
         placeholder: "输入新名称",
         inputValue: options.filename,
@@ -212,6 +236,36 @@ export const useDialogStore = defineStore("dialog", () => {
         operation: options.operation ?? "rename",
         showRenameInput: false,
         resolver: (v: unknown) => resolve(v as ConflictDialogResult),
+      });
+    });
+  }
+
+  /**
+   * unsaved：三按钮（取消 / 不保存 / 保存）。返回 "save" | "discard" | "cancel"
+   * 用于设置窗口关闭未保存确认（Ticket #80 / T8.3）。
+   * 按钮顺序：取消（左） / 不保存（中） / 保存（右，primary）
+   */
+  function unsavedChanges(
+    options: UnsavedChangesDialogOptions
+  ): Promise<UnsavedChangesResult> {
+    return new Promise<UnsavedChangesResult>((resolve) => {
+      enqueue({
+        kind: "unsaved",
+        title: options.title ?? "未保存的修改",
+        message: options.message ?? "有未保存的修改，是否保存？",
+        variant: "warning",
+        confirmText: options.saveText ?? "保存",
+        cancelText: options.cancelText ?? "取消",
+        neutralText: options.discardText ?? "不保存",
+        danger: false,
+        placeholder: "",
+        inputValue: "",
+        validationError: null,
+        filename: "",
+        sourcePath: "",
+        operation: "rename",
+        showRenameInput: false,
+        resolver: (v: unknown) => resolve(v as UnsavedChangesResult),
       });
     });
   }
@@ -234,6 +288,9 @@ export const useDialogStore = defineStore("dialog", () => {
         break;
       case "conflict":
         resolveCurrent({ action: "cancel" });
+        break;
+      case "unsaved":
+        resolveCurrent("cancel");
         break;
     }
   }
@@ -308,6 +365,16 @@ export const useDialogStore = defineStore("dialog", () => {
     }
   }
 
+  /** unsaved：保存（resolve "save"） */
+  function unsavedSave(): void {
+    resolveCurrent("save");
+  }
+
+  /** unsaved：不保存（resolve "discard"） */
+  function unsavedDiscard(): void {
+    resolveCurrent("discard");
+  }
+
   // ===== 工具函数 =====
   function defaultTitleForVariant(variant: AlertVariant): string {
     switch (variant) {
@@ -344,6 +411,7 @@ export const useDialogStore = defineStore("dialog", () => {
     confirm,
     prompt,
     conflict,
+    unsavedChanges,
     // container actions
     cancelCurrent,
     confirmCurrent,
@@ -352,5 +420,7 @@ export const useDialogStore = defineStore("dialog", () => {
     conflictOverwrite,
     conflictRename,
     updateConflictRenameInput,
+    unsavedSave,
+    unsavedDiscard,
   };
 });

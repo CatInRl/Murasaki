@@ -268,4 +268,67 @@ describe("useDialogStore", () => {
       expect(dialog.isOpen).toBe(false);
     });
   });
+  describe("unsavedChanges", () => {
+    it("unsavedSave 返回 'save'", async () => {
+      const dialog = useDialogStore();
+      const p = dialog.unsavedChanges({ message: "test" });
+      expect(dialog.current?.kind).toBe("unsaved");
+      dialog.unsavedSave();
+      await expect(p).resolves.toBe("save");
+      expect(dialog.isOpen).toBe(false);
+    });
+
+    it("unsavedDiscard 返回 'discard'", async () => {
+      const dialog = useDialogStore();
+      const p = dialog.unsavedChanges({ message: "test" });
+      dialog.unsavedDiscard();
+      await expect(p).resolves.toBe("discard");
+    });
+
+    it("cancelCurrent 返回 'cancel'（Escape 行为）", async () => {
+      const dialog = useDialogStore();
+      const p = dialog.unsavedChanges({ message: "test" });
+      dialog.cancelCurrent();
+      await expect(p).resolves.toBe("cancel");
+    });
+
+    it("默认标题为 '未保存的修改'，variant 为 warning", () => {
+      const dialog = useDialogStore();
+      dialog.unsavedChanges({ message: "test" });
+      expect(dialog.current?.title).toBe("未保存的修改");
+      expect(dialog.current?.variant).toBe("warning");
+      expect(dialog.current?.kind).toBe("unsaved");
+    });
+
+    it("默认按钮文本：保存 / 不保存 / 取消", () => {
+      const dialog = useDialogStore();
+      dialog.unsavedChanges({ message: "test" });
+      expect(dialog.current?.confirmText).toBe("保存");
+      expect(dialog.current?.neutralText).toBe("不保存");
+      expect(dialog.current?.cancelText).toBe("取消");
+    });
+
+    it("自定义按钮文本", () => {
+      const dialog = useDialogStore();
+      dialog.unsavedChanges({
+        message: "test",
+        saveText: "存储",
+        discardText: "丢弃",
+        cancelText: "继续编辑",
+      });
+      expect(dialog.current?.confirmText).toBe("存储");
+      expect(dialog.current?.neutralText).toBe("丢弃");
+      expect(dialog.current?.cancelText).toBe("继续编辑");
+    });
+
+    it("入队后 current 为 unsaved，resolve 后队列清空", async () => {
+      const dialog = useDialogStore();
+      const p = dialog.unsavedChanges({ message: "test" });
+      expect(dialog.current?.kind).toBe("unsaved");
+      dialog.unsavedSave();
+      await expect(p).resolves.toBe("save");
+      expect(dialog.current).toBe(null);
+      expect(dialog.isOpen).toBe(false);
+    });
+  });
 });
