@@ -36,12 +36,14 @@ import { useAiProvidersStore } from "../stores/useAiProvidersStore";
 import { useProposalsStore } from "../stores/useProposalsStore";
 import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
 import type { ToolCallEntry } from "../types";
+import { useDialogStore } from "../stores/useDialogStore";
 
 const agent = useAgentStore();
 const workspace = useWorkspaceStore();
 const aiProviders = useAiProvidersStore();
 const proposals = useProposalsStore();
 const editorBridge = useEditorBridgeStore();
+const dialog = useDialogStore();
 
 // ===== 输入框 =====
 const inputText = ref("");
@@ -164,7 +166,7 @@ function onCollapse(): void {
 // ===== 清空对话 =====
 async function onClearConversation(): Promise<void> {
   if (agent.messages.length === 0) return;
-  if (!confirm("确定要清空当前工作区的对话吗？此操作不可撤销。")) return;
+  if (!(await dialog.confirm({ message: "确定要清空当前工作区的对话吗？此操作不可撤销。", danger: true }))) return;
   await agent.clearConversation();
 }
 

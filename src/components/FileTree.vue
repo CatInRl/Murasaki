@@ -5,12 +5,14 @@ import { NScrollbar, NButton, NDropdown, NInput } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
+import { useDialogStore } from "../stores/useDialogStore";
 import TreeNode from "./TreeNode.vue";
 import EmptyState from "./EmptyState.vue";
 import Skeleton from "./Skeleton.vue";
 
 const workspace = useWorkspaceStore();
 const fileOps = useFileOpsStore();
+const dialog = useDialogStore();
 
 const emit = defineEmits<{
   (e: "select-file", path: string): void;
@@ -72,7 +74,7 @@ async function submitRootCreating(): Promise<void> {
       await fileOps.createDirectory(workspace.workspacePath, name);
     }
   } catch (err) {
-    alert(`新建失败: ${err}`);
+    dialog.alert({ message: `新建失败: ${err}`, variant: "error" });
   } finally {
     rootCreating.value = false;
     rootCreatingName.value = "";

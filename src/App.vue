@@ -24,6 +24,7 @@ import CompareWindow from "./components/CompareWindow.vue";
 import ImagePreviewModal from "./components/ImagePreviewModal.vue";
 import AgentPanel from "./components/AgentPanel.vue";
 import ToastContainer from "./components/ToastContainer.vue";
+import DialogContainer from "./components/DialogContainer.vue";
 import { useWorkspaceStore } from "./stores/useWorkspaceStore";
 import { useTabsStore } from "./stores/useTabsStore";
 import { usePersistenceStore } from "./stores/usePersistenceStore";
@@ -32,6 +33,7 @@ import { useFileOpsStore } from "./stores/useFileOpsStore";
 import { useAgentStore } from "./stores/useAgentStore";
 import { useEditorBridgeStore } from "./stores/useEditorBridgeStore";
 import { useProposalsStore } from "./stores/useProposalsStore";
+import { useDialogStore } from "./stores/useDialogStore";
 import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
 import { DEFAULT_THEME } from "./composables/useTheme";
@@ -57,6 +59,7 @@ const fileOps = useFileOpsStore();
 const agentStore = useAgentStore();
 const editorBridge = useEditorBridgeStore();
 const proposalsStore = useProposalsStore();
+const dialog = useDialogStore();
 
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
@@ -441,9 +444,9 @@ async function handleExternalChange(path: string): Promise<void> {
     // 文件被外部删除
     tabsStore.markExternalChange(path, true);
     if (!tab.isDirty) {
-      alert(`文件已被外部删除：${path}`);
+      dialog.alert({ message: `文件已被外部删除：${path}`, variant: "warning" });
     } else {
-      alert(`文件已被外部删除（草稿已保留）：${path}`);
+      dialog.alert({ message: `文件已被外部删除（草稿已保留）：${path}`, variant: "warning" });
     }
     return;
   }
@@ -518,7 +521,7 @@ async function onCompareSave(mergedContent: string): Promise<void> {
     await tabsStore.writeMergedContent(filePath, mergedContent);
   } catch (err) {
     console.error("保存合并结果失败:", err);
-    alert(`保存合并结果失败: ${err}`);
+    dialog.alert({ message: `保存合并结果失败: ${err}`, variant: "error" });
   }
   compareState.value = { ...compareState.value, visible: false };
 }
@@ -644,7 +647,7 @@ async function reloadCurrentFile(): Promise<void> {
     await tabsStore.reloadFromDisk(path);
   } catch (err) {
     console.error("重新加载失败:", err);
-    alert(`重新加载失败: ${err}`);
+    dialog.alert({ message: `重新加载失败: ${err}`, variant: "error" });
   }
 }
 
@@ -660,14 +663,15 @@ async function openFile(path: string): Promise<void> {
     const exists = await invoke<boolean>("path_exists", { path }).catch(() => false);
     if (!exists) {
       const fileName = basename(path);
-      const shouldRemove = confirm(
-        `文件 "${fileName}" 不存在或已被移动。\n\n是否从"最近打开"列表中移除？`
-      );
+      const shouldRemove = await dialog.confirm({
+        message: `文件 "${fileName}" 不存在或已被移动。\n\n是否从"最近打开"列表中移除？`,
+        danger: true,
+      });
       if (shouldRemove) {
         await persistence.removeRecent(path);
       }
     } else {
-      alert(`打开文件失败: ${err}`);
+      dialog.alert({ message: `打开文件失败: ${err}`, variant: "error" });
     }
   }
 }
@@ -693,7 +697,7 @@ async function saveCurrentFile(): Promise<void> {
     await tabsStore.saveTab(activeTab.value.id);
   } catch (err) {
     console.error("保存失败:", err);
-    alert(`保存失败: ${err}`);
+    dialog.alert({ message: `保存失败: ${err}`, variant: "error" });
   }
 }
 
@@ -712,7 +716,7 @@ async function saveAsCurrentFile(): Promise<void> {
       await persistence.addRecent(selected, "file");
     } catch (err) {
       console.error("另存为失败:", err);
-      alert(`另存为失败: ${err}`);
+      dialog.alert({ message: `另存为失败: ${err}`, variant: "error" });
     }
   }
 }
@@ -801,7 +805,7 @@ async function onCloseTabRequest(tabId: string): Promise<void> {
         try {
           await tabsStore.saveTab(tabId);
         } catch (err) {
-          alert(`保存失败: ${err}`);
+          dialog.alert({ message: `保存失败: ${err}`, variant: "error" });
           return;
         }
       } else {
@@ -814,7 +818,7 @@ async function onCloseTabRequest(tabId: string): Promise<void> {
         try {
           await tabsStore.saveTabAs(tabId, selected);
         } catch (err) {
-          alert(`另存为失败: ${err}`);
+          dialog.alert({ message: `另存为失败: ${err}`, variant: "error" });
           return;
         }
       }
@@ -851,7 +855,7 @@ async function onCloseTabRequest(tabId: string): Promise<void> {
       try {
         await tabsStore.saveTab(tabId);
       } catch (err) {
-        alert(`保存失败: ${err}`);
+        dialog.alert({ message: `保存失败: ${err}`, variant: "error" });
         return;
       }
     } else {
@@ -865,7 +869,7 @@ async function onCloseTabRequest(tabId: string): Promise<void> {
       try {
         await tabsStore.saveTabAs(tabId, selected);
       } catch (err) {
-        alert(`另存为失败: ${err}`);
+        dialog.alert({ message: `另存为失败: ${err}`, variant: "error" });
         return;
       }
     }
@@ -978,14 +982,15 @@ async function onOpenRecent(path: string, type: "file" | "folder"): Promise<void
       const exists = await invoke<boolean>("path_exists", { path }).catch(() => false);
       if (!exists) {
         const folderName = basename(path);
-        const shouldRemove = confirm(
-          `文件夹 "${folderName}" 不存在或已被移动。\n\n是否从"最近打开"列表中移除？`
-        );
+        const shouldRemove = await dialog.confirm({
+          message: `文件夹 "${folderName}" 不存在或已被移动。\n\n是否从"最近打开"列表中移除？`,
+          danger: true,
+        });
         if (shouldRemove) {
           await persistence.removeRecent(path);
         }
       } else {
-        alert(`打开工作区失败: ${err}`);
+        dialog.alert({ message: `打开工作区失败: ${err}`, variant: "error" });
       }
     }
   } else {
@@ -1096,15 +1101,15 @@ async function handleMenuEvent(menuId: string): Promise<void> {
     case "new-folder": {
       // 在工作区根目录新建文件夹
       if (!workspace.hasWorkspace) {
-        alert("请先打开一个工作区");
+        dialog.alert({ message: "请先打开一个工作区", variant: "warning" });
         break;
       }
-      const name = prompt("请输入文件夹名称：");
+      const name = await dialog.prompt({ message: "请输入文件夹名称：", placeholder: "文件夹名称" });
       if (name && name.trim()) {
         try {
           await fileOps.createDirectory(workspace.workspacePath!, name.trim());
         } catch (err) {
-          alert(`新建文件夹失败: ${err}`);
+          dialog.alert({ message: `新建文件夹失败: ${err}`, variant: "error" });
         }
       }
       break;
@@ -1132,16 +1137,16 @@ async function handleMenuEvent(menuId: string): Promise<void> {
         const { open } = await import("@tauri-apps/plugin-shell");
         await open("https://github.com/CatInRl/Murasaki");
       } catch {
-        alert("文档暂未在线发布");
+        dialog.alert({ message: "文档暂未在线发布" });
       }
       break;
     }
     case "about": {
-      alert("Murasaki v0.1.0\n轻量级本地 Markdown 文件管理编辑器\n基于 Tauri 2.x + Vue 3 + CodeMirror 6");
+      dialog.alert({ title: "关于 Murasaki", message: "Murasaki v0.1.0\n轻量级本地 Markdown 文件管理编辑器\n基于 Tauri 2.x + Vue 3 + CodeMirror 6" });
       break;
     }
     case "check-updates": {
-      alert("检查更新功能暂不支持（占位菜单项）");
+      dialog.alert({ message: "检查更新功能暂不支持（占位菜单项）" });
       break;
     }
     default:
@@ -1162,7 +1167,7 @@ function onTableInsertConfirm(rows: number, cols: number): void {
 // ===== HTML 导出 =====
 async function exportCurrentHtml(): Promise<void> {
   if (!activeTab.value) {
-    alert("请先打开一个文件");
+    dialog.alert({ message: "请先打开一个文件", variant: "warning" });
     return;
   }
   const tab = activeTab.value;
@@ -1185,7 +1190,7 @@ async function exportCurrentHtml(): Promise<void> {
     await invoke("write_text_file", { path: selected, content: html });
   } catch (err) {
     console.error("导出 HTML 失败:", err);
-    alert(`导出 HTML 失败: ${err}`);
+    dialog.alert({ message: `导出 HTML 失败: ${err}`, variant: "error" });
   }
 }
 </script>
@@ -1289,6 +1294,9 @@ async function exportCurrentHtml(): Promise<void> {
       :source-path="conflictState.sourcePath"
       @resolve="resolveConflict"
     />
+
+    <!-- 对话框容器（Ticket #66） -->
+    <DialogContainer />
 
     <!-- 插入表格对话框 -->
     <TableInsertDialog
