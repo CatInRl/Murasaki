@@ -100,12 +100,31 @@ markdown 格式操作菜单：
 
 ## 编辑模式 (Edit Mode)
 
-用户与 markdown 内容交互的方式。本项目支持两种：
+用户与 markdown 内容交互的方式。本项目支持三种（0.3.0 起）：
 
+- **源码模式 (Source Mode)** —— 纯 markdown 源码编辑，CodeMirror 6 占满编辑区，无预览区。
 - **分屏模式 (Split Mode)** —— 界面分为源码编辑区与渲染预览区，输入时预览实时更新。默认模式。
-- **所见即所得 (WYSIWYG Mode)** —— 用户直接在渲染结果上编辑，所见即所得。计划中的后续支持模式。
+- **所见即所得 (WYSIWYG Mode)** —— 用户直接在渲染结果上编辑，所见即所得。通过 CodeMirror 6 ViewPlugin + Decoration 隐藏 markdown 语法标记实现（Typora 路线），源文件始终是纯 markdown 文本，不引入第二套文档模型。Agent 提案在所有模式原生兼容。
 
-切换方式：通过系统设置窗口的"编辑"分类切换。切换后弹提示"需重启应用生效"，用户确认后重启。非运行时切换。
+三种模式共用同一 CodeMirror 6 实例，**全部支持运行时切换**（无需重启）：
+
+- `source` ↔ `split`：运行时切换（仅显隐预览区 + 调整布局）
+- `wysiwyg` ↔ 其他：运行时切换（叠加/移除 WYSIWYG ViewPlugin）
+
+切换入口：通过系统设置窗口的"编辑器"分类切换。详见 [ADR-0008](docs/adr/0008-wysiwyg-via-codemirror6-typora-approach.md)。
+
+### WYSIWYG 功能优先级（0.3.0）
+
+- **P0（必须）**：行级语法标记隐藏 + 基础渲染（标题/粗体/斜体/删除线/行内代码/列表/引用/分隔线）
+- **P1（应该）**：块级元素 widget（代码块/链接/图片/表格/数学公式/Mermaid）
+- **P2/P3（遗留后续版本）**：YAML frontmatter 卡片 / emoji 短代码替换 / 脚注 / TOC / HTML 内联
+
+### WYSIWYG 光标行为
+
+- 光标在当前段：所有语法标记可见（dim 灰色 + 缩小字号）+ 渲染样式保留
+- 光标离开当前段：所有语法标记隐藏 + 渲染样式保留
+- "当前段"定义：光标所在段落（空行分隔的连续文本行）
+- Agent 提案 decoration 优先级高于 WYSIWYG 隐藏 decoration，提案覆盖范围不隐藏语法标记
 
 ## 主题 (Theme)
 
@@ -125,13 +144,24 @@ markdown 渲染样式的预设组合，影响预览区的内容外观（标题�
 
 ## 系统设置 (System Settings)
 
-应用级配置入口，形态为独立的模态设置窗口。左侧分类导航（如外观、编辑、文件），右侧表单。通过"文件 → 设置…"打开。包含但不限于：
+应用级配置入口，形态为**独立的 Tauri 多窗口**（0.3.0 起，详见 [ADR-0009](docs/adr/0009-settings-window-as-tauri-multi-window.md)）。左侧分类导航，右侧表单。通过"文件 → 设置…"打开，作为独立 OS 窗口存在（可独立最小化/关闭，主窗口不被遮挡）。
 
-- **UI 模式** —— 亮色 / 暗色 / 跟随系统。
-- **编辑模式** —— 分屏 / WYSIWYG（切换后重启或重载生效）。
-- **最近打开记录管理** —— 查看 / 清空最近打开的文件与文件夹。
+### 设置分类（0.3.0，3 个）
 
-未来扩展项（字体、行距、自动保存间隔等）按需增加，不影响菜单结构。
+- **常规** —— UI 模式（亮色/暗色/跟随系统）/ 显示隐藏文件 / 显示 Agent 面板 / 默认图片目录
+- **编辑器** —— 编辑模式（source/split/wysiwyg）/ 字体大小 / 行高 / 字体族 / 显示行号 / 软折行
+- **AI** —— Provider 列表 + 编辑表单 / 默认 Provider / 高级参数折叠区（4 项统一设置：Agent 循环轮数上限 / 单次请求 token 上限 / 累计 token 软上限 / propose_replace 二次确认阈值）
+
+不再设置「主题」分类（markdown 主题通过 OS 原生菜单切换）和「快捷键」分类（后续版本）。
+
+### 保存模型（0.3.0 起）
+
+显式 Save 模型（对齐参考设计 footer 的「恢复默认 / 保存」按钮）：
+
+- 改动暂存在 draft，点「保存」才落盘 + 触发副作用
+- 点「恢复默认」重置当前分类
+- 关闭未保存弹确认（保存/不保存/取消，与 tab 关闭未保存逻辑一致）
+- 副作用统一触发（一次 save 把所有改动一次性应用，通过 Tauri event 通知主窗口）
 
 ## 编辑器配置 (Editor Configuration)
 
@@ -486,7 +516,7 @@ LaTeX 语法的数学公式支持，使用 KaTeX 渲染（轻量、快速）。
 
 ### WYSIWYG 模式 (WYSIWYG Mode)
 
-所见即所得编辑模式——用户直接在渲染结果上编辑，与 Agent 功能协同（proposal 在 WYSIWYG 下的渲染与接受行为需单独适配）。当前为计划阶段，待分屏模式稳定后实施。切回分屏模式入口为系统设置 → 编辑分类。
+所见即所得编辑模式——用户直接在渲染结果上编辑。0.3.0 起实施，采用 CodeMirror 6 内 WYSIWYG（Typora 路线），与 Agent 功能原生协同（proposal 在 WYSIWYG 下直接渲染，无需切换源码模式）。详见 [ADR-0008](docs/adr/0008-wysiwyg-via-codemirror6-typora-approach.md) 与上方"编辑模式"章节。
 
 ## 搜索 (Search)
 
@@ -509,3 +539,71 @@ LaTeX 语法的数学公式支持，使用 KaTeX 渲染（轻量、快速）。
   - **内容匹配** —— 每个命中文件展开后显示匹配行 + 上下文。
 - 点击结果项跳转到对应文件（若无 tab 则新开）并定位到匹配行。
 - 实现路径：Rust 端遍历工作区 `.md` 文件，用 `regex` crate 匹配，返回命中行 + 上下文。
+
+## 设计系统基础 (Design System Foundation)
+
+0.3.0 整体 UX 对齐引入的设计系统基础设施。参考设计稿位于 `murasaki-ui-design/`。
+
+### 设计 Token 体系
+
+三层 token 体系（来自 `murasaki-ui-design/colors_and_type.css` + `.preflight/preflight.html`）：
+
+- **Token 层**：`--murasaki-*` 语义 token（primary/popover/card/muted/border/ring/state-* 等）+ 尺寸 token（radius-sm/md/lg = 4/8/16px）
+- **Tailwind 映射层**：`@theme inline` 把 token 映射为 Tailwind 4 的 `--color-*`（仅设计稿用，实现不引入 Tailwind，详见 [ADR-0006](docs/adr/0006-no-tailwind-keep-scoped-css.md)）
+- **语义类回退层**：即便 Tailwind JIT 未编译，`.bg-popover`/`.text-foreground` 等 CSS 类仍生效
+
+0.3.0 token 补全（在 [theme.css](src/styles/theme.css)）：
+- 字号 token：`--murasaki-text-xs/sm/base/lg/xl/2xl`（12/13/14/16/20/24px）
+- 阴影 token：`--murasaki-shadow-sm/md/lg/2`
+- 布局 token：`--murasaki-menubar-height`（32px，仅设计参考用，应用内不实现 in-app menu bar，详见 [ADR-0007](docs/adr/0007-keep-tauri-native-menu-bar.md)）
+- 过渡 token：`--murasaki-transition-fast`（120ms ease）
+
+间距/字重/行高保留硬编码（不 token 化，避免 token 膨胀）。
+
+### 图标库 (Icon Library)
+
+统一使用 **`lucide-vue-next`**（Vue 3 组件形式的 lucide 图标集），替换所有 emoji + 内联 SVG + naive-ui NIcon。详见 [ADR-0004](docs/adr/0004-lucide-vue-next-as-unified-icon-library.md)。
+
+- 按需引入（tree-shakeable），常用图标约 30-50 个，总增量 <50KB gzip
+- 与设计系统的 `[data-icon]` mask 模式语义 1:1 对应
+- 跨平台渲染一致，可继承 currentColor，响应主题
+
+### naive-ui 主题化策略 (naive-ui Theming)
+
+保留 naive-ui 作为组件库，通过 `NConfigProvider` + `themeOverrides` 把 naive-ui 的颜色/圆角/字体变量映射到 `--murasaki-*` token。详见 [ADR-0005](docs/adr/0005-keep-naive-ui-with-theme-overrides.md)。
+
+- **保留 naive-ui 默认行为**：NModal 的焦点陷阱、NSelect 的虚拟滚动、NDropdown 的点击外部关闭、NTabs 的键盘导航等**行为**保留
+- **视觉通过 themeOverrides 对齐**：颜色/圆角/字体/阴影映射到 `--murasaki-*` token
+- **部分组件自建**：吐司/对话框/右键菜单/空态/错误态/加载态等与设计差异大的组件自建（全局 Pinia store + 单一 Teleport 容器 + Promise/数据驱动 API）
+
+### 样式写法 (Styling Approach)
+
+**不引入 Tailwind**，保留 scoped CSS + `--murasaki-*` token 变量。详见 [ADR-0006](docs/adr/0006-no-tailwind-keep-scoped-css.md)。
+
+- 与设计系统的**语义**对齐（颜色/圆角/间距数值一致），但**写法**不一致（设计用 Tailwind 工具类，实现用 scoped CSS）
+- 翻译规则：`bg-primary/10` → `background: rgba(147, 51, 234, 0.1)` 或 `color-mix(in srgb, var(--murasaki-primary) 10%, transparent)`
+- 硬编码颜色清理是独立工作（如 [CompareWindow.vue](src/components/CompareWindow.vue) 的 16 处硬编码）
+
+### 反馈系统组件模式 (Feedback System Pattern)
+
+0.3.0 引入的反馈系统基础设施，统一模式：**全局 Pinia store + 单一 Teleport 容器 + Promise/数据驱动 API**，不依赖 naive-ui 的 NMessage/NDialog/NDropdown。
+
+- **吐司系统**：`useToastStore` + `ToastContainer.vue`，6 变体（success/info/warning/error/progress/deleted），栈位置右上角
+- **对话框系统**：`useDialogStore` + `DialogContainer.vue`，4 类型（alert/confirm/prompt/conflict），Promise-based API，按钮顺序"取消在左/确认在右"（与 naive-ui 默认相反），替换所有 36 处原生 `alert()/confirm()/prompt()`
+- **右键菜单系统**：`useContextMenuStore` + `ContextMenuContainer.vue`，数据驱动（MenuItem 接口含 label/icon/shortcut/action/disabled/danger/separator），4 处右键菜单（TabBar/Editor/Agent 消息/TreeNode）
+
+### 状态展示组件家族 (State Display Component Family)
+
+0.3.0 引入的状态展示组件三兄弟，共享虚线边框容器与 props 模式，替换 naive-ui 的 NEmpty/NSpin/NSkeleton：
+
+- **EmptyState**：空态，lucide `w-12 h-12 text-muted-foreground/50` 图标 + 标题 + 描述 + 可选操作按钮
+- **ErrorState**：错误态，lucide `alert-triangle` 黄色图标 + 标题 + 描述 + "重试"按钮
+- **Skeleton**：加载态，`h-4 bg-muted rounded animate-pulse` 骨架条（默认 4 行，宽度递减 100%/90%/95%/70%）
+
+### 浮层组件 (Popover)
+
+用 naive-ui **NPopover + themeOverrides** 对齐 token（不自建）。详见 [ADR-0005](docs/adr/0005-keep-naive-ui-with-theme-overrides.md)。
+
+- 浮层是"纯容器"，NPopover 的视觉结构（圆角 + 边框 + 阴影 + 箭头）与设计规范一致，themeOverrides 足够对齐
+- 内容由 slot 自定义（链接表单/图片插入表单/表格配置/UI 模式单选组等）
+- trigger 统一用 `click`（hover 仅用于 tooltip，用 NTooltip）

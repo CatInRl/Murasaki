@@ -105,6 +105,15 @@ murasaki/
   - `.scratch/`（临时调试脚本）
   - 任何机器特定路径配置
 
+## Issue 跟踪约定
+
+- **所有功能/spec 必须有 GitHub issue 跟踪**：用 `/to-spec` skill 生成 spec 并发布到 issue tracker，应用 `ready-for-agent` label
+- **任务拆分必须用子 issue 跟踪**：spec issue 创建后，立即用 `gh issue create` 为每个任务创建独立子 issue，标题用 `T{簇号}.{序号} {任务名}` 格式
+- **子 issue body 必含**：实施步骤 / 验收标准 / 依赖关系（引用依赖的 issue 编号）
+- **子 issue 关联 spec issue**：在子 issue body 末尾用 `Part of #N` 引用 spec issue，让 GitHub 自动关联
+- **spec issue 更新任务清单**：在 spec issue 添加 comment 列出所有子 issue 链接（或用 GitHub 的 task list 语法 `- [ ] T0.1 #N`）
+- **禁止**：把多个任务塞在一条 comment 里 / 不创建 issue 直接开干 / 用本地 md 文件跟踪任务
+
 ## 架构决策
 
 详见 [docs/adr/](docs/adr/)：
