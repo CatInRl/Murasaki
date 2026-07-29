@@ -109,7 +109,7 @@ export interface TabsState {
  */
 export interface SettingsState {
   uiMode: "light" | "dark" | "system";
-  editorMode: "split" | "wysiwyg";
+  editorMode: "source" | "split" | "wysiwyg";
   showLineNumbers: boolean;
   softWrap: boolean;
   /** 是否显示隐藏文件（以 . 开头的文件/目录） */
@@ -120,6 +120,14 @@ export interface SettingsState {
   lastWorkspacePath: string | null;
   /** 是否显示 Agent 面板（默认开） */
   showAgentPanel: boolean;
+  /** 编辑器字体大小（px，12-20） */
+  editorFontSize: number;
+  /** 编辑器行高 */
+  editorLineHeight: number;
+  /** 编辑器等宽字体族 */
+  editorFontFamily: string;
+  /** 粘贴图片时默认保存的相对目录 */
+  defaultImageDir: string;
 }
 
 /**
@@ -135,6 +143,10 @@ export const DEFAULT_SETTINGS: SettingsState = {
   sidebarView: "files",
   lastWorkspacePath: null,
   showAgentPanel: true,
+  editorFontSize: 14,
+  editorLineHeight: 1.6,
+  editorFontFamily: "JetBrains Mono",
+  defaultImageDir: "assets/images",
 };
 
 /**

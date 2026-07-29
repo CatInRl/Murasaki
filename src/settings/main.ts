@@ -1,9 +1,9 @@
-import { createApp, h, type FunctionalComponent } from "vue";
+import { createApp } from "vue";
+import { createPinia } from "pinia";
 import "../styles/theme.css";
+import "./settings.css";
+import SettingsApp from "./SettingsApp.vue";
 
-// 设置窗口 Vue 入口（占位）
-// 具体设置表单内容由 T8.2 实现
-const SettingsApp: FunctionalComponent = () =>
-  h("div", { class: "settings-placeholder" }, "设置窗口");
-
-createApp(SettingsApp).mount("#app");
+const app = createApp(SettingsApp);
+app.use(createPinia());
+app.mount("#app");
