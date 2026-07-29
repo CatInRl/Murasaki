@@ -5,6 +5,57 @@ import type { AiProvider, AiProviderPreset } from "../types";
 import { AI_PROVIDER_PRESETS } from "../types";
 
 /**
+ * 测试连接结果（T8.4）
+ */
+export interface TestConnectionResult {
+  success: boolean;
+  message?: string;
+}
+
+/** localStorage key 前缀：test-result-{providerId} */
+const TEST_RESULT_KEY_PREFIX = "test-result-";
+
+function testResultKey(id: string): string {
+  return `${TEST_RESULT_KEY_PREFIX}${id}`;
+}
+
+/** 将测试结果持久化到 localStorage */
+function saveTestResult(id: string, result: TestConnectionResult): void {
+  try {
+    localStorage.setItem(
+      testResultKey(id),
+      JSON.stringify({ ...result, timestamp: Date.now() })
+    );
+  } catch {
+    // localStorage 不可用时静默失败
+  }
+}
+
+/** 读取 localStorage 中的上次测试结果 */
+function readTestResult(id: string): TestConnectionResult | null {
+  try {
+    const raw = localStorage.getItem(testResultKey(id));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      success: Boolean(parsed.success),
+      message: typeof parsed.message === "string" ? parsed.message : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 清除 localStorage 中的测试结果（删除 provider 时调用） */
+function removeTestResult(id: string): void {
+  try {
+    localStorage.removeItem(testResultKey(id));
+  } catch {
+    // 静默失败
+  }
+}
+
+/**
  * AI Provider 配置 Store
  *
  * 管理 LLM provider 列表与活动 provider。
@@ -89,6 +140,7 @@ export const useAiProvidersStore = defineStore("aiProviders", () => {
   async function deleteProvider(id: string): Promise<void> {
     await invoke("delete_ai_provider", { id });
     providers.value = providers.value.filter((p) => p.id !== id);
+    removeTestResult(id);
   }
 
   /** 设置活动 provider */
@@ -108,7 +160,105 @@ export const useAiProvidersStore = defineStore("aiProviders", () => {
   }
 
   /**
-   * 测试 provider 连接
+   * 测试 provider 连接（T8.4）
+   *
+   * 通过 provider id 查找配置，从后端获取 API key，
+   * 向 {baseUrl}/v1/models 发 GET 请求验证连通性。
+   * 结果持久化到 localStorage（key: test-result-{id}）。
+   *
+   * 不抛出异常 —— 所有错误以 { success: false, message } 返回。
+   */
+  async function testProvider(id: string): Promise<TestConnectionResult> {
+    const provider = providers.value.find((p) => p.id === id);
+    if (!provider) {
+      return { success: false, message: "Provider 不存在" };
+    }
+
+    testStatus.value = "testing";
+    testMessage.value = "测试中…";
+
+    // 从后端获取明文 API key
+    let apiKey: string;
+    try {
+      apiKey = await getApiKey(id);
+    } catch (err) {
+      const message = `无法获取 API Key: ${String(err)}`;
+      const result: TestConnectionResult = { success: false, message };
+      testStatus.value = "error";
+      testMessage.value = message;
+      saveTestResult(id, result);
+      return result;
+    }
+
+    // 规范化 URL：去掉尾部斜杠后拼接 /v1/models
+    const base = provider.baseUrl.replace(/\/+$/, "");
+    const url = `${base}/v1/models`;
+
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
+
+      if (response.ok) {
+        // 尝试解析模型列表（解析失败不影响成功判定）
+        let modelCount = 0;
+        try {
+          const body = await response.json();
+          if (body && Array.isArray(body.data)) {
+            modelCount = body.data.length;
+          }
+        } catch {
+          // 响应体非 JSON 或无法解析，连通性已验证
+        }
+        const message =
+          modelCount > 0
+            ? `连接成功，发现 ${modelCount} 个模型`
+            : "连接成功";
+        const result: TestConnectionResult = { success: true, message };
+        testStatus.value = "success";
+        testMessage.value = message;
+        saveTestResult(id, result);
+        return result;
+      }
+
+      // HTTP 错误响应
+      let errText = "";
+      try {
+        errText = await response.text();
+      } catch {
+        // 忽略 body 读取失败
+      }
+      const message = `HTTP ${response.status}${errText ? `: ${errText}` : ""}`;
+      const result: TestConnectionResult = { success: false, message };
+      testStatus.value = "error";
+      testMessage.value = message;
+      saveTestResult(id, result);
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const result: TestConnectionResult = { success: false, message };
+      testStatus.value = "error";
+      testMessage.value = message;
+      saveTestResult(id, result);
+      return result;
+    }
+  }
+
+  /** 读取 localStorage 中的上次测试结果 */
+  function getTestResult(id: string): TestConnectionResult | null {
+    return readTestResult(id);
+  }
+
+  /** 清除指定 provider 的测试结果 */
+  function clearTestResult(id: string): void {
+    removeTestResult(id);
+  }
+
+  /**
+   * 测试 provider 连接（底层方法，通过 Tauri 后端发请求）
    * 先 GET /models，失败 fallback 1-token chat
    * @returns 成功时返回模型列表（可能为空数组，表示 fallback 成功）
    */
@@ -168,6 +318,9 @@ export const useAiProvidersStore = defineStore("aiProviders", () => {
     deleteProvider,
     setActive,
     getApiKey,
+    testProvider,
+    getTestResult,
+    clearTestResult,
     testConnection,
     resetTestStatus,
     getPresets,

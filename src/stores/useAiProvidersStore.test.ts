@@ -12,10 +12,42 @@ import { invoke } from "@tauri-apps/api/core";
 
 const mockedInvoke = invoke as unknown as ReturnType<typeof vi.fn>;
 
+// ===== Mock fetch =====
+const mockedFetch = vi.fn();
+vi.stubGlobal("fetch", mockedFetch);
+
+/** 构造 fetch Response mock */
+function makeFetchResponse(opts: {
+  ok: boolean;
+  status: number;
+  body?: unknown;
+  bodyText?: string;
+}): Response {
+  const { ok, status, body, bodyText } = opts;
+  return {
+    ok,
+    status,
+    json: vi.fn().mockResolvedValue(body ?? {}),
+    text: vi.fn().mockResolvedValue(bodyText ?? ""),
+  } as unknown as Response;
+}
+
 beforeEach(() => {
   setActivePinia(createPinia());
   mockedInvoke.mockReset();
+  mockedFetch.mockReset();
+  localStorage.clear();
 });
+
+// ===== 测试用 provider 数据 =====
+const TEST_PROVIDER: AiProvider = {
+  id: "p1",
+  name: "DeepSeek",
+  type: "deepseek",
+  baseUrl: "https://api.deepseek.com",
+  model: "deepseek-v4-flash",
+  isActive: true,
+};
 
 describe("useAiProvidersStore", () => {
   describe("初始状态", () => {
@@ -183,6 +215,17 @@ describe("useAiProvidersStore", () => {
       });
       expect(store.providers).toEqual([]);
     });
+
+    it("删除 provider 时同时清除 localStorage 测试结果", async () => {
+      mockedInvoke.mockResolvedValueOnce(undefined);
+      localStorage.setItem("test-result-p1", JSON.stringify({ success: true, message: "ok" }));
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      await store.deleteProvider("p1");
+
+      expect(localStorage.getItem("test-result-p1")).toBeNull();
+    });
   });
 
   describe("setActive", () => {
@@ -226,6 +269,273 @@ describe("useAiProvidersStore", () => {
 
       expect(mockedInvoke).toHaveBeenCalledWith("get_api_key", { id: "p1" });
       expect(key).toBe("sk-plaintext-key");
+    });
+  });
+
+  describe("testProvider", () => {
+    it("provider 不存在时返回失败结果，不调用 fetch", async () => {
+      const store = useAiProvidersStore();
+      const result = await store.testProvider("nonexistent");
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("Provider 不存在");
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it("成功时返回 success: true 并持久化到 localStorage", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-test-key");
+      mockedFetch.mockResolvedValueOnce(
+        makeFetchResponse({
+          ok: true,
+          status: 200,
+          body: { data: [{ id: "model-a" }, { id: "model-b" }] },
+        })
+      );
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      const result = await store.testProvider("p1");
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain("2 个模型");
+
+      // 验证 localStorage 持久化
+      const stored = localStorage.getItem("test-result-p1");
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored!);
+      expect(parsed.success).toBe(true);
+      expect(parsed.message).toContain("2 个模型");
+      expect(typeof parsed.timestamp).toBe("number");
+    });
+
+    it("成功但响应无模型列表时消息为'连接成功'", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-test-key");
+      mockedFetch.mockResolvedValueOnce(
+        makeFetchResponse({
+          ok: true,
+          status: 200,
+          body: {},
+        })
+      );
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      const result = await store.testProvider("p1");
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe("连接成功");
+    });
+
+    it("成功但响应体非 JSON 时仍返回成功", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-test-key");
+      const response = makeFetchResponse({ ok: true, status: 200 });
+      // json() 抛出异常
+      (response.json as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new SyntaxError("Unexpected token")
+      );
+      mockedFetch.mockResolvedValueOnce(response);
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      const result = await store.testProvider("p1");
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe("连接成功");
+    });
+
+    it("HTTP 错误时返回 success: false 并持久化", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-test-key");
+      mockedFetch.mockResolvedValueOnce(
+        makeFetchResponse({
+          ok: false,
+          status: 401,
+          bodyText: "Unauthorized",
+        })
+      );
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      const result = await store.testProvider("p1");
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("HTTP 401");
+      expect(result.message).toContain("Unauthorized");
+
+      const stored = localStorage.getItem("test-result-p1");
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored!);
+      expect(parsed.success).toBe(false);
+    });
+
+    it("网络错误时返回 success: false 并持久化", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-test-key");
+      mockedFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      const result = await store.testProvider("p1");
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("Failed to fetch");
+
+      const stored = localStorage.getItem("test-result-p1");
+      expect(stored).not.toBeNull();
+    });
+
+    it("无法获取 API Key 时返回失败结果并持久化", async () => {
+      mockedInvoke.mockRejectedValueOnce(new Error("Provider 未配置 API key"));
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      const result = await store.testProvider("p1");
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("无法获取 API Key");
+      expect(mockedFetch).not.toHaveBeenCalled();
+
+      const stored = localStorage.getItem("test-result-p1");
+      expect(stored).not.toBeNull();
+    });
+
+    it("更新 testStatus 和 testMessage 状态", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-test-key");
+      mockedFetch.mockResolvedValueOnce(
+        makeFetchResponse({ ok: true, status: 200, body: { data: [] } })
+      );
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      await store.testProvider("p1");
+
+      expect(store.testStatus).toBe("success");
+      expect(store.testMessage).toContain("连接成功");
+    });
+
+    it("失败时更新 testStatus 为 error", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-test-key");
+      mockedFetch.mockRejectedValueOnce(new Error("Network error"));
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      await store.testProvider("p1");
+
+      expect(store.testStatus).toBe("error");
+    });
+
+    it("URL 拼接正确：baseUrl + /v1/models", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-test-key");
+      mockedFetch.mockResolvedValueOnce(
+        makeFetchResponse({ ok: true, status: 200, body: {} })
+      );
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      await store.testProvider("p1");
+
+      expect(mockedFetch).toHaveBeenCalledWith(
+        "https://api.deepseek.com/v1/models",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+
+    it("URL 去掉尾部斜杠后拼接", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-test-key");
+      mockedFetch.mockResolvedValueOnce(
+        makeFetchResponse({ ok: true, status: 200, body: {} })
+      );
+
+      const store = useAiProvidersStore();
+      store.providers = [
+        { ...TEST_PROVIDER, baseUrl: "https://api.deepseek.com/" },
+      ];
+      await store.testProvider("p1");
+
+      expect(mockedFetch).toHaveBeenCalledWith(
+        "https://api.deepseek.com/v1/models",
+        expect.any(Object)
+      );
+    });
+
+    it("Authorization header 携带 Bearer API Key", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-secret-key");
+      mockedFetch.mockResolvedValueOnce(
+        makeFetchResponse({ ok: true, status: 200, body: {} })
+      );
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+      await store.testProvider("p1");
+
+      expect(mockedFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: { Authorization: "Bearer sk-secret-key" },
+        })
+      );
+    });
+
+    it("不抛出异常（所有错误以返回值传递）", async () => {
+      mockedInvoke.mockResolvedValueOnce("sk-test-key");
+      mockedFetch.mockRejectedValueOnce(new Error("网络断开"));
+
+      const store = useAiProvidersStore();
+      store.providers = [TEST_PROVIDER];
+
+      // 不应抛出
+      const result = await store.testProvider("p1");
+      expect(result).toBeDefined();
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("getTestResult", () => {
+    it("无存储结果时返回 null", () => {
+      const store = useAiProvidersStore();
+      expect(store.getTestResult("p1")).toBeNull();
+    });
+
+    it("有存储结果时返回解析后的结果", () => {
+      localStorage.setItem(
+        "test-result-p1",
+        JSON.stringify({
+          success: true,
+          message: "连接成功",
+          timestamp: Date.now(),
+        })
+      );
+
+      const store = useAiProvidersStore();
+      const result = store.getTestResult("p1");
+
+      expect(result).not.toBeNull();
+      expect(result!.success).toBe(true);
+      expect(result!.message).toBe("连接成功");
+    });
+
+    it("损坏的 JSON 返回 null", () => {
+      localStorage.setItem("test-result-p1", "{ invalid json");
+
+      const store = useAiProvidersStore();
+      expect(store.getTestResult("p1")).toBeNull();
+    });
+  });
+
+  describe("clearTestResult", () => {
+    it("清除 localStorage 中的测试结果", () => {
+      localStorage.setItem(
+        "test-result-p1",
+        JSON.stringify({ success: true, message: "ok" })
+      );
+
+      const store = useAiProvidersStore();
+      store.clearTestResult("p1");
+
+      expect(localStorage.getItem("test-result-p1")).toBeNull();
+    });
+
+    it("清除不存在的 key 不报错", () => {
+      const store = useAiProvidersStore();
+      expect(() => store.clearTestResult("nonexistent")).not.toThrow();
     });
   });
 
