@@ -1,0 +1,656 @@
+<script setup lang="ts">
+/**
+ * AiPanel — AI 设置面板
+ *
+ * 设置项：Provider 列表、Provider 编辑表单、默认 Provider 选择
+ * Design ref: settings-ai.html
+ *
+ * 本面板直接使用 useAiProvidersStore（Provider 有独立的持久化逻辑）。
+ * API Key 不在前端持久化，仅通过 get_api_key 按需获取（本面板不预填）。
+ *
+ * T8.2 范围：表单显示与编辑（保存即生效）。
+ * 不包含：测试连接（T8.4）、高级参数可编辑（T8.5 — 硬编码常量，只读展示）。
+ * 移除 Azure OpenAI 选项（spec 决策：统一使用 OpenAICompatibleProvider）。
+ */
+import { ref, computed, watch } from "vue";
+import { Plus, Trash2, Plug, ChevronDown, Eye, EyeOff } from "lucide-vue-next";
+import { useAiProvidersStore } from "../../stores/useAiProvidersStore";
+import { AI_PROVIDER_PRESETS, type AiProvider } from "../../types";
+
+const store = useAiProvidersStore();
+
+/** 当前选中编辑的 provider id */
+const selectedId = ref<string | null>(null);
+
+/** 表单编辑副本（与 store 解耦，保存时写回） */
+const form = ref({
+  name: "",
+  type: "custom" as AiProvider["type"],
+  baseUrl: "",
+  model: "",
+  apiKey: "",
+});
+
+/** API Key 显示/隐藏 */
+const showApiKey = ref(false);
+
+/** 测试状态 */
+const testStatus = ref<"idle" | "testing" | "success" | "error">("idle");
+const testMessage = ref("");
+
+const selectedProvider = computed<AiProvider | null>(() =>
+  store.providers.find((p) => p.id === selectedId.value) ?? null
+);
+
+/** 高级参数硬编码常量（只读展示，spec 决策不放入设置） */
+const ADVANCED_PARAMS = [
+  { label: "Agent 循环轮数上限", value: 15, min: 1, max: 50 },
+  { label: "单次请求 token 上限", value: 16384, min: 1024, step: 1024 },
+  { label: "累计 token 软上限", value: 51200, min: 1024, step: 1024 },
+  { label: "propose_replace 二次确认阈值", value: 50, min: 1 },
+] as const;
+
+/** 初始化：选中第一个 provider 或活动 provider */
+function initSelection(): void {
+  if (store.providers.length === 0) return;
+  const active = store.providers.find((p) => p.isActive);
+  selectedId.value = active?.id ?? store.providers[0].id;
+}
+
+watch(
+  () => store.providers,
+  () => {
+    if (!selectedId.value || !store.providers.find((p) => p.id === selectedId.value)) {
+      initSelection();
+    }
+    syncForm();
+  },
+  { deep: true, immediate: true }
+);
+
+watch(selectedId, syncForm);
+
+function syncForm(): void {
+  const p = selectedProvider.value;
+  if (!p) {
+    form.value = { name: "", type: "custom", baseUrl: "", model: "", apiKey: "" };
+    return;
+  }
+  form.value = {
+    name: p.name,
+    type: p.type,
+    baseUrl: p.baseUrl,
+    model: p.model,
+    apiKey: "", // 不预填，安全考虑
+  };
+  showApiKey.value = false;
+  testStatus.value = "idle";
+  testMessage.value = "";
+}
+
+function selectProvider(id: string): void {
+  selectedId.value = id;
+}
+
+async function setDefault(id: string): Promise<void> {
+  await store.setActive(id);
+}
+
+async function handleAddProvider(): Promise<void> {
+  const preset = AI_PROVIDER_PRESETS[0];
+  const newProvider: AiProvider = {
+    id: "",
+    name: preset.label,
+    type: preset.type,
+    baseUrl: preset.baseUrl,
+    model: preset.model,
+    isActive: store.providers.length === 0,
+  };
+  const saved = await store.saveProvider(newProvider, "");
+  selectedId.value = saved.id;
+}
+
+async function handleDeleteProvider(): Promise<void> {
+  if (!selectedProvider.value) return;
+  const id = selectedProvider.value.id;
+  await store.deleteProvider(id);
+  initSelection();
+}
+
+async function handleSaveProvider(): Promise<void> {
+  if (!selectedProvider.value) return;
+  await store.saveProvider(
+    {
+      ...selectedProvider.value,
+      name: form.value.name,
+      type: form.value.type,
+      baseUrl: form.value.baseUrl,
+      model: form.value.model,
+    },
+    form.value.apiKey
+  );
+  form.value.apiKey = "";
+}
+
+async function handleTestConnection(): Promise<void> {
+  if (!selectedProvider.value || !form.value.apiKey) {
+    testStatus.value = "error";
+    testMessage.value = "请先输入 API Key";
+    return;
+  }
+  testStatus.value = "testing";
+  testMessage.value = "测试中…";
+  try {
+    await store.testConnection(form.value.baseUrl, form.value.apiKey, form.value.model);
+    testStatus.value = store.testStatus;
+    testMessage.value = store.testMessage;
+  } catch {
+    testStatus.value = "error";
+    testMessage.value = store.testMessage;
+  }
+}
+
+function typeLabel(type: AiProvider["type"]): string {
+  const preset = AI_PROVIDER_PRESETS.find((p) => p.type === type);
+  return preset?.label ?? "自定义";
+}
+</script>
+
+<template>
+  <div>
+    <h1 class="settings-page-title">AI</h1>
+
+    <!-- Provider 管理 -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">Provider 管理</h2>
+
+      <div class="provider-workspace">
+        <!-- Provider List -->
+        <aside class="provider-list">
+          <div class="provider-list-header">
+            <span>Providers</span>
+          </div>
+          <div class="provider-items" role="radiogroup" aria-label="选择默认 Provider">
+            <label
+              v-for="p in store.providers"
+              :key="p.id"
+              class="provider-item"
+              :class="{ selected: selectedId === p.id }"
+            >
+              <input
+                type="radio"
+                name="default-provider"
+                class="provider-radio"
+                :checked="p.isActive"
+                @change="setDefault(p.id)"
+              />
+              <div class="provider-item-body" @click="selectProvider(p.id)">
+                <div class="provider-item-main">
+                  <span class="provider-name">{{ p.name }}</span>
+                  <span v-if="p.isActive" class="provider-badge">默认</span>
+                </div>
+                <div class="provider-item-meta">{{ typeLabel(p.type) }}</div>
+              </div>
+            </label>
+          </div>
+          <div class="provider-list-footer">
+            <button class="provider-add-btn" type="button" @click="handleAddProvider">
+              <Plus :size="14" />
+              <span>添加 Provider</span>
+            </button>
+          </div>
+        </aside>
+
+        <!-- Provider Editor -->
+        <div v-if="selectedProvider" class="provider-editor">
+          <div class="provider-editor-header">
+            <h3 class="provider-editor-title">API 设置</h3>
+            <button
+              class="provider-delete-btn"
+              type="button"
+              aria-label="删除 Provider"
+              @click="handleDeleteProvider"
+            >
+              <Trash2 :size="15" />
+            </button>
+          </div>
+
+          <form class="provider-form" @submit.prevent="handleSaveProvider">
+            <div class="setting-row provider-form-row">
+              <div class="setting-label-column">
+                <label class="setting-label">名称</label>
+                <span class="setting-description">用于在列表中识别该 Provider</span>
+              </div>
+              <div class="setting-control-column">
+                <input
+                  v-model="form.name"
+                  class="setting-input"
+                  type="text"
+                  placeholder="例如：DeepSeek"
+                />
+              </div>
+            </div>
+
+            <div class="setting-row provider-form-row">
+              <div class="setting-label-column">
+                <label class="setting-label">类型</label>
+                <span class="setting-description">API 兼容格式（统一使用 OpenAI 兼容）</span>
+              </div>
+              <div class="setting-control-column">
+                <div class="select-wrapper">
+                  <select v-model="form.type">
+                    <option v-for="preset in AI_PROVIDER_PRESETS" :key="preset.type" :value="preset.type">
+                      {{ preset.label }}
+                    </option>
+                  </select>
+                  <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="setting-row provider-form-row">
+              <div class="setting-label-column">
+                <label class="setting-label">API URL</label>
+                <span class="setting-description">OpenAI 兼容端点的基础 URL</span>
+              </div>
+              <div class="setting-control-column">
+                <input
+                  v-model="form.baseUrl"
+                  class="setting-input wide-input"
+                  type="text"
+                  placeholder="https://api.deepseek.com"
+                />
+              </div>
+            </div>
+
+            <div class="setting-row provider-form-row">
+              <div class="setting-label-column">
+                <label class="setting-label">Model</label>
+                <span class="setting-description">默认调用的模型 ID</span>
+              </div>
+              <div class="setting-control-column">
+                <input
+                  v-model="form.model"
+                  class="setting-input"
+                  type="text"
+                  placeholder="deepseek-v4-flash"
+                />
+              </div>
+            </div>
+
+            <div class="setting-row provider-form-row">
+              <div class="setting-label-column">
+                <label class="setting-label">API Key</label>
+                <span class="setting-description">仅在本地加密存储，不会上传</span>
+              </div>
+              <div class="setting-control-column">
+                <div class="password-input-wrap">
+                  <input
+                    v-model="form.apiKey"
+                    class="setting-input password-input"
+                    :type="showApiKey ? 'text' : 'password'"
+                    placeholder="输入 API Key"
+                  />
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    :aria-label="showApiKey ? '隐藏 API Key' : '显示 API Key'"
+                    @click="showApiKey = !showApiKey"
+                  >
+                    <Eye v-if="!showApiKey" :size="14" />
+                    <EyeOff v-else :size="14" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="provider-form-actions">
+              <button type="button" class="secondary-button" @click="handleTestConnection">
+                <Plug :size="14" />
+                测试连接
+              </button>
+              <button type="submit" class="primary-button">保存 Provider</button>
+              <div v-if="testStatus !== 'idle'" class="provider-status">
+                <span
+                  class="provider-status-dot"
+                  :class="{
+                    success: testStatus === 'success',
+                    error: testStatus === 'error',
+                    testing: testStatus === 'testing',
+                  }"
+                ></span>
+                <span class="provider-status-text">{{ testMessage }}</span>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- Empty state -->
+        <div v-else class="provider-editor-empty">
+          <p>点击左侧「添加 Provider」创建第一个 AI Provider</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 高级参数（只读，硬编码常量） -->
+    <section class="settings-section">
+      <details class="advanced-params">
+        <summary class="advanced-params-summary">
+          <ChevronDown :size="16" class="advanced-params-chevron" />
+          <span class="advanced-params-title">高级参数</span>
+          <span class="advanced-params-hint">硬编码常量，不可编辑（Agent 循环、token 上限与提案确认阈值）</span>
+        </summary>
+        <div class="advanced-params-body">
+          <div
+            v-for="param in ADVANCED_PARAMS"
+            :key="param.label"
+            class="setting-row"
+          >
+            <div class="setting-label-column">
+              <label class="setting-label">{{ param.label }}</label>
+            </div>
+            <div class="setting-control-column">
+              <input
+                class="setting-input number-readonly"
+                type="number"
+                :value="param.value"
+                :min="'min' in param ? param.min : undefined"
+                :max="'max' in param ? param.max : undefined"
+                :step="'step' in param ? param.step : undefined"
+                readonly
+              />
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+  </div>
+</template>
+
+<style scoped>
+/* === Provider Workspace === */
+.provider-workspace {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--murasaki-line);
+  border-radius: var(--murasaki-radius-lg);
+  overflow: hidden;
+  background: var(--murasaki-background);
+  min-height: 360px;
+}
+
+/* === Provider List === */
+.provider-list {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--murasaki-surface);
+  border-right: 1px solid var(--murasaki-line);
+  overflow: hidden;
+}
+.provider-list-header {
+  padding: 14px 14px 8px;
+  font-size: var(--murasaki-text-xs);
+  font-weight: 600;
+  color: var(--murasaki-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+.provider-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 10px 8px;
+}
+.provider-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--murasaki-radius-md);
+  cursor: pointer;
+  transition: background 120ms;
+  user-select: none;
+}
+.provider-item:hover {
+  background: var(--murasaki-neutral-200);
+}
+.provider-item.selected {
+  background: var(--murasaki-purple-50);
+}
+.provider-item.selected .provider-name {
+  color: var(--murasaki-primary);
+  font-weight: 500;
+}
+.provider-radio {
+  margin: 2px 0 0 0;
+  accent-color: var(--murasaki-primary);
+  flex-shrink: 0;
+}
+.provider-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.provider-item-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.provider-name {
+  font-size: var(--murasaki-text-sm);
+  color: var(--murasaki-ink);
+}
+.provider-badge {
+  padding: 1px 5px;
+  border-radius: var(--murasaki-radius-sm);
+  background: var(--murasaki-purple-100);
+  color: var(--murasaki-purple-700);
+  font-size: 11px;
+  font-weight: 500;
+}
+.provider-item-meta {
+  font-size: var(--murasaki-text-xs);
+  color: var(--murasaki-ink-3);
+}
+.provider-list-footer {
+  padding: 10px;
+  border-top: 1px solid var(--murasaki-line);
+}
+.provider-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px dashed var(--murasaki-line);
+  border-radius: var(--murasaki-radius-md);
+  background: transparent;
+  color: var(--murasaki-ink-2);
+  font-size: var(--murasaki-text-sm);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+.provider-add-btn:hover {
+  background: var(--murasaki-neutral-100);
+  border-color: var(--murasaki-purple-300);
+  color: var(--murasaki-primary);
+}
+
+/* === Provider Editor === */
+.provider-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+}
+.provider-editor-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--murasaki-ink-3);
+  font-size: var(--murasaki-text-sm);
+}
+.provider-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.provider-editor-title {
+  font-size: var(--murasaki-text-lg);
+  font-weight: 600;
+  color: var(--murasaki-ink);
+  margin: 0;
+}
+.provider-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--murasaki-radius-sm);
+  background: transparent;
+  color: var(--murasaki-ink-3);
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.provider-delete-btn:hover {
+  background: var(--murasaki-state-error);
+  color: #ffffff;
+}
+.provider-form {
+  display: flex;
+  flex-direction: column;
+}
+.provider-form-row {
+  padding: 12px 0;
+}
+.provider-form-row:first-child {
+  padding-top: 0;
+}
+.provider-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--murasaki-line);
+}
+.provider-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--murasaki-ink-2);
+  font-size: var(--murasaki-text-xs);
+}
+.provider-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--murasaki-neutral-400);
+}
+.provider-status-dot.success {
+  background: var(--murasaki-state-success);
+}
+.provider-status-dot.error {
+  background: var(--murasaki-state-error);
+}
+.provider-status-dot.testing {
+  background: var(--murasaki-state-warning);
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* === Wide input for API URL === */
+.wide-input {
+  width: 280px;
+}
+
+/* === Password Input === */
+.password-input-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.password-input-wrap .setting-input {
+  padding-right: 32px;
+  width: 200px;
+}
+.password-toggle {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--murasaki-radius-sm);
+  background: transparent;
+  color: var(--murasaki-ink-3);
+  cursor: pointer;
+}
+.password-toggle:hover {
+  color: var(--murasaki-ink);
+}
+
+/* === Advanced Params === */
+.advanced-params {
+  border: 1px solid var(--murasaki-line);
+  border-radius: var(--murasaki-radius-md);
+  overflow: hidden;
+}
+.advanced-params-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--murasaki-surface);
+  transition: background 120ms;
+}
+.advanced-params-summary:hover {
+  background: var(--murasaki-neutral-100);
+}
+.advanced-params-chevron {
+  transition: transform 120ms;
+  color: var(--murasaki-ink-3);
+  flex-shrink: 0;
+}
+.advanced-params[open] .advanced-params-chevron {
+  transform: rotate(180deg);
+}
+.advanced-params-title {
+  font-size: var(--murasaki-text-sm);
+  font-weight: 600;
+  color: var(--murasaki-ink);
+}
+.advanced-params-hint {
+  font-size: var(--murasaki-text-xs);
+  color: var(--murasaki-ink-3);
+}
+.advanced-params-body {
+  padding: 0 16px 8px;
+  background: var(--murasaki-background);
+}
+.number-readonly {
+  width: 100px;
+  background: var(--murasaki-muted);
+  color: var(--murasaki-ink-2);
+  cursor: not-allowed;
+}
+</style>
