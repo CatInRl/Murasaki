@@ -61,6 +61,8 @@ interface ModePalette {
   cardColor: string;
   /** --murasaki-popover */
   popoverColor: string;
+  /** --murasaki-popover-foreground */
+  popoverForegroundColor: string;
   /** 模态背景，对齐 --murasaki-popover */
   modalColor: string;
   /** --murasaki-surface */
@@ -90,6 +92,7 @@ const LIGHT_PALETTE: ModePalette = {
   bodyColor: "#ffffff",
   cardColor: "#fafafa",
   popoverColor: "#ffffff",
+  popoverForegroundColor: "#171717",
   modalColor: "#ffffff",
   tableColor: "#f9fafb",
   tableHeaderColor: "#f5f5f5",
@@ -108,6 +111,7 @@ const DARK_PALETTE: ModePalette = {
   bodyColor: "#0f0f14",
   cardColor: "#18181f",
   popoverColor: "#1c1c24",
+  popoverForegroundColor: "#e5e7eb",
   modalColor: "#1c1c24",
   tableColor: "#16161d",
   tableHeaderColor: "#1f1f28",
@@ -170,7 +174,7 @@ function applyDataTheme(uiMode: UiMode): void {
  * --murasaki-* token。
  *
  * 纯函数，无副作用：相同 mode 输入始终返回等价配置，可单元测试断言输出。
- * NPopover 的组件级 overrides 留到 T5.1 补全。
+ * NPopover 的组件级 overrides 在 T5.1 补全（issue #71）。
  */
 export function createMurasakiThemeOverrides(
   mode: EffectiveMode
@@ -226,6 +230,16 @@ export function createMurasakiThemeOverrides(
       boxShadow1: SHADOW[1],
       boxShadow2: SHADOW[2],
       boxShadow3: SHADOW[3],
+    },
+
+    // === NPopover 组件级 overrides（T5.1, issue #71）===
+    // 浮层背景/文字/圆角/阴影对齐 --murasaki-* token。
+    // borderColor 不适用：naive-ui NPopover 默认无边框，靠 boxShadow 表达层级。
+    Popover: {
+      color: p.popoverColor,
+      textColor: p.popoverForegroundColor,
+      borderRadius: RADIUS_MD,
+      boxShadow: SHADOW[3],
     },
   };
 }

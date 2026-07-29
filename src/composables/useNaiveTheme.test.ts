@@ -145,11 +145,21 @@ describe("composables/useNaiveTheme", () => {
       expect(dark.common!.boxShadow1).toBe(light.common!.boxShadow1);
     });
 
-    it("不包含 NPopover 组件级 overrides（留到 T5.1）", () => {
-      const overrides = createMurasakiThemeOverrides("light");
-      // common.popoverColor 属于颜色变量映射，在范围内；
-      // 但不应包含 Popover 组件级 overrides 键
-      expect(overrides).not.toHaveProperty("Popover");
+    it("NPopover 组件级 overrides 对齐 --murasaki-* token（T5.1, issue #71）", () => {
+      const light = createMurasakiThemeOverrides("light");
+      const dark = createMurasakiThemeOverrides("dark");
+      expect(light).toHaveProperty("Popover");
+      // color 对齐 --murasaki-popover
+      expect(light.Popover!.color).toBe("#ffffff");
+      expect(dark.Popover!.color).toBe("#1c1c24");
+      // textColor 对齐 --murasaki-popover-foreground
+      expect(light.Popover!.textColor).toBe("#171717");
+      expect(dark.Popover!.textColor).toBe("#e5e7eb");
+      // borderRadius 对齐 --murasaki-radius-md
+      expect(light.Popover!.borderRadius).toBe("8px");
+      // boxShadow 对齐 --murasaki-shadow-lg
+      expect(light.Popover!.boxShadow).toBe("0 12px 32px rgba(15, 23, 42, 0.12)");
+      expect(dark.Popover!.boxShadow).toBe(light.Popover!.boxShadow);
     });
   });
 });
