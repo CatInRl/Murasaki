@@ -23,6 +23,7 @@ import SettingsWindow from "./components/SettingsWindow.vue";
 import CompareWindow from "./components/CompareWindow.vue";
 import ImagePreviewModal from "./components/ImagePreviewModal.vue";
 import AgentPanel from "./components/AgentPanel.vue";
+import ToastContainer from "./components/ToastContainer.vue";
 import { useWorkspaceStore } from "./stores/useWorkspaceStore";
 import { useTabsStore } from "./stores/useTabsStore";
 import { usePersistenceStore } from "./stores/usePersistenceStore";
@@ -1425,6 +1426,7 @@ async function exportCurrentHtml(): Promise<void> {
         </NSpace>
       </template>
     </NModal>
+    <ToastContainer />
   </NConfigProvider>
 </template>
 
