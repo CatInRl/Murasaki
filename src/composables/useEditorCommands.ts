@@ -177,6 +177,161 @@ export function toggleBlockquote(view: EditorView): void {
 }
 
 /**
+ * 切换内联格式（粗体 ** / 斜体 * / 删除线 ~~ / 行内代码 `）
+ * - 选区为空：插入标记对，光标置于中间
+ * - 选区已被同标记包围（标记在选区外或选区内）：移除标记
+ * - 否则：用标记包围选区
+ */
+export function toggleInline(view: EditorView, marker: string): void {
+  const { from, to } = view.state.selection.main;
+  const doc = view.state.doc;
+
+  if (from === to) {
+    // 空选区：插入 marker+marker，光标在中间
+    const insert = marker + marker;
+    view.dispatch({
+      changes: { from, to, insert },
+      selection: { anchor: from + marker.length },
+      userEvent: "input.toggleInline",
+    });
+    return;
+  }
+
+  const selected = doc.sliceString(from, to);
+
+  // 选区自身被标记包围（如选中 "**bold**"）
+  if (
+    selected.startsWith(marker) &&
+    selected.endsWith(marker) &&
+    selected.length >= marker.length * 2
+  ) {
+    const inner = selected.slice(marker.length, selected.length - marker.length);
+    view.dispatch({
+      changes: { from, to, insert: inner },
+      selection: { anchor: from, head: from + inner.length },
+      userEvent: "input.toggleInline",
+    });
+    return;
+  }
+
+  // 选区两侧紧邻同名标记
+  const before = doc.sliceString(Math.max(0, from - marker.length), from);
+  const after = doc.sliceString(to, Math.min(doc.length, to + marker.length));
+  if (before === marker && after === marker) {
+    view.dispatch({
+      changes: [
+        { from: to, to: to + marker.length, insert: "" },
+        { from: from - marker.length, to: from, insert: "" },
+      ],
+      selection: { anchor: from - marker.length, head: to - marker.length },
+      userEvent: "input.toggleInline",
+    });
+    return;
+  }
+
+  // 包围选区
+  const insert = marker + selected + marker;
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: from, head: from + insert.length },
+    userEvent: "input.toggleInline",
+  });
+}
+
+/**
+ * 在当前选区插入链接 [text](url)，选区文字作为默认链接文字
+ */
+export function insertLink(view: EditorView, url: string, text: string): void {
+  const sel = view.state.selection.main;
+  const insert = `[${text}](${url})`;
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert },
+    selection: { anchor: sel.from + insert.length },
+    userEvent: "input.insert",
+  });
+}
+
+/**
+ * 在当前选区插入图片 ![alt](url)，选区文字作为默认替代文字
+ */
+export function insertImage(view: EditorView, url: string, alt: string): void {
+  const sel = view.state.selection.main;
+  const insert = `![${alt}](${url})`;
+  view.dispatch({
+    changes: { from: sel.from, to: sel.to, insert },
+    selection: { anchor: sel.from + insert.length },
+    userEvent: "input.insert",
+  });
+}
+
+/**
+ * 判断光标列位置是否落在某行的内联标记对内（如 **bold** 中的光标）
+ */
+function isCursorInInline(lineText: string, col: number, marker: string): boolean {
+  let idx = 0;
+  while (idx <= lineText.length - marker.length) {
+    const open = lineText.indexOf(marker, idx);
+    if (open < 0) break;
+    const close = lineText.indexOf(marker, open + marker.length);
+    if (close < 0) break;
+    if (col > open && col < close) return true;
+    idx = close + marker.length;
+  }
+  return false;
+}
+
+/**
+ * 计算当前选区/光标所在位置的活跃格式集合（供工具栏高亮激活态）
+ */
+export function getActiveFormats(view: EditorView): Set<string> {
+  const active = new Set<string>();
+  const { from, to, head } = view.state.selection.main;
+  const doc = view.state.doc;
+
+  const inlineMarkers: Record<string, string> = {
+    bold: "**",
+    italic: "*",
+    strikethrough: "~~",
+    code: "`",
+  };
+  for (const [id, marker] of Object.entries(inlineMarkers)) {
+    if (from !== to) {
+      const selected = doc.sliceString(from, to);
+      if (
+        selected.startsWith(marker) &&
+        selected.endsWith(marker) &&
+        selected.length >= marker.length * 2
+      ) {
+        active.add(id);
+        continue;
+      }
+      const before = doc.sliceString(Math.max(0, from - marker.length), from);
+      const after = doc.sliceString(to, Math.min(doc.length, to + marker.length));
+      if (before === marker && after === marker) {
+        active.add(id);
+      }
+    } else {
+      const lineObj = doc.lineAt(head);
+      const col = head - lineObj.from;
+      if (isCursorInInline(lineObj.text, col, marker)) {
+        active.add(id);
+      }
+    }
+  }
+
+  const line = doc.lineAt(head).text;
+  if (/^###\s/.test(line)) active.add("h3");
+  else if (/^##\s/.test(line)) active.add("h2");
+  else if (/^#\s/.test(line)) active.add("h1");
+  if (/^\s*[-*+]\s+\[[ xX]\]\s+/.test(line)) active.add("task-list");
+  else if (/^\s*\d+\.\s+/.test(line)) active.add("ordered-list");
+  else if (/^\s*[-*+]\s+/.test(line)) active.add("unordered-list");
+  if (/^\s*>\s+/.test(line)) active.add("blockquote");
+
+  return active;
+}
+
+/**
  * 插入水平分隔线：在当前行下方插入 ---
  */
 export function insertHorizontalRule(view: EditorView): void {
