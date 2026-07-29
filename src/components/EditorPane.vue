@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import SourceEditor from "./SourceEditor.vue";
 import PreviewPane from "./PreviewPane.vue";
 import { useScrollSync } from "../composables/useScrollSync";
@@ -20,6 +20,8 @@ interface Props {
   currentFilePath?: string | null;
   /** 工作区根路径（用于解析相对 .md 链接） */
   workspacePath?: string | null;
+  /** 编辑模式：source（纯源码）/ split（分屏，默认）/ wysiwyg（所见即所得，预览区隐藏） */
+  editorMode?: "source" | "split" | "wysiwyg";
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -30,6 +32,7 @@ const props = withDefaults(defineProps<Props>(), {
   previewTheme: "github",
   currentFilePath: null,
   workspacePath: null,
+  editorMode: "split",
 });
 
 const emit = defineEmits<{
@@ -83,6 +86,7 @@ function onCursorChange(payload: { line: number; ch: number }) {
 }
 
 // ============ 滚动同步 ============
+// 仅在 split 模式下绑定（source/wysiwyg 无预览区）
 let detachScrollSync: (() => void) | null = null;
 
 const scrollSync = useScrollSync({
@@ -91,20 +95,42 @@ const scrollSync = useScrollSync({
   throttleMs: 50,
 });
 
-onMounted(() => {
-  // 等待 CodeMirror 与预览容器都就绪后再绑定
-  void nextTick(() => {
-    const editorScrollDom = editorRef.value?.getScrollDom() ?? null;
-    const previewScrollDom = previewRef.value?.getScrollDom() ?? null;
-    detachScrollSync = scrollSync.attach(editorScrollDom, previewScrollDom);
-  });
-});
-
-onBeforeUnmount(() => {
+function detachScrollSyncIfAny(): void {
   if (detachScrollSync) {
     detachScrollSync();
     detachScrollSync = null;
   }
+}
+
+function attachScrollSyncForSplit(): void {
+  detachScrollSyncIfAny();
+  if (props.editorMode !== "split") return;
+  const editorScrollDom = editorRef.value?.getScrollDom() ?? null;
+  const previewScrollDom = previewRef.value?.getScrollDom() ?? null;
+  detachScrollSync = scrollSync.attach(editorScrollDom, previewScrollDom);
+}
+
+onMounted(() => {
+  // 等待 CodeMirror 与预览容器都就绪后再绑定（仅 split 模式）
+  void nextTick(() => attachScrollSyncForSplit());
+});
+
+// 模式切换时重新绑定/解绑滚动同步：
+// - 进入 split：等 PreviewPane 渲染就绪后绑定
+// - 离开 split：立即解绑（预览区将卸载）
+watch(
+  () => props.editorMode,
+  (mode) => {
+    if (mode === "split") {
+      void nextTick(() => attachScrollSyncForSplit());
+    } else {
+      detachScrollSyncIfAny();
+    }
+  }
+);
+
+onBeforeUnmount(() => {
+  detachScrollSyncIfAny();
 });
 
 // ============ 任务列表复选框切换 ============
@@ -181,10 +207,10 @@ defineExpose({
 </script>
 
 <template>
-  <div class="editor-pane">
+  <div class="editor-pane" :class="`mode-${editorMode}`">
     <div
       class="pane-left"
-      :style="{ width: leftWidthPct + '%' }"
+      :style="{ width: editorMode === 'split' ? leftWidthPct + '%' : '100%' }"
       @dragover="onEditorDragOver"
       @drop="onEditorDrop"
     >
@@ -194,19 +220,25 @@ defineExpose({
         :tab-id="tabId"
         :show-line-numbers="showLineNumbers"
         :soft-wrap="softWrap"
+        :editor-mode="editorMode"
         @update:model-value="onInput"
         @cursor-change="onCursorChange"
         @context-action="(a) => emit('context-action', a)"
       />
     </div>
     <div
+      v-if="editorMode === 'split'"
       class="splitter"
       :class="{ dragging }"
       @mousedown="onMouseDown"
     >
       <div class="splitter-handle"></div>
     </div>
-    <div class="pane-right" :style="{ width: `calc(${100 - leftWidthPct}% - 6px)` }">
+    <div
+      v-if="editorMode === 'split'"
+      class="pane-right"
+      :style="{ width: `calc(${100 - leftWidthPct}% - 6px)` }"
+    >
       <PreviewPane
         ref="previewRef"
         :source="modelValue"

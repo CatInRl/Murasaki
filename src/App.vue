@@ -252,6 +252,8 @@ onMounted(async () => {
   if (persistence.settings.markdownTheme) {
     currentTheme.value = persistence.settings.markdownTheme;
   }
+  // 应用保存的编辑模式（运行时切换，无需重启）
+  editorBridge.setEditorMode(persistence.settings.editorMode);
   // 恢复侧栏视图
   if (persistence.settings.sidebarView) {
     sidebarView.value = persistence.settings.sidebarView;
@@ -408,6 +410,11 @@ watch(sidebarView, (v) => {
   if (initialized.value) {
     void persistence.updateSettings({ sidebarView: v });
   }
+});
+
+// 编辑模式设置变更 -> 运行时同步到当前编辑器（无需重启）
+watch(() => persistence.settings.editorMode, (mode) => {
+  editorBridge.setEditorMode(mode);
 });
 
 // 工作区变化时保存（关闭工作区或切换工作区）
@@ -764,8 +771,10 @@ function onSettingsChange(
       // 这些通过 persistence.settings 响应式传递给 EditorPane（v-bind :show-line-numbers / :soft-wrap）
       break;
     case "uiMode":
-    case "editorMode":
       // 需重启应用完全生效（仅在设置窗口提示，不在此处处理）
+      break;
+    case "editorMode":
+      // 运行时生效：由 watch(persistence.settings.editorMode) 同步到 editorBridge
       break;
   }
 }
@@ -1327,6 +1336,7 @@ async function exportCurrentHtml(): Promise<void> {
             :preview-theme="currentTheme"
             :current-file-path="currentFilePath"
             :workspace-path="workspace.workspacePath"
+            :editor-mode="editorBridge.editorMode"
             @cursor-change="onCursorChange"
             @open-internal="openFile"
             @drop-image-path="onDropImagePath"

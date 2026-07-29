@@ -90,6 +90,11 @@ const editorModeOptions: Array<{
   description: string;
 }> = [
   {
+    label: "源码",
+    value: "source",
+    description: "纯源码编辑，无预览区",
+  },
+  {
     label: "分屏编辑",
     value: "split",
     description: "左侧源码、右侧预览（当前默认）",
@@ -97,7 +102,7 @@ const editorModeOptions: Array<{
   {
     label: "所见即所得（WYSIWYG）",
     value: "wysiwyg",
-    description: "占位符，后续版本支持（切换需重启应用生效）",
+    description: "源码中直接渲染样式，隐藏语法标记（运行时切换）",
   },
 ];
 

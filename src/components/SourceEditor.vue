@@ -32,6 +32,7 @@ import {
   expireAllProposalsEffect,
 } from "../agent/proposals";
 import { useProposalsStore } from "../stores/useProposalsStore";
+import { wysiwygExtensions } from "../editor/wysiwyg/wysiwygPlugin";
 
 /**
  * Murasaki light syntax theme — purple-tinted, writing-first.
@@ -211,6 +212,8 @@ interface Props {
   softWrap?: boolean;
   /** 是否只读 */
   readOnly?: boolean;
+  /** 编辑模式：source/split/wysiwyg（wysiwyg 叠加 WYSIWYG ViewPlugin，其他模式移除） */
+  editorMode?: "source" | "split" | "wysiwyg";
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -218,6 +221,7 @@ const props = withDefaults(defineProps<Props>(), {
   showLineNumbers: true,
   softWrap: true,
   readOnly: false,
+  editorMode: "split",
 });
 
 const emit = defineEmits<{
@@ -246,6 +250,8 @@ let lastTabId: string | null = null;
 const lineNumbersComp = new Compartment();
 const wrapComp = new Compartment();
 const readOnlyComp = new Compartment();
+// WYSIWYG ViewPlugin 的叠加/移除通过此 Compartment 运行时切换（不销毁编辑器实例）
+const wysiwygComp = new Compartment();
 
 function buildExtensions() {
   return [
@@ -280,6 +286,8 @@ function buildExtensions() {
     lineNumbersComp.of(props.showLineNumbers ? lineNumbers() : []),
     wrapComp.of(props.softWrap ? EditorView.lineWrapping : []),
     readOnlyComp.of(EditorState.readOnly.of(props.readOnly)),
+    // WYSIWYG ViewPlugin 仅在 wysiwyg 模式下叠加（运行时通过 Compartment 切换）
+    wysiwygComp.of(props.editorMode === "wysiwyg" ? wysiwygExtensions : []),
     foldGutter({ openText: "▾", closedText: "▸" }),
     murasakiTheme,
     syntaxHighlighting(murasakiHighlightStyle),
@@ -436,6 +444,17 @@ watch(
   (v) => {
     viewRef.value?.dispatch({
       effects: readOnlyComp.reconfigure(EditorState.readOnly.of(v)),
+    });
+  }
+);
+
+// 编辑模式切换：仅 wysiwyg 叠加 WYSIWYG ViewPlugin，其他模式移除
+// 通过 Compartment.reconfigure 动态切换，不销毁编辑器实例，内容/光标/undo 栈保持不变
+watch(
+  () => props.editorMode,
+  (v) => {
+    viewRef.value?.dispatch({
+      effects: wysiwygComp.reconfigure(v === "wysiwyg" ? wysiwygExtensions : []),
     });
   }
 );
