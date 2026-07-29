@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { BookOpen } from "lucide-vue-next";
-import { NEmpty } from "naive-ui";
+import { BookOpen, FileText } from "lucide-vue-next";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
 import { basename, dirname } from "../utils/path";
+import EmptyState from "./EmptyState.vue";
 
 const persistence = usePersistenceStore();
 
@@ -35,6 +35,13 @@ function onAction(key: string) {
     case "new-file": emit("new-file"); break;
   }
 }
+
+// 底部快捷键提示
+const shortcutHints = [
+  { keys: "Ctrl+O", label: "打开" },
+  { keys: "Ctrl+N", label: "新建" },
+  { keys: "Ctrl+Shift+O", label: "打开文件夹" },
+] as const;
 </script>
 
 <template>
@@ -129,10 +136,7 @@ function onAction(key: string) {
               @click="emit('open-recent', entry.path, 'file')"
             >
               <span class="recent-icon recent-icon-file" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
+                <FileText :size="16" />
               </span>
               <div class="item-text">
                 <div class="item-name">{{ basename(entry.path) }}</div>
@@ -143,12 +147,19 @@ function onAction(key: string) {
           </ul>
         </div>
 
-        <NEmpty
+        <EmptyState
           v-if="recentFolders.length === 0 && recentFiles.length === 0"
-          description="暂无最近打开记录"
-          size="small"
-          style="margin-top: 24px"
+          :icon="FileText"
+          title="暂无最近文件"
         />
+      </section>
+
+      <!-- 底部快捷键提示 -->
+      <section class="shortcut-hints" aria-label="快捷键提示">
+        <div v-for="hint in shortcutHints" :key="hint.keys" class="shortcut-hint">
+          <kbd class="shortcut-key">{{ hint.keys }}</kbd>
+          <span class="shortcut-label">{{ hint.label }}</span>
+        </div>
       </section>
 
       <!-- 底部：版本号 + 设置入口 -->
@@ -231,7 +242,7 @@ function onAction(key: string) {
 .welcome-content {
   position: relative;
   z-index: 1;
-  max-width: 640px;
+  max-width: 480px;
   width: 100%;
   padding: 48px 40px;
   text-align: center;
@@ -428,8 +439,8 @@ function onAction(key: string) {
     transform var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .recent-item:hover {
-  background: var(--murasaki-purple-50);
-  border-color: var(--murasaki-purple-100);
+  background: var(--murasaki-muted);
+  border-color: var(--murasaki-border);
 }
 .recent-item:hover .item-arrow {
   transform: translateX(3px);
@@ -484,9 +495,40 @@ function onAction(key: string) {
               opacity var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 
+/* === 快捷键提示 === */
+.shortcut-hints {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 32px;
+}
+.shortcut-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--murasaki-ink-3);
+}
+.shortcut-key {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: var(--murasaki-radius-sm);
+  background: var(--murasaki-muted);
+  border: 1px solid var(--murasaki-border);
+  color: var(--murasaki-ink-2);
+  line-height: 1.4;
+}
+.shortcut-label {
+  color: var(--murasaki-muted-foreground);
+}
+
 /* === 底部 === */
 .welcome-footer {
-  margin-top: 40px;
+  margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--murasaki-line);
   font-size: 12px;
