@@ -457,9 +457,15 @@ watch(
 }
 .match-highlight {
   background: rgba(147, 51, 234, 0.2);
-  color: inherit;
-  padding: 0;
+  color: var(--murasaki-primary-foreground);
+  padding: 0 2px;
   border-radius: 2px;
+}
+
+/* 搜索当前项：hover 行内的匹配关键词加深到 40% alpha */
+.match-line:hover .match-highlight,
+.filename-line:hover .match-highlight {
+  background: rgba(147, 51, 234, 0.4);
 }
 
 /* ===== 文件名匹配分组 ===== */
