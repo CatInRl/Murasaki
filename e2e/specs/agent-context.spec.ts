@@ -10,6 +10,8 @@
  *
  * 不发起真实 LLM 请求：直接通过 store action 验证 UI 行为。
  * 工具调用可见性通过直接构造 messages 数组验证（绕过 LLM 流式）。
+ *
+ * T4.1 更新：工具调用现在在折叠卡片内，需先点击 .tool-call-card-header 展开。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
@@ -168,6 +170,11 @@ describe("Agent 上下文 + 工具调用可见性", () => {
       });
     });
 
+    // 展开工具调用折叠卡片（T4.1: 条目在折叠卡片内，需先展开）
+    const cardHeader1 = await browser.$(".tool-call-card-header");
+    await cardHeader1.click();
+    await browser.pause(200);
+
     // 工具调用条目应可见
     const entries = await browser.$$(".tool-call-entry");
     expect(entries.length).toBeGreaterThanOrEqual(2);
@@ -186,7 +193,7 @@ describe("Agent 上下文 + 工具调用可见性", () => {
     expect(summaryText).toBe("调用中...");
   });
 
-  it("点击工具调用条目展开参数和结果", async () => {
+  it("点击工具调用折叠卡片展开参数和结果", async () => {
     const wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
@@ -214,13 +221,13 @@ describe("Agent 上下文 + 工具调用可见性", () => {
       });
     });
 
-    // 初始状态下详情不应可见
+    // 初始状态下详情不应可见（卡片折叠，条目未渲染）
     const detailBefore = await browser.$(".tool-call-detail");
     expect(await detailBefore.isExisting()).toBe(false);
 
-    // 点击条目展开
-    const entry = await browser.$(".tool-call-entry");
-    await entry.click();
+    // 点击卡片头部展开（T4.1: 折叠卡片整体展开）
+    const cardHeader2 = await browser.$(".tool-call-card-header");
+    await cardHeader2.click();
 
     // 详情应可见
     const detailAfter = await browser.$(".tool-call-detail");
@@ -260,6 +267,11 @@ describe("Agent 上下文 + 工具调用可见性", () => {
         ],
       });
     });
+
+    // 展开工具调用折叠卡片（T4.1: 条目在折叠卡片内，需先展开）
+    const cardHeader3 = await browser.$(".tool-call-card-header");
+    await cardHeader3.click();
+    await browser.pause(200);
 
     const errorEntry = await browser.$(".tool-call-error");
     expect(await errorEntry.isDisplayed()).toBe(true);

@@ -8,6 +8,8 @@
  * - 工具调用条目出现（若 LLM 发出 tool call）
  *
  * 需要有效的 MURASAKI_E2E_API_KEY 环境变量。
+ *
+ * T4.1 更新：工具调用现在在折叠卡片内，需先点击 .tool-call-card-header 展开。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
@@ -99,6 +101,12 @@ describe("Agent LLM 调用循环", () => {
         (err: unknown) => done({ error: String(err) }),
       );
     });
+
+    // 等待工具调用折叠卡片出现并展开（T4.1: 条目在折叠卡片内）
+    const cardHeader = await browser.$(".tool-call-card-header");
+    await cardHeader.waitForExist({ timeout: 10000 });
+    await cardHeader.click();
+    await browser.pause(300);
 
     // 验证有工具调用条目（至少 calling 或 done 状态）
     const toolEntries = await browser.$$(".tool-call-entry");
