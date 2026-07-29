@@ -8,6 +8,10 @@ import {
   toggleCodeBlock,
   insertHorizontalRule,
   insertTable,
+  toggleInline,
+  insertLink,
+  insertImage,
+  getActiveFormats,
   createTestView,
   setSelection,
   getDoc,
@@ -193,4 +197,94 @@ describe("useEditorCommands", () => {
       expect(getDoc(v)).toBe("test");
     });
   });
+
+describe("toggleInline", () => {
+  it("空选区：插入标记对，光标在中间", () => {
+    const v = makeView("ab");
+    setSelection(v, 1);
+    toggleInline(v, "**");
+    expect(getDoc(v)).toBe("a****b");
+  });
+
+  it("有选区：用 ** 包围", () => {
+    const v = makeView("hello");
+    setSelection(v, 0, 5);
+    toggleInline(v, "**");
+    expect(getDoc(v)).toBe("**hello**");
+  });
+
+  it("选区自身被 ** 包围：移除标记", () => {
+    const v = makeView("**hello**");
+    setSelection(v, 0, 9);
+    toggleInline(v, "**");
+    expect(getDoc(v)).toBe("hello");
+  });
+
+  it("选区两侧紧邻 **：移除标记", () => {
+    const v = makeView("**hello**");
+    setSelection(v, 2, 7);
+    toggleInline(v, "**");
+    expect(getDoc(v)).toBe("hello");
+  });
+
+  it("行内代码：用 ` 包围", () => {
+    const v = makeView("code");
+    setSelection(v, 0, 4);
+    toggleInline(v, "`");
+    expect(getDoc(v)).toBe("`code`");
+  });
+});
+
+describe("insertLink", () => {
+  it("插入 [text](url)", () => {
+    const v = makeView("hello");
+    setSelection(v, 0, 5);
+    insertLink(v, "https://example.com", "hello");
+    expect(getDoc(v)).toBe("[hello](https://example.com)");
+  });
+});
+
+describe("insertImage", () => {
+  it("插入 ![alt](url)", () => {
+    const v = makeView("");
+    setSelection(v, 0);
+    insertImage(v, "/img.png", "fig");
+    expect(getDoc(v)).toBe("![fig](/img.png)");
+  });
+});
+
+describe("getActiveFormats", () => {
+  it("光标在 **bold** 内 → bold 激活", () => {
+    const v = makeView("**bold**");
+    setSelection(v, 3);
+    expect(getActiveFormats(v).has("bold")).toBe(true);
+  });
+
+  it("光标在 ## 标题行 → h2 激活", () => {
+    const v = makeView("## title");
+    setSelection(v, 3);
+    const a = getActiveFormats(v);
+    expect(a.has("h2")).toBe(true);
+    expect(a.has("h1")).toBe(false);
+  });
+
+  it("光标在 - [ ] 任务行 → task-list 激活", () => {
+    const v = makeView("- [ ] todo");
+    setSelection(v, 5);
+    expect(getActiveFormats(v).has("task-list")).toBe(true);
+  });
+
+  it("光标在 > 引用行 → blockquote 激活", () => {
+    const v = makeView("> quote");
+    setSelection(v, 3);
+    expect(getActiveFormats(v).has("blockquote")).toBe(true);
+  });
+
+  it("普通文本无激活格式", () => {
+    const v = makeView("plain text");
+    setSelection(v, 3);
+    expect(getActiveFormats(v).size).toBe(0);
+  });
+});
+
 });

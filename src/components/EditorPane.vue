@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import SourceEditor from "./SourceEditor.vue";
+import EditorToolbar from "./EditorToolbar.vue";
 import PreviewPane from "./PreviewPane.vue";
 import { useScrollSync } from "../composables/useScrollSync";
 
@@ -45,6 +46,7 @@ const emit = defineEmits<{
 
 const editorRef = ref<InstanceType<typeof SourceEditor> | null>(null);
 const previewRef = ref<InstanceType<typeof PreviewPane> | null>(null);
+const cursorKey = ref(0);
 
 // 分隔条拖拽
 const dragging = ref(false);
@@ -80,6 +82,7 @@ function onInput(value: string) {
 
 function onCursorChange(payload: { line: number; ch: number }) {
   emit("cursor-change", payload);
+  cursorKey.value++;
 }
 
 // ============ 滚动同步 ============
@@ -182,8 +185,13 @@ defineExpose({
 
 <template>
   <div class="editor-pane">
-    <div
-      class="pane-left"
+    <EditorToolbar
+      :get-view="() => editorRef?.getView() ?? null"
+      :cursor-key="cursorKey"
+    />
+    <div class="editor-split">
+      <div
+        class="pane-left"
       :style="{ width: leftWidthPct + '%' }"
       @dragover="onEditorDragOver"
       @drop="onEditorDrop"
@@ -217,12 +225,14 @@ defineExpose({
         @open-internal="(p) => emit('open-internal', p)"
       />
     </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .editor-pane {
   display: flex;
+  flex-direction: column;
   width: 100%;
   /* 高度由父级 flex 约束；min-height: 0 允许在 flex 容器中正确收缩 */
   flex: 1;
@@ -231,6 +241,14 @@ defineExpose({
   position: relative;
   background: var(--murasaki-background);
 }
+.editor-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
 .pane-left {
   height: 100%;
   overflow: hidden;
