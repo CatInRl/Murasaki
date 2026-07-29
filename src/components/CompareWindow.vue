@@ -339,7 +339,7 @@ function onLocalInput(e: Event): void {
   justify-content: space-between;
   align-items: center;
   padding: 8px 0 12px 0;
-  border-bottom: 1px solid #e8e8e8;
+  border-bottom: 1px solid var(--murasaki-border);
   margin-bottom: 12px;
 }
 .toolbar-label {
@@ -360,19 +360,19 @@ function onLocalInput(e: Event): void {
   vertical-align: middle;
 }
 .legend-equal {
-  background: #f0f0f0;
+  background: var(--murasaki-muted);
 }
 .legend-add {
-  background: #d4f4dd;
-  border: 1px solid #7bd99a;
+  background: rgba(22, 163, 74, 0.15);
+  border: 1px solid rgba(22, 163, 74, 0.5);
 }
 .legend-del {
-  background: #ffe0e0;
-  border: 1px solid #ff9999;
+  background: rgba(220, 38, 38, 0.15);
+  border: 1px solid rgba(220, 38, 38, 0.5);
 }
 .legend-mod {
-  background: #fff3a0;
-  border: 1px solid #d4b300;
+  background: rgba(217, 119, 6, 0.2);
+  border: 1px solid rgba(217, 119, 6, 0.5);
 }
 
 .compare-body {
@@ -386,7 +386,7 @@ function onLocalInput(e: Event): void {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--murasaki-border);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -395,13 +395,13 @@ function onLocalInput(e: Event): void {
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: #fafafa;
-  border-bottom: 1px solid #e8e8e8;
+  background: var(--murasaki-card);
+  border-bottom: 1px solid var(--murasaki-border);
   font-size: 12px;
 }
 .side-title {
   font-weight: 600;
-  color: #24292e;
+  color: var(--murasaki-foreground);
 }
 .side-hint {
   font-size: 11px;
@@ -426,7 +426,7 @@ function onLocalInput(e: Event): void {
   flex-shrink: 0;
   width: 36px;
   text-align: right;
-  color: #999;
+  color: var(--murasaki-muted-foreground);
   padding-right: 8px;
   user-select: none;
 }
@@ -434,33 +434,33 @@ function onLocalInput(e: Event): void {
   flex: 1;
   white-space: pre-wrap;
   word-break: break-all;
-  color: #24292e;
+  color: var(--murasaki-foreground);
 }
 .line-text.placeholder {
-  color: #ccc;
+  color: var(--murasaki-ink-3);
   font-style: italic;
 }
 .row-equal {
   background: transparent;
 }
 .row-external-only {
-  background: #ffe0e0;
+  background: rgba(220, 38, 38, 0.15);
 }
 .row-local-only {
-  background: #d4f4dd;
+  background: rgba(22, 163, 74, 0.15);
 }
 .row-modified {
-  background: #fff3a0;
+  background: rgba(217, 119, 6, 0.2);
 }
 
 .seg-del {
-  background: #ffb3b3;
+  background: rgba(220, 38, 38, 0.3);
   text-decoration: line-through;
-  color: #c00;
+  color: var(--murasaki-state-error);
 }
 .seg-add {
-  background: #a5d8a5;
-  color: #080;
+  background: rgba(22, 163, 74, 0.3);
+  color: var(--murasaki-state-success);
 }
 
 .local-editor {
@@ -473,11 +473,11 @@ function onLocalInput(e: Event): void {
   font-family: "Consolas", "Menlo", monospace;
   font-size: 12px;
   line-height: 1.5;
-  background: #fafafa;
-  color: #24292e;
+  background: var(--murasaki-card);
+  color: var(--murasaki-foreground);
 }
 .local-editor:focus {
-  background: #fff;
+  background: var(--murasaki-background);
 }
 
 .dirty-hint {

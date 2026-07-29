@@ -742,7 +742,7 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
 .settings-nav {
   width: 140px;
   flex-shrink: 0;
-  border-right: 1px solid #e8e8e8;
+  border-right: 1px solid var(--murasaki-border);
   padding: 8px 0;
 }
 .nav-item {
@@ -781,7 +781,7 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
   font-size: 15px;
   font-weight: 600;
   margin: 0 0 16px 0;
-  color: #24292e;
+  color: var(--murasaki-foreground);
 }
 .radio-list {
   display: flex;
@@ -822,7 +822,7 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
 .ai-pane .ai-list {
   width: 200px;
   flex-shrink: 0;
-  border: 1px solid #e8e8e8;
+  border: 1px solid var(--murasaki-border);
   border-radius: 4px;
   overflow: auto;
   max-height: 50vh;
@@ -832,7 +832,7 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--murasaki-border);
   position: sticky;
   top: 0;
   background: #fff;
@@ -857,7 +857,7 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
 .ai-pane .ai-list-item-name {
   font-size: 13px;
   font-weight: 500;
-  color: #24292e;
+  color: var(--murasaki-foreground);
   display: flex;
   align-items: center;
 }
@@ -878,7 +878,7 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
   align-items: center;
   justify-content: center;
   height: 200px;
-  border: 1px dashed #e8e8e8;
+  border: 1px dashed var(--murasaki-border);
   border-radius: 4px;
 }
 .ai-pane .ai-models-list {
@@ -904,7 +904,7 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
 .ai-active-name {
   font-size: 14px;
   font-weight: 600;
-  color: #24292e;
+  color: var(--murasaki-foreground);
   display: flex;
   align-items: center;
 }

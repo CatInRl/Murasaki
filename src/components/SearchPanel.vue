@@ -262,7 +262,7 @@ watch(
       <NScrollbar>
         <div v-if="searchStore.loading" class="results-loading">
           <NSpin size="small" />
-          <span style="margin-left: 8px; font-size: 12px; color: #999">
+          <span style="margin-left: 8px; font-size: 12px; color: var(--murasaki-muted-foreground)">
             搜索中…
           </span>
         </div>
@@ -347,7 +347,7 @@ watch(
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #fff;
+  background: var(--murasaki-background);
 }
 .search-toolbar {
   height: 36px;
@@ -356,7 +356,7 @@ watch(
   align-items: center;
   gap: 8px;
   padding: 0 8px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--murasaki-border);
 }
 .search-input {
   flex: 1;
@@ -374,7 +374,7 @@ watch(
 }
 .search-summary {
   font-size: 11px;
-  color: #999;
+  color: var(--murasaki-muted-foreground);
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -405,10 +405,10 @@ watch(
   justify-content: space-between;
   gap: 8px;
   padding: 4px 12px;
-  background: #fafafa;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--murasaki-card);
+  border-bottom: 1px solid var(--murasaki-border);
   font-size: 12px;
-  color: #555;
+  color: var(--murasaki-ink-2);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -421,8 +421,8 @@ watch(
 }
 .group-count {
   flex-shrink: 0;
-  background: #e8e8e8;
-  color: #666;
+  background: var(--murasaki-muted);
+  color: var(--murasaki-muted-foreground);
   border-radius: 8px;
   padding: 0 6px;
   font-size: 10px;
@@ -436,15 +436,15 @@ watch(
   padding: 2px 12px;
   cursor: pointer;
   font-size: 12px;
-  color: #333;
+  color: var(--murasaki-foreground);
   transition: background 0.1s;
 }
 .match-line:hover {
-  background: rgba(24, 160, 88, 0.08);
+  background: rgba(147, 51, 234, 0.08);
 }
 .line-number {
   flex-shrink: 0;
-  color: #999;
+  color: var(--murasaki-muted-foreground);
   font-family: "Consolas", "Menlo", monospace;
   min-width: 32px;
   text-align: right;
@@ -459,7 +459,7 @@ watch(
   font-family: "Consolas", "Menlo", monospace;
 }
 .match-highlight {
-  background: #fff3a0;
+  background: rgba(147, 51, 234, 0.2);
   color: inherit;
   padding: 0;
   border-radius: 2px;
@@ -468,12 +468,12 @@ watch(
 /* ===== 文件名匹配分组 ===== */
 .filename-group {
   margin-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--murasaki-border);
   padding-bottom: 4px;
 }
 .filename-header {
-  background: #f0f7ff !important;
-  color: #1f6feb !important;
+  background: rgba(147, 51, 234, 0.08) !important;
+  color: var(--murasaki-primary) !important;
   font-weight: 600;
 }
 .filename-line {
@@ -483,11 +483,11 @@ watch(
   padding: 4px 12px;
   cursor: pointer;
   font-size: 12px;
-  color: #333;
+  color: var(--murasaki-foreground);
   transition: background 0.1s;
 }
 .filename-line:hover {
-  background: rgba(24, 160, 88, 0.08);
+  background: rgba(147, 51, 234, 0.08);
 }
 .filename-icon {
   flex-shrink: 0;
@@ -498,7 +498,7 @@ watch(
   flex-shrink: 0;
   font-family: "Consolas", "Menlo", monospace;
   font-weight: 500;
-  color: #24292e;
+  color: var(--murasaki-foreground);
 }
 .filename-path {
   flex: 1;
@@ -506,7 +506,7 @@ watch(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #999;
+  color: var(--murasaki-muted-foreground);
   font-size: 11px;
   font-family: "Consolas", "Menlo", monospace;
 }
