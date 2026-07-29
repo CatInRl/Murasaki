@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { NScrollbar, NEmpty, NSpin } from "naive-ui";
+import { List } from "lucide-vue-next";
+import { NScrollbar } from "naive-ui";
 import type { OutlineItem } from "../types";
+import EmptyState from "./EmptyState.vue";
+import Skeleton from "./Skeleton.vue";
 
 interface Props {
   /** 大纲数据 */
@@ -37,15 +40,12 @@ function normLevel(level: number): number {
     </div>
 
     <NScrollbar class="outline-scroll">
-      <div v-if="loading" class="outline-loading">
-        <NSpin size="small" />
-        <span style="margin-left: 8px; font-size: 12px; color: var(--murasaki-ink-3)">解析中…</span>
-      </div>
-      <NEmpty
+      <Skeleton v-if="loading" :lines="4" />
+      <EmptyState
         v-else-if="items.length === 0"
-        description="无标题"
-        size="small"
-        style="padding: 24px 0"
+        :icon="List"
+        title="无标题"
+        description="本文档暂无标题段落"
       />
       <div v-else class="outline-content">
         <div
@@ -92,14 +92,6 @@ function normLevel(level: number): number {
 .outline-scroll {
   flex: 1;
   min-height: 0;
-}
-.outline-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 0;
-  font-size: 12px;
-  color: var(--murasaki-ink-3);
 }
 .outline-content {
   padding: 6px 0;
