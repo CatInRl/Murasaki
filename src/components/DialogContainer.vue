@@ -5,8 +5,8 @@
  * 单一 Teleport 容器，消费 useDialogStore 的模态栈。
  * 同时只显示一个对话框（queue[0]）。
  *
- * 4 类型：alert / confirm / prompt / conflict
- * 按钮顺序：取消在左，确认在右
+ * 5 类型：alert / confirm / prompt / conflict / unsaved
+ * 按钮顺序：取消在左，确认在右（unsaved 多一个中间"不保存"按钮）
  * Escape 键等同取消；打开时聚焦默认按钮（取消），prompt 聚焦输入框
  */
 import { ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
@@ -137,7 +137,7 @@ function onRenameInput(e: Event): void {
 
           <div class="dialog-body">
             <p
-              v-if="dialog.current.kind === 'alert' || dialog.current.kind === 'confirm'"
+              v-if="dialog.current.kind === 'alert' || dialog.current.kind === 'confirm' || dialog.current.kind === 'unsaved'"
               class="dialog-message"
             >{{ dialog.current.message }}</p>
 
@@ -244,6 +244,29 @@ function onRenameInput(e: Event): void {
                 @click="dialog.conflictOverwrite()"
               >
                 <RotateCw :size="14" />
+                {{ dialog.current.confirmText }}
+              </button>
+            </template>
+
+            <template v-else-if="dialog.current.kind === 'unsaved'">
+              <button
+                ref="cancelBtnRef"
+                class="dialog-btn"
+                @click="dialog.cancelCurrent()"
+              >
+                {{ dialog.current.cancelText }}
+              </button>
+              <button
+                class="dialog-btn"
+                @click="dialog.unsavedDiscard()"
+              >
+                {{ dialog.current.neutralText }}
+              </button>
+              <button
+                ref="confirmBtnRef"
+                class="dialog-btn primary"
+                @click="dialog.unsavedSave()"
+              >
                 {{ dialog.current.confirmText }}
               </button>
             </template>
