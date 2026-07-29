@@ -1,18 +1,20 @@
 /**
- * WYSIWYG decoration computation — pure function (Ticket #72 / T7.1).
+ * WYSIWYG decoration computation — pure function (Ticket #72 / T7.1, #76 / T7.2).
  *
- * 给定 markdown 文本 + 光标位置 + 语法树，计算出 WYSIWYG 所需的 decoration 描述符集合。
- * 该函数不依赖 CodeMirror Decoration 对象，返回可序列化的描述符，便于单元测试断言。
+ * T7.1：行级标记 hide/dim + 列表 bullet / 分隔线 hr widget + 引用块左边框。
+ * T7.2：块级 widget —— 代码块 Shiki 高亮 / 链接锚文本 / 图片渲染 / 表格对齐 /
+ *       数学公式 KaTeX / Mermaid SVG。光标离开当前段 → widget 替换渲染；
+ *       光标进入当前段 → dim 标记，显示原始 markdown 可编辑。
  *
  * 光标行为（ADR-0008）：
  * - 光标在当前段（空行分隔的连续非空行）→ 标记 dim（opacity:0.4 + 缩小）
  * - 光标离开当前段 → 标记 hide（display:none）；列表标记/分隔线替换为 widget
+ * - 块级元素（代码块/链接/图片/表格/数学/Mermaid）离开段 → 整体替换为渲染 widget
  *
- * P0 范围：行级标记（HeaderMark/EmphasisMark/CodeMark/QuoteMark/ListMark/TaskMarker）+ 分隔线/列表 bullet widget + 引用块左边框。
- * LinkMark 故意不在此处隐藏 —— 链接渲染是 T7.2（块级 widget），P0 隐藏 `[]()` 会留下 URL 残留，体验残缺。
- * 代码块（FencedCode/CodeBlock）整体不下降，其 ``` 反引号不隐藏（代码块 widget 是 T7.2）。
+ * 该函数不依赖 CodeMirror Decoration 对象，返回可序列化的描述符，便于单元测试断言。
+ * 块级 widget 的实际 DOM 渲染（Shiki/KaTeX/Mermaid/markdown-it 表格）在 wysiwygPlugin.ts 中完成。
  */
-import type { Tree } from "@lezer/common";
+import type { Tree, SyntaxNode } from "@lezer/common";
 
 /** 行级语法标记节点名。命中即应用 hide/dim。 */
 const INLINE_MARK_TYPES = new Set([
@@ -23,6 +25,8 @@ const INLINE_MARK_TYPES = new Set([
   "QuoteMark",
   "ListMark",
   "TaskMarker",
+  "LinkMark", // T7.2: 链接/图片的 []() 标记
+  "TableDelimiter", // T7.2: 表格管道符
 ]);
 
 /** 无序列表标记首字符（- * +）。有序列表（1. a.）保持可见，不替换为 bullet。 */
@@ -62,7 +66,76 @@ export interface RenderDeco {
   cssClass: string;
 }
 
-export type ComputedDeco = MarkDeco | WidgetDeco | RenderDeco;
+// ===== T7.2 块级 widget 描述符 =====
+
+/** 代码块 widget：替换整个 FencedCode/CodeBlock，由 wysiwygPlugin 用 Shiki 高亮渲染。 */
+export interface CodeBlockWidgetDeco {
+  type: "blockWidget";
+  widget: "codeBlock";
+  from: number;
+  to: number;
+  lang: string;
+  code: string;
+}
+
+/** Mermaid widget：替换 ```mermaid 代码块，由 wysiwygPlugin 用 mermaid.js 异步渲染 SVG。 */
+export interface MermaidWidgetDeco {
+  type: "blockWidget";
+  widget: "mermaid";
+  from: number;
+  to: number;
+  code: string;
+}
+
+/** 链接 widget：替换 [text](url)，渲染为蓝色下划线锚文本。 */
+export interface LinkWidgetDeco {
+  type: "blockWidget";
+  widget: "link";
+  from: number;
+  to: number;
+  text: string;
+  url: string;
+}
+
+/** 图片 widget：替换 ![alt](url)，渲染为实际 <img>。 */
+export interface ImageWidgetDeco {
+  type: "blockWidget";
+  widget: "image";
+  from: number;
+  to: number;
+  alt: string;
+  url: string;
+}
+
+/** 表格 widget：替换 Table 节点，由 wysiwygPlugin 用 markdown-it 渲染对齐表格 HTML。 */
+export interface TableWidgetDeco {
+  type: "blockWidget";
+  widget: "table";
+  from: number;
+  to: number;
+  /** 原始 markdown 表格片段（含管道符与对齐分隔行）。 */
+  source: string;
+}
+
+/** 数学公式 widget：替换 $...$ / $$...$$，由 wysiwygPlugin 用 KaTeX 渲染。 */
+export interface MathWidgetDeco {
+  type: "blockWidget";
+  widget: "math";
+  from: number;
+  to: number;
+  expr: string;
+  displayMode: boolean;
+}
+
+export type BlockWidgetDeco =
+  | CodeBlockWidgetDeco
+  | MermaidWidgetDeco
+  | LinkWidgetDeco
+  | ImageWidgetDeco
+  | TableWidgetDeco
+  | MathWidgetDeco;
+
+export type ComputedDeco = MarkDeco | WidgetDeco | RenderDeco | BlockWidgetDeco;
 
 export interface ComputeInput {
   /** 完整 markdown 文本。 */
@@ -137,6 +210,77 @@ function inViewport(
   return nodeTo >= viewport.from && nodeFrom <= viewport.to;
 }
 
+/** 判断 [from,to] 是否落在任一代码范围内（用于排除数学公式匹配）。 */
+function inAnyCodeRange(
+  from: number,
+  to: number,
+  codeRanges: Array<{ from: number; to: number }>
+): boolean {
+  for (const r of codeRanges) {
+    if (from >= r.from && to <= r.to) return true;
+  }
+  return false;
+}
+
+/** 从 FencedCode 节点提取语言与代码文本。 */
+function extractFencedCode(node: SyntaxNode, doc: string): { lang: string; code: string } {
+  const infoNode = node.getChild("CodeInfo");
+  const lang = infoNode ? doc.slice(infoNode.from, infoNode.to).trim() : "";
+  const codeTextNode = node.getChild("CodeText");
+  const code = codeTextNode ? doc.slice(codeTextNode.from, codeTextNode.to) : "";
+  return { lang, code };
+}
+
+/** 从 Link/Image 节点提取锚文本与 URL（仅行内式 `[text](url)` 能提取）。 */
+function extractAnchorData(
+  node: SyntaxNode,
+  doc: string
+): { text: string; url: string } | null {
+  const marks = node.getChildren("LinkMark");
+  if (marks.length < 2) return null;
+  const text = doc.slice(marks[0].to, marks[1].from);
+  const urlNode = node.getChild("URL");
+  const url = urlNode ? doc.slice(urlNode.from, urlNode.to) : "";
+  return { text, url };
+}
+
+interface MathRange {
+  from: number;
+  to: number;
+  expr: string;
+  displayMode: boolean;
+}
+
+/**
+ * 正则扫描数学公式范围（@codemirror/lang-markdown 默认不解析 $...$）。
+ * 先匹配 $$...$$（displayMode=true），再匹配 $...$（displayMode=false），
+ * 跳过已落在代码范围内的匹配（避免代码块/行内代码内的 $ 被误判）。
+ */
+function findMathRanges(
+  doc: string,
+  codeRanges: Array<{ from: number; to: number }>
+): MathRange[] {
+  const result: MathRange[] = [];
+  const displayRe = /\$\$([\s\S]+?)\$\$/g;
+  let m: RegExpExecArray | null;
+  while ((m = displayRe.exec(doc)) !== null) {
+    const from = m.index;
+    const to = m.index + m[0].length;
+    if (inAnyCodeRange(from, to, codeRanges)) continue;
+    result.push({ from, to, expr: m[1], displayMode: true });
+  }
+  const inlineRe = /\$([^\$\n]+?)\$/g;
+  while ((m = inlineRe.exec(doc)) !== null) {
+    const from = m.index;
+    const to = m.index + m[0].length;
+    if (inAnyCodeRange(from, to, codeRanges)) continue;
+    // 跳过与 display math 重叠的
+    if (result.some((r) => r.from <= from && r.to >= to)) continue;
+    result.push({ from, to, expr: m[1], displayMode: false });
+  }
+  return result;
+}
+
 /**
  * 纯函数：给定 markdown 文本 + 光标 + 语法树 → WYSIWYG decoration 描述符集合。
  *
@@ -146,13 +290,97 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   const { doc, selectionHead, tree, proposalRanges, viewport } = input;
   const para = getParagraphRange(doc, selectionHead);
   const decos: ComputedDeco[] = [];
+  /** 代码范围（FencedCode/CodeBlock/InlineCode），用于排除数学公式匹配。 */
+  const codeRanges: Array<{ from: number; to: number }> = [];
 
   tree.iterate({
     enter(ref) {
       const { name, from, to } = ref;
 
-      // 代码块整体不下降：其 ``` 反引号不隐藏（代码块 widget 是 T7.2）
-      if (name === "FencedCode" || name === "CodeBlock") return false;
+      // 行内代码：仅记录范围（用于排除数学公式）
+      if (name === "InlineCode") {
+        codeRanges.push({ from, to });
+        return;
+      }
+
+      // 代码块（围栏 / 缩进）：块级 widget
+      if (name === "FencedCode" || name === "CodeBlock") {
+        codeRanges.push({ from, to });
+        if (!inViewport(from, to, viewport)) return false;
+        if (overlapsAnyProposal(from, to, proposalRanges)) return false;
+
+        const inParagraph = to >= para.from && from <= para.to;
+        if (inParagraph) {
+          // 光标在代码块内：围栏 CodeMark 走默认 dim（继续遍历子节点）
+          return true;
+        }
+        // 光标离开：整体替换为 widget
+        if (name === "FencedCode") {
+          const { lang, code } = extractFencedCode(ref.node, doc);
+          if (lang.toLowerCase() === "mermaid") {
+            decos.push({ type: "blockWidget", widget: "mermaid", from, to, code });
+          } else {
+            decos.push({ type: "blockWidget", widget: "codeBlock", from, to, lang, code });
+          }
+        } else {
+          // 缩进代码块：整体作为代码（无语言）
+          const code = doc.slice(from, to);
+          decos.push({ type: "blockWidget", widget: "codeBlock", from, to, lang: "", code });
+        }
+        return false; // 不进入子节点（围栏 CodeMark 不再单独生成 mark deco）
+      }
+
+      // 链接 / 图片：行内 widget
+      if (name === "Link" || name === "Image") {
+        if (!inViewport(from, to, viewport)) return;
+        if (overlapsAnyProposal(from, to, proposalRanges)) return;
+
+        const inParagraph = to >= para.from && from <= para.to;
+        if (inParagraph) {
+          // 光标在段内：LinkMark 走默认 dim（继续遍历子节点）
+          return;
+        }
+        const data = extractAnchorData(ref.node, doc);
+        if (!data || !data.url) {
+          // 引用式链接等无法提取 URL → 保持原样（继续遍历，LinkMark dim）
+          return;
+        }
+        if (name === "Link") {
+          decos.push({
+            type: "blockWidget",
+            widget: "link",
+            from,
+            to,
+            text: data.text,
+            url: data.url,
+          });
+        } else {
+          decos.push({
+            type: "blockWidget",
+            widget: "image",
+            from,
+            to,
+            alt: data.text,
+            url: data.url,
+          });
+        }
+        return false; // 不进入子节点
+      }
+
+      // 表格：块级 widget
+      if (name === "Table") {
+        if (!inViewport(from, to, viewport)) return false;
+        if (overlapsAnyProposal(from, to, proposalRanges)) return false;
+
+        const inParagraph = to >= para.from && from <= para.to;
+        if (inParagraph) {
+          // 光标在表格内：TableDelimiter 走默认 dim（继续遍历子节点）
+          return true;
+        }
+        const source = doc.slice(from, to);
+        decos.push({ type: "blockWidget", widget: "table", from, to, source });
+        return false; // 不进入子节点
+      }
 
       // 行级标记：hide / dim
       if (INLINE_MARK_TYPES.has(name)) {
@@ -209,6 +437,23 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       }
     },
   });
+
+  // 数学公式：正则扫描（语法树不解析 $...$）
+  const mathRanges = findMathRanges(doc, codeRanges);
+  for (const mr of mathRanges) {
+    if (!inViewport(mr.from, mr.to, viewport)) continue;
+    if (overlapsAnyProposal(mr.from, mr.to, proposalRanges)) continue;
+    const inParagraph = mr.to >= para.from && mr.from <= para.to;
+    if (inParagraph) continue; // 光标在段内：显示原始 markdown（可编辑）
+    decos.push({
+      type: "blockWidget",
+      widget: "math",
+      from: mr.from,
+      to: mr.to,
+      expr: mr.expr,
+      displayMode: mr.displayMode,
+    });
+  }
 
   decos.sort((a, b) => a.from - b.from || a.to - b.to);
   return decos;

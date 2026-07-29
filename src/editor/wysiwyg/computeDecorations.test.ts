@@ -10,11 +10,12 @@ import {
   type MarkDeco,
   type WidgetDeco,
   type RenderDeco,
+  type BlockWidgetDeco,
   type ComputeInput,
 } from "./computeDecorations";
 
 /**
- * 用 markdownLanguage（GFM 扩展）解析，确保 TaskMarker / Strikethrough 节点存在。
+ * 用 markdownLanguage（GFM 扩展）解析，确保 TaskMarker / Strikethrough / Table 节点存在。
  * computeDecorations 与具体解析器无关，只按节点名遍历。
  */
 function treeOf(doc: string): Tree {
@@ -57,6 +58,8 @@ const replaces = (d: ComputedDeco[]): WidgetDeco[] =>
   d.filter((x): x is WidgetDeco => x.type === "replace");
 const renders = (d: ComputedDeco[]): RenderDeco[] =>
   d.filter((x): x is RenderDeco => x.type === "render");
+const blockWidgets = (d: ComputedDeco[]): BlockWidgetDeco[] =>
+  d.filter((x): x is BlockWidgetDeco => x.type === "blockWidget");
 
 // ===== getParagraphRange =====
 
@@ -158,10 +161,10 @@ describe("computeDecorations — 行内代码", () => {
     expect(cm.every((m) => m.kind === "dim")).toBe(true);
   });
 
-  it("代码块（FencedCode）的 ``` 反引号不隐藏", () => {
+  it("代码块（FencedCode）的 ``` 反引号不单独隐藏（整体替换为 widget）", () => {
     const doc = "```js\nconsole.log(1)\n```\n\nbody";
     const d = compute(doc, 30); // 光标在 body
-    // FencedCode 内的 CodeMark 不应产生 decoration
+    // FencedCode 整体替换为 codeBlock widget，内部 CodeMark 不再单独生成 mark deco
     const cm = marks(d).filter((m) => m.markType === "CodeMark");
     expect(cm).toHaveLength(0);
   });
@@ -289,5 +292,204 @@ describe("computeDecorations — 排序", () => {
       const b = d[i];
       expect(a.from < b.from || (a.from === b.from && a.to <= b.to)).toBe(true);
     }
+  });
+});
+
+// ===== T7.2：代码块 widget =====
+
+describe("computeDecorations — 代码块 widget (T7.2)", () => {
+  it("```js 代码块光标离开 → codeBlock widget 替换（携带 lang/code）", () => {
+    const doc = "```js\nconsole.log(1)\n```\n\nbody";
+    const d = compute(doc, 30); // 光标在 body
+    const cb = blockWidgets(d).filter((w) => w.widget === "codeBlock");
+    expect(cb).toHaveLength(1);
+    expect(cb[0].lang).toBe("js");
+    expect(cb[0].code).toBe("console.log(1)");
+  });
+
+  it("光标在代码块内 → 围栏 CodeMark dim，不生成 widget", () => {
+    const doc = "```js\nconsole.log(1)\n```\n\nbody";
+    const d = compute(doc, 10); // 光标在代码块内
+    expect(blockWidgets(d).filter((w) => w.widget === "codeBlock")).toHaveLength(0);
+    const cm = marks(d).filter((m) => m.markType === "CodeMark");
+    expect(cm.length).toBeGreaterThanOrEqual(1);
+    expect(cm.every((m) => m.kind === "dim")).toBe(true);
+  });
+
+  it("```mermaid 代码块光标离开 → mermaid widget（非 codeBlock）", () => {
+    const doc = "```mermaid\ngraph LR\nA-->B\n```\n\nbody";
+    const d = compute(doc, 35);
+    const mw = blockWidgets(d).filter((w) => w.widget === "mermaid");
+    expect(mw).toHaveLength(1);
+    expect(mw[0].code).toContain("graph LR");
+    // 不应同时生成 codeBlock
+    expect(blockWidgets(d).filter((w) => w.widget === "codeBlock")).toHaveLength(0);
+  });
+
+  it("无语言围栏代码块 → codeBlock widget lang 为空", () => {
+    const doc = "```\nplain\n```\n\nbody";
+    const d = compute(doc, 20);
+    const cb = blockWidgets(d).filter((w) => w.widget === "codeBlock");
+    expect(cb).toHaveLength(1);
+    expect(cb[0].lang).toBe("");
+    expect(cb[0].code).toBe("plain");
+  });
+});
+
+// ===== T7.2：链接 widget =====
+
+describe("computeDecorations — 链接 widget (T7.2)", () => {
+  it("[text](url) 光标离开 → link widget（携带 text/url）", () => {
+    const doc = "[text](https://example.com)\n\nbody";
+    const d = compute(doc, 30);
+    const lw = blockWidgets(d).filter((w) => w.widget === "link");
+    expect(lw).toHaveLength(1);
+    expect(lw[0].text).toBe("text");
+    expect(lw[0].url).toBe("https://example.com");
+  });
+
+  it("光标在链接段内 → LinkMark dim，不生成 widget", () => {
+    const doc = "[text](https://example.com)\n\nbody";
+    const d = compute(doc, 5);
+    expect(blockWidgets(d).filter((w) => w.widget === "link")).toHaveLength(0);
+    const lm = marks(d).filter((m) => m.markType === "LinkMark");
+    expect(lm.length).toBeGreaterThan(0);
+    expect(lm.every((m) => m.kind === "dim")).toBe(true);
+  });
+
+  it("链接 URL 含特殊字符仍能正确提取", () => {
+    const doc = "[docs](https://x.com/a?b=1&c=2)\n\nbody";
+    const d = compute(doc, 35);
+    const lw = blockWidgets(d).filter((w) => w.widget === "link");
+    expect(lw).toHaveLength(1);
+    expect(lw[0].url).toBe("https://x.com/a?b=1&c=2");
+  });
+});
+
+// ===== T7.2：图片 widget =====
+
+describe("computeDecorations — 图片 widget (T7.2)", () => {
+  it("![alt](url) 光标离开 → image widget（携带 alt/url）", () => {
+    const doc = "![alt](https://example.com/x.png)\n\nbody";
+    const d = compute(doc, 40);
+    const iw = blockWidgets(d).filter((w) => w.widget === "image");
+    expect(iw).toHaveLength(1);
+    expect(iw[0].alt).toBe("alt");
+    expect(iw[0].url).toBe("https://example.com/x.png");
+  });
+
+  it("光标在图片段内 → 不生成 widget", () => {
+    const doc = "![alt](https://example.com/x.png)\n\nbody";
+    const d = compute(doc, 5);
+    expect(blockWidgets(d).filter((w) => w.widget === "image")).toHaveLength(0);
+  });
+});
+
+// ===== T7.2：表格 widget =====
+
+describe("computeDecorations — 表格 widget (T7.2)", () => {
+  it("表格光标离开 → table widget（携带 source）", () => {
+    const doc = "| a | b |\n|---|---|\n| 1 | 2 |\n\nbody";
+    const d = compute(doc, 35);
+    const tw = blockWidgets(d).filter((w) => w.widget === "table");
+    expect(tw).toHaveLength(1);
+    expect(tw[0].source).toContain("| a | b |");
+    expect(tw[0].source).toContain("|---|---|");
+  });
+
+  it("光标在表格内 → TableDelimiter dim，不生成 widget", () => {
+    const doc = "| a | b |\n|---|---|\n| 1 | 2 |\n\nbody";
+    const d = compute(doc, 3);
+    expect(blockWidgets(d).filter((w) => w.widget === "table")).toHaveLength(0);
+    const td = marks(d).filter((m) => m.markType === "TableDelimiter");
+    expect(td.length).toBeGreaterThan(0);
+    expect(td.every((m) => m.kind === "dim")).toBe(true);
+  });
+});
+
+// ===== T7.2：数学公式 widget =====
+
+describe("computeDecorations — 数学公式 widget (T7.2)", () => {
+  it("行内 $a^2$ 光标离开 → math widget (displayMode=false)", () => {
+    const doc = "inline $a^2$ math\n\nbody";
+    const d = compute(doc, 20);
+    const mw = blockWidgets(d).filter((w) => w.widget === "math");
+    expect(mw).toHaveLength(1);
+    expect(mw[0].expr).toBe("a^2");
+    expect(mw[0].displayMode).toBe(false);
+  });
+
+  it("块级 $$...$$ 光标离开 → math widget (displayMode=true)", () => {
+    const doc = "block:\n\n$$a + b$$\n\nbody";
+    const d = compute(doc, 22);
+    const mw = blockWidgets(d).filter((w) => w.widget === "math");
+    expect(mw).toHaveLength(1);
+    expect(mw[0].displayMode).toBe(true);
+    expect(mw[0].expr).toBe("a + b");
+  });
+
+  it("代码块内的 $ 不被误判为数学公式", () => {
+    const doc = "```js\nconst $ = dollar\n```\n\nbody";
+    const d = compute(doc, 35);
+    expect(blockWidgets(d).filter((w) => w.widget === "math")).toHaveLength(0);
+  });
+
+  it("行内代码内的 $ 不被误判为数学公式", () => {
+    const doc = "price `$5` here\n\nbody";
+    const d = compute(doc, 20);
+    expect(blockWidgets(d).filter((w) => w.widget === "math")).toHaveLength(0);
+  });
+
+  it("光标在数学公式段内 → 不生成 widget（显示原始 markdown）", () => {
+    const doc = "inline $a^2$ math\n\nbody";
+    const d = compute(doc, 10);
+    expect(blockWidgets(d).filter((w) => w.widget === "math")).toHaveLength(0);
+  });
+
+  it("多个行内公式都被识别", () => {
+    const doc = "$a$ and $b$\n\nbody";
+    const d = compute(doc, 15);
+    expect(blockWidgets(d).filter((w) => w.widget === "math")).toHaveLength(2);
+  });
+});
+
+// ===== T7.2：提案优先级（块级 widget） =====
+
+describe("computeDecorations — T7.2 提案优先级", () => {
+  it("提案覆盖的代码块不替换为 widget", () => {
+    const doc = "```js\nconsole.log(1)\n```\n\nbody";
+    const d = compute(doc, 30, [{ from: 0, to: 24 }]);
+    expect(blockWidgets(d).filter((w) => w.widget === "codeBlock")).toHaveLength(0);
+  });
+
+  it("提案覆盖的链接不替换为 widget", () => {
+    const doc = "[text](https://example.com)\n\nbody";
+    const d = compute(doc, 30, [{ from: 0, to: 27 }]);
+    expect(blockWidgets(d).filter((w) => w.widget === "link")).toHaveLength(0);
+  });
+
+  it("提案覆盖的表格不替换为 widget", () => {
+    const doc = "| a | b |\n|---|---|\n| 1 | 2 |\n\nbody";
+    const d = compute(doc, 35, [{ from: 0, to: 29 }]);
+    expect(blockWidgets(d).filter((w) => w.widget === "table")).toHaveLength(0);
+  });
+
+  it("提案覆盖的数学公式不替换为 widget", () => {
+    const doc = "inline $a^2$ math\n\nbody";
+    const d = compute(doc, 20, [{ from: 7, to: 12 }]);
+    expect(blockWidgets(d).filter((w) => w.widget === "math")).toHaveLength(0);
+  });
+});
+
+// ===== T7.2：视口裁剪（块级 widget） =====
+
+describe("computeDecorations — T7.2 视口裁剪", () => {
+  it("视口外的代码块 widget 被跳过", () => {
+    const doc = "```js\na\n```\n\n```ts\nb\n```";
+    // 第一个代码块 [0,11)，第二个 [13,24)；视口只覆盖后半
+    const d = computeWithViewport(doc, 0, { from: 13, to: 24 });
+    const cb = blockWidgets(d).filter((w) => w.widget === "codeBlock");
+    expect(cb).toHaveLength(1);
+    expect(cb[0].from).toBeGreaterThanOrEqual(13);
   });
 });
