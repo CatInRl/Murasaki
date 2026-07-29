@@ -253,7 +253,7 @@ describe("Agent 上下文 + 工具调用可见性", () => {
             name: "get_outline",
             arguments: "{}",
             status: "error",
-            summary: "✗ No file path",
+            summary: "No file path",
             result: { ok: false, error: "No file path" },
             parsedArgs: {},
           },
@@ -266,7 +266,7 @@ describe("Agent 上下文 + 工具调用可见性", () => {
 
     const summary = await browser.$(".tool-call-error .tool-call-summary");
     const text = (await summary.getText()).trim();
-    expect(text).toContain("✗");
+    expect(text).toContain("No file path");
   });
 
   it("非法 arguments 时工具结果含 invalid_json 错误", async () => {

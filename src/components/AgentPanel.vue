@@ -5,6 +5,16 @@
  * Ticket #20: 面板 + 循环骨架 + 单轮对话 + 流式 + 取消 + 无工作区禁用
  */
 import { ref, computed, watch, nextTick, onMounted } from "vue";
+import {
+  AlertTriangle,
+  Paperclip,
+  Wrench,
+  FilePlus,
+  Plus,
+  RotateCw,
+  Check,
+  X,
+} from "lucide-vue-next";
 import { useAgentStore } from "../stores/useAgentStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useAiProvidersStore } from "../stores/useAiProvidersStore";
@@ -199,7 +209,7 @@ onMounted(() => {
       class="agent-token-warning agent-token-danger"
       title="累计 prompt token 已超过软限制，建议清空对话"
     >
-      <span class="token-warning-icon">⚠</span>
+      <AlertTriangle :size="12" class="token-warning-icon" />
       <span class="token-warning-text">
         累计 {{ agent.cumulativeTokens }} / {{ agent.tokenLimit }} tokens，已超限
       </span>
@@ -220,7 +230,7 @@ onMounted(() => {
       class="agent-compression-badge"
       title="已应用上下文压缩"
     >
-      <span>🗜</span>
+      <Paperclip :size="12" />
       <span v-if="agent.lastCompression.layer1Applied">L1·</span>
       <span v-if="agent.lastCompression.layer2Applied">L2·</span>
       <span v-if="agent.lastCompression.truncated">截断·</span>
@@ -296,7 +306,7 @@ onMounted(() => {
           >
             {{ msg.content }}
             <span v-if="msg.interrupted" class="agent-interrupted-tag">
-              ⚠ 已中断
+              <AlertTriangle :size="11" /> 已中断
             </span>
           </div>
 
@@ -317,7 +327,7 @@ onMounted(() => {
               @click="toggleToolCall(tc.id)"
             >
               <div class="tool-call-header">
-                <span class="tool-call-icon">🔧</span>
+                <Wrench :size="10" class="tool-call-icon" />
                 <span class="tool-call-name">{{ tc.name }}</span>
                 <span class="tool-call-summary">
                   {{ tc.status === "calling" ? "调用中..." : tc.summary }}
@@ -403,7 +413,7 @@ onMounted(() => {
           }"
           @click="p.status === 'pending' && proposals.jumpToProposal(p.id)"
         >
-          <span class="proposal-item-icon">{{ p.type === 'insert' ? '＋' : '↻' }}</span>
+          <span class="proposal-item-icon"><Plus v-if="p.type === 'insert'" :size="11" /><RotateCw v-else :size="11" /></span>
           <span class="proposal-item-label">{{ p.label }}</span>
           <span class="proposal-item-meta">{{ p.lineCount }} 行</span>
           <template v-if="p.status === 'pending'">
@@ -411,16 +421,16 @@ onMounted(() => {
               class="proposal-item-btn proposal-item-accept"
               title="接受"
               @click.stop="proposals.acceptProposal(p.id)"
-            >✓</button>
+            ><Check :size="11" /></button>
             <button
               class="proposal-item-btn proposal-item-reject"
               title="拒绝"
               @click.stop="proposals.rejectProposal(p.id)"
-            >✗</button>
+            ><X :size="11" /></button>
           </template>
           <span v-else-if="p.status === 'accepted'" class="proposal-item-status">已接受</span>
           <span v-else-if="p.status === 'rejected'" class="proposal-item-status">已拒绝</span>
-          <span v-else-if="p.status === 'expired'" class="proposal-item-status">⚠ 已过期</span>
+          <span v-else-if="p.status === 'expired'" class="proposal-item-status"><AlertTriangle :size="10" /> 已过期</span>
         </div>
       </div>
 
@@ -449,7 +459,7 @@ onMounted(() => {
           }"
         >
           <div class="newfile-card-header">
-            <span class="newfile-card-icon">📄</span>
+            <FilePlus :size="12" class="newfile-card-icon" />
             <span class="newfile-card-label" :title="nf.label">{{ nf.label }}</span>
             <span class="newfile-card-meta">{{ nf.lineCount }} 行</span>
           </div>
@@ -462,18 +472,18 @@ onMounted(() => {
                 class="newfile-btn newfile-btn-reject"
                 title="拒绝"
                 @click="proposals.rejectNewFileProposal(nf.id)"
-              >✗ 拒绝</button>
+              ><X :size="11" /> 拒绝</button>
               <button
                 class="newfile-btn newfile-btn-accept"
                 title="接受并创建文件"
                 @click="proposals.acceptNewFileProposal(nf.id)"
-              >✓ 接受</button>
+              ><Check :size="11" /> 接受</button>
             </div>
           </template>
 
           <!-- written 状态：显示已写入路径 -->
           <div v-else-if="nf.status === 'written'" class="newfile-card-status newfile-status-written">
-            ✓ 已创建
+            <Check :size="11" /> 已创建
             <span v-if="nf.writtenPath" class="newfile-written-path" :title="nf.writtenPath">
               {{ nf.writtenPath }}
             </span>
@@ -481,20 +491,20 @@ onMounted(() => {
 
           <!-- rejected 状态 -->
           <div v-else-if="nf.status === 'rejected'" class="newfile-card-status newfile-status-rejected">
-            ✗ 已拒绝
+            <X :size="11" /> 已拒绝
           </div>
 
           <!-- error 状态：显示错误信息 + 重试按钮 -->
           <template v-else-if="nf.status === 'error'">
             <div class="newfile-card-status newfile-status-error" :title="nf.error">
-              ⚠ {{ nf.error }}
+              <AlertTriangle :size="11" /> {{ nf.error }}
             </div>
             <div class="newfile-card-actions">
               <button
                 class="newfile-btn newfile-btn-retry"
                 title="重试"
                 @click="proposals.acceptNewFileProposal(nf.id)"
-              >↻ 重试</button>
+              ><RotateCw :size="11" /> 重试</button>
             </div>
           </template>
         </div>

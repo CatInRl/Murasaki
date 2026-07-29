@@ -126,7 +126,7 @@ describe("agent tools registry", () => {
       const { result, summary } = await executeTool("get_current_document", "{}", ctx);
       expect(result.ok).toBe(false);
       expect(result.error).toBe("No active editor");
-      expect(summary).toContain("✗");
+      expect(summary).toContain(result.error);
     });
 
     it("返回文档内容、路径、光标、frontmatter", async () => {
@@ -250,7 +250,7 @@ describe("agent tools registry", () => {
       const { result, summary } = await executeTool("get_outline", "{}", ctx);
       expect(result.ok).toBe(false);
       expect(result.error).toContain("No file path");
-      expect(summary).toContain("✗");
+      expect(summary).toContain(result.error);
     });
 
     it("成功返回大纲", async () => {
@@ -283,7 +283,7 @@ describe("agent tools registry", () => {
       const { result, summary } = await executeTool("list_files", "{}", ctx);
       expect(result.ok).toBe(false);
       expect(result.error).toBe("No workspace open");
-      expect(summary).toContain("✗");
+      expect(summary).toContain(result.error);
     });
 
     it("成功返回文件列表", async () => {
@@ -526,7 +526,7 @@ describe("agent tools registry", () => {
       );
       expect(result.ok).toBe(false);
       expect(result.error).toBe("No workspace open");
-      expect(summary).toContain("✗");
+      expect(summary).toContain(result.error);
     });
 
     it("缺少 path 参数返回错误", async () => {

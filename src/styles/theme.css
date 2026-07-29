@@ -338,7 +338,7 @@ body,
   color: #166534;
 }
 
-/* Floating ✓/✗ buttons */
+/* Floating accept/reject buttons */
 .cm-proposal-buttons {
   display: inline-flex;
   gap: 2px;

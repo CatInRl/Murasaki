@@ -117,7 +117,7 @@ const getCurrentDocument: ToolDef = {
     };
   },
   summarize(result: ToolResult): string {
-    if (!result.ok) return `✗ ${result.error}`;
+    if (!result.ok) return result.error ?? "未知错误";
     const data = result.data as { content?: string; truncated?: boolean };
     const len = data.content?.length ?? 0;
     return data.truncated ? `已获取 ${len}+ 字符（截断）` : `已获取 ${len} 字符`;
@@ -152,7 +152,7 @@ const getSelection: ToolDef = {
     return { ok: true, data: { from: sel.from, to: sel.to, text } };
   },
   summarize(result: ToolResult): string {
-    if (!result.ok) return `✗ ${result.error}`;
+    if (!result.ok) return result.error ?? "未知错误";
     if (result.data === null) return "无选区";
     const data = result.data as { text?: string };
     return `已获取 ${data.text?.length ?? 0} 字符选区`;
@@ -217,7 +217,7 @@ const getVisibleRange: ToolDef = {
     return { ok: true, data: { fromLine, toLine } };
   },
   summarize(result: ToolResult): string {
-    if (!result.ok) return `✗ ${result.error}`;
+    if (!result.ok) return result.error ?? "未知错误";
     const data = result.data as { fromLine?: number; toLine?: number };
     return `L${data.fromLine}-${data.toLine}`;
   },
@@ -250,7 +250,7 @@ const getOutline: ToolDef = {
     }
   },
   summarize(result: ToolResult): string {
-    if (!result.ok) return `✗ ${result.error}`;
+    if (!result.ok) return result.error ?? "未知错误";
     const items = result.data as unknown[];
     return `${items?.length ?? 0} 个标题`;
   },
@@ -283,7 +283,7 @@ const listFiles: ToolDef = {
     }
   },
   summarize(result: ToolResult): string {
-    if (!result.ok) return `✗ ${result.error}`;
+    if (!result.ok) return result.error ?? "未知错误";
     const data = result.data as { files?: string[] };
     return `${data.files?.length ?? 0} 个文件`;
   },
@@ -332,7 +332,7 @@ const readFile: ToolDef = {
     }
   },
   summarize(result: ToolResult): string {
-    if (!result.ok) return `✗ ${result.error}`;
+    if (!result.ok) return result.error ?? "未知错误";
     const data = result.data as { contentLength?: number; truncated?: boolean };
     const len = data.contentLength ?? 0;
     return data.truncated ? `${len}+ 字符（截断）` : `${len} 字符`;
@@ -394,7 +394,7 @@ const searchAcrossFiles: ToolDef = {
     }
   },
   summarize(result: ToolResult): string {
-    if (!result.ok) return `✗ ${result.error}`;
+    if (!result.ok) return result.error ?? "未知错误";
     const data = result.data as { totalHits?: number; truncated?: boolean };
     const total = data.totalHits ?? 0;
     return data.truncated ? `${total}+ 命中（截断）` : `${total} 命中`;
@@ -476,7 +476,7 @@ const proposeInsert: ToolDef = {
     }
   },
   summarize(result: ToolResult): string {
-    if (!result.ok) return `✗ ${result.error}`;
+    if (!result.ok) return result.error ?? "未知错误";
     const data = result.data as { lineCount?: number };
     return `插入 ${data.lineCount ?? 0} 行`;
   },
@@ -574,7 +574,7 @@ const proposeReplace: ToolDef = {
     }
   },
   summarize(result: ToolResult): string {
-    if (!result.ok) return `✗ ${result.error}`;
+    if (!result.ok) return result.error ?? "未知错误";
     const data = result.data as { lineCount?: number; requiresConfirmation?: boolean };
     const lines = data.lineCount ?? 0;
     if (data.requiresConfirmation) {
@@ -670,7 +670,7 @@ const proposeNewFile: ToolDef = {
     }
   },
   summarize(result: ToolResult): string {
-    if (!result.ok) return `✗ ${result.error}`;
+    if (!result.ok) return result.error ?? "未知错误";
     const data = result.data as { path?: string; lineCount?: number };
     return `提议新文件 ${data.path ?? ""} (${data.lineCount ?? 0} 行)`;
   },
@@ -705,7 +705,7 @@ export async function executeTool(
   if (!tool) {
     return {
       result: { ok: false, error: `Unknown tool: ${name}` },
-      summary: `✗ 未知工具: ${name}`,
+      summary: `未知工具: ${name}`,
       parsedArgs: null,
     };
   }
@@ -717,7 +717,7 @@ export async function executeTool(
   } catch {
     return {
       result: { ok: false, error: "invalid_json" },
-      summary: "✗ 参数 JSON 解析失败",
+      summary: "参数 JSON 解析失败",
       parsedArgs: { _error: "invalid_json", raw: argsJson },
     };
   }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { AlertTriangle } from "lucide-vue-next";
 import { NModal, NButton, NSpace, NText, NTag, NScrollbar } from "naive-ui";
 import { diff_match_patch } from "diff-match-patch";
 
@@ -315,7 +316,7 @@ function onLocalInput(e: Event): void {
     <template #footer>
       <NSpace justify="space-between" align="center">
         <NText v-if="hasEdits" type="warning" class="dirty-hint">
-          ⚠ 你已编辑本地版本（与初始内容不同）
+          <AlertTriangle :size="14" /> 你已编辑本地版本（与初始内容不同）
         </NText>
         <NText v-else depth="3" class="dirty-hint">
           直接编辑右侧文本框，完成后点击"保存合并结果"

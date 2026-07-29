@@ -502,7 +502,7 @@ function onProviderTypeChange(newType: AiProvider["type"]): void {
             </NFormItem>
           </NForm>
           <NAlert type="info" :show-icon="true" style="margin-top: 16px">
-            切换此选项后请刷新文件树（点击文件树顶部 ↻ 按钮或右键 → 刷新）以应用变更。
+            切换此选项后请刷新文件树（点击文件树顶部刷新按钮或右键 → 刷新）以应用变更。
           </NAlert>
         </div>
 
