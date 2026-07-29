@@ -14,7 +14,9 @@ import {
   RotateCw,
   Check,
   X,
+  MessageSquare,
 } from "lucide-vue-next";
+import EmptyState from "./EmptyState.vue";
 import { useAgentStore } from "../stores/useAgentStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useAiProvidersStore } from "../stores/useAiProvidersStore";
@@ -273,9 +275,12 @@ onMounted(() => {
         @scroll="checkScroll"
       >
         <!-- 空对话提示 -->
-        <div v-if="agent.messages.length === 0" class="agent-welcome">
-          <p>向 Agent 发送消息开始对话</p>
-        </div>
+        <EmptyState
+          v-if="agent.messages.length === 0"
+          :icon="MessageSquare"
+          title="向 Agent 发送消息开始对话"
+          description="Agent 可基于当前工作区辅助编辑与生成"
+        />
 
         <!-- 消息列表 -->
         <div
@@ -694,15 +699,6 @@ onMounted(() => {
   border-radius: 3px;
 }
 
-/* 空对话欢迎 */
-.agent-welcome {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--murasaki-muted, #9ca3af);
-  font-size: 12px;
-}
 
 /* 消息 */
 .agent-message {

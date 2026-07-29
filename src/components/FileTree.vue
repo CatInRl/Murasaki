@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { RotateCw } from "lucide-vue-next";
-import { NScrollbar, NSpin, NEmpty, NButton, NDropdown, NInput } from "naive-ui";
+import { RotateCw, FolderOpen } from "lucide-vue-next";
+import { NScrollbar, NButton, NDropdown, NInput } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
 import TreeNode from "./TreeNode.vue";
+import EmptyState from "./EmptyState.vue";
+import Skeleton from "./Skeleton.vue";
 
 const workspace = useWorkspaceStore();
 const fileOps = useFileOpsStore();
@@ -81,6 +83,11 @@ function cancelRootCreating(): void {
   rootCreating.value = false;
   rootCreatingName.value = "";
 }
+
+// ===== 空状态：打开工作区 =====
+async function onOpenWorkspace(): Promise<void> {
+  await workspace.openFolderDialog();
+}
 </script>
 
 <template>
@@ -102,15 +109,18 @@ function cancelRootCreating(): void {
 
     <!-- 文件树内容 -->
     <NScrollbar class="tree-scroll">
-      <div v-if="workspace.loading && workspace.fileTree.length === 0" class="tree-loading">
-        <NSpin size="small" />
-        <span style="margin-left: 8px; font-size: 12px; color: #999">加载中…</span>
-      </div>
-      <NEmpty
+      <Skeleton
+        v-if="workspace.loading && workspace.fileTree.length === 0"
+        :lines="4"
+      />
+      <EmptyState
         v-else-if="!workspace.hasWorkspace"
-        description="未打开工作区"
-        size="small"
-        style="padding: 24px 0"
+        :icon="FolderOpen"
+        title="未打开工作区"
+        description="打开一个文件夹开始编辑"
+        action-text="打开文件夹"
+        :action-icon="FolderOpen"
+        @action="onOpenWorkspace"
       />
       <div v-else class="tree-content">
         <!-- 根目录新建输入框 -->
@@ -201,14 +211,6 @@ function cancelRootCreating(): void {
 .tree-scroll {
   flex: 1;
   min-height: 0;
-}
-.tree-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 0;
-  font-size: 12px;
-  color: var(--murasaki-ink-3);
 }
 .tree-content {
   padding: 4px 0;

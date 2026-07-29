@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, watch } from "vue";
-import { FileText } from "lucide-vue-next";
-import { NInput, NCheckbox, NButton, NScrollbar, NSpin, NEmpty } from "naive-ui";
+import { FileText, SearchX } from "lucide-vue-next";
+import { NInput, NCheckbox, NButton, NScrollbar } from "naive-ui";
+import EmptyState from "./EmptyState.vue";
+import Skeleton from "./Skeleton.vue";
 import { useSearchStore } from "../stores/useSearchStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import type { SearchResult } from "../types";
@@ -176,6 +178,11 @@ function onClose(): void {
   emit("close");
 }
 
+// ===== 清空搜索（无结果态操作）=====
+function onClearSearch(): void {
+  searchStore.clear();
+}
+
 // ===== 选中匹配行 =====
 function onSelectMatch(filePath: string, lineNumber: number): void {
   emit("select-file", filePath, lineNumber);
@@ -260,17 +267,13 @@ watch(
     <!-- 结果区 -->
     <div class="search-results">
       <NScrollbar>
-        <div v-if="searchStore.loading" class="results-loading">
-          <NSpin size="small" />
-          <span style="margin-left: 8px; font-size: 12px; color: #999">
-            搜索中…
-          </span>
-        </div>
-        <NEmpty
+        <Skeleton v-if="searchStore.loading" :lines="4" :icon="FileText" />
+        <EmptyState
           v-else-if="showEmpty"
-          description="无匹配结果"
-          size="small"
-          style="padding: 24px 0"
+          :icon="SearchX"
+          title="未找到匹配的文件"
+          action-text="清空搜索"
+          @action="onClearSearch"
         />
         <div v-else-if="hasResults" class="results-content">
           <!-- 文件名匹配分组（展示在内容匹配之前） -->
@@ -386,12 +389,6 @@ watch(
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-.results-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 0;
 }
 .results-content {
   padding: 4px 0;
