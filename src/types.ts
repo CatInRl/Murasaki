@@ -35,6 +35,7 @@ export type SidebarView = "files" | "outline";
  * 标签页数据结构
  * - path: 文件绝对路径（null 表示未保存的新文件）
  * - content: 当前编辑器内容
+ * - savedContent: 已保存到磁盘的内容快照，用于 dirty 比较
  * - lastMtime: 上次已知文件 mtime（毫秒），用于外部修改检测
  * - isDirty: 是否有未保存修改
  * - hasExternalChange: 是否检测到外部修改（用于冲突处理）
@@ -45,6 +46,7 @@ export interface Tab {
   id: string;
   path: string | null;
   content: string;
+  savedContent: string;
   lastMtime: number | null;
   isDirty: boolean;
   hasExternalChange: boolean;

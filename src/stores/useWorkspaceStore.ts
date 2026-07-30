@@ -4,6 +4,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { TreeNode } from "../types";
 import { usePersistenceStore } from "./usePersistenceStore";
+import { useToastStore } from "./useToastStore";
+
+/** 防重入锁：进行中的 refreshTree 调用 Promise（模块级，避免并发调用） */
+let refreshPromise: Promise<void> | null = null;
+
+/** 刷新文件树超时阈值（毫秒） */
+const REFRESH_TIMEOUT_MS = 30000;
 
 /**
  * 工作区 Store
@@ -13,6 +20,7 @@ import { usePersistenceStore } from "./usePersistenceStore";
  */
 export const useWorkspaceStore = defineStore("workspace", () => {
   const persistence = usePersistenceStore();
+  const toast = useToastStore();
 
   // ===== State =====
   /** 当前工作区根路径（null = 未打开工作区） */
@@ -73,22 +81,41 @@ export const useWorkspaceStore = defineStore("workspace", () => {
 
   /**
    * 刷新文件树（重新读取当前工作区）
+   * - 防重入：进行中再次调用直接返回同一个 Promise
+   * - 30s 超时兜底：避免大工作区/网络盘同步递归导致 loading 永久卡住
    */
   async function refreshTree(): Promise<void> {
     if (!workspacePath.value) return;
+    // 防重入：进行中直接返回同一个 Promise
+    if (refreshPromise) return refreshPromise;
+
     loading.value = true;
-    try {
-      const tree = await invoke<TreeNode[]>("list_tree", {
-        path: workspacePath.value,
-        showHidden: persistence.settings.showHiddenFiles,
-      });
-      fileTree.value = tree;
-    } catch (err) {
-      console.error("刷新文件树失败:", err);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
+    refreshPromise = (async () => {
+      try {
+        const treePromise = invoke<TreeNode[]>("list_tree", {
+          path: workspacePath.value,
+          showHidden: persistence.settings.showHiddenFiles,
+        });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), REFRESH_TIMEOUT_MS)
+        );
+        const tree = await Promise.race([treePromise, timeoutPromise]);
+        fileTree.value = tree;
+      } catch (err) {
+        if (err instanceof Error && err.message === "timeout") {
+          console.error(`刷新文件树超时（${REFRESH_TIMEOUT_MS / 1000}s）`);
+          toast.warning("刷新超时", {
+            description: "可能是工作区过大或网络盘响应慢",
+          });
+        } else {
+          console.error("刷新文件树失败:", err);
+        }
+      } finally {
+        loading.value = false;
+        refreshPromise = null;
+      }
+    })();
+    return refreshPromise;
   }
 
   /**

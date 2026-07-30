@@ -152,4 +152,74 @@ describe("多 Tab 管理", () => {
     const activeTab = state.tabs.find(t => t.id === state.activeTabId);
     expect(activeTab?.isDirty).toBe(true);
   });
+
+  it("撤销到原始内容后 dirty 标记清除", async () => {
+    const wsPath = resetWorkspace([
+      { path: "undo-test.md", content: "# 标题\n\n正文\n" },
+    ]);
+    await openFileInTab(browser, `${wsPath}\\undo-test.md`);
+
+    // 等待编辑器加载（CodeMirror 6 的 .cm-content）
+    const cmContent = await browser.$(".cm-content");
+    await cmContent.waitForExist({ timeout: 5000 });
+
+    // 通过 CodeMirror view 在光标处插入文本（模拟真实输入）
+    await browser.executeAsync((done: (res: unknown) => void) => {
+      // @ts-ignore
+      const view = window.__editorRef__?.getView?.();
+      if (!view) return done("no editor view");
+      try {
+        view.focus();
+        view.dispatch(view.state.replaceSelection("X"));
+        done(null);
+      } catch (e) {
+        done(String(e));
+      }
+    });
+
+    // 等待 store 同步（CodeMirror updateListener 异步触发 updateContent）
+    await browser.waitUntil(async () => {
+      const isDirty = await browser.execute(() => {
+        // @ts-ignore
+        const tabs = window.__pinia__._s.get("tabs");
+        return tabs.activeTab?.isDirty;
+      });
+      return isDirty === true;
+    }, { timeout: 3000, timeoutMsg: "输入后 dirty 标记未出现" });
+
+    // 验证 dirty 标记存在
+    let isDirty = await browser.execute(() => {
+      // @ts-ignore
+      const tabs = window.__pinia__._s.get("tabs");
+      return tabs.activeTab?.isDirty;
+    });
+    expect(isDirty).toBe(true);
+
+    // 触发 CodeMirror undo（通过 App.vue 暴露的 window.__editorRef__.undo）
+    await browser.executeAsync((done: (res: unknown) => void) => {
+      // @ts-ignore
+      if (!window.__editorRef__?.undo) return done("no undo");
+      // @ts-ignore
+      try { window.__editorRef__.undo(); done(null); }
+      catch (e) { done(String(e)); }
+    });
+
+    // 等待 store 同步（undo 触发 updateListener → updateContent → 与 savedContent 对比）
+    await browser.waitUntil(async () => {
+      const isDirty = await browser.execute(() => {
+        // @ts-ignore
+        const tabs = window.__pinia__._s.get("tabs");
+        return tabs.activeTab?.isDirty;
+      });
+      return isDirty === false;
+    }, { timeout: 3000, timeoutMsg: "撤销后 dirty 标记未清除" });
+
+    // 验证 dirty 标记消失
+    isDirty = await browser.execute(() => {
+      // @ts-ignore
+      const tabs = window.__pinia__._s.get("tabs");
+      return tabs.activeTab?.isDirty;
+    });
+    expect(isDirty).toBe(false);
+  });
 });

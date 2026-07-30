@@ -30,63 +30,17 @@ body {
   width: 100%;
 }
 
-/* === Settings Window Shell === */
+/* === Settings Shell (single-entry route overlay) === */
 .settings-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
   display: grid;
-  grid-template-rows: 44px 1fr;
+  grid-template-rows: 1fr;
   grid-template-columns: 200px 1fr;
-  grid-template-areas:
-    "titlebar titlebar"
-    "sidebar  content";
-  height: 100vh;
-  width: 100vw;
+  grid-template-areas: "sidebar content";
   overflow: hidden;
   background: var(--murasaki-background);
-}
-
-/* === Title Bar === */
-.settings-title-bar {
-  grid-area: titlebar;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px 0 16px;
-  background: var(--murasaki-surface);
-  border-bottom: 1px solid var(--murasaki-line);
-  -webkit-app-region: drag;
-  user-select: none;
-}
-.settings-title-text {
-  font-size: var(--murasaki-text-sm);
-  font-weight: 600;
-  color: var(--murasaki-ink);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.settings-title-text svg {
-  color: var(--murasaki-primary);
-}
-.settings-title-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: var(--murasaki-radius-sm);
-  background: transparent;
-  color: var(--murasaki-ink-3);
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-  transition: background 120ms, color 120ms;
-}
-.settings-title-close:hover {
-  background: var(--murasaki-neutral-200);
-  color: var(--murasaki-ink);
-}
-.settings-title-close:active {
-  background: var(--murasaki-neutral-300);
 }
 
 /* === Sidebar === */

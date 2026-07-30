@@ -286,6 +286,7 @@ pub fn run() {
             watcher::stop_watching,
             watcher::stop_all_watching,
             menu::update_recent_menu,
+            menu::set_theme_checked,
             settings::open_settings,
             ai_providers::get_ai_providers,
             ai_providers::save_ai_provider,

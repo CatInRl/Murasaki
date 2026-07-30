@@ -6,7 +6,7 @@
 
 ## [0.3.0] - 2026-07-30
 
-本版本进行整体 UX 对齐与 WYSIWYG 模式实现，建立设计系统基础、反馈系统基础设施、状态展示三兄弟、Agent 面板全量视觉对齐、WYSIWYG 模式（CodeMirror 6 内 Typora 路线）、设置窗口多窗口化、Markdown 渲染样式统一。
+本版本进行整体 UX 对齐与 WYSIWYG 模式实现，建立设计系统基础、反馈系统基础设施、状态展示三兄弟、Agent 面板全量视觉对齐、WYSIWYG 模式（CodeMirror 6 内 Typora 路线）、设置页单入口路由、Markdown 渲染样式统一。
 
 ### Added
 
@@ -36,6 +36,31 @@
 - 修复导出 HTML 中 Mermaid 图表不显示紫色主题（PreviewPane.vue 初始化 Mermaid 主题，确保预览和导出使用相同配置）。
 - 修复 tauri-driver/msedgedriver 孤立 bug（setup.ts 的防御性清理 `Stop-Process -Name msedgedriver` 会杀掉 tauri-driver 的子进程导致永久孤立，改为杀 tauri-driver 让 Windows Job Object 自动带走 msedgedriver）。
 - 修复 webdriverio 9.x attach() "Invalid URL" bug（attachOptions.options 为 undefined 时 detectBackend 返回 undefined 字段，需显式传入 hostname/port/protocol/path）。
+
+### Post-Release Fixes（同版本号内补丁）
+
+- 设置保存后运行时生效（无需重启）：`settings://saved` 监听器调用 `loadSettings()` 重新加载磁盘设置到主窗口 store
+- WYSIWYG 模式可用：修复设置通信断裂导致 WYSIWYG 模式无法触达的问题
+- 设置窗口空白：从 Tauri 多窗口改为单入口路由（index.html#settings），规避 WebView2 第二窗口加载失败
+- 设置窗口双重关闭按钮：删除自绘标题栏，改为 footer 关闭按钮
+- 设置窗口菜单栏污染：单入口路由后自动消失
+- 主题菜单勾选状态：菜单项改用 `CheckMenuItemBuilder`，新增 `set_theme_checked` 命令
+- 撤销到原始内容后 dirty 标记不清：Tab 加 `savedContent` 字段，`updateContent` 对比决定 `isDirty`
+- 刷新按钮卡死：`list_tree` 加 30s 超时兜底 + `refreshTree` 防重入锁
+
+### Changed（Post-Release）
+
+- 设置页架构：Tauri 多窗口 → 单入口路由（ADR-0009 架构变更，设置页在主窗口内渲染）
+- 主题菜单项：`MenuItem` → `CheckMenuItem`，支持 checked 状态
+- `useTabsStore`：Tab 接口新增 `savedContent` 字段记录已保存内容快照
+
+### E2E 测试（Post-Release）
+
+- 新增 `settings-runtime.spec.ts`：设置保存后运行时生效
+- 新增 `tabs.spec.ts`：撤销到原始内容后 dirty 清除
+- 新增 `workspace.spec.ts`：刷新按钮停止动画
+- 新增 `settings-window.spec.ts`：单入口路由渲染设置页
+- 新增 `verify-wysiwyg-manual.spec.ts`：WYSIWYG 真实用户路径验证（6 个测试）
 
 ## [0.2.0] - 2026-07-29
 

@@ -107,4 +107,37 @@ describe("工作区 + 文件树", () => {
       { timeout: 5000 }
     );
   });
+
+  it("刷新按钮在合理时间内停止动画", async () => {
+    const wsPath = resetWorkspace(defaultFixtureFiles());
+    await openWorkspace(browser, wsPath);
+
+    // 等待文件树渲染（刷新按钮在 .file-tree 的 toolbar 内）
+    const tree = await browser.$(".file-tree");
+    await tree.waitForExist({ timeout: 10000 });
+
+    // 点击刷新按钮（FileTree.vue 中 title="刷新" 的 NButton）
+    const refreshBtn = await browser.$(".file-tree button[title='刷新']");
+    await refreshBtn.waitForExist({ timeout: 5000 });
+    await refreshBtn.click();
+
+    // 等待 loading 完成（最多 10 秒，远低于 refreshTree 的 30s 超时兜底）
+    // bug 7 修复前 loading 可能永久卡住；修复后必然在 30s 内归位
+    await browser.waitUntil(async () => {
+      const loading = await browser.execute(() => {
+        // @ts-ignore
+        const ws = window.__pinia__._s.get("workspace");
+        return ws.loading;
+      });
+      return loading === false;
+    }, { timeout: 10000, timeoutMsg: "刷新按钮动画未在 10 秒内停止" });
+
+    // 最终 loading 必须为 false
+    const loading = await browser.execute(() => {
+      // @ts-ignore
+      const ws = window.__pinia__._s.get("workspace");
+      return ws.loading;
+    });
+    expect(loading).toBe(false);
+  });
 });

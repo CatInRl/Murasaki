@@ -91,6 +91,9 @@ export const useTabsStore = defineStore("tabs", () => {
         id: genId(),
         path,
         content: finalContent,
+        // savedContent 始终记录磁盘上的内容快照（不含草稿）
+        // 这样有草稿恢复时 content !== savedContent → isDirty=true
+        savedContent: content,
         lastMtime: mtime,
         isDirty,
         hasExternalChange: false,
@@ -114,6 +117,9 @@ export const useTabsStore = defineStore("tabs", () => {
       id: genId(),
       path: null,
       content: initialContent,
+      // 未保存的新文件没有磁盘快照，savedContent 固定为空字符串
+      // 这样 isDirty = content !== "" = initialContent.length > 0，与原逻辑一致
+      savedContent: "",
       lastMtime: null,
       isDirty: initialContent.length > 0,
       hasExternalChange: false,
@@ -206,6 +212,8 @@ export const useTabsStore = defineStore("tabs", () => {
       }
       const mtime = await invoke<number>("get_file_mtime", { path: filePath }).catch(() => 0);
       tab.lastMtime = mtime;
+      // 选择"加载磁盘版本"后，磁盘内容即当前内容，更新快照
+      tab.savedContent = tab.content;
       tab.isDirty = false;
       tab.hasExternalChange = false;
     } else {
@@ -236,6 +244,8 @@ export const useTabsStore = defineStore("tabs", () => {
     const mtime = await invoke<number>("get_file_mtime", { path: filePath }).catch(() => 0);
     tab.content = content;
     tab.lastMtime = mtime;
+    // 从磁盘重载后，磁盘内容即当前内容，更新快照
+    tab.savedContent = content;
     tab.isDirty = false;
     tab.hasExternalChange = false;
   }
@@ -250,6 +260,8 @@ export const useTabsStore = defineStore("tabs", () => {
     if (tab) {
       tab.content = mergedContent;
       tab.lastMtime = mtime;
+      // 合并保存后磁盘内容即当前内容，更新快照
+      tab.savedContent = mergedContent;
       tab.isDirty = false;
       tab.hasExternalChange = false;
     }
@@ -300,7 +312,9 @@ export const useTabsStore = defineStore("tabs", () => {
     const tab = tabs.value.find((t) => t.id === tabId);
     if (tab) {
       tab.content = content;
-      tab.isDirty = true;
+      // 与已保存内容对比：相同则清除 dirty，不同则标记 dirty
+      // 这样撤销回到原始内容时 isDirty 自动变为 false
+      tab.isDirty = content !== tab.savedContent;
     }
   }
 
@@ -325,6 +339,8 @@ export const useTabsStore = defineStore("tabs", () => {
     // 更新 mtime
     const mtime = await invoke<number>("get_file_mtime", { path: tab.path }).catch(() => 0);
     tab.lastMtime = mtime;
+    // 保存后更新已保存内容快照，确保后续编辑能正确比较 dirty
+    tab.savedContent = tab.content;
     tab.isDirty = false;
     tab.hasExternalChange = false;
     // 删除草稿（已保存到磁盘）
@@ -341,6 +357,8 @@ export const useTabsStore = defineStore("tabs", () => {
     const mtime = await invoke<number>("get_file_mtime", { path: newPath }).catch(() => 0);
     tab.path = newPath;
     tab.lastMtime = mtime;
+    // 另存为后磁盘内容即当前内容，更新快照
+    tab.savedContent = tab.content;
     tab.isDirty = false;
     tab.hasExternalChange = false;
   }

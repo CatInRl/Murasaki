@@ -25,6 +25,7 @@ import AgentPanel from "./components/AgentPanel.vue";
 import ToastContainer from "./components/ToastContainer.vue";
 import DialogContainer from "./components/DialogContainer.vue";
 import ContextMenuContainer from "./components/ContextMenuContainer.vue";
+import SettingsApp from "./settings/SettingsApp.vue";
 import { useWorkspaceStore } from "./stores/useWorkspaceStore";
 import { useTabsStore } from "./stores/useTabsStore";
 import { usePersistenceStore } from "./stores/usePersistenceStore";
@@ -147,7 +148,9 @@ async function onCollapseAgentPanel(): Promise<void> {
   await persistence.updateSettings({ showAgentPanel: false } as Partial<SettingsState>);
 }
 
-// ===== 打开设置窗口（Tauri 多窗口，见 ADR-0009） =====
+// ===== 设置页（单入口路由，在主窗口内通过 navigate 事件切换） =====
+const settingsVisible = ref(false);
+
 async function openSettings(): Promise<void> {
   try {
     await invoke("open_settings");
@@ -247,6 +250,7 @@ let unlistenMenu: UnlistenFn | null = null;
 let unlistenRecentOpen: UnlistenFn | null = null;
 let unlistenSingleInstance: UnlistenFn | null = null;
 let unlistenSettingsSaved: UnlistenFn | null = null;
+let unlistenNavigate: UnlistenFn | null = null;
 let initialized = ref(false);
 
 onMounted(async () => {
@@ -302,10 +306,24 @@ onMounted(async () => {
     }
   );
 
-  // 4c. 监听设置窗口的保存事件（多窗口通信，见 ADR-0009）
-  // 设置变更的副作用由 T8.2/T8.3 实现，此处先用 console.log 占位
-  unlistenSettingsSaved = await listen<unknown>("settings://saved", (event) => {
-    console.log("[settings] 收到设置保存事件:", event.payload);
+  // 4c. 监听设置页的保存事件（单入口路由下同窗口通信，event 机制仍可用）
+  // 重新从磁盘加载设置到主窗口 store，watch/响应式绑定自动应用副作用
+  unlistenSettingsSaved = await listen<unknown>("settings://saved", async () => {
+    await persistence.loadSettings();
+    // 同步主题（currentTheme 不在 watch 监听内，需手动同步）
+    if (persistence.settings.markdownTheme) {
+      currentTheme.value = persistence.settings.markdownTheme;
+      // 显式同步原生菜单勾选状态：设置窗口可能修改了 markdownTheme，
+      // 若新值与旧值相同 watch 不会触发，故在此补一次保证菜单勾选正确
+      void invoke("set_theme_checked", {
+        themeId: "theme-" + persistence.settings.markdownTheme,
+      });
+    }
+  });
+
+  // 4d. 监听主窗口 navigate 事件：切换设置页显隐（单入口路由）
+  unlistenNavigate = await listen<string>("navigate", (event) => {
+    settingsVisible.value = event.payload === "settings";
   });
 
   // 5. 同步最近打开菜单到原生菜单
@@ -381,6 +399,10 @@ onBeforeUnmount(() => {
     unlistenSettingsSaved();
     unlistenSettingsSaved = null;
   }
+  if (unlistenNavigate) {
+    unlistenNavigate();
+    unlistenNavigate = null;
+  }
   window.removeEventListener("keydown", onKeyDown);
   fileWatcher.stop();
   imagePaste.teardown();
@@ -406,6 +428,8 @@ watch(currentTheme, (newTheme) => {
   if (initialized.value) {
     void persistence.updateSettings({ markdownTheme: newTheme });
   }
+  // 同步原生主题菜单的勾选状态（菜单点击 / 初始加载 / 设置同步均会触发此 watch）
+  void invoke("set_theme_checked", { themeId: "theme-" + newTheme });
 });
 
 // 最近打开记录变化时同步原生菜单（debounced，避免频繁重建）
@@ -1371,6 +1395,9 @@ async function exportCurrentHtml(): Promise<void> {
 
     <!-- 右键菜单容器（全局唯一，数据驱动） -->
     <ContextMenuContainer />
+
+    <!-- 设置页（单入口路由，覆盖主窗口） -->
+    <SettingsApp v-if="settingsVisible" @close="settingsVisible = false" />
 
     <!-- 冲突对话框 -->
     <ConflictDialog

@@ -117,7 +117,9 @@ describe("设置窗口", () => {
     try { await closeWorkspace(browser); } catch { /* ignore */ }
   });
 
-  it("通过 open_settings 命令打开设置窗口", async () => {
+  // 0.3.1 起 settings 改为单入口路由（index.html#settings），不再创建独立窗口。
+  // 旧"多窗口"测试已废弃，新的单入口路由测试见下方 `open_settings 命令在主窗口内渲染设置页`。
+  it.skip("通过 open_settings 命令打开设置窗口（旧多窗口行为，已废弃）", async () => {
     const handlesBefore = await browser.getWindowHandles();
     expect(handlesBefore.length).toBe(1);
 
@@ -153,5 +155,52 @@ describe("设置窗口", () => {
 
   it.skip("设置窗口标题为「设置」", async () => {
     // 需要 settings window UI 加载，E2E 环境下不可用
+  });
+
+  it("open_settings 命令在主窗口内渲染设置页（单入口路由）", async () => {
+    // 前序测试可能遗留 settingsVisible=true（旧测试断言多窗口会失败但仍渲染设置页）
+    // 先重置：emit navigate 事件携带非 "settings" payload，触发 settingsVisible=false
+    await browser.executeAsync((done: (res: unknown) => void) => {
+      // @ts-ignore
+      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
+        event: "navigate",
+        payload: "editor",
+      }).then(
+        () => done(null),
+        (err: unknown) => done(err ? String(err) : null)
+      );
+    });
+    await browser.pause(300);
+
+    // 验证初始无设置页 DOM
+    expect(await (await browser.$(".settings-shell")).isExisting()).toBe(false);
+
+    const handlesBefore = await browser.getWindowHandles();
+    expect(handlesBefore.length).toBe(1);
+
+    // 调用 open_settings 命令（单入口路由：在主窗口内通过 navigate 事件切换）
+    await openSettingsWindow();
+
+    // 设置页 DOM 应在主窗口内渲染
+    const settingsShell = await browser.$(".settings-shell");
+    await settingsShell.waitForExist({ timeout: 5000 });
+    expect(await settingsShell.isExisting()).toBe(true);
+
+    // 不应创建新窗口（单入口路由 vs 旧多窗口方案）
+    const handlesAfter = await browser.getWindowHandles();
+    expect(handlesAfter.length).toBe(1);
+
+    // 清理：隐藏设置页，避免影响后续 spec（session 内残留 settingsVisible）
+    await browser.executeAsync((done: (res: unknown) => void) => {
+      // @ts-ignore
+      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
+        event: "navigate",
+        payload: "editor",
+      }).then(
+        () => done(null),
+        (err: unknown) => done(err ? String(err) : null)
+      );
+    });
+    await browser.pause(200);
   });
 });

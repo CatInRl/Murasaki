@@ -12,9 +12,9 @@
  * - 副作用统一触发：一次 save 通过 Tauri event `settings://saved` 通知主窗口
  */
 import { ref, computed, onMounted } from "vue";
-import { Settings, Type, Bot, X } from "lucide-vue-next";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Settings, Type, Bot } from "lucide-vue-next";
 import { emit } from "@tauri-apps/api/event";
+import "./settings.css";
 import GeneralPanel from "./panels/GeneralPanel.vue";
 import EditorPanel from "./panels/EditorPanel.vue";
 import AiPanel from "./panels/AiPanel.vue";
@@ -33,6 +33,8 @@ import {
 const persistence = usePersistenceStore();
 const aiProviders = useAiProvidersStore();
 const dialog = useDialogStore();
+
+const emitClose = defineEmits<{ (e: "close"): void }>();
 
 const activeCategory = ref<SettingsCategory>("general");
 
@@ -91,10 +93,12 @@ function handleRestoreDefault(): void {
 }
 
 /**
- * 关闭窗口：若有未保存改动，弹三按钮确认。
+ * 关闭设置页：若有未保存改动，弹三按钮确认。
  * - 保存：先保存再关闭
  * - 不保存：直接关闭
- * - 取消：留在设置窗口
+ * - 取消：留在设置页
+ *
+ * 通过 emit "close" 通知父组件（App.vue）隐藏设置页（单入口路由）
  */
 async function handleClose(): Promise<void> {
   if (isDirty(draft.value, snapshot.value)) {
@@ -106,28 +110,12 @@ async function handleClose(): Promise<void> {
       await handleSave();
     }
   }
-  await getCurrentWindow().close();
+  emitClose("close");
 }
 </script>
 
 <template>
   <div class="settings-shell">
-    <!-- Title Bar -->
-    <div class="settings-title-bar">
-      <div class="settings-title-text">
-        <Settings :size="16" />
-        <span>设置</span>
-      </div>
-      <button
-        class="settings-title-close"
-        type="button"
-        aria-label="关闭"
-        @click="handleClose"
-      >
-        <X :size="16" />
-      </button>
-    </div>
-
     <!-- Sidebar -->
     <nav class="settings-sidebar" aria-label="设置分类">
       <div class="settings-category-list">
@@ -184,6 +172,14 @@ async function handleClose(): Promise<void> {
           @click="handleRestoreDefault"
         >
           恢复默认
+        </button>
+        <button
+          class="secondary-button"
+          type="button"
+          style="margin-left: auto"
+          @click="handleClose"
+        >
+          关闭
         </button>
         <button
           class="primary-button"

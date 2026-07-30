@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
-use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 
 /// 最近打开菜单状态
 /// - folders/files: 前端推送的最近路径列表
 /// - id_to_path: 菜单项 ID → 完整路径的反查映射（每次重建菜单时刷新）
+/// - current_theme: 当前选中的主题菜单项 ID（如 "theme-murasaki"），
+///   供 build_app_menu 在菜单重建时恢复正确的 checked 状态
 ///
 /// 使用稳定的 ID（基于路径类型前缀 + 序号）配合 id_to_path 映射反查，
 /// 避免在菜单重建期间用户点击旧菜单项时因索引错位打开错误路径。
@@ -13,6 +15,7 @@ pub struct RecentMenuState {
     pub folders: Mutex<Vec<String>>,
     pub files: Mutex<Vec<String>>,
     pub id_to_path: Mutex<HashMap<String, String>>,
+    pub current_theme: Mutex<String>,
 }
 
 impl Default for RecentMenuState {
@@ -21,6 +24,7 @@ impl Default for RecentMenuState {
             folders: Mutex::new(Vec::new()),
             files: Mutex::new(Vec::new()),
             id_to_path: Mutex::new(HashMap::new()),
+            current_theme: Mutex::new("theme-murasaki".to_string()),
         }
     }
 }
@@ -100,12 +104,40 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .build()?;
 
     // === Theme menu ===
+    // 使用 CheckMenuItem 以支持勾选状态，checked 由 current_theme 决定
+    // 菜单重建（如 update_recent_menu）时据此恢复正确的勾选项
+    let current_theme = state
+        .current_theme
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
+    let theme_murasaki = CheckMenuItemBuilder::new("Murasaki")
+        .id("theme-murasaki")
+        .checked(current_theme == "theme-murasaki")
+        .build(app)?;
+    let theme_github = CheckMenuItemBuilder::new("GitHub")
+        .id("theme-github")
+        .checked(current_theme == "theme-github")
+        .build(app)?;
+    let theme_newsprint = CheckMenuItemBuilder::new("Newsprint")
+        .id("theme-newsprint")
+        .checked(current_theme == "theme-newsprint")
+        .build(app)?;
+    let theme_night = CheckMenuItemBuilder::new("Night")
+        .id("theme-night")
+        .checked(current_theme == "theme-night")
+        .build(app)?;
+    let theme_academic = CheckMenuItemBuilder::new("Academic")
+        .id("theme-academic")
+        .checked(current_theme == "theme-academic")
+        .build(app)?;
+
     let theme_menu = SubmenuBuilder::new(app, "主题")
-        .text("theme-murasaki", "Murasaki")
-        .text("theme-github", "GitHub")
-        .text("theme-newsprint", "Newsprint")
-        .text("theme-night", "Night")
-        .text("theme-academic", "Academic")
+        .item(&theme_murasaki)
+        .item(&theme_github)
+        .item(&theme_newsprint)
+        .item(&theme_night)
+        .item(&theme_academic)
         .build()?;
 
     // === Help menu ===
@@ -199,6 +231,46 @@ pub fn update_recent_menu(
     }
     let menu = build_app_menu(&app).map_err(|e| e.to_string())?;
     app.set_menu(menu).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 前端调用：设置主题菜单的 checked 状态
+/// 同时更新 current_theme，以便后续菜单重建（如 update_recent_menu）时恢复正确勾选
+#[tauri::command]
+pub fn set_theme_checked(
+    app: AppHandle,
+    state: tauri::State<'_, RecentMenuState>,
+    theme_id: String,
+) -> Result<(), String> {
+    // 先更新存储的主题 ID，供下次 build_app_menu 使用
+    {
+        let mut current = state.current_theme.lock().map_err(|e| e.to_string())?;
+        *current = theme_id.clone();
+    }
+
+    // 遍历顶层菜单找到 "主题" 子菜单，更新其中各 CheckMenuItem 的勾选状态
+    let theme_ids = [
+        "theme-murasaki",
+        "theme-github",
+        "theme-newsprint",
+        "theme-night",
+        "theme-academic",
+    ];
+    let menu = app.menu().ok_or("菜单未初始化")?;
+    for item in menu.items().map_err(|e| e.to_string())? {
+        if let Some(submenu) = item.as_submenu() {
+            for sub_item in submenu.items().map_err(|e| e.to_string())? {
+                let id = sub_item.id().as_ref();
+                if theme_ids.contains(&id) {
+                    if let Some(check_item) = sub_item.as_check_menuitem() {
+                        check_item
+                            .set_checked(id == theme_id)
+                            .map_err(|e| e.to_string())?;
+                    }
+                }
+            }
+        }
+    }
     Ok(())
 }
 
