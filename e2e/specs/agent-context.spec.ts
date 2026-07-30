@@ -17,7 +17,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles, setupActiveProvider, teardownActiveProvider } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, dismissAllDialogs, closeAllTabs } from "../helpers/store";
+import { openWorkspace, closeWorkspace, openFileInTab, dismissAllDialogs, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
 
 let browser: Browser;
 
@@ -28,6 +28,7 @@ const API_KEY = process.env.MURASAKI_E2E_API_KEY ?? "";
 describe("Agent 上下文 + 工具调用可见性", () => {
   beforeAll(async () => {
     browser = await createSession();
+    await waitForPinia(browser);
   }, 60000);
 
   afterAll(async () => {
@@ -38,6 +39,7 @@ describe("Agent 上下文 + 工具调用可见性", () => {
   });
 
   beforeEach(async () => {
+    await resetPersistenceSettings(browser);
     resetWorkspace(defaultFixtureFiles());
     // 关闭所有 tabs（避免 dirty tab 触发 unsaved dialog 遮挡点击）
     try { await closeAllTabs(browser); } catch { /* ignore */ }

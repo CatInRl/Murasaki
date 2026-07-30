@@ -1,34 +1,42 @@
 /**
- * WYSIWYG ViewPlugin（Ticket #72 / T7.1, #76 / T7.2）。
+ * WYSIWYG 装饰系统（Ticket #72 / T7.1, #76 / T7.2）。
  *
- * CodeMirror 6 ViewPlugin：遍历 @codemirror/lang-markdown 语法树，对行级语法标记
- * 应用 hide/dim decoration（光标在当前段 → dim；离开 → hide / 替换为 widget）。
+ * 架构（ADR-0008）：StateField 提供装饰 + 轻量 ViewPlugin 监听语法树变化。
+ *
+ * 为什么不用单一 ViewPlugin？
+ * - CM6 限制：ViewPlugin 不允许提供跨换行的块级替换装饰
+ *   （"Decorations that replace line breaks may not be specified via plugins"）。
+ *   代码块 / 表格 / Mermaid 等块级 widget 需要替换多行范围，必须用 StateField。
+ * - StateField 通过 `EditorView.decorations.from(f)` 提供装饰，不受此限制。
  *
  * T7.1：行级标记 hide/dim + 列表 bullet / 分隔线 hr widget + 引用块左边框。
  * T7.2：块级 widget —— 代码块 Shiki 高亮 / 链接锚文本 / 图片 / 表格 / 数学 KaTeX / Mermaid SVG。
  *
  * Decoration 计算逻辑提取为纯函数 computeDecorations（便于单元测试），本文件负责：
- * - 把描述符转换为 CodeMirror DecorationSet
- * - 监听 selection / doc / viewport 变化（防抖 50ms）
- * - 大文档（>10000 行）仅计算可见视口
+ * - 把描述符转换为 CodeMirror DecorationSet（StateField.create / update）
+ * - 监听 selection / doc / 提案 / 语法树变化（同步重算）
  * - Agent 提案覆盖范围不隐藏标记（提案优先级高于 WYSIWYG 隐藏）
  *
  * 详见 ADR-0008（CodeMirror 6 内 WYSIWYG / Typora 路线）。
  */
 import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, WidgetType } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
-import { syntaxTree } from "@codemirror/language";
+import { EditorState, StateField, StateEffect } from "@codemirror/state";
+import { syntaxTree, ensureSyntaxTree } from "@codemirror/language";
 import { codeToHtml } from "shiki";
 import katex from "katex";
 import mermaid from "mermaid";
-import { proposalField } from "../../agent/proposals";
+import {
+  proposalField,
+  addProposalEffect,
+  removeProposalEffect,
+  expireAllProposalsEffect,
+  proposalActionEffect,
+} from "../../agent/proposals";
 import { currentShikiTheme, getMarkdownRenderer, resolveShikiThemeOption } from "../../composables/useMarkdownRenderer";
 import {
   computeDecorations,
   ComputedDeco,
   BlockWidgetDeco,
-  DEBOUNCE_MS,
-  LARGE_DOC_LINE_THRESHOLD,
 } from "./computeDecorations";
 
 // ===== T7.1 Widgets =====
@@ -305,64 +313,121 @@ function getProposalRanges(state: EditorState): Array<{ from: number; to: number
     .map((p) => ({ from: p.from, to: p.to }));
 }
 
-// ===== ViewPlugin =====
+// ===== StateField：提供装饰（支持跨换行块级替换） =====
 
-class WysiwygPluginValue {
-  decorations: DecorationSet;
-  private timer: ReturnType<typeof setTimeout> | null = null;
-  private destroyed = false;
-  /** Mermaid 渲染 id 计数器（实例字段，保证 SVG id 唯一且避免模块级可变状态） */
-  private mermaidIdCounter = 0;
-
-  constructor(view: EditorView) {
-    this.decorations = this.compute(view);
-  }
-
-  private compute(view: EditorView): DecorationSet {
-    const state = view.state;
-    const decos = computeDecorations({
-      doc: state.doc.toString(),
-      selectionHead: state.selection.main.head,
-      tree: syntaxTree(state),
-      proposalRanges: getProposalRanges(state),
-      viewport:
-        state.doc.lines > LARGE_DOC_LINE_THRESHOLD
-          ? { from: view.viewport.from, to: view.viewport.to }
-          : undefined,
-    });
-    const nextMermaidId = (): string => `murasaki-mermaid-${this.mermaidIdCounter++}`;
-    return toDecorationSet(decos, nextMermaidId);
-  }
-
-  update(u: ViewUpdate): void {
-    if (!u.docChanged && !u.selectionSet && !u.viewportChanged) {
-      // 提案变化（新增/接受/拒绝/过期）也需重算：提案覆盖范围的标记要保持可见，
-      // 提案解决后恢复隐藏。比较 proposalField 前后引用是否变化来检测（Ticket #79 / T7.4）。
-      if (u.startState.field(proposalField, false) === u.state.field(proposalField, false)) {
-        return;
-      }
-    }
-    // 防抖 50ms：合并连续光标移动 / 输入，避免每次按键都重算语法树遍历。
-    if (this.timer !== null) clearTimeout(this.timer);
-    this.timer = setTimeout(() => {
-      this.timer = null;
-      if (this.destroyed) return;
-      this.decorations = this.compute(u.view);
-      // 空事务触发 CM6 重新读取 decorations getter（getter 返回新的 DecorationSet）。
-      u.view.dispatch([]);
-    }, DEBOUNCE_MS);
-  }
-
-  destroy(): void {
-    this.destroyed = true;
-    if (this.timer !== null) clearTimeout(this.timer);
-  }
+/**
+ * Mermaid SVG id 计数器（模块级）。
+ * StateField 是单例（每个 EditorState 一个），模块级计数器足够保证 id 唯一。
+ */
+let mermaidIdCounter = 0;
+function nextMermaidId(): string {
+  return `murasaki-mermaid-${mermaidIdCounter++}`;
 }
 
-/** WYSIWYG ViewPlugin —— 叠加到现有 CodeMirror 编辑器即可启用 WYSIWYG 隐藏。 */
-export const wysiwygPlugin = ViewPlugin.fromClass(WysiwygPluginValue, {
-  decorations: (v) => v.decorations,
+/**
+ * 显式触发装饰重算的 StateEffect。
+ * 用于语法树异步解析完成时通知 StateField 重算（StateField.update 只在 transaction 时触发，
+ * 而语法树解析完成不产生 transaction，需要 ViewPlugin 监听并 dispatch 此 effect）。
+ */
+export const recomputeWysiwygEffect = StateEffect.define<void>();
+
+/**
+ * 从 EditorState 计算 WYSIWYG DecorationSet（纯函数，无副作用）。
+ *
+ * 强制完整解析语法树（小文档同步完成；大文档 5s 超时回退到部分解析），
+ * 避免 FencedCode/Table 等节点未识别导致 widget 不渲染。
+ *
+ * 注意：StateField 无法访问 view.viewport，因此不做视口增量计算。
+ * 大文档（>10000 行）场景下性能可接受（CM6 RangeSet 增量构建），
+ * 如需优化可再引入 ViewPlugin 监听 viewport 并 dispatch effect。
+ */
+function computeDecorationsForState(state: EditorState): DecorationSet {
+  ensureSyntaxTree(state, state.doc.length + 1, 5000);
+  const decos = computeDecorations({
+    doc: state.doc.toString(),
+    selectionHead: state.selection.main.head,
+    tree: syntaxTree(state),
+    proposalRanges: getProposalRanges(state),
+    // StateField 不访问 viewport —— 全量计算（大文档性能可接受）
+    viewport: undefined,
+  });
+  return toDecorationSet(decos, nextMermaidId);
+}
+
+/**
+ * WYSIWYG StateField —— 提供所有 WYSIWYG 装饰。
+ *
+ * 通过 `EditorView.decorations.from(f)` 提供装饰，不受 ViewPlugin 的
+ * "不能跨换行块级替换" 限制，因此可以渲染代码块/表格/Mermaid 等多行 widget。
+ *
+ * 重算时机：
+ * - docChanged / selectionSet → 立即重算（光标移动改变段范围，标记 hide/dim 切换）
+ * - 提案 effect（add/remove/expire/action）→ 重算（提案覆盖范围标记可见性变化）
+ * - recomputeWysiwygEffect → 重算（语法树异步解析完成）
+ * - 其他 → 映射现有装饰到新位置（保持 widget 实例，避免重渲染）
+ */
+export const wysiwygField = StateField.define<DecorationSet>({
+  create(state) {
+    return computeDecorationsForState(state);
+  },
+  update(decos, tr) {
+    // docChanged 或 selection 变化 → 重算（光标移动改变段范围，标记 hide/dim 切换）
+    // 注意：Transaction 没有 selectionSet 布尔属性（那是 ViewUpdate 的），
+    // 用 tr.selection !== undefined 检测事务是否包含选区变化。
+    if (tr.docChanged || tr.selection !== undefined) {
+      return computeDecorationsForState(tr.state);
+    }
+    // 提案变化 → 重算
+    if (
+      tr.effects.some(
+        (e) =>
+          e.is(addProposalEffect) ||
+          e.is(removeProposalEffect) ||
+          e.is(expireAllProposalsEffect) ||
+          e.is(proposalActionEffect)
+      )
+    ) {
+      return computeDecorationsForState(tr.state);
+    }
+    // 显式重算 effect（语法树异步完成等）
+    if (tr.effects.some((e) => e.is(recomputeWysiwygEffect))) {
+      return computeDecorationsForState(tr.state);
+    }
+    // 其他事务：映射装饰到新位置（不重算，保持 widget 实例稳定）
+    return decos.map(tr.changes);
+  },
+  provide: (f) => EditorView.decorations.from(f),
 });
+
+// ===== 轻量 ViewPlugin：监听语法树异步解析变化 =====
+
+/**
+ * 语法树监视器：当语法树引用变化（异步解析完成）时，dispatch recomputeWysiwygEffect
+ * 通知 wysiwygField 重算装饰。
+ *
+ * 为什么需要这个？
+ * - StateField.update 只在 transaction 时触发，但语法树解析完成不产生 transaction。
+ * - 初次创建编辑器时，语法树可能未完整解析，FencedCode/Table/Link 等节点未被识别，
+ *   导致 widget 不渲染。语法树解析完成后，需要触发重算。
+ * - 此 ViewPlugin 不提供任何装饰（decorations 不返回），仅用于副作用 dispatch。
+ */
+const wysiwygSyntaxWatcher = ViewPlugin.fromClass(
+  class {
+    constructor(view: EditorView) {
+      // 初次构造时强制解析语法树（小文档同步完成）
+      ensureSyntaxTree(view.state, view.state.doc.length + 1, 5000);
+    }
+    update(u: ViewUpdate): void {
+      // 语法树引用变化 = 异步解析完成（或文档变化触发重新解析）
+      if (syntaxTree(u.startState) !== syntaxTree(u.state)) {
+        u.view.dispatch({ effects: recomputeWysiwygEffect.of() });
+      }
+    }
+    destroy(): void {
+      // nothing to clean up
+    }
+  }
+);
 
 /** WYSIWYG 所需样式（标记隐藏/dim、bullet、分隔线、引用块左边框、T7.2 块级 widget）。 */
 export const wysiwygTheme = EditorView.theme({
@@ -496,7 +561,11 @@ export const wysiwygTheme = EditorView.theme({
 });
 
 /**
- * 一键启用 WYSIWYG：ViewPlugin + 主题。
+ * 一键启用 WYSIWYG：StateField（提供装饰）+ 语法树监视 ViewPlugin + 主题。
+ *
  * 在 SourceEditor.vue 中通过 Compartment 按模式（source/split/wysiwyg）叠加/移除。
+ * - wysiwygField：StateField，提供所有 WYSIWYG 装饰（含跨换行块级 widget）
+ * - wysiwygSyntaxWatcher：ViewPlugin，监听语法树异步解析并触发重算（不提供装饰）
+ * - wysiwygTheme：EditorView.theme，WYSIWYG 样式
  */
-export const wysiwygExtensions = [wysiwygPlugin, wysiwygTheme];
+export const wysiwygExtensions = [wysiwygField, wysiwygSyntaxWatcher, wysiwygTheme];

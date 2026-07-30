@@ -287,6 +287,7 @@ function buildExtensions() {
     // 段落格式化快捷键（高优先级，避免被 defaultKeymap 拦截）
     paragraphKeymap(),
     markdown({
+      base: markdownLanguage, // 使用带 GFM 的 base（含删除线/任务列表/表格等扩展）
       defaultCodeLanguage: markdownLanguage,
       codeLanguages: languages,
     }),

@@ -13,8 +13,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
-import { resetWorkspace } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia } from "../helpers/store";
+import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
+import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
 
 let browser: Browser;
 
@@ -29,8 +29,33 @@ describe("设计系统", () => {
   });
 
   beforeEach(async () => {
+    await resetPersistenceSettings(browser);
+    const wsPath = resetWorkspace(defaultFixtureFiles());
     try { await closeAllTabs(browser); } catch { /* ignore */ }
     try { await closeWorkspace(browser); } catch { /* ignore */ }
+    // 打开工作区确保 StatusBar / 侧栏等 DOM 稳定渲染
+    // （前序 spec 可能将 statusBarVisible 切换为 false，打开工作区不直接重置它，
+    //  但状态栏内的图标渲染依赖 StatusBar 组件挂载，配合下方 waitUntil 保证存在）
+    await openWorkspace(browser, wsPath);
+    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    // 显式恢复状态栏可见（前序 spec 的 Alt+Shift+S 可能隐藏状态栏且未恢复）
+    await browser.execute(() => {
+      // @ts-ignore
+      const pinia = window.__pinia__;
+      // 状态栏显隐通过 keydown 切换；这里通过派发 Alt+Shift+S 让 App.vue 重置
+      // 但若已可见则不要再切，先检测 .status-bar 是否存在
+      if (!document.querySelector(".status-bar")) {
+        const ev = new KeyboardEvent("keydown", {
+          key: "s", bubbles: true, cancelable: true,
+          altKey: true, shiftKey: true,
+        });
+        window.dispatchEvent(ev);
+      }
+    });
+    await browser.pause(150);
+    // 等待状态栏出现（若已被隐藏）
+    const statusBar = await browser.$(".status-bar");
+    await statusBar.waitForExist({ timeout: 5000 });
   });
 
   it("--murasaki-primary token 解析为 #9333ea", async () => {

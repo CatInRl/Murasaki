@@ -305,11 +305,11 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
 
       // 代码块（围栏 / 缩进）：块级 widget
       if (name === "FencedCode" || name === "CodeBlock") {
+        const inParagraph = to >= para.from && from <= para.to;
         codeRanges.push({ from, to });
         if (!inViewport(from, to, viewport)) return false;
         if (overlapsAnyProposal(from, to, proposalRanges)) return false;
 
-        const inParagraph = to >= para.from && from <= para.to;
         if (inParagraph) {
           // 光标在代码块内：围栏 CodeMark 走默认 dim（继续遍历子节点）
           return true;

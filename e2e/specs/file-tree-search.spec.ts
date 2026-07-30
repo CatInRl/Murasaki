@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia } from "../helpers/store";
+import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
 
 let browser: Browser;
 
@@ -29,6 +29,7 @@ describe("文件树选中态 & 搜索高亮", () => {
   });
 
   beforeEach(async () => {
+    await resetPersistenceSettings(browser);
     try { await closeAllTabs(browser); } catch { /* ignore */ }
     try { await closeWorkspace(browser); } catch { /* ignore */ }
   });

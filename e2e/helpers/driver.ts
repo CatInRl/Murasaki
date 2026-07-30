@@ -243,6 +243,11 @@ export async function closeSession(browser: Browser): Promise<void> {
 
   // 清理 WebView2 用户数据目录：避免下一次 session 恢复上次的窗口状态
   // （例如 settings 窗口）。目录在 %LOCALAPPDATA%\com.murasaki.app\EBWebView\
+  //
+  // 注意：tauri-plugin-store 的持久化设置（sidebarView/editorMode 等）不在此时清理。
+  // TRAE Sandbox 会阻止 Node.js 和 PowerShell 子进程删除 %APPDATA%\com.murasaki.app\，
+  // 直接 kill 进程。持久化设置泄漏通过 resetPersistenceSettings(browser) 在
+  // 各 spec 的 beforeEach 中重置（走 Pinia store API，不涉及文件操作）。
   const identifier = "com.murasaki.app";
   const localAppData = `${process.env.USERPROFILE}\\AppData\\Local`;
   const webviewDir = resolve(localAppData, identifier, "EBWebView");

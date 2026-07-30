@@ -6,8 +6,7 @@
  */
 import { spawn, execSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createConnection } from "node:net";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
 
 const DRIVER_PORT = 4444;
 // tauri-driver 默认把 msedgedriver 监听在这个端口（cli.rs --native-port 默认 4445）。
@@ -125,30 +124,10 @@ export default async function setup(): Promise<void | (() => Promise<void>)> {
   // 0. 清理残留进程（避免上一次测试残留的 murasaki 持有文件句柄）
   killStaleProcesses();
 
-  // 1. 清理真实的 Tauri 应用数据目录（bundle identifier = com.murasaki.app）
-  //    - %APPDATA%\com.murasaki.app\  -> tauri-plugin-store (settings/recent/tabs.json)
-  //    - %LOCALAPPDATA%\com.murasaki.app\  -> WebView2 用户数据 + murasaki-args.log
-  //
-  //    注意：tauri-plugin-store 和 WebView2 使用 Win32 SHGetKnownFolderPath
-  //    读取真实 APPDATA，不尊重环境变量。所以不重定向 APPDATA，只清理真实目录。
-  //    之前重定向 APPDATA 会导致 msedgedriver 启动 murasaki 时，
-  //    murasaki 继承了重定向的 APPDATA，但 WebView2 在 msedgedriver 子进程中
-  //    可能因路径异常而启动失败（murasaki-argv.log 不生成 = murasaki 未启动）。
-  const identifier = "com.murasaki.app";
-  for (const base of [
-    `${process.env.USERPROFILE}\\AppData\\Roaming`,
-    `${process.env.USERPROFILE}\\AppData\\Local`
-  ]) {
-    const realDir = resolve(base, identifier);
-    if (existsSync(realDir)) {
-      console.log(`[e2e] cleaning real app data: ${realDir}`);
-      try {
-        rmSync(realDir, { recursive: true, force: true });
-      } catch (err) {
-        console.warn(`[e2e] failed to clean ${realDir}:`, err);
-      }
-    }
-  }
+  // 1. AppData 清理已移至 closeSession（每 spec 间清理）和运行前 PowerShell 外部清理。
+  //    TRAE Sandbox 会直接 kill 尝试删除 AppData 的 Node.js 进程，try/catch 无法兜底。
+  //    所以 setup.ts 不再做 AppData 清理，由 driver.ts 的 closeSession 通过
+  //    PowerShell 子进程清理（sandbox 允许 PowerShell 操作 AppData）。
 
   // 2. 启动 tauri-driver，显式传入 --native-driver 路径
   //    用 detached + shell 方式启动，避免 vitest fork 环境影响 tauri-driver 的 hyper 服务器

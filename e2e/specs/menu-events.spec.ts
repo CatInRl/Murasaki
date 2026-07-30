@@ -20,7 +20,8 @@ import {
   getTabsState,
   emitMenuEvent,
   waitForPinia,
-  ensureSplitMode
+  ensureSplitMode,
+  resetPersistenceSettings
 } from "../helpers/store";
 
 let browser: Browser;
@@ -38,6 +39,7 @@ describe("菜单事件链", () => {
   });
 
   beforeEach(async () => {
+    await resetPersistenceSettings(browser);
     const wsPath = resetWorkspace(defaultFixtureFiles());
     try {
       await closeAllTabs(browser);

@@ -22,6 +22,14 @@ e2e/.workspace-*/
 e2e/.diag-source.html
 e2e/.test-log.txt
 e2e/search-diag.txt
+e2e/e2e/
+e2e/parse-*.cjs
+e2e/test-summary.txt
+e2e/wysiwyg-full-report.json
+e2e/E2E-TEST-REPORT.md
+
+# TRAE IDE
+.trae/
 
 # E2E one-off diagnostic spec (manual debugging only)
 e2e/specs/inspect.spec.ts

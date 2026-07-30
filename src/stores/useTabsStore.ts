@@ -397,6 +397,15 @@ export const useTabsStore = defineStore("tabs", () => {
   /**
    * 从持久化状态恢复 tabs（应用启动时调用）
    * 注意：草稿内容已在 openFile 中读取，这里仅恢复路径列表
+   *
+   * 关键：按持久化顺序恢复 tab，避免 openFile（追加到末尾）和 newTab
+   * （追加到末尾）混合调用导致顺序错位。例如持久化顺序为
+   * [fileA, newFile, fileB]，如果先 openFile(fileA)、openFile(fileB)、
+   * 再 newTab(newFile)，恢复后顺序变为 [fileA, fileB, newFile]，
+   * activeIndex 会指向错误的 tab。
+   *
+   * 修复方案：先按顺序恢复所有 tab（path tab 通过 openFile 追加，
+   * newFile tab 通过 newTab 追加），然后按持久化顺序重排 tabs 数组。
    */
   async function restore(): Promise<void> {
     restoring.value = true;
@@ -405,27 +414,44 @@ export const useTabsStore = defineStore("tabs", () => {
       const state = await persistence.loadTabs();
       if (state.tabs.length === 0) return;
 
-      // 恢复每个 tab
+      // 阶段 1：按持久化顺序恢复每个 tab，记录持久化路径到 tab id 的映射
+      const orderedTabIds: string[] = []; // 按持久化顺序记录 tab id
+
       for (const persisted of state.tabs) {
         if (persisted.path) {
           try {
-            await openFile(persisted.path);
+            const tab = await openFile(persisted.path);
             // 覆盖光标/滚动位置（openFile 不恢复这些）
-            const tab = tabs.value.find((t) => t.path === persisted.path);
             if (tab) {
               tab.cursor = persisted.cursor;
               tab.scroll = persisted.scroll;
             }
+            if (tab) orderedTabIds.push(tab.id);
           } catch (err) {
             console.warn(`恢复 tab 失败: ${persisted.path}`, err);
+            // 失败的 tab 不计入 orderedTabIds，后续重排时跳过
           }
         } else {
           // 未保存的新文件 tab
-          newTab(persisted.content);
+          const tab = newTab(persisted.content);
+          orderedTabIds.push(tab.id);
         }
       }
 
-      // 恢复激活索引
+      // 阶段 2：按持久化顺序重排 tabs 数组
+      // openFile 和 newTab 都追加到末尾，但混合调用时顺序可能错位
+      // 通过 orderedTabIds 重建正确的顺序
+      if (orderedTabIds.length === tabs.value.length) {
+        const tabMap = new Map(tabs.value.map((t) => [t.id, t]));
+        const reordered = orderedTabIds
+          .map((id) => tabMap.get(id))
+          .filter((t): t is Tab => t !== undefined);
+        if (reordered.length === tabs.value.length) {
+          tabs.value = reordered;
+        }
+      }
+
+      // 阶段 3：恢复激活索引
       if (state.activeIndex >= 0 && state.activeIndex < tabs.value.length) {
         activeTabId.value = tabs.value[state.activeIndex].id;
       }

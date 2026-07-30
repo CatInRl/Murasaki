@@ -10,13 +10,14 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, closeAllTabs } from "../helpers/store";
+import { openWorkspace, closeWorkspace, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
 
 let browser: Browser;
 
 describe("工作区 + 文件树", () => {
   beforeAll(async () => {
     browser = await createSession();
+    await waitForPinia(browser);
   }, 60000);
 
   afterAll(async () => {
@@ -24,6 +25,7 @@ describe("工作区 + 文件树", () => {
   });
 
   beforeEach(async () => {
+    await resetPersistenceSettings(browser);
     // 每个测试前重置工作区并关闭已打开的工作区和 tabs
     // 避免前序测试的 tab 残留导致 sidebar 不消失（App.vue v-if="hasWorkspace || hasTabs"）
     resetWorkspace(defaultFixtureFiles());

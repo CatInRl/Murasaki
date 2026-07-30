@@ -15,7 +15,8 @@ import {
   openFileInTab,
   setActiveContent,
   waitForPinia,
-  ensureSplitMode
+  ensureSplitMode,
+  resetPersistenceSettings
 } from "../helpers/store";
 
 let browser: Browser;
@@ -33,6 +34,7 @@ describe("编辑器 + 预览 同步", () => {
   });
 
   beforeEach(async () => {
+    await resetPersistenceSettings(browser);
     const wsPath = resetWorkspace(defaultFixtureFiles());
     try {
       await closeWorkspace(browser);

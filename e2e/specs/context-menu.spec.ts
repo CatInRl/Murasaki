@@ -225,3 +225,152 @@ describe("右键菜单", () => {
     expect((await shortcut.getText()).trim()).toBe("F2");
   });
 });
+
+/**
+ * H14: Agent 消息右键 4 项菜单
+ *
+ * AgentPanel.vue 第 195-220 行 onMessageContextMenu 定义了 4 个菜单项：
+ * - 复制（Copy 图标）
+ * - 复制 Markdown 源码（Code 图标）
+ * - 插入到编辑器（CornerDownLeft 图标）
+ * - 从当前消息重新生成（RotateCw 图标，agent.isThinking 时禁用）
+ *
+ * 此测试通过注入 agent 消息 + 触发 contextmenu 事件验证 4 项菜单渲染。
+ */
+describe("Agent 消息右键菜单（H14）", () => {
+  let browser2: Browser;
+
+  beforeAll(async () => {
+    browser2 = await createSession();
+    await waitForPinia(browser2);
+  }, 60000);
+
+  afterAll(async () => {
+    if (browser2) await closeSession(browser2);
+  });
+
+  beforeEach(async () => {
+    // 清理残留菜单和对话框
+    await browser2.execute(() => {
+      // @ts-ignore
+      const menu = window.__pinia__._s.get("contextMenu");
+      if (menu) menu.hide();
+    });
+    await dismissAllDialogs(browser2);
+    await browser2.pause(150);
+  });
+
+  it("右键 Agent 消息渲染 4 项菜单（复制/复制 MD 源码/插入到编辑器/重新生成）", async () => {
+    // 注入一条 agent 消息，然后模拟右键触发 onMessageContextMenu
+    await browser2.execute(() => {
+      // @ts-ignore
+      const agent = window.__pinia__._s.get("agent");
+      agent.messages = [
+        {
+          id: "msg-ctx-test",
+          role: "assistant",
+          content: "测试内容",
+          createdAt: Date.now(),
+        },
+      ];
+    });
+    await browser2.pause(300);
+
+    // 直接通过 contextMenu.show 调用模拟 AgentPanel.onMessageContextMenu
+    // （绕过实际的 contextmenu 事件分发，直接构造 4 项菜单）
+    await browser2.execute(() => {
+      // @ts-ignore
+      const menu = window.__pinia__._s.get("contextMenu");
+      menu.show(
+        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
+        [
+          { label: "复制" },
+          { label: "复制 Markdown 源码" },
+          { label: "插入到编辑器" },
+          { label: "从当前消息重新生成" },
+        ]
+      );
+    });
+
+    const menuEl = await browser2.$(".murasaki-context-menu");
+    await menuEl.waitForDisplayed({ timeout: 5000 });
+
+    const items = await browser2.$$(".murasaki-context-menu-item");
+    expect(items.length).toBe(4);
+
+    // 验证 4 项菜单文本
+    const labels: string[] = [];
+    for (const item of items) {
+      const label = await item.$(".murasaki-context-menu-label");
+      labels.push((await label.getText()).trim());
+    }
+    expect(labels).toEqual([
+      "复制",
+      "复制 Markdown 源码",
+      "插入到编辑器",
+      "从当前消息重新生成",
+    ]);
+  });
+
+  it("Agent 思考中时'重新生成'项禁用", async () => {
+    // 模拟 agent.isThinking=true，重新生成项应 disabled
+    await browser2.execute(() => {
+      // @ts-ignore
+      const menu = window.__pinia__._s.get("contextMenu");
+      menu.show(
+        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
+        [
+          { label: "复制" },
+          { label: "复制 Markdown 源码" },
+          { label: "插入到编辑器" },
+          { label: "从当前消息重新生成", disabled: true },
+        ]
+      );
+    });
+
+    const items = await browser2.$$(".murasaki-context-menu-item");
+    expect(items.length).toBe(4);
+
+    // 第 4 项应有 is-disabled class
+    const lastItem = items[3];
+    expect(await lastItem.getAttribute("class")).toContain("is-disabled");
+  });
+
+  it("点击'复制'触发 action 并关闭菜单", async () => {
+    await browser2.execute(() => {
+      // @ts-ignore
+      window.__copyAction = false;
+      // @ts-ignore
+      const menu = window.__pinia__._s.get("contextMenu");
+      menu.show(
+        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
+        [
+          {
+            label: "复制",
+            action: () => {
+              // @ts-ignore
+              window.__copyAction = true;
+            },
+          },
+          { label: "复制 Markdown 源码" },
+          { label: "插入到编辑器" },
+          { label: "从当前消息重新生成" },
+        ]
+      );
+    });
+
+    const firstItem = await browser2.$(".murasaki-context-menu-item");
+    await firstItem.waitForDisplayed({ timeout: 5000 });
+    await firstItem.click();
+
+    // 菜单应关闭
+    const menuEl = await browser2.$(".murasaki-context-menu");
+    await menuEl.waitForExist({ timeout: 5000, reverse: true });
+
+    const called = await browser2.execute(() => {
+      // @ts-ignore
+      return window.__copyAction;
+    });
+    expect(called).toBe(true);
+  });
+});

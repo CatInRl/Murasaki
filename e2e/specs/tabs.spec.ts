@@ -14,7 +14,9 @@ import {
   openWorkspace,
   closeWorkspace,
   openFileInTab,
-  getTabsState
+  getTabsState,
+  waitForPinia,
+  resetPersistenceSettings
 } from "../helpers/store";
 
 let browser: Browser;
@@ -22,6 +24,7 @@ let browser: Browser;
 describe("多 Tab 管理", () => {
   beforeAll(async () => {
     browser = await createSession();
+    await waitForPinia(browser);
   }, 60000);
 
   afterAll(async () => {
@@ -29,6 +32,7 @@ describe("多 Tab 管理", () => {
   });
 
   beforeEach(async () => {
+    await resetPersistenceSettings(browser);
     const wsPath = resetWorkspace(defaultFixtureFiles());
     try {
       await closeWorkspace(browser);
