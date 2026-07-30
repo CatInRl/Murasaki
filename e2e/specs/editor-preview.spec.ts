@@ -13,7 +13,9 @@ import {
   openWorkspace,
   closeWorkspace,
   openFileInTab,
-  setActiveContent
+  setActiveContent,
+  waitForPinia,
+  ensureSplitMode
 } from "../helpers/store";
 
 let browser: Browser;
@@ -21,6 +23,9 @@ let browser: Browser;
 describe("编辑器 + 预览 同步", () => {
   beforeAll(async () => {
     browser = await createSession();
+    await waitForPinia(browser);
+    // E2E 全量运行时前序 spec 可能改了 editorMode，强制重置为 split
+    await ensureSplitMode(browser);
   }, 60000);
 
   afterAll(async () => {

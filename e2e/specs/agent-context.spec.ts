@@ -16,10 +16,14 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
-import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab } from "../helpers/store";
+import { resetWorkspace, defaultFixtureFiles, setupActiveProvider, teardownActiveProvider } from "../helpers/fixtures";
+import { openWorkspace, closeWorkspace, openFileInTab, dismissAllDialogs, closeAllTabs } from "../helpers/store";
 
 let browser: Browser;
+
+// 工具调用可见性测试需要 provider 配置才能渲染对话区
+// （AgentPanel 在 showNoProvider=true 时显示"未配置 AI 服务"空状态，遮挡消息列表）
+const API_KEY = process.env.MURASAKI_E2E_API_KEY ?? "";
 
 describe("Agent 上下文 + 工具调用可见性", () => {
   beforeAll(async () => {
@@ -27,16 +31,23 @@ describe("Agent 上下文 + 工具调用可见性", () => {
   }, 60000);
 
   afterAll(async () => {
-    if (browser) await closeSession(browser);
+    if (browser) {
+      try { await teardownActiveProvider(browser); } catch { /* ignore */ }
+      await closeSession(browser);
+    }
   });
 
   beforeEach(async () => {
     resetWorkspace(defaultFixtureFiles());
+    // 关闭所有 tabs（避免 dirty tab 触发 unsaved dialog 遮挡点击）
+    try { await closeAllTabs(browser); } catch { /* ignore */ }
     try {
       await closeWorkspace(browser);
     } catch {
       // 首次启动无工作区
     }
+    // 关闭前序 spec 残留的 dialog / toast（dialog-overlay 会遮挡点击）
+    await dismissAllDialogs(browser);
     // 清空 agent 对话
     await browser.execute(() => {
       // @ts-ignore
@@ -44,6 +55,25 @@ describe("Agent 上下文 + 工具调用可见性", () => {
       const agent = pinia._s.get("agent");
       if (agent) agent.clearConversation();
     });
+    // 配置 provider，确保 AgentPanel 渲染对话区而非"未配置 AI 服务"空状态
+    // 工具调用可见性测试（test 6/7/8）依赖对话区渲染
+    try { await teardownActiveProvider(browser); } catch { /* ignore */ }
+    if (API_KEY) {
+      try {
+        await setupActiveProvider(browser, API_KEY);
+        // 验证 provider 已配置
+        const hasProvider = await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("aiProviders").hasProvider;
+        });
+        console.log(`[beforeEach] setupActiveProvider ok, hasProvider=${hasProvider}`);
+      } catch (err) {
+        console.error(`[beforeEach] setupActiveProvider failed:`, err instanceof Error ? err.message : String(err));
+        throw err;
+      }
+    } else {
+      console.warn(`[beforeEach] API_KEY is empty, skipping provider setup`);
+    }
   });
 
   it("无工作区时显示「打开工作区后启用 Agent」空状态", async () => {
@@ -140,6 +170,38 @@ describe("Agent 上下文 + 工具调用可见性", () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
+    // provider 已在 beforeEach 中通过 setupActiveProvider 配置，
+    // AgentPanel 渲染对话区而非"未配置 AI 服务"空状态。
+
+    // 调试：检查 AgentPanel 状态
+    const debugState = await browser.execute(() => {
+      // @ts-ignore
+      const pinia = window.__pinia__;
+      const aiProviders = pinia._s.get("aiProviders");
+      const workspace = pinia._s.get("workspace");
+      const persistence = pinia._s.get("persistence");
+      const agent = pinia._s.get("agent");
+      return {
+        hasProvider: aiProviders.hasProvider,
+        hasWorkspace: workspace.hasWorkspace,
+        showAgentPanel: persistence?.settings?.showAgentPanel,
+        messagesLen: agent.messages.length,
+        isLoading: agent.isLoading,
+      };
+    });
+    console.log("[debug] AgentPanel state:", JSON.stringify(debugState));
+
+    // 等待 agent store 完成从磁盘加载对话（loadChatFromDisk 是异步的，
+    // 会覆盖 messages.value，必须在 push 前等待完成）
+    await browser.waitUntil(async () => {
+      const loading = await browser.execute(() => {
+        // @ts-ignore
+        return window.__pinia__._s.get("agent").isLoading;
+      });
+      return loading === false;
+    }, { timeout: 5000, interval: 100 });
+    console.log("[debug] agent.isLoading is now false");
+
     // 直接构造一条带工具调用的 assistant 消息
     await browser.execute(() => {
       // @ts-ignore
@@ -170,8 +232,60 @@ describe("Agent 上下文 + 工具调用可见性", () => {
       });
     });
 
+    // 调试：检查消息是否推入
+    const msgCount = await browser.execute(() => {
+      // @ts-ignore
+      return window.__pinia__._s.get("agent").messages.length;
+    });
+    console.log(`[debug] messages count after push: ${msgCount}`);
+
+    // 调试：检查消息的 toolCalls 字段
+    const msgDebug = await browser.execute(() => {
+      // @ts-ignore
+      const agent = window.__pinia__._s.get("agent");
+      const msg = agent.messages[0];
+      if (!msg) return { msgExists: false };
+      return {
+        msgExists: true,
+        role: msg.role,
+        hasToolCalls: !!msg.toolCalls,
+        toolCallsLen: msg.toolCalls?.length,
+        toolCallsType: typeof msg.toolCalls,
+        isArray: Array.isArray(msg.toolCalls),
+        keys: Object.keys(msg),
+      };
+    });
+    console.log("[debug] message object:", JSON.stringify(msgDebug));
+
+    // 调试：检查 AgentPanel 渲染了什么
+    await browser.pause(500);
+    const panelDebug = await browser.execute(() => {
+      const panel = document.querySelector(".agent-panel");
+      if (!panel) return { panelExists: false };
+      const emptyStates = panel.querySelectorAll(".agent-empty-state");
+      const conversations = panel.querySelectorAll(".agent-conversation");
+      const messages = panel.querySelectorAll(".agent-message");
+      const assistantMsgs = panel.querySelectorAll(".agent-message-assistant");
+      const toolCards = panel.querySelectorAll(".tool-call-card");
+      const headers = panel.querySelectorAll(".tool-call-card-header");
+      const assistantEl = assistantMsgs[0];
+      return {
+        panelExists: true,
+        emptyStateCount: emptyStates.length,
+        conversationCount: conversations.length,
+        messageCount: messages.length,
+        assistantMsgCount: assistantMsgs.length,
+        toolCardCount: toolCards.length,
+        headerCount: headers.length,
+        assistantInnerHTML: assistantEl ? assistantEl.innerHTML.substring(0, 800) : null,
+      };
+    });
+    console.log("[debug] panel render:", JSON.stringify(panelDebug));
+
     // 展开工具调用折叠卡片（T4.1: 条目在折叠卡片内，需先展开）
+    // 注意：messages.push 后 Vue 异步渲染，需 waitForExist 等待卡片挂载
     const cardHeader1 = await browser.$(".tool-call-card-header");
+    await cardHeader1.waitForExist({ timeout: 5000 });
     await cardHeader1.click();
     await browser.pause(200);
 
@@ -197,6 +311,8 @@ describe("Agent 上下文 + 工具调用可见性", () => {
     const wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
+
+    // provider 已在 beforeEach 中配置
 
     await browser.execute(() => {
       // @ts-ignore
@@ -227,6 +343,7 @@ describe("Agent 上下文 + 工具调用可见性", () => {
 
     // 点击卡片头部展开（T4.1: 折叠卡片整体展开）
     const cardHeader2 = await browser.$(".tool-call-card-header");
+    await cardHeader2.waitForExist({ timeout: 5000 });
     await cardHeader2.click();
 
     // 详情应可见
@@ -244,6 +361,8 @@ describe("Agent 上下文 + 工具调用可见性", () => {
     const wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
+
+    // provider 已在 beforeEach 中配置
 
     await browser.execute(() => {
       // @ts-ignore
@@ -270,6 +389,7 @@ describe("Agent 上下文 + 工具调用可见性", () => {
 
     // 展开工具调用折叠卡片（T4.1: 条目在折叠卡片内，需先展开）
     const cardHeader3 = await browser.$(".tool-call-card-header");
+    await cardHeader3.waitForExist({ timeout: 5000 });
     await cardHeader3.click();
     await browser.pause(200);
 

@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles, setupActiveProvider, teardownActiveProvider } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab } from "../helpers/store";
+import { openWorkspace, closeWorkspace, openFileInTab, dismissAllDialogs, closeAllTabs } from "../helpers/store";
 
 let browser: Browser;
 
@@ -26,7 +26,9 @@ describe("Agent 上下文压缩与护栏", () => {
 
   beforeEach(async () => {
     resetWorkspace(defaultFixtureFiles());
+    try { await closeAllTabs(browser); } catch { /* ignore */ }
     try { await closeWorkspace(browser); } catch { /* ignore */ }
+    await dismissAllDialogs(browser);
     await browser.execute(() => {
       // @ts-ignore
       const agent = window.__pinia__._s.get("agent");

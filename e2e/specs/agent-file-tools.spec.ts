@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace } from "../helpers/store";
+import { openWorkspace, closeWorkspace, dismissAllDialogs, closeAllTabs } from "../helpers/store";
 
 let browser: Browser;
 
@@ -28,11 +28,13 @@ describe("Agent 文件类工具", () => {
 
   beforeEach(async () => {
     resetWorkspace(defaultFixtureFiles());
+    try { await closeAllTabs(browser); } catch { /* ignore */ }
     try {
       await closeWorkspace(browser);
     } catch {
       // 首次启动无工作区
     }
+    await dismissAllDialogs(browser);
   });
 
   it("无工作区时 list_files 返回错误", async () => {

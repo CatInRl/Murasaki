@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles, setupActiveProvider, teardownActiveProvider } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab } from "../helpers/store";
+import { openWorkspace, closeWorkspace, openFileInTab, dismissAllDialogs, closeAllTabs } from "../helpers/store";
 
 const API_KEY = process.env.MURASAKI_E2E_API_KEY ?? "";
 
@@ -33,7 +33,9 @@ describe("Agent 取消/中断", () => {
   beforeEach(async () => {
     if (!API_KEY) return;
     resetWorkspace(defaultFixtureFiles());
+    try { await closeAllTabs(browser); } catch { /* ignore */ }
     try { await closeWorkspace(browser); } catch { /* ignore */ }
+    await dismissAllDialogs(browser);
     await browser.execute(() => {
       // @ts-ignore
       const agent = window.__pinia__._s.get("agent");
@@ -55,6 +57,17 @@ describe("Agent 取消/中断", () => {
     const card = await browser.$(".agent-context-card");
     await card.waitForExist({ timeout: 10000 });
 
+    // 验证 provider 已配置（sendMessage 在 status="thinking" 前需要先 await get_api_key）
+    const providerOk = await browser.execute(() => {
+      const aiProviders = (window as any).__pinia__._s.get("aiProviders");
+      return !!(aiProviders?.activeProvider && aiProviders.hasProvider);
+    });
+    if (!providerOk) {
+      console.warn("[diag] provider 未就绪，重试 setupActiveProvider");
+      await setupActiveProvider(browser, API_KEY);
+      await browser.pause(500);
+    }
+
     // 发送一条可能耗时较长的消息
     const sendPromise = browser.executeAsync((done: (res: unknown) => void) => {
       const agent = (window as any).__pinia__._s.get("agent");
@@ -64,16 +77,28 @@ describe("Agent 取消/中断", () => {
       setTimeout(() => done(null), 100);
     });
 
-    // 等待 thinking 状态
-    await browser.waitUntil(
-      async () => {
-        const status = await browser.execute(
-          () => (window as any).__pinia__._s.get("agent")?.status
-        );
-        return status === "thinking";
-      },
-      { timeout: 10000 }
-    );
+    // 等待 thinking 状态（sendMessage 需先 await get_api_key invoke，全量 E2E 下可能较慢）
+    let lastStatus = "";
+    try {
+      await browser.waitUntil(
+        async () => {
+          const status = await browser.execute(
+            () => (window as any).__pinia__._s.get("agent")?.status
+          );
+          lastStatus = String(status);
+          return status === "thinking";
+        },
+        { timeout: 20000, interval: 500 }
+      );
+    } catch (err) {
+      const errMsg = await browser.execute(
+        () => (window as any).__pinia__._s.get("agent")?.errorMessage
+      );
+      throw new Error(
+        `等待 thinking 超时：lastStatus="${lastStatus}", errorMessage="${errMsg ?? ""}". ` +
+        `providerOk=${providerOk}`
+      );
+    }
 
     // 等待 sendMessage 启动
     await sendPromise;
@@ -92,14 +117,14 @@ describe("Agent 取消/中断", () => {
         );
         return status === "interrupted" || status === "done" || status === "error" || status === "idle";
       },
-      { timeout: 10000 }
+      { timeout: 15000 }
     );
 
     const finalStatus = await browser.execute(
       () => (window as any).__pinia__._s.get("agent")?.status
     );
     expect(["interrupted", "done", "idle", "error"]).toContain(finalStatus);
-  }, 30000);
+  }, 60000);
 
   it("中断后 assistant 消息含 interrupted: true", async () => {
     if (!API_KEY) {
@@ -128,7 +153,7 @@ describe("Agent 取消/中断", () => {
         );
         return status === "thinking";
       },
-      { timeout: 10000 }
+      { timeout: 20000, interval: 500 }
     );
 
     await sendPromise2;
@@ -146,7 +171,7 @@ describe("Agent 取消/中断", () => {
         );
         return status !== "thinking";
       },
-      { timeout: 10000 }
+      { timeout: 15000 }
     );
 
     await browser.pause(500);
@@ -169,5 +194,5 @@ describe("Agent 取消/中断", () => {
         expect((lastMsg as any).interrupted).toBe(true);
       }
     }
-  }, 30000);
+  }, 60000);
 });

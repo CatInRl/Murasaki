@@ -4,6 +4,67 @@
  */
 import type { Browser } from "webdriverio";
 
+/**
+ * 等待主窗口加载完成并暴露 __pinia__
+ *
+ * 关键：webdriverio 9.x 的 waitUntil 与 browser.execute 组合在 tauri-driver 下
+ * 行为异常（execute 返回 false 后 waitUntil 不重试），改用手动轮询。
+ *
+ * 健壮性处理：如果上一次测试遗留了 settings 窗口的 WebView2 状态，新 session
+ * 的 active window 可能是 settings 窗口（title = "设置"），且 WebView2 可能在
+ * 启动后异步恢复 settings 窗口。解决方案：每次轮询时检查当前 title，若非
+ * "Murasaki" 则遍历 handles 切换到主窗口。
+ */
+export async function waitForPinia(
+  browser: Browser,
+  timeout = 30000
+): Promise<void> {
+  const start = Date.now();
+  let lastSwitchAttempt = 0;
+
+  while (Date.now() - start < timeout) {
+    // 每 2s 或首次：遍历所有 handles，寻找暴露了 __pinia__ 的窗口。
+    // 不再依赖 title === "Murasaki"（启动期间 title 可能是 "localhost" 或空），
+    // 而是直接在每个 handle 上执行 execute 检测 __pinia__。
+    if (Date.now() - lastSwitchAttempt > 2000) {
+      lastSwitchAttempt = Date.now();
+      try {
+        const handles = await browser.getWindowHandles().catch(() => []);
+        for (const handle of handles) {
+          try {
+            await browser.switchToWindow(handle);
+            const hasPinia = await browser.execute(() => {
+              // @ts-ignore
+              return !!(window as any).__pinia__;
+            }).catch(() => false);
+            if (hasPinia) return;
+          } catch {
+            // 忽略：该 handle 可能已失效
+          }
+        }
+      } catch {
+        // 忽略：切换失败不致命
+      }
+    }
+
+    const ready = await browser.execute(() => {
+      // @ts-ignore
+      return !!(window as any).__pinia__;
+    });
+    if (ready) return;
+    await browser.pause(500);
+  }
+  // 超时：诊断信息
+  const title = await browser.getTitle().catch(() => "<unknown>");
+  const state = await browser.execute(() => document.readyState).catch(() => "<unknown>");
+  const handles = await browser.getWindowHandles().catch(() => []);
+  throw new Error(
+    `waitForPinia 超时 (${timeout}ms)：__pinia__ 未暴露。` +
+    ` title="${title}", readyState="${state}", handles=${handles.length}.` +
+    ` 可能原因：上一次测试遗留 WebView2 窗口状态（如 settings 窗口）。`
+  );
+}
+
 /** 获取 store 实例（在浏览器上下文中执行） */
 export async function getStore<T = any>(
   browser: Browser,
@@ -49,14 +110,21 @@ export async function closeWorkspace(browser: Browser): Promise<void> {
 }
 
 /** 关闭所有 tabs（测试隔离用，避免前序测试的 tab 残留导致 sidebar 不消失）
- *  用 doCloseTab 强制关闭，绕过 dirty tab 的 needsConfirm 弹窗 */
+ *  用 doCloseTab 强制关闭，绕过 dirty tab 的 needsConfirm 弹窗。
+ *  逐个关闭避免 Promise.all 并发导致 splice 索引错位（dirty tab 在 await invoke
+ *  期间数组被其他 close 修改，splice(idx) 删错元素） */
 export async function closeAllTabs(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
     // @ts-ignore
     const pinia = window.__pinia__;
     const tabs = pinia._s.get("tabs");
     const ids = tabs.tabs.map((t: any) => t.id);
-    Promise.all(ids.map((id: string) => Promise.resolve(tabs.doCloseTab(id))))
+    // 逐个关闭：reduce 串联 Promise，确保前一个 doCloseTab 完成后再执行下一个
+    ids.reduce(
+      (p: Promise<unknown>, id: string) =>
+        p.then(() => Promise.resolve(tabs.doCloseTab(id))),
+      Promise.resolve()
+    )
       .then(() => done(null))
       .catch((err: unknown) => done(err ? String(err) : null));
   });
@@ -139,6 +207,88 @@ export async function getCurrentTheme(browser: Browser): Promise<string> {
     const persistence = pinia._s.get("persistence");
     return persistence?.settings?.markdownTheme ?? null;
   });
+}
+
+/**
+ * 确保编辑器处于 split 模式（显示预览面板）。
+ *
+ * E2E 全量运行时，前序 spec 可能将 editorMode 改为 source/wysiwyg 并持久化，
+ * 导致后续 spec 的 .preview-pane 不存在。此 helper 在 beforeAll 中调用，
+ * 强制重置为 split 并等待应用生效。
+ */
+export async function ensureSplitMode(browser: Browser): Promise<void> {
+  await browser.executeAsync((done: (res: unknown) => void) => {
+    // @ts-ignore
+    const pinia = window.__pinia__;
+    const persistence = pinia._s.get("persistence");
+    Promise.resolve(persistence.updateSettings({ editorMode: "split" }))
+      .then(() => done(null))
+      .catch((err: unknown) => done(err ? String(err) : null));
+  });
+  // 等待 editorBridge watch 触发 + 重新渲染
+  await browser.pause(500);
+}
+
+/**
+ * 重置持久化设置到默认值（测试隔离用）。
+ *
+ * 清理前序 spec 残留的 editorMode / showAgentPanel / sidebarView 等设置，
+ * 确保当前 spec 从干净状态开始。
+ */
+export async function resetPersistenceSettings(browser: Browser): Promise<void> {
+  await browser.executeAsync((done: (res: unknown) => void) => {
+    // @ts-ignore
+    const pinia = window.__pinia__;
+    const persistence = pinia._s.get("persistence");
+    Promise.resolve(persistence.updateSettings({
+      editorMode: "split",
+      showAgentPanel: true,
+      sidebarView: "files",
+      showLineNumbers: true,
+      softWrap: true,
+    }))
+      .then(() => done(null))
+      .catch((err: unknown) => done(err ? String(err) : null));
+  });
+  await browser.pause(300);
+}
+
+/**
+ * 关闭所有打开的对话框（测试隔离用）。
+ *
+ * 前序 spec 可能残留未关闭的 dialog（如 unsaved changes / confirm / prompt），
+ * dialog-overlay 会遮挡后续测试的点击。此 helper 直接清空 dialog store 的 queue。
+ * 同时清理 toast，避免残留吐司遮挡元素。
+ */
+export async function dismissAllDialogs(browser: Browser): Promise<void> {
+  await browser.execute(() => {
+    // @ts-ignore
+    const pinia = window.__pinia__;
+    const dialog = pinia._s.get("dialog");
+    if (dialog && dialog.queue) {
+      // resolve 所有 pending promise 为 cancel，再清空 queue
+      const items = dialog.queue.slice();
+      for (const item of items) {
+        try {
+          switch (item.kind) {
+            case "alert": item.resolver(undefined); break;
+            case "confirm": item.resolver(false); break;
+            case "prompt": item.resolver(null); break;
+            case "conflict": item.resolver({ action: "cancel" }); break;
+            case "unsaved": item.resolver("cancel"); break;
+            default: item.resolver(undefined); break;
+          }
+        } catch { /* ignore */ }
+      }
+      dialog.queue.length = 0;
+    }
+    // 清理 toast
+    const toast = pinia._s.get("toast");
+    if (toast && toast.items) {
+      toast.items.length = 0;
+    }
+  });
+  await browser.pause(150);
 }
 
 /**

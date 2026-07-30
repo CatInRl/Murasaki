@@ -18,7 +18,9 @@ import {
   closeAllTabs,
   openFileInTab,
   getTabsState,
-  emitMenuEvent
+  emitMenuEvent,
+  waitForPinia,
+  ensureSplitMode
 } from "../helpers/store";
 
 let browser: Browser;
@@ -26,6 +28,9 @@ let browser: Browser;
 describe("菜单事件链", () => {
   beforeAll(async () => {
     browser = await createSession();
+    await waitForPinia(browser);
+    // E2E 全量运行时前序 spec 可能改了 editorMode，强制重置为 split
+    await ensureSplitMode(browser);
   }, 60000);
 
   afterAll(async () => {
@@ -140,11 +145,36 @@ describe("菜单事件链", () => {
     });
 
     it("menu-event 'settings' 打开设置窗口", async () => {
+      const handlesBefore = await browser.getWindowHandles();
       await emitMenuEvent(browser, "settings");
-      // SettingsWindow 通过 NModal preset="card" 渲染，内部有 .settings-layout
-      const layout = await browser.$(".settings-layout");
-      await layout.waitForExist({ timeout: 3000 });
-      expect(await layout.isDisplayed()).toBe(true);
+      // 设置窗口现在是独立的 Tauri 多窗口（ADR-0009），不再是 NModal。
+      // E2E 环境下第二个 WebView2 无法加载 tauri://localhost/settings.html
+      // （additional_browser_args 只注入了主窗口），所以只验证窗口创建。
+      // 事件链：emit menu-event → App.vue listener → handleMenuEvent → openSettings → invoke("open_settings")
+      // 需要较长超时等待整个异步链完成。
+      await browser.waitUntil(
+        async () => (await browser.getWindowHandles()).length > handlesBefore.length,
+        { timeout: 15000, interval: 500 }
+      );
+      const handlesAfter = await browser.getWindowHandles();
+      expect(handlesAfter.length).toBeGreaterThan(handlesBefore.length);
+
+      // 清理：关闭 settings 窗口（fire-and-forget，invoke Promise 不会 resolve）
+      const settingsHandle = handlesAfter.find((h) => !handlesBefore.includes(h));
+      if (settingsHandle) {
+        await browser.switchToWindow(settingsHandle);
+        await browser.executeAsync((done: (res: unknown) => void) => {
+          try {
+            // @ts-ignore
+            window.__TAURI_INTERNALS__.invoke("plugin:window|close", { label: "settings" });
+          } catch { /* ignore */ }
+          done(null);
+        });
+        await browser.pause(500);
+        // 切回主窗口
+        const mainHandle = handlesBefore[0];
+        if (mainHandle) await browser.switchToWindow(mainHandle);
+      }
     });
   });
 });

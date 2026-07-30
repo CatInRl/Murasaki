@@ -7,13 +7,14 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
-import { closeWorkspace, closeAllTabs } from "../helpers/store";
+import { closeWorkspace, closeAllTabs, waitForPinia } from "../helpers/store";
 
 let browser: Browser;
 
 describe("Murasaki 启动 smoke 测试", () => {
   beforeAll(async () => {
     browser = await createSession();
+    await waitForPinia(browser);
   }, 60000);
 
   afterAll(async () => {
@@ -27,6 +28,13 @@ describe("Murasaki 启动 smoke 测试", () => {
     try {
       await closeAllTabs(browser);
       await closeWorkspace(browser);
+    } catch {
+      // ignore
+    }
+    // 等待欢迎页渲染
+    try {
+      const wp = await browser.$(".welcome-page");
+      await wp.waitForExist({ timeout: 5000 });
     } catch {
       // ignore
     }
@@ -46,6 +54,11 @@ describe("Murasaki 启动 smoke 测试", () => {
   it("欢迎页包含 'Murasaki' 标题文本", async () => {
     const titleEl = await browser.$(".welcome-page .brand-title");
     await titleEl.waitForExist({ timeout: 10000 });
+    // Vue 异步渲染可能需要额外时间填充文本
+    await browser.waitUntil(async () => {
+      const text = (await titleEl.getText()).trim();
+      return text.length > 0;
+    }, { timeout: 5000 });
     const text = (await titleEl.getText()).trim();
     expect(text).toMatch(/Murasaki/i);
   });

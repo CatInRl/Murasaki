@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles, setupActiveProvider, teardownActiveProvider } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab } from "../helpers/store";
+import { openWorkspace, closeWorkspace, openFileInTab, dismissAllDialogs, closeAllTabs } from "../helpers/store";
 
 const API_KEY = process.env.MURASAKI_E2E_API_KEY ?? "";
 
@@ -37,7 +37,9 @@ describe("Agent LLM 调用循环", () => {
   beforeEach(async () => {
     if (!API_KEY) return;
     resetWorkspace(defaultFixtureFiles());
+    try { await closeAllTabs(browser); } catch { /* ignore */ }
     try { await closeWorkspace(browser); } catch { /* ignore */ }
+    await dismissAllDialogs(browser);
     // 清空对话
     await browser.execute(() => {
       // @ts-ignore

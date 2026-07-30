@@ -20,7 +20,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
-import { openWorkspace, closeWorkspace, openFileInTab, getTabsState } from "../helpers/store";
+import { openWorkspace, closeWorkspace, openFileInTab, getTabsState, waitForPinia, ensureSplitMode } from "../helpers/store";
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -307,6 +307,8 @@ let browser: Browser;
 beforeAll(async () => {
   writeFixtures();
   browser = await createSession();
+  await waitForPinia(browser);
+  await ensureSplitMode(browser);
 }, 60000);
 
 afterAll(async () => {

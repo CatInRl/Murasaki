@@ -15,7 +15,31 @@ export interface FixtureFile {
 
 /** 重置工作区目录，写入指定文件 */
 export function resetWorkspace(files: FixtureFile[] = []): string {
-  if (existsSync(WORKSPACE_ROOT)) rmSync(WORKSPACE_ROOT, { recursive: true, force: true });
+  if (existsSync(WORKSPACE_ROOT)) {
+    // 前序测试的 murasaki.exe 进程可能仍持有 .workspace 目录的文件句柄
+    // （file watcher 释放需要时间），导致 rmSync 遇到 EPERM。
+    // 重试最多 3 次，每次失败后等待 500ms。
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        rmSync(WORKSPACE_ROOT, { recursive: true, force: true });
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        // 等待 500ms 让 murasaki 释放文件句柄
+        const start = Date.now();
+        while (Date.now() - start < 500) { /* busy wait */ }
+      }
+    }
+    if (lastErr) {
+      // 最后一次尝试仍失败：抛出清晰错误
+      throw new Error(
+        `resetWorkspace: rmSync failed after 3 retries (EPERM?): ${String(lastErr)}.\n` +
+        "可能原因：前序测试的 murasaki.exe 进程仍持有 .workspace 文件句柄。"
+      );
+    }
+  }
   mkdirSync(WORKSPACE_ROOT, { recursive: true });
   for (const f of files) {
     const fullPath = resolve(WORKSPACE_ROOT, f.path);

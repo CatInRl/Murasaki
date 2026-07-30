@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles, setupActiveProvider, teardownActiveProvider } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace } from "../helpers/store";
+import { openWorkspace, closeWorkspace, openFileInTab } from "../helpers/store";
 
 const API_KEY = process.env.MURASAKI_E2E_API_KEY ?? "";
 
@@ -41,7 +41,9 @@ describe("Agent 对话持久化", () => {
       return;
     }
     await openWorkspace(browser, wpPath);
-    
+    // 需要打开文件才能触发 agent 上下文卡片渲染
+    await openFileInTab(browser, `${wpPath}\\intro.md`);
+
     // 发送一条消息
     const card = await browser.$(".agent-context-card");
     await card.waitForExist({ timeout: 10000 });

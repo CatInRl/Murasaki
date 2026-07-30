@@ -484,11 +484,13 @@ describe("3. 多 Tab 切换时撤销栈独立性", () => {
 
     const originalA = await cmGetDoc(browser);
     await cmInsertText(browser, "X");
-    await browser.waitUntil(async () => (await cmGetDoc(browser)).includes("X"), { timeout: 3000 });
+    // 超时从 3000ms 提升到 10000ms：Tab A 是 math.md（含 KaTeX 公式），
+    // CodeMirror 在切换后重新渲染公式可能延迟，3s 不够
+    await browser.waitUntil(async () => (await cmGetDoc(browser)).includes("X"), { timeout: 10000 });
     const afterInputA = await cmGetDoc(browser);
 
     await cmUndo(browser);
-    expect(await cmGetDoc(browser)).toBe(originalA);
+    await browser.waitUntil(async () => (await cmGetDoc(browser)) === originalA, { timeout: 10000 });
 
     // 切到 Tab B 再切回 Tab A
     await browser.executeAsync((id: string, done) => {
@@ -504,9 +506,9 @@ describe("3. 多 Tab 切换时撤销栈独立性", () => {
       done(null);
     }, tabA.id);
 
-    // redo 应恢复 X
+    // redo 应恢复 X —— 用 waitUntil 等待 redo 在切换后稳定传播
     await cmRedo(browser);
-    expect(await cmGetDoc(browser)).toBe(afterInputA);
+    await browser.waitUntil(async () => (await cmGetDoc(browser)) === afterInputA, { timeout: 10000 });
   });
 
   it("3.3 关闭 Tab A 后 Tab B 撤销栈不受影响", async () => {

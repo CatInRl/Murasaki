@@ -18,6 +18,7 @@ import { resolve } from "node:path";
 import { execSync } from "node:child_process";
 import http from "node:http";
 import { createConnection } from "node:net";
+import { existsSync, rmSync } from "node:fs";
 
 const DEFAULT_BINARY = resolve(
   process.cwd(),
@@ -199,6 +200,11 @@ export async function createSession(
  *
  * msedgedriver 子进程也可能残留，导致下一个 session 创建失败
  *（DevToolsActivePort file doesn't exist / Chrome instance exited）。
+ *
+ * 关键：murasaki 退出后必须清理 WebView2 用户数据目录（EBWebView），
+ * 否则下一次启动 murasaki 时 WebView2 会恢复上次的窗口状态
+ *（例如 settings-window 测试遗留的设置窗口），导致新 session 的
+ * active window 不是主窗口（title != "Murasaki"），__pinia__ 也不可见。
  */
 export async function closeSession(browser: Browser): Promise<void> {
   try {
@@ -207,26 +213,45 @@ export async function closeSession(browser: Browser): Promise<void> {
     // 忽略：session 可能已经失效
   }
   // 等待 murasaki 进程退出（最多 8 秒）
+  let exited = false;
   for (let i = 0; i < 16; i++) {
     try {
       execSync(
         'powershell -NoProfile -Command "if (Get-Process -Name murasaki -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"',
         { timeout: 2000, stdio: "ignore" }
       );
-      return; // 进程已退出
+      exited = true;
+      break;
     } catch {
       await new Promise((r) => setTimeout(r, 500));
     }
   }
-  // 超时后强制清理 murasaki（不要杀 msedgedriver —— 会孤立 tauri-driver，
-  // 而 tauri-driver 只在启动时 spawn 一次 msedgedriver，无法恢复）。
-  try {
-    execSync(
-      'powershell -NoProfile -Command "Get-Process -Name murasaki -ErrorAction SilentlyContinue | Stop-Process -Force"',
-      { timeout: 5000, stdio: "ignore" }
-    );
-  } catch {
-    // 忽略
+  if (!exited) {
+    // 超时后强制清理 murasaki（不要杀 msedgedriver —— 会孤立 tauri-driver，
+    // 而 tauri-driver 只在启动时 spawn 一次 msedgedriver，无法恢复）。
+    try {
+      execSync(
+        'powershell -NoProfile -Command "Get-Process -Name murasaki -ErrorAction SilentlyContinue | Stop-Process -Force"',
+        { timeout: 5000, stdio: "ignore" }
+      );
+    } catch {
+      // 忽略
+    }
   }
-  await new Promise((r) => setTimeout(r, 1500));
+  // 等待文件句柄释放（无论正常退出还是强杀）
+  await new Promise((r) => setTimeout(r, 1200));
+
+  // 清理 WebView2 用户数据目录：避免下一次 session 恢复上次的窗口状态
+  // （例如 settings 窗口）。目录在 %LOCALAPPDATA%\com.murasaki.app\EBWebView\
+  const identifier = "com.murasaki.app";
+  const localAppData = `${process.env.USERPROFILE}\\AppData\\Local`;
+  const webviewDir = resolve(localAppData, identifier, "EBWebView");
+  if (existsSync(webviewDir)) {
+    try {
+      rmSync(webviewDir, { recursive: true, force: true });
+    } catch (err) {
+      // 忽略：偶发 EPERM（WebView2 子进程残留句柄）
+      console.warn(`[driver] failed to clean EBWebView:`, err instanceof Error ? err.message : String(err));
+    }
+  }
 }
