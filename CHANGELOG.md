@@ -13,7 +13,7 @@
 - **设计系统基础对齐（#33, #34）**：引入 lucide-vue-next 统一图标库替换所有 emoji + 内联 SVG + naive-ui NIcon；保留 naive-ui 通过 NConfigProvider + themeOverrides 把颜色/圆角/字体变量映射到 `--murasaki-*` token；补全字号/阴影/menubar-height/transition token；清理 CompareWindow/SearchPanel 等组件的硬编码颜色。
 - **反馈系统基础设施（#36, #37, #38）**：自建 Toast store + Teleport 容器（6 变体：success/info/warning/error/progress/deleted）+ Promise API 对话框（alert/confirm/prompt/conflict 四类型，替换 36 处原生弹窗）+ 数据驱动右键菜单（TabBar/Editor/Agent 消息/TreeNode 四处）；统一视觉：取消在左/确认在右、Escape 等同取消、打开聚焦默认按钮。
 - **状态展示三兄弟（#39）**：自建 EmptyState + ErrorState + Skeleton 组件，共享虚线边框容器与 props 模式，替换 naive-ui NEmpty/NSpin/NSkeleton。
-- **WYSIWYG 模式（#42, #43, #44, #45）**：CodeMirror 6 内 WYSIWYG（Typora 路线），单编辑器实例，markdown 文本为唯一数据源，通过 ViewPlugin + Decoration 隐藏/显示语法标记。三种模式（source/split/wysiwyg）共用同一 CM6 实例，全部运行时切换无需重启。光标进入段落时标记 dim 灰色显现，离开后隐藏。P0 行级语法标记隐藏 + P1 块级元素 widget（代码块 Shiki 高亮/链接/图片/表格/KaTeX/Mermaid SVG）全部实现。
+- **WYSIWYG 模式（#42, #43, #44, #45）**：CodeMirror 6 内 WYSIWYG（Typora 路线），单编辑器实例，markdown 文本为唯一数据源，通过 StateField + Decoration 隐藏/显示语法标记。三种模式（source/split/wysiwyg）共用同一 CM6 实例，全部运行时切换无需重启。光标进入段落时标记 dim 灰色显现，离开后隐藏。P0 行级语法标记隐藏 + P1 块级元素 widget（代码块 Shiki 高亮/链接/图片/表格/KaTeX/Mermaid SVG）全部实现。
 - **WYSIWYG 工具栏（#46, #47）**：编辑器顶部工具栏，源码/WYSIWYG 模式共用，分组按钮（文本格式/标题/列表/插入）+ 分隔符，行为一致修改底层 markdown 文本。
 - **设置窗口多窗口化（#48, #49, #50, #51, #52, #53）**：改为 Tauri 多窗口形态（独立 OS 窗口可独立最小化/关闭）；3 个分类（常规/编辑器/AI）；显式 Save 模型（恢复默认/保存两个按钮，关闭未保存弹确认）；AI 分类含 Provider 列表 + 编辑表单 + 测试连接 + 高级参数折叠区；Provider 删除二次确认。
 - **Markdown 渲染样式统一（#84-#89）**：新建 `src/styles/markdown-content.css` 作为预览/导出/WYSIWYG 共享样式单一来源，5 套主题（murasaki/github/newsprint/night/academic）通过 data-md-theme 切换，Murasaki 紫色品牌主题为默认；Shiki 自定义品牌色主题（keyword 紫 #c084fc / function 蓝 #60a5fa / string 绿 #4ade80）；Mermaid 紫色主题变量；KaTeX 蓝色样式；标题字号对齐设计稿（H1=22px/H2=18px/H3=15px）；WYSIWYG widget 样式与预览像素级对齐。
@@ -47,6 +47,7 @@
 - 主题菜单勾选状态：菜单项改用 `CheckMenuItemBuilder`，新增 `set_theme_checked` 命令
 - 撤销到原始内容后 dirty 标记不清：Tab 加 `savedContent` 字段，`updateContent` 对比决定 `isDirty`
 - 刷新按钮卡死：`list_tree` 加 30s 超时兜底 + `refreshTree` 防重入锁
+- WYSIWYG 块级 widget 不渲染：CM6 限制 ViewPlugin 不能提供跨换行块级替换装饰（"Decorations that replace line breaks may not be specified via plugins"），导致代码块/表格/Mermaid 等多行 widget 不渲染。重构为 StateField + 轻量 ViewPlugin 监听器架构：`wysiwygField` (StateField) 通过 `EditorView.decorations.from(f)` 提供装饰不受此限制，`wysiwygSyntaxWatcher` (ViewPlugin) 监听语法树异步解析变化并 dispatch `recomputeWysiwygEffect` 触发重算。
 
 ### Changed（Post-Release）
 
@@ -61,6 +62,9 @@
 - 新增 `workspace.spec.ts`：刷新按钮停止动画
 - 新增 `settings-window.spec.ts`：单入口路由渲染设置页
 - 新增 `verify-wysiwyg-manual.spec.ts`：WYSIWYG 真实用户路径验证（6 个测试）
+- 新增 `wysiwyg-full.spec.ts`：WYSIWYG 全量展示与编辑测试（19 大类 79 用例）
+- 新增 `wysiwyg-widgets.spec.ts`：WYSIWYG 块级 widget 渲染测试（14 用例）
+- 新增 12 个功能盲区 spec：`agent-panel-visual` / `context-menu-business` / `external-modifications` / `file-operations` / `html-export` / `misc-visual` / `outline-navigation` / `persistence-recovery` / `scroll-sync` / `search-navigation` / `settings-explicit-save` / `shortcuts` / `state-display`
 
 ## [0.2.0] - 2026-07-29
 
