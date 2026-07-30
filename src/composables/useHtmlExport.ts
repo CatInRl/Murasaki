@@ -1,9 +1,47 @@
 import { invoke } from "@tauri-apps/api/core";
-import { getMarkdownRenderer, getFrontMatter } from "./useMarkdownRenderer";
-import { renderFrontMatterCard, FRONT_MATTER_CSS } from "./useFrontMatter";
+import { getMarkdownRenderer, getFrontMatter, resolveShikiThemeOption } from "./useMarkdownRenderer";
+import { renderFrontMatterCard } from "./useFrontMatter";
 import { MARKDOWN_THEMES } from "./useTheme";
-import { codeToHtml } from "shiki";
+import { codeToHtml, type ThemeRegistration } from "shiki";
 import { dirname, extname, joinPaths } from "../utils/path";
+import markdownContentCss from "../styles/markdown-content.css?raw";
+
+/**
+ * Murasaki 应用级 design token（--murasaki-* 变量）
+ *
+ * 导出 HTML 是独立文件，不在 Vue 应用内，无法从 :root 继承主题.css 中
+ * 声明的 --murasaki-* 值。markdown-content.css 在多处引用了这些变量
+ * （如 var(--murasaki-primary)、var(--murasaki-radius-md)），因此需要把
+ * markdown-content.css 实际引用到的 --murasaki-* 值内联到导出 CSS 的 :root。
+ *
+ * 取值必须与 src/styles/theme.css 的 :root 块保持一致；任何主题.css 的
+ * 调整都需要同步反映到这里。
+ */
+const MURASAKI_DESIGN_TOKENS = `
+  --murasaki-primary: #9333ea;
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-line: #e5e5e5;
+  --murasaki-border: #e5e5e5;
+  --murasaki-state-info: #2563eb;
+  --murasaki-neutral-900: #171717;
+  --murasaki-background: #ffffff;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+  --murasaki-font-ui: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --murasaki-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --murasaki-duration-fast: 120ms;
+  --murasaki-ease: cubic-bezier(0.4, 0, 0.2, 1);
+`;
 
 /**
  * HTML 导出 composable
@@ -33,79 +71,39 @@ export interface ExportHtmlOptions {
   filePath: string | null;
 }
 
-/** 主题 CSS：与 PreviewPane.vue 的样式一致（精简版） */
-function getThemeCss(theme: string): string {
-  // 基础 markdown-body 样式 + 共享的 front-matter 卡片样式
-  const base = `
-.markdown-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; padding: 24px 32px; }
-.markdown-body h1 { font-size: 2em; margin: 0.67em 0; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-.markdown-body h2 { font-size: 1.5em; margin: 0.83em 0; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-.markdown-body h3 { font-size: 1.25em; margin: 1em 0; }
-.markdown-body h4 { font-size: 1em; margin: 1em 0; }
-.markdown-body h5 { font-size: 0.875em; margin: 1em 0; }
-.markdown-body h6 { font-size: 0.85em; color: #6a737d; margin: 1em 0; }
-.markdown-body p { margin: 0 0 16px; }
-.markdown-body ul, .markdown-body ol { margin: 0 0 16px; padding-left: 2em; }
-.markdown-body li { margin: 4px 0; }
-.markdown-body blockquote { margin: 0 0 16px; padding: 0 1em; color: #6a737d; border-left: 0.25em solid #dfe2e5; }
-.markdown-body code { font-family: Consolas, 'Courier New', monospace; font-size: 0.92em; background: rgba(175, 184, 193, 0.2); padding: 0.2em 0.4em; border-radius: 3px; }
-.markdown-body pre { background: #0d1117; color: #c9d1d9; padding: 16px; border-radius: 6px; overflow: auto; margin: 0 0 16px; }
-.markdown-body pre code { background: transparent; padding: 0; font-size: 0.9em; }
-.markdown-body a { color: #0366d6; text-decoration: none; }
-.markdown-body a:hover { text-decoration: underline; }
-.markdown-body img { max-width: 100%; }
-.markdown-body table { border-collapse: collapse; margin: 0 0 16px; display: block; overflow: auto; }
-.markdown-body th, .markdown-body td { border: 1px solid #dfe2e5; padding: 6px 13px; }
-.markdown-body th { background: #f6f8fa; font-weight: 600; }
-.markdown-body hr { border: 0; border-top: 1px solid #eaecef; margin: 24px 0; }
-.markdown-body .mermaid { text-align: center; margin: 16px 0; }
-.markdown-body input[type="checkbox"] { margin-right: 0.5em; }
-${FRONT_MATTER_CSS}
+/**
+ * 主题 CSS：从共享样式 src/styles/markdown-content.css 读取
+ *
+ * 实现导出=预览（GitHub issue #86 / T3）：
+ *   - markdown-content.css 的 [data-md-theme="X"] 块定义 --md-* 主题变量
+ *   - .markdown-body 后代选择器定义所有 markdown 元素样式（含 front-matter 卡片）
+ *   - 导出 HTML 的 body 同时带 markdown-body class 和 data-md-theme 属性，
+ *     使 [data-md-theme="X"] 与 .markdown-body 选择器在同一元素上生效，
+ *     主题切换通过 data-md-theme 属性驱动，与 PreviewPane 完全一致
+ *   - --murasaki-* 设计 token 在导出文件内未定义，需在 :root 内联
+ *   - 容器布局（padding/background/font）镜像 PreviewPane 的 .preview-pane 样式
+ */
+function getThemeCss(_theme: string): string {
+  return `
+:root {
+${MURASAKI_DESIGN_TOKENS}
+}
+html, body {
+  margin: 0;
+  padding: 0;
+}
+body.markdown-body {
+  /* 容器布局，与 PreviewPane.vue 的 .preview-pane 一致 */
+  padding: 28px 36px;
+  background: var(--md-bg, var(--murasaki-background));
+  color: var(--md-fg, var(--murasaki-ink));
+  font-family: var(--murasaki-font-ui);
+  font-size: 14px;
+  line-height: 1.75;
+}
+/* 共享 markdown 元素样式（含 front-matter 卡片，主题差异由 data-md-theme 驱动） */
+${markdownContentCss}
 `;
-
-  if (theme === "night") {
-    return (
-      base +
-      `
-body { background: #0d1117; }
-.markdown-body { color: #c9d1d9; background: #0d1117; }
-.markdown-body a { color: #58a6ff; }
-.markdown-body blockquote { color: #8b949e; border-left-color: #30363d; }
-.markdown-body th { background: #161b22; }
-.markdown-body th, .markdown-body td { border-color: #30363d; }
-.markdown-body code { background: rgba(110, 118, 129, 0.4); }
-.markdown-body h6 { color: #8b949e; }
-/* Night 主题的 front-matter 卡片样式已由共享 CSS 中的 .theme-night 前缀覆盖 */
-.markdown-body.theme-night .front-matter-card { background: #161b22; border-color: #30363d; }
-`
-    );
-  }
-  if (theme === "newsprint") {
-    return (
-      base +
-      `
-body { background: #f5f5f0; }
-.markdown-body { color: #2a2a2a; background: #f5f5f0; }
-`
-    );
-  }
-  if (theme === "academic") {
-    return (
-      base +
-      `
-body { background: #fffdf7; }
-.markdown-body { color: #1a1a1a; background: #fffdf7; font-family: Georgia, "Times New Roman", serif; }
-`
-    );
-  }
-  // github (default)
-  return (
-    base +
-    `
-body { background: #fff; }
-.markdown-body { color: #24292e; background: #fff; }
-`
-  );
 }
 
 /** 解析 Shiki 主题名 */
@@ -192,7 +190,7 @@ async function inlineImages(
  */
 async function highlightCodeBlocksInHtml(
   html: string,
-  shikiTheme: string
+  shikiTheme: string | ThemeRegistration
 ): Promise<string> {
   // 匹配 <pre><code class="language-xxx" data-lang="xxx">...</code></pre>
   const blockRegex =
@@ -236,7 +234,7 @@ export async function exportHtml(options: ExportHtmlOptions): Promise<string> {
   const bodyHtml = renderer.render(source);
 
   // 2. 高亮代码块
-  const shikiTheme = resolveShikiTheme(theme);
+  const shikiTheme = resolveShikiThemeOption(resolveShikiTheme(theme));
   let highlighted = await highlightCodeBlocksInHtml(bodyHtml, shikiTheme);
 
   // 3. 内联图片为 Base64
@@ -247,6 +245,10 @@ export async function exportHtml(options: ExportHtmlOptions): Promise<string> {
   const finalBody = fmCard + highlighted;
 
   // 5. 包装完整 HTML
+  // body 同时带 markdown-body class 和 data-md-theme 属性：
+  //   - markdown-body 让 markdown-content.css 的 .markdown-body 后代选择器生效
+  //   - data-md-theme 触发 [data-md-theme="X"] 块定义的 --md-* 主题变量
+  //   - 不再需要内层 .markdown-body div 包裹（body 本身即容器）
   const css = getThemeCss(theme);
   const html = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -258,10 +260,8 @@ export async function exportHtml(options: ExportHtmlOptions): Promise<string> {
 ${css}
 </style>
 </head>
-<body>
-<div class="markdown-body">
+<body class="markdown-body" data-md-theme="${theme}">
 ${finalBody}
-</div>
 </body>
 </html>`;
 

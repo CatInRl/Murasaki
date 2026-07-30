@@ -1110,6 +1110,9 @@ async function handleMenuEvent(menuId: string): Promise<void> {
     case "settings":
       await openSettings();
       break;
+    case "theme-murasaki":
+      currentTheme.value = "murasaki";
+      break;
     case "theme-github":
       currentTheme.value = "github";
       break;

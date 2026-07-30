@@ -22,7 +22,7 @@ import { codeToHtml } from "shiki";
 import katex from "katex";
 import mermaid from "mermaid";
 import { proposalField } from "../../agent/proposals";
-import { currentShikiTheme, getMarkdownRenderer } from "../../composables/useMarkdownRenderer";
+import { currentShikiTheme, getMarkdownRenderer, resolveShikiThemeOption } from "../../composables/useMarkdownRenderer";
 import {
   computeDecorations,
   ComputedDeco,
@@ -79,25 +79,37 @@ class CodeBlockWidget extends WidgetType {
     return other.lang === this.lang && other.code === this.code;
   }
   toDOM(): HTMLElement {
+    const wrapper = document.createElement("div");
+    wrapper.className = "murasaki-wysiwyg-codeblock-wrapper";
+
+    // 语言标签栏（issue #85 / T2）：有语言时显示，空语言不显示
+    if (this.lang) {
+      const label = document.createElement("div");
+      label.className = "murasaki-wysiwyg-code-lang-label";
+      label.textContent = this.lang;
+      wrapper.appendChild(label);
+    }
+
     const pre = document.createElement("pre");
     pre.className = "murasaki-wysiwyg-codeblock";
     const codeEl = document.createElement("code");
     if (this.lang) codeEl.className = `language-${this.lang}`;
     codeEl.textContent = this.code;
     pre.appendChild(codeEl);
-    // 异步 Shiki 高亮：完成后用高亮 HTML 替换占位
-    void codeToHtml(this.code, { lang: this.lang || "text", theme: currentShikiTheme.value })
+    wrapper.appendChild(pre);
+    // 异步 Shiki 高亮：完成后用高亮 HTML 替换占位 <pre>（保留 wrapper + 语言标签）
+    void codeToHtml(this.code, { lang: this.lang || "text", theme: resolveShikiThemeOption(currentShikiTheme.value) })
       .then((html) => {
         if (!pre.isConnected) return;
-        const wrapper = document.createElement("div");
-        wrapper.innerHTML = html;
-        const replacement = wrapper.firstElementChild as HTMLElement | null;
+        const tmp = document.createElement("div");
+        tmp.innerHTML = html;
+        const replacement = tmp.firstElementChild as HTMLElement | null;
         if (replacement) pre.replaceWith(replacement);
       })
       .catch(() => {
         // 未知语言或加载失败：保留 <pre><code> 占位
       });
-    return pre;
+    return wrapper;
   }
   ignoreEvent(): boolean {
     return true;
@@ -222,7 +234,10 @@ class MathWidget extends WidgetType {
   }
   toDOM(): HTMLElement {
     const el = document.createElement(this.displayMode ? "div" : "span");
-    el.className = "murasaki-wysiwyg-math";
+    // 块级公式追加 modifier class，便于在 wysiwygTheme 中区分块级居中样式（T6）
+    el.className = this.displayMode
+      ? "murasaki-wysiwyg-math murasaki-wysiwyg-math-block"
+      : "murasaki-wysiwyg-math";
     try {
       el.innerHTML = katex.renderToString(this.expr, {
         displayMode: this.displayMode,
@@ -358,10 +373,15 @@ export const wysiwygTheme = EditorView.theme({
     opacity: "0.4",
     fontSize: "80%",
   },
+  // 引用块：紫色淡背景 + 斜体 + 灰色文字，对齐预览 .markdown-body blockquote（T6）
   ".murasaki-wysiwyg-blockquote": {
     borderLeft: "3px solid var(--murasaki-purple-300, #d8b4fe)",
-    paddingLeft: "10px",
-    color: "var(--murasaki-ink-2, #525252)",
+    background: "var(--murasaki-purple-50, #faf5ff)",
+    color: "var(--murasaki-muted-foreground, #737373)",
+    fontStyle: "italic",
+    padding: "10px 16px",
+    borderRadius:
+      "0 var(--murasaki-radius-sm, 4px) var(--murasaki-radius-sm, 4px) 0",
   },
   ".murasaki-wysiwyg-bullet": {
     color: "var(--murasaki-primary, #9333ea)",
@@ -375,19 +395,50 @@ export const wysiwygTheme = EditorView.theme({
     height: "0",
   },
   // T7.2 块级 widget 样式
+  // 代码块：深色 neutral-900 背景，对齐预览 .markdown-body pre（T6）
   ".murasaki-wysiwyg-codeblock": {
-    backgroundColor: "var(--murasaki-surface, #fafafa)",
-    border: "1px solid var(--murasaki-line, #e5e5e5)",
-    borderRadius: "6px",
-    padding: "8px 12px",
+    backgroundColor: "#171717",
+    color: "#e5e7eb",
+    borderRadius: "var(--murasaki-radius-md, 8px)",
+    padding: "14px 18px",
     fontFamily: "var(--murasaki-font-mono, ui-monospace, monospace)",
-    fontSize: "12.5px",
+    fontSize: "13px",
+    lineHeight: "1.6",
     overflow: "auto",
-    margin: "4px 0",
+    margin: "12px 0 16px",
+    boxShadow: "var(--murasaki-shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.04))",
   },
+  // 代码块 wrapper + 语言标签栏（issue #85 / T2）：与预览 .code-block-wrapper 视觉一致
+  ".murasaki-wysiwyg-codeblock-wrapper": {
+    overflow: "hidden",
+    borderRadius: "var(--murasaki-radius-md, 8px)",
+    margin: "12px 0 16px",
+    boxShadow: "var(--murasaki-shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.04))",
+  },
+  ".murasaki-wysiwyg-codeblock-wrapper .murasaki-wysiwyg-codeblock": {
+    margin: "0",
+    borderRadius: "0",
+    boxShadow: "none",
+  },
+  ".murasaki-wysiwyg-codeblock-wrapper .murasaki-wysiwyg-code-lang-label": {
+    backgroundColor: "var(--murasaki-neutral-800, #262626)",
+    color: "var(--murasaki-neutral-400, #a3a3a3)",
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    padding: "4px 12px",
+    borderBottom: "1px solid var(--murasaki-neutral-700, #404040)",
+  },
+  // Mermaid：白色卡片包裹，对齐预览/T5（T6）
   ".murasaki-wysiwyg-mermaid": {
-    textAlign: "center",
-    margin: "8px 0",
+    background: "white",
+    border: "1px solid var(--murasaki-border, #e5e5e5)",
+    borderRadius: "var(--murasaki-radius-md, 8px)",
+    padding: "0.75rem",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "12px 0",
     minHeight: "20px",
     color: "var(--murasaki-ink-3, #a3a3a3)",
     fontSize: "12px",
@@ -396,19 +447,28 @@ export const wysiwygTheme = EditorView.theme({
     maxWidth: "100%",
     height: "auto",
   },
+  // 链接：紫色 primary + 始终下划线，对齐预览 .markdown-body a（T6）
   ".murasaki-wysiwyg-link": {
-    color: "#2563eb",
+    color: "var(--murasaki-primary, #9333ea)",
     textDecoration: "underline",
     cursor: "text",
   },
+  ".murasaki-wysiwyg-link:hover": {
+    color: "var(--murasaki-purple-700, #7e22ce)",
+  },
+  // 图片：圆角 + 阴影，对齐预览 .markdown-body img（T6）
   ".murasaki-wysiwyg-image": {
     maxWidth: "100%",
+    borderRadius: "var(--murasaki-radius-sm, 4px)",
+    boxShadow: "var(--murasaki-shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.04))",
     display: "inline-block",
     verticalAlign: "middle",
   },
+  // 表格：字号 13px + padding 对齐预览 .markdown-body table（T6）
   ".murasaki-wysiwyg-table": {
     margin: "8px 0",
     overflow: "auto",
+    fontSize: "13px",
   },
   ".murasaki-wysiwyg-table table": {
     borderCollapse: "collapse",
@@ -416,14 +476,22 @@ export const wysiwygTheme = EditorView.theme({
   },
   ".murasaki-wysiwyg-table th, .murasaki-wysiwyg-table td": {
     border: "1px solid var(--murasaki-line, #e5e5e5)",
-    padding: "4px 8px",
+    padding: "8px 14px",
   },
   ".murasaki-wysiwyg-table th": {
-    backgroundColor: "var(--murasaki-surface, #fafafa)",
+    backgroundColor: "var(--murasaki-surface-2, #f3f4f6)",
     fontWeight: "600",
   },
+  // 数学公式：蓝色斜体，对齐预览 KaTeX 样式（T5 / T6）
   ".murasaki-wysiwyg-math": {
+    color: "var(--murasaki-state-info, #2563eb)",
+    fontStyle: "italic",
     display: "inline-block",
+  },
+  ".murasaki-wysiwyg-math-block": {
+    display: "block",
+    textAlign: "center",
+    padding: "0.5rem 0",
   },
 });
 

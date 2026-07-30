@@ -13,7 +13,7 @@ import markdownItContainer from "markdown-it-container";
 import markdownItMultimdTable from "markdown-it-multimd-table";
 import markdownItTexmath from "markdown-it-texmath";
 import katex from "katex";
-import { codeToHtml } from "shiki";
+import { codeToHtml, type ThemeRegistration } from "shiki";
 import { getCurrentTheme } from "./useTheme";
 
 /**
@@ -21,6 +21,82 @@ import { getCurrentTheme } from "./useTheme";
  * 通过 setShikiTheme 切换，切换后需要重新高亮已渲染的代码块。
  */
 let currentShikiThemeName = getCurrentTheme().shikiTheme;
+
+/**
+ * Murasaki 品牌色 Shiki 主题（issue #85 / T2）。
+ * 对齐设计稿 ux-markdown-structures.html:543 的语法色：
+ *  - keyword / storage：#c084fc（紫，品牌主色系）
+ *  - function / type：#60a5fa（蓝）
+ *  - string：#4ade80（绿）
+ *  - comment：#6b7280 italic（灰斜体）
+ *  - variable：#e5e7eb（深色代码块前景）
+ *  - number / boolean：#2563eb（info 蓝）
+ *  - operator / punctuation：#6b7280（灰）
+ *
+ * 代码块背景为深色（--md-codeblock-bg: var(--murasaki-neutral-900)），故 type=dark，
+ * variable 用深色模式前景 #e5e7eb。
+ * 当 currentShikiThemeName === "murasaki" 时通过 resolveShikiThemeOption 传入。
+ */
+const murasakiShikiTheme: ThemeRegistration = {
+  name: "murasaki",
+  type: "dark",
+  colors: {
+    "editor.background": "#171717",
+    "editor.foreground": "#e5e7eb",
+  },
+  fg: "#e5e7eb",
+  bg: "#171717",
+  tokenColors: [
+    {
+      scope: ["keyword", "storage.type", "storage.modifier"],
+      settings: { foreground: "#c084fc" },
+    },
+    {
+      scope: ["entity.name.function", "support.function"],
+      settings: { foreground: "#60a5fa" },
+    },
+    {
+      scope: ["string", "string.quoted"],
+      settings: { foreground: "#4ade80" },
+    },
+    {
+      scope: ["comment"],
+      settings: { foreground: "#6b7280", fontStyle: "italic" },
+    },
+    {
+      scope: ["variable", "meta.variable"],
+      settings: { foreground: "#e5e7eb" },
+    },
+    {
+      scope: ["constant.numeric", "constant.language.boolean"],
+      settings: { foreground: "#2563eb" },
+    },
+    {
+      scope: [
+        "entity.name.class",
+        "entity.name.type",
+        "support.type",
+        "support.class",
+      ],
+      settings: { foreground: "#60a5fa" },
+    },
+    {
+      scope: ["keyword.operator", "punctuation"],
+      settings: { foreground: "#6b7280" },
+    },
+  ],
+};
+
+/**
+ * 解析 Shiki 主题参数：murasaki 主题返回自定义 theme object，其他主题返回主题名字符串。
+ * 供 highlightCodeBlocks / wysiwygPlugin / useHtmlExport 共用，确保 murasaki 主题走品牌色。
+ */
+export function resolveShikiThemeOption(
+  themeName: string
+): string | ThemeRegistration {
+  if (themeName === "murasaki") return murasakiShikiTheme;
+  return themeName;
+}
 
 /**
  * 自定义 fence 处理：
@@ -45,7 +121,12 @@ function codeBlockPlugin(md: MarkdownIt) {
     const escapedCode = md.utils.escapeHtml(code);
     const langAttr = lang ? ` data-lang="${md.utils.escapeHtml(lang)}"` : ' data-lang=""';
     const langClass = lang ? ` class="language-${lang}"` : "";
-    return `<pre${lineAttr}><code${langClass}${langAttr}>${escapedCode}</code></pre>`;
+    const pre = `<pre${lineAttr}><code${langClass}${langAttr}>${escapedCode}</code></pre>`;
+    // 有语言时包裹语言标签栏（issue #85 / T2）；语言为空则不显示标签栏
+    if (lang) {
+      return `<div class="code-block-wrapper"><div class="code-lang-label">${md.utils.escapeHtml(lang)}</div>${pre}</div>`;
+    }
+    return pre;
   };
 }
 
@@ -169,7 +250,7 @@ async function highlightCodeBlocks(container: HTMLElement) {
     try {
       const html = await codeToHtml(code, {
         lang,
-        theme: currentShikiThemeName,
+        theme: resolveShikiThemeOption(currentShikiThemeName),
       });
       const wrapper = document.createElement("div");
       wrapper.innerHTML = html;

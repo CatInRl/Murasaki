@@ -745,6 +745,64 @@ describe("12. 标题与分隔线", () => {
   });
 });
 
+// ===== 测试组 12.5：T7 样式对齐（ux-markdown-structures.html） =====
+describe("12.5 T7 样式对齐设计稿", () => {
+  /** 获取预览区内某元素的计算样式 */
+  async function previewComputedStyle(browser: Browser, selector: string, prop: string): Promise<string | null> {
+    return browser.execute((s: string, p: string) => {
+      const root = document.querySelector(".preview-pane");
+      if (!root) return null;
+      const el = s ? root.querySelector(s) : root;
+      if (!el) return null;
+      return window.getComputedStyle(el).getPropertyValue(p);
+    }, selector, prop);
+  }
+
+  it("12.5.1 H1 字号为 22px（对齐 ux-markdown-structures）", async () => {
+    await openAndWait(browser, "render/heading.md");
+    const fontSize = await previewComputedStyle(browser, "h1", "font-size");
+    expect(fontSize).toBe("22px");
+  });
+
+  it("12.5.2 H2 字号为 18px", async () => {
+    await openAndWait(browser, "render/heading.md");
+    const fontSize = await previewComputedStyle(browser, "h2", "font-size");
+    expect(fontSize).toBe("18px");
+  });
+
+  it("12.5.3 H3 字号为 15px", async () => {
+    await openAndWait(browser, "render/heading.md");
+    const fontSize = await previewComputedStyle(browser, "h3", "font-size");
+    expect(fontSize).toBe("15px");
+  });
+
+  it("12.5.4 ul padding-left 为 20px（pl-5）", async () => {
+    await openAndWait(browser, "render/list.md");
+    const padding = await previewComputedStyle(browser, "ul", "padding-left");
+    expect(padding).toBe("20px");
+  });
+
+  it("12.5.5 ol padding-left 为 20px（pl-5）", async () => {
+    await openAndWait(browser, "render/list.md");
+    const padding = await previewComputedStyle(browser, "ol", "padding-left");
+    expect(padding).toBe("20px");
+  });
+
+  it("12.5.6 li::marker 不使用紫色（应继承默认色）", async () => {
+    await openAndWait(browser, "render/list.md");
+    // marker 颜色应继承 li 的颜色，而非 #9333ea
+    const markerColor = await browser.execute(() => {
+      const root = document.querySelector(".preview-pane");
+      if (!root) return null;
+      const li = root.querySelector("ul li");
+      if (!li) return null;
+      return window.getComputedStyle(li, "::marker").color;
+    });
+    expect(markerColor).not.toContain("147, 51, 234"); // 不应是 #9333ea 的 rgb 形式
+    expect(markerColor).not.toBe("#9333ea");
+  });
+});
+
 // ===== 测试组 13：行内格式 =====
 describe("13. 行内格式", () => {
   it("13.1 加粗渲染为 <strong>", async () => {

@@ -101,6 +101,7 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
 
     // === Theme menu ===
     let theme_menu = SubmenuBuilder::new(app, "主题")
+        .text("theme-murasaki", "Murasaki")
         .text("theme-github", "GitHub")
         .text("theme-newsprint", "Newsprint")
         .text("theme-night", "Night")

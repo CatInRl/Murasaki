@@ -30,7 +30,7 @@ const props = withDefaults(defineProps<Props>(), {
   splitRatio: 0.5,
   showLineNumbers: true,
   softWrap: true,
-  previewTheme: "github",
+  previewTheme: "murasaki",
   currentFilePath: null,
   workspacePath: null,
   editorMode: "split",

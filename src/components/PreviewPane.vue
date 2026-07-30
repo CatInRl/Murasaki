@@ -3,10 +3,12 @@ import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { getMarkdownRenderer, getFrontMatter } from "../composables/useMarkdownRenderer";
 import { renderFrontMatterCard } from "../composables/useFrontMatter";
 import { MARKDOWN_THEMES } from "../composables/useTheme";
+// 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
+import "../styles/markdown-content.css";
 
 interface Props {
   source: string;
-  /** 主题样式类名（github / newsprint / night / academic） */
+  /** 预览主题名（murasaki / github / newsprint / night / academic） */
   theme?: string;
   /** 当前文件路径（用于解析相对 .md 链接） */
   currentFilePath?: string | null;
@@ -15,7 +17,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  theme: "github",
+  theme: "murasaki",
   currentFilePath: null,
   workspacePath: null,
 });
@@ -55,8 +57,23 @@ async function ensureMermaid(): Promise<MermaidApi> {
     const mermaid = (mod.default ?? mod) as unknown as MermaidApi;
     mermaid.initialize({
       startOnLoad: false,
-      theme: "default",
+      theme: "base",
       securityLevel: "loose",
+      themeVariables: {
+        primaryColor: "#f3e8ff",
+        primaryBorderColor: "#9333ea",
+        primaryTextColor: "#581c87",
+        lineColor: "#9333ea",
+        secondaryColor: "#fdf4ff",
+        tertiaryColor: "#faf5ff",
+        background: "#ffffff",
+        mainBkg: "#f3e8ff",
+        secondBkg: "#fdf4ff",
+        borderColor: "#9333ea",
+        edgeLabelBackground: "#faf5ff",
+        clusterBkg: "#faf5ff",
+        clusterBorder: "#9333ea",
+      },
     });
     mermaidReady = mermaid;
   }
@@ -272,35 +289,28 @@ defineExpose({
 });</script>
 
 <template>
-  <div ref="scrollRef" class="preview-pane" :class="`theme-${theme}`">
+  <div ref="scrollRef" class="preview-pane" :data-md-theme="theme">
     <div ref="containerRef" class="markdown-body" @click="onPreviewClick"></div>
   </div>
 </template>
 
 <style scoped>
+/*
+ * 容器布局/滚动条样式保留在此（非 markdown 元素样式）。
+ * 所有 markdown 元素样式与主题变量统一在 src/styles/markdown-content.css，
+ * 通过 .preview-pane 上的 data-md-theme 属性驱动 --md-* 变量切换。
+ */
 .preview-pane {
   height: 100%;
   width: 100%;
   overflow: auto;
   padding: 28px 36px;
-  background: var(--murasaki-background);
-  color: var(--murasaki-ink);
+  background: var(--md-bg, var(--murasaki-background));
+  color: var(--md-fg, var(--murasaki-ink));
   font-family: var(--murasaki-font-ui);
   font-size: 14px;
   line-height: 1.75;
   transition: padding var(--murasaki-duration-base) var(--murasaki-ease);
-}
-.preview-pane.theme-night {
-  background: #0d1117;
-  color: #c9d1d9;
-}
-.preview-pane.theme-newsprint {
-  background: #f5f5f0;
-  color: #2a2a2a;
-}
-.preview-pane.theme-academic {
-  background: #fffdf7;
-  color: #1a1a1a;
 }
 
 /* 滚动条样式（继承自全局） */
@@ -319,308 +329,11 @@ defineExpose({
   background-clip: padding-box;
 }
 
-/* === Typography (refined for purple brand) === */
-.markdown-body :deep(h1) {
-  font-size: 26px;
-  font-weight: 700;
-  margin: 0 0 16px 0;
-  letter-spacing: -0.02em;
-  line-height: 1.3;
-  color: var(--murasaki-ink);
-}
-.markdown-body :deep(h2) {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 20px 0 10px 0;
-  letter-spacing: -0.01em;
-  line-height: 1.35;
-  color: var(--murasaki-ink);
-}
-.markdown-body :deep(h3) {
-  font-size: 17px;
-  font-weight: 600;
-  margin: 16px 0 8px 0;
-  color: var(--murasaki-ink);
-}
-.markdown-body :deep(h4) {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 14px 0 6px 0;
-  color: var(--murasaki-ink);
-}
-.markdown-body :deep(h5) {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 12px 0 4px 0;
-  color: var(--murasaki-ink-2);
-}
-.markdown-body :deep(h6) {
-  font-size: 13px;
-  font-weight: 600;
-  margin: 12px 0 4px 0;
-  color: var(--murasaki-ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.markdown-body :deep(p) {
-  margin: 0 0 12px 0;
-  line-height: 1.75;
-  color: var(--murasaki-ink-2);
-}
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  margin: 0 0 12px 0;
-  padding-left: 24px;
-}
-.markdown-body :deep(li) {
-  margin: 4px 0;
-  color: var(--murasaki-ink-2);
-}
-.markdown-body :deep(li::marker) {
-  color: var(--murasaki-primary);
-}
-/* Task list: 移除默认 list-style，让 checkbox 居首 */
-.markdown-body :deep(.task-list-item) {
-  list-style: none;
-  margin-left: -20px;
-}
-.markdown-body :deep(input[type="checkbox"]) {
-  margin-right: 8px;
-  width: 14px;
-  height: 14px;
-  accent-color: var(--murasaki-primary);
-  vertical-align: middle;
-  cursor: pointer;
-}
-
-/* Blockquote: purple left border + purple-50 bg */
-.markdown-body :deep(blockquote) {
-  margin: 12px 0;
-  padding: 10px 16px;
-  border-left: 3px solid var(--murasaki-primary);
-  background: var(--murasaki-purple-50);
-  border-radius: 0 var(--murasaki-radius-sm) var(--murasaki-radius-sm) 0;
-  color: var(--murasaki-ink-2);
-}
-.markdown-body :deep(blockquote p) {
-  margin: 0;
-}
-
-/* Inline code: purple-tinted */
-.markdown-body :deep(code) {
-  font-family: var(--murasaki-font-mono);
-  font-size: 0.88em;
-  background: rgba(147, 51, 234, 0.08);
-  color: var(--murasaki-purple-800);
-  padding: 0.15em 0.4em;
-  border-radius: 3px;
-}
-
-/* Code block: dark surface */
-.markdown-body :deep(pre) {
-  background: var(--murasaki-neutral-900);
-  color: #e5e7eb;
-  padding: 14px 18px;
-  border-radius: var(--murasaki-radius-md);
-  overflow: auto;
-  margin: 12px 0 16px 0;
-  font-size: 13px;
-  line-height: 1.6;
-  box-shadow: var(--murasaki-shadow-sm);
-}
-.markdown-body :deep(pre code) {
-  background: transparent;
-  color: inherit;
-  padding: 0;
-  font-size: 13px;
-  border-radius: 0;
-}
-
-/* Links: purple, hover underline */
-.markdown-body :deep(a) {
-  color: var(--murasaki-purple-700);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
-}
-.markdown-body :deep(a:hover) {
-  border-bottom-color: currentColor;
-}
-
-.markdown-body :deep(img) {
-  max-width: 100%;
-  border-radius: var(--murasaki-radius-sm);
-  box-shadow: var(--murasaki-shadow-sm);
-}
-
-/* Tables */
-.markdown-body :deep(table) {
-  border-collapse: collapse;
-  margin: 0 0 16px;
-  display: block;
-  overflow: auto;
-  font-size: 13px;
-  width: max-content;
-  max-width: 100%;
-}
-.markdown-body :deep(th),
-.markdown-body :deep(td) {
-  border: 1px solid var(--murasaki-line);
-  padding: 8px 14px;
-}
-.markdown-body :deep(th) {
-  background: var(--murasaki-surface-2);
-  font-weight: 600;
-  color: var(--murasaki-ink);
-  text-align: left;
-}
-.markdown-body :deep(td) {
-  color: var(--murasaki-ink-2);
-}
-.markdown-body :deep(tr:hover td) {
-  background: var(--murasaki-purple-50);
-}
-
-.markdown-body :deep(hr) {
-  border: 0;
-  border-top: 1px solid var(--murasaki-line);
-  margin: 24px 0;
-}
-.markdown-body :deep(.mermaid) {
-  text-align: center;
-  margin: 16px 0;
-}
-
-/* === Theme-specific overrides === */
-.theme-night .markdown-body :deep(a) { color: #a78bfa; }
-.theme-night .markdown-body :deep(blockquote) {
-  color: #b3b3c0;
-  border-left-color: #7e22ce;
-  background: rgba(126, 34, 206, 0.12);
-}
-.theme-night .markdown-body :deep(th) { background: #161b22; }
-.theme-night .markdown-body :deep(th),
-.theme-night .markdown-body :deep(td) { border-color: #30363d; }
-.theme-night .markdown-body :deep(code) {
-  background: rgba(110, 118, 129, 0.4);
-  color: #d8b4fe;
-}
-.theme-night .markdown-body :deep(tr:hover td) {
-  background: rgba(126, 34, 206, 0.12);
-}
-
-.theme-newsprint .markdown-body :deep(a) { color: #5b21b6; }
-.theme-newsprint .markdown-body :deep(blockquote) {
-  border-left-color: #5b21b6;
-  background: #ede9d8;
-}
-
-.theme-academic .markdown-body :deep(a) { color: #6b21a8; }
-.theme-academic .markdown-body :deep(blockquote) {
-  border-left-color: #6b21a8;
-  background: #f5edd6;
-}
-
-/* ===== Front-matter 卡片样式 ===== */
-.markdown-body :deep(.front-matter-card) {
-  background: linear-gradient(135deg, var(--murasaki-purple-50) 0%, var(--murasaki-surface-2) 100%);
-  border: 1px solid var(--murasaki-purple-200);
-  border-radius: var(--murasaki-radius-md);
-  padding: 14px 18px;
-  margin: 0 0 24px;
-  font-size: 13px;
-  position: relative;
-  overflow: hidden;
-}
-.markdown-body :deep(.front-matter-card)::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 3px;
-  height: 100%;
-  background: var(--murasaki-primary);
-}
-.markdown-body :deep(.front-matter-card .fm-title) {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--murasaki-purple-800);
-  margin-bottom: 8px;
-  line-height: 1.4;
-}
-.markdown-body :deep(.front-matter-card .fm-row) {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 4px 0;
-  color: var(--murasaki-ink-2);
-}
-.markdown-body :deep(.front-matter-card .fm-key) {
-  font-weight: 600;
-  color: var(--murasaki-purple-700);
-  min-width: 60px;
-  text-transform: capitalize;
-}
-.markdown-body :deep(.front-matter-card .fm-value) {
-  color: var(--murasaki-ink);
-}
-.markdown-body :deep(.front-matter-card .fm-date) {
-  font-variant-numeric: tabular-nums;
-}
-.markdown-body :deep(.front-matter-card .fm-tags) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-.markdown-body :deep(.front-matter-card .fm-tag) {
-  display: inline-block;
-  background: var(--murasaki-primary);
-  color: #fff;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.3px;
-}
-
-/* Night 主题下 front-matter 卡片配色 */
-.theme-night .markdown-body :deep(.front-matter-card) {
-  background: linear-gradient(135deg, rgba(126, 34, 206, 0.15) 0%, #161b22 100%);
-  border-color: #7e22ce;
-}
-.theme-night .markdown-body :deep(.front-matter-card .fm-title) {
-  color: #d8b4fe;
-}
-.theme-night .markdown-body :deep(.front-matter-card .fm-key) {
-  color: #c084fc;
-}
-.theme-night .markdown-body :deep(.front-matter-card .fm-value) {
-  color: #e5e7eb;
-}
-.theme-night .markdown-body :deep(.front-matter-card .fm-tag) {
-  background: #7e22ce;
-}
-
 /* === 紧凑窗口：减小 padding === */
 @media (max-width: 980px) {
   .preview-pane {
     padding: 20px 24px;
     font-size: 13px;
-  }
-  .markdown-body :deep(h1) { font-size: 22px; }
-  .markdown-body :deep(h2) { font-size: 18px; }
-}
-
-/* === 触屏：增加点击区 === */
-@media (pointer: coarse) {
-  .markdown-body :deep(a) {
-    padding: 2px 0;
-  }
-  .markdown-body :deep(input[type="checkbox"]) {
-    width: 18px;
-    height: 18px;
   }
 }
 </style>
