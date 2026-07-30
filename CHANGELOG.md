@@ -4,6 +4,39 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-30
+
+本版本进行整体 UX 对齐与 WYSIWYG 模式实现，建立设计系统基础、反馈系统基础设施、状态展示三兄弟、Agent 面板全量视觉对齐、WYSIWYG 模式（CodeMirror 6 内 Typora 路线）、设置窗口多窗口化、Markdown 渲染样式统一。
+
+### Added
+
+- **设计系统基础对齐（#33, #34）**：引入 lucide-vue-next 统一图标库替换所有 emoji + 内联 SVG + naive-ui NIcon；保留 naive-ui 通过 NConfigProvider + themeOverrides 把颜色/圆角/字体变量映射到 `--murasaki-*` token；补全字号/阴影/menubar-height/transition token；清理 CompareWindow/SearchPanel 等组件的硬编码颜色。
+- **反馈系统基础设施（#36, #37, #38）**：自建 Toast store + Teleport 容器（6 变体：success/info/warning/error/progress/deleted）+ Promise API 对话框（alert/confirm/prompt/conflict 四类型，替换 36 处原生弹窗）+ 数据驱动右键菜单（TabBar/Editor/Agent 消息/TreeNode 四处）；统一视觉：取消在左/确认在右、Escape 等同取消、打开聚焦默认按钮。
+- **状态展示三兄弟（#39）**：自建 EmptyState + ErrorState + Skeleton 组件，共享虚线边框容器与 props 模式，替换 naive-ui NEmpty/NSpin/NSkeleton。
+- **WYSIWYG 模式（#42, #43, #44, #45）**：CodeMirror 6 内 WYSIWYG（Typora 路线），单编辑器实例，markdown 文本为唯一数据源，通过 ViewPlugin + Decoration 隐藏/显示语法标记。三种模式（source/split/wysiwyg）共用同一 CM6 实例，全部运行时切换无需重启。光标进入段落时标记 dim 灰色显现，离开后隐藏。P0 行级语法标记隐藏 + P1 块级元素 widget（代码块 Shiki 高亮/链接/图片/表格/KaTeX/Mermaid SVG）全部实现。
+- **WYSIWYG 工具栏（#46, #47）**：编辑器顶部工具栏，源码/WYSIWYG 模式共用，分组按钮（文本格式/标题/列表/插入）+ 分隔符，行为一致修改底层 markdown 文本。
+- **设置窗口多窗口化（#48, #49, #50, #51, #52, #53）**：改为 Tauri 多窗口形态（独立 OS 窗口可独立最小化/关闭）；3 个分类（常规/编辑器/AI）；显式 Save 模型（恢复默认/保存两个按钮，关闭未保存弹确认）；AI 分类含 Provider 列表 + 编辑表单 + 测试连接 + 高级参数折叠区；Provider 删除二次确认。
+- **Markdown 渲染样式统一（#84-#89）**：新建 `src/styles/markdown-content.css` 作为预览/导出/WYSIWYG 共享样式单一来源，5 套主题（murasaki/github/newsprint/night/academic）通过 data-md-theme 切换，Murasaki 紫色品牌主题为默认；Shiki 自定义品牌色主题（keyword 紫 #c084fc / function 蓝 #60a5fa / string 绿 #4ade80）；Mermaid 紫色主题变量；KaTeX 蓝色样式；标题字号对齐设计稿（H1=22px/H2=18px/H3=15px）；WYSIWYG widget 样式与预览像素级对齐。
+- **欢迎页视觉对齐（#40）**：lucide book-open 品牌 + 快捷键提示区 + EmptyState 空最近文件列表。
+- **Agent 面板全量视觉对齐（#41）**：emoji 全换 lucide 图标；工具调用折叠卡片；提案列表卡片；用户/助手消息气泡区分；provider chip；中断标签 alert-triangle。
+- **Murasaki 主题（#84）**：新增紫色品牌主题，OS 原生菜单切换。
+- 0.3.0 全功能 E2E 测试覆盖：WYSIWYG 模式切换、工具栏操作、设置窗口、Toast/Dialog/ContextMenu、Markdown 渲染样式断言（50/50 通过）。
+
+### Changed
+
+- 标签栏移除主题选择器 NSelect，仅保留 TabBar + 新建按钮；markdown 主题切换通过 OS 原生菜单 + 设置窗口。
+- 状态栏按 ux-panels 规范补全：lucide 图标项 + 文本、已保存指示、孤立会话清理按钮、provider chip。
+- 文件树选中态补 text-primary + font-medium；搜索高亮改紫色 20% alpha。
+- 浮层统一用 naive-ui NPopover + themeOverrides（trigger=click，show-arrow=true）。
+- useHtmlExport 改为读取共享 markdown-content.css，确保导出 HTML 与预览视觉一致。
+
+### Fixed
+
+- 修复 useHtmlExport 中 FRONT_MATTER_CSS 死导入（T1 重构后 useFrontMatter 不再导出）。
+- 修复导出 HTML 中 Mermaid 图表不显示紫色主题（PreviewPane.vue 初始化 Mermaid 主题，确保预览和导出使用相同配置）。
+- 修复 tauri-driver/msedgedriver 孤立 bug（setup.ts 的防御性清理 `Stop-Process -Name msedgedriver` 会杀掉 tauri-driver 的子进程导致永久孤立，改为杀 tauri-driver 让 Windows Job Object 自动带走 msedgedriver）。
+- 修复 webdriverio 9.x attach() "Invalid URL" bug（attachOptions.options 为 undefined 时 detectBackend 返回 undefined 字段，需显式传入 hostname/port/protocol/path）。
+
 ## [0.2.0] - 2026-07-29
 
 本版本引入完整的 Agent 能力（基于 OpenAI 兼容端点的 BYOK 助手），并刷新整体视觉风格以匹配 Murasaki 品牌。
@@ -49,6 +82,7 @@ Murasaki 首个正式版本：基于 Tauri 2.x + Vue 3 的本地 Markdown 文件
 - 系统设置（编辑分类含行号 / 软折行开关、AI Provider 配置）。
 - 全屏 F11 自动隐藏状态栏；Ctrl+Shift+E 文件树 / Ctrl+Shift+M 大纲侧栏切换。
 
-[Unreleased]: https://github.com/CatInRl/Murasaki/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/CatInRl/Murasaki/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/CatInRl/Murasaki/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/CatInRl/Murasaki/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/CatInRl/Murasaki/releases/tag/v0.1.0
