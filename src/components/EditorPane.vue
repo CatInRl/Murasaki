@@ -23,6 +23,12 @@ interface Props {
   workspacePath?: string | null;
   /** 编辑模式：source（纯源码）/ split（分屏，默认）/ wysiwyg（所见即所得，预览区隐藏） */
   editorMode?: "source" | "split" | "wysiwyg";
+  /** 编辑器字体大小（px） */
+  fontSize?: number;
+  /** 编辑器行高 */
+  lineHeight?: number;
+  /** 编辑器等宽字体族 */
+  fontFamily?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -34,6 +40,9 @@ const props = withDefaults(defineProps<Props>(), {
   currentFilePath: null,
   workspacePath: null,
   editorMode: "split",
+  fontSize: 14,
+  lineHeight: 1.6,
+  fontFamily: "JetBrains Mono",
 });
 
 const emit = defineEmits<{
@@ -229,9 +238,14 @@ defineExpose({
         :show-line-numbers="showLineNumbers"
         :soft-wrap="softWrap"
         :editor-mode="editorMode"
+        :font-size="fontSize"
+        :line-height="lineHeight"
+        :font-family="fontFamily"
+        :markdown-theme="previewTheme"
         @update:model-value="onInput"
         @cursor-change="onCursorChange"
         @context-action="(a) => emit('context-action', a)"
+        @open-internal="(p) => emit('open-internal', p)"
       />
     </div>
     <div

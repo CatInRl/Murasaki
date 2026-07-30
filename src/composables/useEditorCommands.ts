@@ -375,12 +375,98 @@ export function insertTable(view: EditorView, rows: number, cols: number): void 
 }
 
 /**
+ * 自定义 Enter 键处理器：引用块场景确保换行时保持正确的 `>` 层级。
+ *
+ * 问题：@codemirror/lang-markdown 的 insertNewlineContinueMarkup 在某些嵌套引用块
+ * 场景下会错误地增加层级。此处理器在引用块上下文中显式控制换行行为：
+ * - 非空行：插入相同层级的前缀 `> > ` 等
+ * - 空行（只有前缀）：退出引用块（去掉前缀，或减少一层）
+ * - 引用块内含列表标记：交给默认处理器（insertNewlineContinueMarkup 处理列表续行）
+ * - 非引用块行：返回 false 交给默认处理器
+ */
+function handleEnterInBlockquote(view: EditorView): boolean {
+  const sel = view.state.selection.main;
+  // 只处理光标（无选区）场景
+  if (sel.from !== sel.to) return false;
+  const head = sel.head;
+  const doc = view.state.doc;
+  const line = doc.lineAt(head);
+
+  // 匹配行首的引用块前缀：可选空白 + 一个或多个 `> ` 组合
+  const prefixMatch = /^(\s*)((?:>\s*)+)/.exec(line.text);
+  if (!prefixMatch) return false; // 非引用块行
+
+  const fullPrefix = prefixMatch[0];
+  const leadingWhitespace = prefixMatch[1];
+  const quotePart = prefixMatch[2];
+
+  // 统计 `>` 层级
+  const quoteLevel = (quotePart.match(/>/g) || []).length;
+  if (quoteLevel === 0) return false;
+
+  // 引用块前缀之后的内容
+  const contentAfterPrefix = line.text.slice(fullPrefix.length);
+
+  // 如果前缀后面有列表标记（- * + 或 数字.），交给默认处理器处理列表续行
+  if (/^\s*([-*+]\s+|\d+[.)]\s+)/.test(contentAfterPrefix)) {
+    return false;
+  }
+
+  // 判断是否为空行（只有前缀，没有实际内容）
+  const isEmptyLine = contentAfterPrefix.trim() === "";
+
+  if (isEmptyLine) {
+    // 空行：退出引用块
+    if (quoteLevel <= 1) {
+      // 单层引用：完全退出（删除前缀，保留行）
+      view.dispatch({
+        changes: { from: line.from, to: line.from + fullPrefix.length, insert: "" },
+        selection: { anchor: line.from },
+        userEvent: "input.delete",
+      });
+    } else {
+      // 多层引用：减少一层（去掉最后一个 `>` 及其后随空白）
+      const lastGt = quotePart.lastIndexOf(">");
+      const newQuotePart = quotePart.slice(0, lastGt).replace(/\s+$/, "");
+      const newPrefix = leadingWhitespace + newQuotePart + (newQuotePart ? " " : "");
+      view.dispatch({
+        changes: { from: line.from, to: line.from + fullPrefix.length, insert: newPrefix },
+        selection: { anchor: line.from + newPrefix.length },
+        userEvent: "input.delete",
+      });
+    }
+    return true;
+  }
+
+  // 非空行：换行并保持相同层级
+  // 去除光标前的尾部空白（避免行末多余空格）
+  let from = head;
+  while (from > line.from + fullPrefix.length && /\s/.test(line.text.charAt(from - line.from - 1))) {
+    from--;
+  }
+
+  // 构建新行前缀：与前一行完全相同的引用前缀
+  const insert = "\n" + fullPrefix;
+  view.dispatch({
+    changes: { from, to: head, insert },
+    selection: { anchor: from + insert.length },
+    userEvent: "input",
+  });
+  return true;
+}
+
+/**
  * 段落快捷键 keymap 扩展
- * 返回一个高优先级 keymap，捕获 Ctrl+1-6/0、Ctrl+Shift+K/Q/X/[/]
+ * 返回一个高优先级 keymap，捕获 Enter（引用块换行）、Ctrl+1-6/0、Ctrl+Shift+K/Q/X/[/]
  */
 export function paragraphKeymap(): Extension {
   return Prec.highest(
     keymap.of([
+      // Enter：引用块换行处理（仅在引用块上下文生效，其他场景 fallthrough 到默认处理器）
+      {
+        key: "Enter",
+        run: (v) => handleEnterInBlockquote(v),
+      },
       // Ctrl+1 ~ Ctrl+6：标题
       {
         key: "Ctrl-1",

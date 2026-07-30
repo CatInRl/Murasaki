@@ -8,6 +8,11 @@ declare module "markdown-it-emoji" {
   export { bare, light, full };
 }
 
+declare module "markdown-it-emoji/lib/data/full.mjs" {
+  const emojiData: Record<string, string>;
+  export default emojiData;
+}
+
 declare module "markdown-it-front-matter" {
   import type MarkdownIt from "markdown-it";
   // 注意：cb 在解析到 front-matter 时为必填，缺省会抛 TypeError

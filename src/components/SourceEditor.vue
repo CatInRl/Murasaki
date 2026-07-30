@@ -221,6 +221,14 @@ interface Props {
   readOnly?: boolean;
   /** 编辑模式：source/split/wysiwyg（wysiwyg 叠加 WYSIWYG ViewPlugin，其他模式移除） */
   editorMode?: "source" | "split" | "wysiwyg";
+  /** 编辑器字体大小（px） */
+  fontSize?: number;
+  /** 编辑器行高 */
+  lineHeight?: number;
+  /** 编辑器等宽字体族 */
+  fontFamily?: string;
+  /** Markdown 主题（驱动 WYSIWYG 模式下的 --md-* 变量，与预览/导出一致） */
+  markdownTheme?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -229,6 +237,10 @@ const props = withDefaults(defineProps<Props>(), {
   softWrap: true,
   readOnly: false,
   editorMode: "split",
+  fontSize: 14,
+  lineHeight: 1.6,
+  fontFamily: "JetBrains Mono",
+  markdownTheme: "murasaki",
 });
 
 const emit = defineEmits<{
@@ -238,6 +250,8 @@ const emit = defineEmits<{
   (e: "cursor-change", payload: { line: number; ch: number }): void;
   /** 右键菜单高级操作（插入表格/链接/图片），由父组件处理 */
   (e: "context-action", action: "insert-table" | "insert-link" | "insert-image"): void;
+  /** WYSIWYG 模式下 Ctrl+Click 内部 .md 链接：要求父组件在新 tab 中打开 */
+  (e: "open-internal", path: string): void;
 }>();
 
 const hostRef = ref<HTMLDivElement | null>(null);
@@ -259,6 +273,8 @@ const wrapComp = new Compartment();
 const readOnlyComp = new Compartment();
 // WYSIWYG ViewPlugin 的叠加/移除通过此 Compartment 运行时切换（不销毁编辑器实例）
 const wysiwygComp = new Compartment();
+// 字体配置（大小/行高/字体族）通过此 Compartment 运行时切换
+const fontComp = new Compartment();
 
 function buildExtensions() {
   return [
@@ -294,6 +310,8 @@ function buildExtensions() {
     lineNumbersComp.of(props.showLineNumbers ? lineNumbers() : []),
     wrapComp.of(props.softWrap ? EditorView.lineWrapping : []),
     readOnlyComp.of(EditorState.readOnly.of(props.readOnly)),
+    // 字体配置（大小/行高/字体族）—— 通过 Compartment 运行时切换
+    fontComp.of(buildFontTheme()),
     // WYSIWYG ViewPlugin 仅在 wysiwyg 模式下叠加（运行时通过 Compartment 切换）
     wysiwygComp.of(props.editorMode === "wysiwyg" ? wysiwygExtensions : []),
     foldGutter({ openText: "▾", closedText: "▸" }),
@@ -329,6 +347,26 @@ function buildExtensions() {
   ];
 }
 
+/**
+ * 构建字体主题（EditorView.theme）。
+ * 把 fontSize/lineHeight/fontFamily props 转换为 .cm-content / .cm-scroller 的 CSS。
+ * 通过 fontComp 在设置变更时重新应用，无需销毁编辑器实例。
+ */
+function buildFontTheme() {
+  const fontCss = `${props.fontFamily}, ui-monospace, monospace`;
+  const sizePx = `${props.fontSize}px`;
+  return EditorView.theme({
+    ".cm-content": {
+      fontFamily: fontCss,
+      fontSize: sizePx,
+      lineHeight: String(props.lineHeight),
+    },
+    ".cm-scroller": {
+      fontFamily: fontCss,
+    },
+  });
+}
+
 onMounted(() => {
   if (!hostRef.value) return;
   const view = new EditorView({
@@ -347,6 +385,34 @@ onMounted(() => {
   emit("ready", view);
   // 注册到 editor bridge（供 agent 工具使用）
   useEditorBridgeStore().registerView(view);
+  // 监听 WYSIWYG 链接 widget 的内部跳转事件（Ctrl+Click 相对 .md 路径）
+  // LinkWidget.dispatchEvent 发出自定义事件，这里接收后透传给父组件
+  hostRef.value.addEventListener("murasaki-open-internal", ((e: CustomEvent) => {
+    emit("open-internal", e.detail as string);
+  }) as EventListener);
+  // 监听任务列表复选框点击切换事件
+  // TaskCheckboxWidget 点击后发出 murasaki-toggle-task，这里 dispatch changes 修改 markdown
+  hostRef.value.addEventListener("murasaki-toggle-task", ((e: CustomEvent) => {
+    const { from, to, checked } = e.detail as { from: number; to: number; checked: boolean };
+    // 替换 [from, to] 范围为 `- [x]` 或 `- [ ]`
+    // 原始范围是 ListMark + TaskMarker，如 "- [ ]" 或 "- [x]"
+    // 替换为对应的新标记
+    const newMark = checked ? "- [x]" : "- [ ]";
+    view.dispatch({
+      changes: { from, to, insert: newMark },
+      userEvent: "input.toggleTask",
+    });
+  }) as EventListener);
+  // 监听块级 widget 点击事件：把光标定位到块起始位置，触发原始 markdown 编辑
+  // CodeBlock/Mermaid/Table/Math widget 点击后发出 murasaki-focus-block
+  hostRef.value.addEventListener("murasaki-focus-block", ((e: CustomEvent) => {
+    const { from } = e.detail as { from: number };
+    view.dispatch({
+      selection: { anchor: from },
+      scrollIntoView: true,
+    });
+    view.focus();
+  }) as EventListener);
 });
 
 onBeforeUnmount(() => {
@@ -467,6 +533,17 @@ watch(
   }
 );
 
+// 字体设置变更（大小/行高/字体族）→ 重新应用 fontComp
+// 通过 Compartment.reconfigure 动态切换，不销毁编辑器实例
+watch(
+  [() => props.fontSize, () => props.lineHeight, () => props.fontFamily],
+  () => {
+    viewRef.value?.dispatch({
+      effects: fontComp.reconfigure(buildFontTheme()),
+    });
+  }
+);
+
 // ===== 右键菜单 =====
 function onContextMenu(e: MouseEvent): void {
   const view = viewRef.value;
@@ -557,7 +634,12 @@ defineExpose({
 </script>
 
 <template>
-  <div class="source-editor" @contextmenu="onContextMenu">
+  <div
+    class="source-editor"
+    :class="{ 'mode-wysiwyg': editorMode === 'wysiwyg' }"
+    :data-md-theme="markdownTheme"
+    @contextmenu="onContextMenu"
+  >
     <div ref="hostRef" class="cm-host"></div>
   </div>
 </template>
@@ -569,6 +651,11 @@ defineExpose({
   overflow: hidden;
   background: var(--murasaki-background);
 }
+/* WYSIWYG 模式：跟随 markdown 主题（--md-bg / --md-fg），与预览/导出视觉一致 */
+.source-editor.mode-wysiwyg {
+  background: var(--md-bg, var(--murasaki-background));
+  color: var(--md-fg, var(--murasaki-ink));
+}
 .cm-host {
   height: 100%;
   width: 100%;
@@ -576,6 +663,10 @@ defineExpose({
 .cm-host :deep(.cm-editor) {
   height: 100%;
   background: var(--murasaki-background);
+}
+/* WYSIWYG 模式：编辑器背景跟随 --md-bg */
+.source-editor.mode-wysiwyg .cm-host :deep(.cm-editor) {
+  background: var(--md-bg, var(--murasaki-background));
 }
 .cm-host :deep(.cm-editor.cm-focused) {
   outline: none;

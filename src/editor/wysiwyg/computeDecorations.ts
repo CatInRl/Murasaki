@@ -15,6 +15,8 @@
  * 块级 widget 的实际 DOM 渲染（Shiki/KaTeX/Mermaid/markdown-it 表格）在 wysiwygPlugin.ts 中完成。
  */
 import type { Tree, SyntaxNode } from "@lezer/common";
+// markdown-it-emoji 的完整 shortcode → unicode 映射（用于 WYSIWYG 模式渲染 emoji shortcode）
+import emojiData from "markdown-it-emoji/lib/data/full.mjs";
 
 /** 行级语法标记节点名。命中即应用 hide/dim。 */
 const INLINE_MARK_TYPES = new Set([
@@ -50,12 +52,14 @@ export interface MarkDeco {
   markType: string;
 }
 
-/** 替换 decoration：用 widget 替换 [from,to] 文本（列表 bullet / 分隔线）。 */
+/** 替换 decoration：用 widget 替换 [from,to] 文本（列表 bullet / 分隔线 / 任务复选框）。 */
 export interface WidgetDeco {
   type: "replace";
   from: number;
   to: number;
-  widget: "bullet" | "hr";
+  widget: "bullet" | "hr" | "taskCheckbox";
+  /** 仅 taskCheckbox 使用：是否已勾选 */
+  checked?: boolean;
 }
 
 /** 渲染 decoration：对 [from,to] 内容 span 应用渲染样式类（引用块左边框等）。 */
@@ -117,7 +121,7 @@ export interface TableWidgetDeco {
   source: string;
 }
 
-/** 数学公式 widget：替换 $...$ / $$...$$，由 wysiwygPlugin 用 KaTeX 渲染。 */
+/** 数学公式 widget：替换 $...$ / $$...$$，用 KaTeX 渲染。 */
 export interface MathWidgetDeco {
   type: "blockWidget";
   widget: "math";
@@ -127,13 +131,26 @@ export interface MathWidgetDeco {
   displayMode: boolean;
 }
 
+/** Emoji shortcode widget：替换 `:smile:` 等短代码为实际 emoji 字符。 */
+export interface EmojiWidgetDeco {
+  type: "blockWidget";
+  widget: "emoji";
+  from: number;
+  to: number;
+  /** 解析后的 emoji unicode 字符。 */
+  emoji: string;
+  /** 原始 shortcode（不含冒号），用于 eq 比较。 */
+  shortcode: string;
+}
+
 export type BlockWidgetDeco =
   | CodeBlockWidgetDeco
   | MermaidWidgetDeco
   | LinkWidgetDeco
   | ImageWidgetDeco
   | TableWidgetDeco
-  | MathWidgetDeco;
+  | MathWidgetDeco
+  | EmojiWidgetDeco;
 
 export type ComputedDeco = MarkDeco | WidgetDeco | RenderDeco | BlockWidgetDeco;
 
@@ -305,12 +322,14 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
 
       // 代码块（围栏 / 缩进）：块级 widget
       if (name === "FencedCode" || name === "CodeBlock") {
-        const inParagraph = to >= para.from && from <= para.to;
+        // 块级元素：光标在节点范围内才显示源码，不依赖段落重叠
+        // （否则相邻段落无空行时 para 会扩展覆盖整个块，导致 widget 不生成）
+        const cursorInRange = selectionHead >= from && selectionHead <= to;
         codeRanges.push({ from, to });
         if (!inViewport(from, to, viewport)) return false;
         if (overlapsAnyProposal(from, to, proposalRanges)) return false;
 
-        if (inParagraph) {
+        if (cursorInRange) {
           // 光标在代码块内：围栏 CodeMark 走默认 dim（继续遍历子节点）
           return true;
         }
@@ -372,8 +391,9 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
         if (!inViewport(from, to, viewport)) return false;
         if (overlapsAnyProposal(from, to, proposalRanges)) return false;
 
-        const inParagraph = to >= para.from && from <= para.to;
-        if (inParagraph) {
+        // 块级元素：光标在节点范围内才显示源码，不依赖段落重叠
+        const cursorInRange = selectionHead >= from && selectionHead <= to;
+        if (cursorInRange) {
           // 光标在表格内：TableDelimiter 走默认 dim（继续遍历子节点）
           return true;
         }
@@ -392,7 +412,23 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
         if (name === "ListMark") {
           const text = doc.slice(from, to);
           if (UNORDERED_LIST_FIRST_CHAR.test(text)) {
-            // 无序列表：段内 dim，离开替换为 bullet widget
+            // 检查是否是任务列表项：父节点 ListItem 有 TaskMarker 子节点
+            // 任务列表语法 `- [ ] text` / `- [x] text`，ListMark + TaskMarker 一起替换为 checkbox
+            const parent = ref.node.parent;
+            const taskMarker = parent?.getChild("TaskMarker");
+            if (taskMarker) {
+              const checked = doc.slice(taskMarker.from, taskMarker.to).toLowerCase().includes("x");
+              if (inParagraph) {
+                // 段内：dim ListMark + TaskMarker（可编辑原始 markdown）
+                decos.push({ type: "mark", from, to, kind: "dim", markType: name });
+                decos.push({ type: "mark", from: taskMarker.from, to: taskMarker.to, kind: "dim", markType: "TaskMarker" });
+              } else {
+                // 离开段：把 ListMark + TaskMarker 一起替换为 checkbox widget
+                decos.push({ type: "replace", from, to: taskMarker.to, widget: "taskCheckbox", checked });
+              }
+              return;
+            }
+            // 普通无序列表：段内 dim，离开替换为 bullet widget
             if (inParagraph) {
               decos.push({ type: "mark", from, to, kind: "dim", markType: name });
             } else {
@@ -452,6 +488,33 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       to: mr.to,
       expr: mr.expr,
       displayMode: mr.displayMode,
+    });
+  }
+
+  // Emoji shortcode：正则扫描 `:shortcode:` 并替换为 emoji widget
+  // 跳过代码范围内的匹配（代码块/行内代码内的冒号不解析）
+  const emojiRe = /:([a-z0-9_+-]+):/g;
+  let em: RegExpExecArray | null;
+  while ((em = emojiRe.exec(doc)) !== null) {
+    const from = em.index;
+    const to = em.index + em[0].length;
+    const shortcode = em[1];
+    // 查找 shortcode 对应的 emoji unicode
+    const emojiChar = (emojiData as Record<string, string>)[shortcode];
+    if (!emojiChar) continue; // 未知 shortcode：保持原样
+    // 跳过代码范围内的匹配
+    if (inAnyCodeRange(from, to, codeRanges)) continue;
+    if (!inViewport(from, to, viewport)) continue;
+    if (overlapsAnyProposal(from, to, proposalRanges)) continue;
+    const inParagraph = to >= para.from && from <= para.to;
+    if (inParagraph) continue; // 光标在段内：显示原始 shortcode（可编辑）
+    decos.push({
+      type: "blockWidget",
+      widget: "emoji",
+      from,
+      to,
+      emoji: emojiChar,
+      shortcode,
     });
   }
 

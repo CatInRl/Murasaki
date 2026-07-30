@@ -48,6 +48,14 @@
 - 撤销到原始内容后 dirty 标记不清：Tab 加 `savedContent` 字段，`updateContent` 对比决定 `isDirty`
 - 刷新按钮卡死：`list_tree` 加 30s 超时兜底 + `refreshTree` 防重入锁
 - WYSIWYG 块级 widget 不渲染：CM6 限制 ViewPlugin 不能提供跨换行块级替换装饰（"Decorations that replace line breaks may not be specified via plugins"），导致代码块/表格/Mermaid 等多行 widget 不渲染。重构为 StateField + 轻量 ViewPlugin 监听器架构：`wysiwygField` (StateField) 通过 `EditorView.decorations.from(f)` 提供装饰不受此限制，`wysiwygSyntaxWatcher` (ViewPlugin) 监听语法树异步解析变化并 dispatch `recomputeWysiwygEffect` 触发重算。
+- 外部链接在 app 内打开：WYSIWYG LinkWidget 未处理点击事件导致链接在 WebView 内导航。改为 Ctrl/Cmd+Click 通过 tauri-plugin-shell 调用系统浏览器打开外部 URL，相对 .md 路径仍走应用内新 tab 打开。
+- WYSIWYG 模式不支持主题切换：wysiwygTheme 硬编码颜色不跟随 markdown 主题。SourceEditor 添加 `markdownTheme` prop 设置 `data-md-theme` 属性，wysiwygTheme 全部改用 `--md-*` 主题变量，与预览/导出视觉一致。
+- 多列表格不渲染：块级元素（代码块/表格）使用段落重叠判断（`inParagraph`），相邻段落无空行时 para 扩展覆盖整个块导致 widget 不生成。改为 `cursorInRange`（光标是否在节点范围内）判断，光标在块内显示源码可编辑，离开则渲染 widget。
+- 任务列表按无序列表渲染：WYSIWYG 装饰计算未处理 `TaskMarker` 节点。新增 TaskMarker 识别逻辑，ListMark + TaskMarker 一起替换为可点击的 checkbox widget，点击切换 [ ]/[x] 状态并 dispatch changes 修改源码。
+- 代码块/表格/公式需点击上方行才能编辑：CodeMirror 默认将光标定位到 widget 附近行而非块范围内。为块级 widget（CodeBlock/Mermaid/Table/Math）添加点击事件，发出 `murasaki-focus-block` 自定义事件，SourceEditor 监听后将光标定位到块起始位置触发原始 markdown 编辑。
+- 短代码 Emoji 未渲染：WYSIWYG 模式未扫描 `:shortcode:` 格式。新增 emojiRe 正则扫描，使用 markdown-it-emoji 的 full 数据映射将 `:smile:` 等短代码替换为 EmojiWidget 渲染实际 emoji 字符，光标在段内时保持原样可编辑。
+- 嵌套引用块换行后引用层级自动加一：@codemirror/lang-markdown 的 `insertNewlineContinueMarkup` 在某些嵌套引用块场景下会错误增加层级。新增自定义 Enter 键处理器 `handleEnterInBlockquote`：非空行换行保持相同 `>` 层级，空行换行退出引用块（单层完全退出，多层减少一层），引用块内含列表标记时交给默认处理器。
+- 设置中修改字体大小无效：SourceEditor 硬编码 `fontSize: 13px` 不响应设置变更。添加 `fontSize/lineHeight/fontFamily` props，通过 `Compartment` 运行时动态切换字体主题，App.vue 将 persistence.settings 的编辑器字体设置透传到 EditorPane → SourceEditor，设置保存后立即生效无需重启。
 
 ### Changed（Post-Release）
 
