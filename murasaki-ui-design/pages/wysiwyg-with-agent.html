@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Murasaki WYSIWYG Editor - Agent</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <div data-viewport-mode="app-shell">
+
+      <!-- Menu Bar -->
+      <div id="menu-bar">
+        <div class="menu-brand">
+          <i data-lucide="feather" style="width:15px;height:15px;color:var(--murasaki-primary)"></i>
+          Murasaki
+        </div>
+        <div class="menu-item">文件(F)</div>
+        <div class="menu-item">编辑(E)</div>
+        <div class="menu-item">段落(P)</div>
+        <div class="menu-item">主题(T)</div>
+        <div class="menu-item">帮助(H)</div>
+      </div>
+
+      <!-- Sidebar -->
+      <div id="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-tab active" id="sidebar-tab-tree" title="文件树">
+            <i data-lucide="folder-tree" style="width:16px;height:16px"></i>
+          </div>
+          <div class="sidebar-tab" id="sidebar-tab-outline" title="大纲">
+            <i data-lucide="list" style="width:16px;height:16px"></i>
+          </div>
+        </div>
+
+        <!-- File Tree Panel -->
+        <div class="sidebar-content">
+          <div class="sidebar-panel active" id="panel-tree">
+            <div class="tree-item" style="padding-left:6px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="chevron-right" class="arrow" style="color:var(--murasaki-ink-3)"></i>
+              <i data-lucide="folder-open" style="color:var(--murasaki-primary);width:14px;height:14px;margin-right:5px"></i>
+              <span class="label" style="font-weight:500;">my-docs</span>
+            </div>
+            <div class="tree-item" style="padding-left:22px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="chevron-right" class="arrow" style="color:var(--murasaki-ink-3)"></i>
+              <i data-lucide="folder-open" style="color:var(--murasaki-primary);width:14px;height:14px;margin-right:5px"></i>
+              <span class="label">notes</span>
+            </div>
+            <div class="tree-item" style="padding-left:44px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="file-text" style="width:14px;height:14px;margin-right:5px;color:var(--murasaki-ink-3)"></i>
+              <span class="label">快速入门.md</span>
+            </div>
+            <div class="tree-item selected" style="padding-left:44px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="file-text" style="width:14px;height:14px;margin-right:5px"></i>
+              <span class="label">项目提案书.md</span>
+            </div>
+            <div class="tree-item" style="padding-left:44px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="file-text" style="width:14px;height:14px;margin-right:5px;color:var(--murasaki-ink-3)"></i>
+              <span class="label">开发日志.md</span>
+            </div>
+            <div class="tree-item" style="padding-left:22px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="chevron-right" class="arrow collapsed" style="color:var(--murasaki-ink-3)"></i>
+              <i data-lucide="image" style="width:14px;height:14px;margin-right:5px;color:var(--murasaki-ink-3)"></i>
+              <span class="label">assets</span>
+            </div>
+            <div class="tree-item" style="padding-left:22px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="file-text" style="width:14px;height:14px;margin-right:5px;color:var(--murasaki-ink-3)"></i>
+              <span class="label">spec.md</span>
+            </div>
+          </div>
+
+          <!-- Outline Panel (hidden) -->
+          <div class="sidebar-panel" id="panel-outline">
+            <div class="outline-item h1">
+              <span class="outline-dot"></span>
+              项目提案书
+            </div>
+            <div class="outline-item h2">
+              <span class="outline-dot"></span>
+              核心特性
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Bar -->
+      <div id="tab-bar">
+        <div class="tab-list">
+          <div class="tab-item">
+            <i data-lucide="file-text" class="tab-icon"></i>
+            <span>快速入门.md</span>
+            <span class="close-btn"><i data-lucide="x"></i></span>
+          </div>
+          <div class="tab-item active">
+            <i data-lucide="file-text" class="tab-icon"></i>
+            <span>项目提案书.md</span>
+            <span class="dirty-dot"></span>
+            <span class="close-btn"><i data-lucide="x"></i></span>
+          </div>
+          <div class="tab-item">
+            <i data-lucide="file-text" class="tab-icon"></i>
+            <span>README.md</span>
+            <span class="close-btn"><i data-lucide="x"></i></span>
+          </div>
+        </div>
+        <div class="tab-add-btn" title="新建标签页">
+          <i data-lucide="plus"></i>
+        </div>
+      </div>
+
+      <!-- Main WYSIWYG Area -->
+      <div id="main-area">
+
+        <!-- WYSIWYG Toolbar -->
+        <div id="wysiwyg-toolbar">
+          <div class="toolbar-group">
+            <button class="toolbar-btn" title="段落样式">
+              <i data-lucide="heading" style="width:14px;height:14px"></i>
+              <i data-lucide="chevron-down" style="width:10px;height:10px"></i>
+            </button>
+          </div>
+          <div class="toolbar-divider"></div>
+          <div class="toolbar-group">
+            <button class="toolbar-btn" title="加粗"><i data-lucide="bold" style="width:14px;height:14px"></i></button>
+            <button class="toolbar-btn" title="斜体"><i data-lucide="italic" style="width:14px;height:14px"></i></button>
+            <button class="toolbar-btn" title="删除线"><i data-lucide="strikethrough" style="width:14px;height:14px"></i></button>
+            <button class="toolbar-btn" title="行内代码"><i data-lucide="code" style="width:14px;height:14px"></i></button>
+          </div>
+          <div class="toolbar-divider"></div>
+          <div class="toolbar-group">
+            <button class="toolbar-btn" title="无序列表"><i data-lucide="list" style="width:14px;height:14px"></i></button>
+            <button class="toolbar-btn" title="有序列表"><i data-lucide="list-ordered" style="width:14px;height:14px"></i></button>
+            <button class="toolbar-btn" title="任务列表"><i data-lucide="check-square" style="width:14px;height:14px"></i></button>
+          </div>
+          <div class="toolbar-divider"></div>
+          <div class="toolbar-group">
+            <button class="toolbar-btn" title="链接"><i data-lucide="link" style="width:14px;height:14px"></i></button>
+            <button class="toolbar-btn" title="图片"><i data-lucide="image" style="width:14px;height:14px"></i></button>
+            <button class="toolbar-btn" title="表格"><i data-lucide="table" style="width:14px;height:14px"></i></button>
+          </div>
+          <div class="toolbar-spacer"></div>
+          <div class="toolbar-group">
+            <button class="toolbar-btn" title="撤销"><i data-lucide="undo" style="width:14px;height:14px"></i></button>
+            <button class="toolbar-btn" title="重做"><i data-lucide="redo" style="width:14px;height:14px"></i></button>
+          </div>
+        </div>
+
+        <!-- WYSIWYG Canvas -->
+        <div id="wysiwyg-canvas" data-scroll-region="primary">
+          <div class="wysiwyg-document">
+
+            <div class="wysiwyg-block wysiwyg-block-heading">
+              <h1>项目提案书</h1>
+            </div>
+
+            <div class="wysiwyg-block wysiwyg-block-paragraph">
+              <p>本项目旨在为团队提供一款轻量、高效的本地 Markdown 编辑器，支持所见即所得编辑模式与 AI 辅助写作。</p>
+            </div>
+
+            <!-- Inline diff inside WYSIWYG canvas -->
+            <div class="wysiwyg-block wysiwyg-block-diff">
+              <div class="wysiwyg-diff-row wysiwyg-diff-old">
+                <p><span class="diff-strike">我们希望通过这次升级，让用户能够更加方便地管理和编辑文档。</span></p>
+                <div class="wysiwyg-diff-actions">
+                  <button class="diff-btn diff-btn-accept" title="接受"><i data-lucide="check" style="width:12px;height:12px"></i></button>
+                  <button class="diff-btn diff-btn-reject" title="拒绝"><i data-lucide="x" style="width:12px;height:12px"></i></button>
+                </div>
+              </div>
+              <div class="wysiwyg-diff-row wysiwyg-diff-new">
+                <p>本升级将显著降低文档管理与编辑的认知负担，使用户能够更专注于内容创作本身。</p>
+              </div>
+            </div>
+
+            <div class="wysiwyg-block wysiwyg-block-paragraph">
+              <p>主要功能包括实时预览、文件树管理、多主题切换、Mermaid 图表以及 KaTeX 公式渲染。</p>
+            </div>
+
+            <div class="wysiwyg-block wysiwyg-block-heading">
+              <h2>核心特性</h2>
+            </div>
+
+            <div class="wysiwyg-block wysiwyg-block-list">
+              <ul>
+                <li>分屏编辑与实时预览</li>
+                <li>文件树管理与大纲导航</li>
+                <li>四套 Markdown 主题切换</li>
+                <li>Mermaid 图表与 KaTeX 公式</li>
+              </ul>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Agent Panel -->
+      <div id="agent-panel">
+
+        <!-- Panel Header -->
+        <div id="agent-header">
+          <div class="agent-header-left">
+            <i data-lucide="bot" style="width:15px;height:15px;color:var(--murasaki-primary)"></i>
+            <span class="agent-header-title">Agent</span>
+          </div>
+          <div class="agent-header-right">
+            <span class="agent-context-chip">
+              <i data-lucide="file-text" style="width:11px;height:11px"></i>
+              项目提案书.md
+            </span>
+            <button class="agent-collapse-btn" title="收起面板">
+              <i data-lucide="panel-right-close" style="width:14px;height:14px"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Context Card -->
+        <div id="agent-context-card">
+          <div class="context-card-left">
+            <i data-lucide="paperclip" style="width:12px;height:12px;color:var(--murasaki-ink-3)"></i>
+            <span class="context-path">docs/项目提案书.md</span>
+            <span class="context-tokens">≈ 312 tokens</span>
+          </div>
+          <button class="context-remove-btn" title="移除上下文">
+            <i data-lucide="x" style="width:12px;height:12px"></i>
+          </button>
+        </div>
+
+        <!-- Conversation Area -->
+        <div id="agent-conversation">
+
+          <!-- User message -->
+          <div class="agent-message agent-message-user">
+            <div class="agent-message-bubble agent-message-bubble-user">
+              帮我把第二段改得更正式
+            </div>
+          </div>
+
+          <!-- Assistant message -->
+          <div class="agent-message agent-message-assistant">
+            <div class="agent-avatar">
+              <i data-lucide="sparkles" style="width:14px;height:14px;color:var(--murasaki-primary)"></i>
+            </div>
+            <div class="agent-message-bubble agent-message-bubble-assistant">
+              好的，我先查看当前段落，然后生成更正式的替换方案。<span class="streaming-cursor"></span>
+            </div>
+          </div>
+
+          <!-- Expanded tool call -->
+          <div class="tool-call-entry tool-call-expanded">
+            <div class="tool-call-header" onclick="this.parentElement.classList.toggle('tool-call-expanded')">
+              <i data-lucide="wrench" style="width:12px;height:12px;color:var(--murasaki-ink-3)"></i>
+              <span class="tool-call-name">get_current_document</span>
+              <span class="tool-call-separator">&middot;</span>
+              <span class="tool-call-summary">已获取 312 字符</span>
+              <i data-lucide="chevron-down" class="tool-call-chevron" style="width:12px;height:12px;color:var(--murasaki-ink-3)"></i>
+            </div>
+            <div class="tool-call-body">
+              <div class="tool-call-section">
+                <div class="tool-call-label">参数</div>
+                <pre class="tool-call-code">{"path": "docs/项目提案书.md"}</pre>
+              </div>
+              <div class="tool-call-section">
+                <div class="tool-call-label">结果</div>
+                <pre class="tool-call-code">{"content": "# 项目提案书\n\n本项目旨在...", "tokens": 312}</pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Collapsed tool call -->
+          <div class="tool-call-entry">
+            <div class="tool-call-header" onclick="this.parentElement.classList.toggle('tool-call-expanded')">
+              <i data-lucide="wrench" style="width:12px;height:12px;color:var(--murasaki-ink-3)"></i>
+              <span class="tool-call-name">propose_replace</span>
+              <span class="tool-call-separator">&middot;</span>
+              <span class="tool-call-summary">替换第 2 段描述文字</span>
+              <i data-lucide="chevron-right" class="tool-call-chevron" style="width:12px;height:12px;color:var(--murasaki-ink-3)"></i>
+            </div>
+            <div class="tool-call-body">
+              <div class="tool-call-section">
+                <div class="tool-call-label">参数</div>
+                <pre class="tool-call-code">{"paragraph": 2, "old": "我们希望通过这次升级...", "new": "本升级将显著降低..."}</pre>
+              </div>
+              <div class="tool-call-section">
+                <div class="tool-call-label">结果</div>
+                <pre class="tool-call-code">{"status": "proposed"}</pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Proposal List -->
+          <div id="agent-proposal-list">
+            <div class="proposal-label">待审批的提议</div>
+            <div class="proposal-item">
+              <div class="proposal-item-left">
+                <span class="proposal-icon">&#x21C4;</span>
+                <div>
+                  <div class="proposal-name">替换段落</div>
+                  <div class="proposal-detail">propose_replace &middot; 第 2 段</div>
+                </div>
+              </div>
+              <div class="proposal-actions">
+                <button class="proposal-btn proposal-btn-accept" title="接受">
+                  <i data-lucide="check" style="width:14px;height:14px"></i>
+                </button>
+                <button class="proposal-btn proposal-btn-reject" title="拒绝">
+                  <i data-lucide="x" style="width:14px;height:14px"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Input Area -->
+        <div id="agent-input-area">
+          <div class="agent-input-wrapper">
+            <textarea class="agent-input" placeholder="向 Agent 发送消息..." rows="2"></textarea>
+            <button class="agent-send-btn agent-send-btn-stop" title="停止生成">
+              <i data-lucide="square" style="width:14px;height:14px"></i>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Status Bar -->
+      <div id="status-bar">
+        <div class="status-left">
+          <span>项目提案书.md</span>
+          <span style="color:var(--murasaki-ink-3)">docs/</span>
+          <span class="status-agent-indicator">
+            <span class="status-agent-dot"></span>
+            Agent 运行中
+          </span>
+        </div>
+        <div class="status-right">
+          <span>行 1, 列 1</span>
+          <span>字符 312</span>
+          <span>字数 256</span>
+        </div>
+      </div>
+
+    </div>
+    <script>lucide.createIcons();</script>
+
+    <style id="critical-layout">
+      /* === App Shell Grid (3-column with agent panel) === */
+      [data-viewport-mode="app-shell"] {
+        display: grid;
+        grid-template-rows: 32px 36px 1fr 24px;
+        grid-template-columns: 260px 1fr 380px;
+        grid-template-areas:
+          "menubar    menubar    menubar"
+          "sidebar    tabbar     agentpanel"
+          "sidebar    main       agentpanel"
+          "statusbar  statusbar  statusbar";
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        background: var(--murasaki-background);
+      }
+
+      /* === Menu Bar === */
+      #menu-bar {
+        grid-area: menubar;
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        background: var(--murasaki-background);
+        border-bottom: 1px solid var(--murasaki-line);
+        gap: 2px;
+        user-select: none;
+      }
+      #menu-bar .menu-item {
+        padding: 4px 10px;
+        font-size: 12px;
+        color: var(--murasaki-ink-2);
+        border-radius: var(--murasaki-radius-sm);
+        cursor: default;
+        transition: background 120ms, color 120ms;
+      }
+      #menu-bar .menu-item:hover {
+        background: var(--murasaki-muted);
+        color: var(--murasaki-ink);
+      }
+      .menu-brand {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--murasaki-primary);
+        margin-right: 12px;
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .menu-brand svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      /* === Sidebar === */
+      #sidebar {
+        grid-area: sidebar;
+        display: flex;
+        flex-direction: column;
+        background: var(--murasaki-surface);
+        border-right: 1px solid var(--murasaki-line);
+        overflow: hidden;
+      }
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        padding: 6px 8px;
+        gap: 2px;
+        border-bottom: 1px solid var(--murasaki-line);
+      }
+      .sidebar-tab {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 28px;
+        border-radius: var(--murasaki-radius-sm);
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+        position: relative;
+      }
+      .sidebar-tab:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink-2);
+      }
+      .sidebar-tab.active {
+        color: var(--murasaki-primary);
+      }
+      .sidebar-tab.active::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 16px;
+        height: 2px;
+        background: var(--murasaki-primary);
+        border-radius: 1px;
+      }
+      .sidebar-tab svg {
+        width: 16px;
+        height: 16px;
+      }
+      .sidebar-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px 0;
+      }
+      .sidebar-panel {
+        display: none;
+        flex-direction: column;
+        height: 100%;
+      }
+      .sidebar-panel.active {
+        display: flex;
+      }
+
+      /* File Tree */
+      .tree-item {
+        display: flex;
+        align-items: center;
+        padding: 3px 8px 3px 0;
+        font-size: 13px;
+        color: var(--murasaki-ink-2);
+        cursor: pointer;
+        transition: background 120ms;
+        white-space: nowrap;
+        user-select: none;
+      }
+      .tree-item:hover {
+        background: var(--murasaki-neutral-200);
+      }
+      .tree-item.selected {
+        background: var(--murasaki-purple-50);
+        color: var(--murasaki-primary);
+      }
+      .tree-item .indent {
+        display: inline-block;
+        flex-shrink: 0;
+      }
+      .tree-item svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        margin-right: 5px;
+      }
+      .tree-item .arrow {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        margin-right: 2px;
+        color: var(--murasaki-ink-3);
+      }
+      .tree-item .arrow.collapsed {
+        transform: rotate(-90deg);
+      }
+      .tree-item .label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Outline */
+      .outline-item {
+        display: flex;
+        align-items: center;
+        padding: 4px 12px;
+        font-size: 13px;
+        color: var(--murasaki-ink-2);
+        cursor: pointer;
+        transition: background 120ms;
+      }
+      .outline-item:hover {
+        background: var(--murasaki-neutral-200);
+      }
+      .outline-item.h1 {
+        font-weight: 600;
+        color: var(--murasaki-ink);
+      }
+      .outline-item.h2 {
+        padding-left: 24px;
+      }
+      .outline-item.h3 {
+        padding-left: 36px;
+        font-size: 12px;
+        color: var(--murasaki-ink-3);
+      }
+      .outline-item .outline-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--murasaki-ink-3);
+        margin-right: 8px;
+        flex-shrink: 0;
+      }
+      .outline-item.h1 .outline-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--murasaki-primary);
+      }
+
+      /* === Tab Bar === */
+      #tab-bar {
+        grid-area: tabbar;
+        display: flex;
+        align-items: flex-end;
+        background: var(--murasaki-surface);
+        border-bottom: 1px solid var(--murasaki-line);
+        overflow: hidden;
+        padding: 0 4px;
+      }
+      .tab-list {
+        display: flex;
+        align-items: flex-end;
+        flex: 1;
+        overflow-x: auto;
+        overflow-y: hidden;
+      }
+      .tab-list::-webkit-scrollbar {
+        display: none;
+      }
+      .tab-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        font-size: 13px;
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: background 120ms, color 120ms, border-color 120ms;
+        white-space: nowrap;
+        flex-shrink: 0;
+        position: relative;
+        user-select: none;
+      }
+      .tab-item:hover {
+        color: var(--murasaki-ink-2);
+        background: var(--murasaki-neutral-100);
+      }
+      .tab-item.active {
+        color: var(--murasaki-ink);
+        background: var(--murasaki-background);
+        border-bottom-color: var(--murasaki-primary);
+      }
+      .tab-item svg.tab-icon {
+        width: 13px;
+        height: 13px;
+        color: var(--murasaki-ink-3);
+        flex-shrink: 0;
+      }
+      .tab-item.active svg.tab-icon {
+        color: var(--murasaki-primary);
+      }
+      .tab-item .dirty-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--murasaki-primary);
+        flex-shrink: 0;
+      }
+      .tab-item .close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border-radius: var(--murasaki-radius-sm);
+        opacity: 0;
+        transition: opacity 120ms, background 120ms;
+        color: var(--murasaki-ink-3);
+        flex-shrink: 0;
+        margin-left: 2px;
+      }
+      .tab-item:hover .close-btn {
+        opacity: 1;
+      }
+      .tab-item .close-btn:hover {
+        background: var(--murasaki-neutral-300);
+        color: var(--murasaki-ink);
+      }
+      .tab-item .close-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+      .tab-add-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        margin-bottom: 2px;
+        border-radius: var(--murasaki-radius-sm);
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+        flex-shrink: 0;
+      }
+      .tab-add-btn:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink-2);
+      }
+      .tab-add-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      /* === Main WYSIWYG Area === */
+      #main-area {
+        grid-area: main;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--murasaki-background);
+      }
+
+      /* === WYSIWYG Toolbar === */
+      #wysiwyg-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 10px;
+        background: var(--murasaki-surface);
+        border-bottom: 1px solid var(--murasaki-line);
+        flex-shrink: 0;
+        overflow-x: auto;
+      }
+      #wysiwyg-toolbar::-webkit-scrollbar {
+        display: none;
+      }
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        flex-shrink: 0;
+      }
+      .toolbar-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        height: 28px;
+        min-width: 28px;
+        padding: 0 6px;
+        border-radius: var(--murasaki-radius-sm);
+        border: none;
+        background: transparent;
+        color: var(--murasaki-ink-2);
+        cursor: pointer;
+        transition: background 120ms, color 120ms, transform 120ms;
+      }
+      .toolbar-btn:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink);
+      }
+      .toolbar-btn:active {
+        background: var(--murasaki-neutral-300);
+        transform: translateY(1px);
+      }
+      .toolbar-btn svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+      }
+      .toolbar-divider {
+        width: 1px;
+        height: 20px;
+        background: var(--murasaki-line);
+        flex-shrink: 0;
+        margin: 0 2px;
+      }
+      .toolbar-spacer {
+        flex: 1;
+        min-width: 8px;
+      }
+
+      /* === WYSIWYG Canvas === */
+      #wysiwyg-canvas {
+        flex: 1;
+        overflow-y: auto;
+        padding: 28px 32px;
+        background: var(--murasaki-background);
+      }
+      #wysiwyg-canvas::-webkit-scrollbar {
+        width: 8px;
+      }
+      #wysiwyg-canvas::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      #wysiwyg-canvas::-webkit-scrollbar-thumb {
+        background: var(--murasaki-neutral-300);
+        border-radius: 4px;
+      }
+      #wysiwyg-canvas::-webkit-scrollbar-thumb:hover {
+        background: var(--murasaki-neutral-400);
+      }
+      .wysiwyg-document {
+        max-width: 640px;
+        margin: 0 auto;
+      }
+
+      /* === WYSIWYG Blocks === */
+      .wysiwyg-block {
+        position: relative;
+        padding: 4px 8px;
+        margin: 0 -8px 4px -8px;
+        border-radius: var(--murasaki-radius-sm);
+        border-left: 2px solid transparent;
+        transition: background 120ms, border-color 120ms, box-shadow 120ms;
+      }
+      .wysiwyg-block:hover {
+        background: var(--murasaki-surface);
+      }
+      .wysiwyg-block:focus-within {
+        outline: none;
+        background: var(--murasaki-surface);
+        border-left-color: var(--murasaki-primary);
+        box-shadow: 0 0 0 1px var(--murasaki-line);
+      }
+      .wysiwyg-block h1,
+      .wysiwyg-block h2,
+      .wysiwyg-block p,
+      .wysiwyg-block ul,
+      .wysiwyg-block ol {
+        margin: 0;
+        padding: 0;
+      }
+      .wysiwyg-block-heading h1 {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--murasaki-ink);
+        letter-spacing: -0.02em;
+        line-height: 1.3;
+        margin: 0 0 16px 0;
+      }
+      .wysiwyg-block-heading h2 {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--murasaki-ink);
+        letter-spacing: -0.01em;
+        line-height: 1.35;
+        margin: 20px 0 10px 0;
+      }
+      .wysiwyg-block-paragraph p {
+        font-size: 15px;
+        line-height: 1.75;
+        color: var(--murasaki-ink-2);
+        margin-bottom: 12px;
+      }
+      .wysiwyg-block-list ul {
+        margin: 0 0 12px 0;
+        padding-left: 24px;
+      }
+      .wysiwyg-block-list li {
+        font-size: 15px;
+        line-height: 1.75;
+        color: var(--murasaki-ink-2);
+        margin-bottom: 4px;
+      }
+      .wysiwyg-block-list li::marker {
+        color: var(--murasaki-primary);
+      }
+
+      /* === Inline Diff in WYSIWYG Canvas === */
+      .wysiwyg-block-diff {
+        padding: 10px 12px;
+        margin: 4px -8px 12px -8px;
+        background: var(--murasaki-surface);
+        border-radius: var(--murasaki-radius-md);
+        border: 1px solid var(--murasaki-line);
+      }
+      .wysiwyg-diff-row {
+        position: relative;
+        padding: 4px 6px;
+        border-radius: var(--murasaki-radius-sm);
+        border-left: 2px solid transparent;
+      }
+      .wysiwyg-diff-row p {
+        font-size: 15px;
+        line-height: 1.75;
+        margin: 0;
+      }
+      .wysiwyg-diff-old {
+        background: rgba(220, 38, 38, 0.06);
+        border-left-color: var(--murasaki-state-error);
+        padding-right: 64px;
+      }
+      .wysiwyg-diff-new {
+        background: rgba(22, 163, 74, 0.08);
+        border-left-color: var(--murasaki-state-success);
+        margin-top: 6px;
+      }
+      .diff-strike {
+        text-decoration: line-through;
+        color: var(--murasaki-ink-3);
+      }
+      .wysiwyg-diff-actions {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        gap: 4px;
+        z-index: 10;
+      }
+      .diff-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: var(--murasaki-radius-sm);
+        border: none;
+        cursor: pointer;
+        transition: background 120ms, transform 120ms;
+      }
+      .diff-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+      .diff-btn-accept {
+        background: var(--murasaki-state-success);
+        color: #fff;
+      }
+      .diff-btn-accept:hover {
+        background: #15803d;
+        transform: scale(1.1);
+      }
+      .diff-btn-reject {
+        background: var(--murasaki-state-error);
+        color: #fff;
+      }
+      .diff-btn-reject:hover {
+        background: #b91c1c;
+        transform: scale(1.1);
+      }
+
+      /* === Status Bar === */
+      #status-bar {
+        grid-area: statusbar;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        background: var(--murasaki-surface);
+        border-top: 1px solid var(--murasaki-line);
+        font-size: 12px;
+        color: var(--murasaki-ink-3);
+        user-select: none;
+      }
+      .status-left,
+      .status-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .status-right span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .status-agent-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--murasaki-primary);
+        font-weight: 500;
+      }
+      .status-agent-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--murasaki-primary);
+        animation: agent-pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes agent-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+
+      /* ====================================================================
+         Agent Panel Styles
+         ==================================================================== */
+
+      /* === Agent Panel Container === */
+      #agent-panel {
+        grid-area: agentpanel;
+        display: flex;
+        flex-direction: column;
+        background: var(--murasaki-surface);
+        border-left: 1px solid var(--murasaki-line);
+        overflow: hidden;
+        width: 380px;
+        min-width: 380px;
+        max-width: 380px;
+      }
+
+      /* === Agent Header === */
+      #agent-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        height: 36px;
+        min-height: 36px;
+        border-bottom: 1px solid var(--murasaki-line);
+        background: var(--murasaki-background);
+        user-select: none;
+      }
+      .agent-header-left {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .agent-header-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--murasaki-ink);
+        letter-spacing: -0.01em;
+      }
+      .agent-header-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .agent-context-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        font-size: 11px;
+        color: var(--murasaki-ink-3);
+        background: var(--murasaki-muted);
+        border-radius: 10px;
+        white-space: nowrap;
+      }
+      .agent-collapse-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: var(--murasaki-radius-sm);
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+        background: none;
+        border: none;
+      }
+      .agent-collapse-btn:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink-2);
+      }
+
+      /* === Context Card === */
+      #agent-context-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 12px;
+        margin: 8px 10px 4px 10px;
+        background: var(--murasaki-background);
+        border-radius: var(--murasaki-radius-md);
+        border: 1px solid var(--murasaki-line);
+      }
+      .context-card-left {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        flex: 1;
+      }
+      .context-path {
+        font-size: 12px;
+        color: var(--murasaki-ink-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .context-tokens {
+        font-size: 11px;
+        color: var(--murasaki-ink-3);
+        flex-shrink: 0;
+        background: var(--murasaki-muted);
+        padding: 1px 6px;
+        border-radius: 8px;
+      }
+      .context-remove-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: var(--murasaki-radius-sm);
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        background: none;
+        border: none;
+        flex-shrink: 0;
+        margin-left: 4px;
+        transition: background 120ms, color 120ms;
+      }
+      .context-remove-btn:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-state-error);
+      }
+
+      /* === Conversation Area === */
+      #agent-conversation {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 10px 0 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      #agent-conversation::-webkit-scrollbar {
+        width: 5px;
+      }
+      #agent-conversation::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      #agent-conversation::-webkit-scrollbar-thumb {
+        background: var(--murasaki-neutral-300);
+        border-radius: 3px;
+      }
+      #agent-conversation::-webkit-scrollbar-thumb:hover {
+        background: var(--murasaki-neutral-400);
+      }
+
+      /* === Agent Messages === */
+      .agent-message {
+        display: flex;
+        flex-direction: column;
+      }
+      .agent-message-user {
+        align-items: flex-end;
+      }
+      .agent-message-assistant {
+        align-items: flex-start;
+      }
+      .agent-avatar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--murasaki-purple-100);
+        margin-bottom: 4px;
+        flex-shrink: 0;
+      }
+      .agent-message-bubble {
+        max-width: calc(100% - 16px);
+        padding: 8px 12px;
+        font-size: 13px;
+        line-height: 1.55;
+        border-radius: var(--murasaki-radius-md);
+        word-break: break-word;
+      }
+      .agent-message-bubble-user {
+        background: var(--murasaki-purple-100);
+        color: var(--murasaki-purple-900);
+        border-bottom-right-radius: var(--murasaki-radius-sm);
+      }
+      .agent-message-bubble-assistant {
+        background: var(--murasaki-background);
+        color: var(--murasaki-ink);
+        border-bottom-left-radius: var(--murasaki-radius-sm);
+        border: 1px solid var(--murasaki-line);
+      }
+
+      /* Streaming cursor */
+      .streaming-cursor {
+        display: inline-block;
+        width: 7px;
+        height: 15px;
+        background: var(--murasaki-primary);
+        border-radius: 1px;
+        margin-left: 2px;
+        vertical-align: text-bottom;
+        animation: blink-cursor 0.8s ease-in-out infinite;
+      }
+      @keyframes blink-cursor {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
+      /* === Tool Call Entries === */
+      .tool-call-entry {
+        border-radius: var(--murasaki-radius-md);
+        overflow: hidden;
+        border: 1px solid var(--murasaki-line);
+        background: var(--murasaki-background);
+        transition: border-color 120ms;
+      }
+      .tool-call-entry:hover {
+        border-color: var(--murasaki-neutral-300);
+      }
+      .tool-call-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--murasaki-ink-2);
+        user-select: none;
+        transition: background 120ms;
+      }
+      .tool-call-header:hover {
+        background: var(--murasaki-muted);
+      }
+      .tool-call-name {
+        font-weight: 600;
+        font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+        font-size: 11.5px;
+        color: var(--murasaki-ink);
+      }
+      .tool-call-separator {
+        color: var(--murasaki-ink-3);
+      }
+      .tool-call-summary {
+        color: var(--murasaki-ink-3);
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tool-call-chevron {
+        flex-shrink: 0;
+        transition: transform 200ms;
+      }
+      .tool-call-body {
+        display: none;
+        border-top: 1px solid var(--murasaki-line);
+        padding: 8px 10px;
+      }
+      .tool-call-expanded .tool-call-body {
+        display: block;
+      }
+      .tool-call-expanded .tool-call-chevron {
+        transform: rotate(0deg);
+      }
+      .tool-call-entry:not(.tool-call-expanded) .tool-call-chevron {
+        transform: rotate(0deg);
+      }
+      .tool-call-section {
+        margin-bottom: 6px;
+      }
+      .tool-call-section:last-child {
+        margin-bottom: 0;
+      }
+      .tool-call-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--murasaki-ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 3px;
+      }
+      .tool-call-code {
+        font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--murasaki-ink-2);
+        background: var(--murasaki-neutral-100);
+        padding: 6px 8px;
+        border-radius: var(--murasaki-radius-sm);
+        overflow-x: auto;
+        margin: 0;
+        white-space: pre;
+      }
+
+      /* === Proposal List === */
+      #agent-proposal-list {
+        margin-top: 4px;
+        padding: 8px 0;
+        border-top: 1px solid var(--murasaki-line);
+      }
+      .proposal-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--murasaki-ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 6px;
+        padding: 0 2px;
+      }
+      .proposal-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 8px;
+        border-radius: var(--murasaki-radius-md);
+        background: var(--murasaki-background);
+        border: 1px solid var(--murasaki-line);
+        margin-bottom: 4px;
+        transition: border-color 120ms;
+      }
+      .proposal-item:hover {
+        border-color: var(--murasaki-neutral-300);
+      }
+      .proposal-item-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        flex: 1;
+      }
+      .proposal-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: var(--murasaki-radius-sm);
+        background: var(--murasaki-purple-100);
+        color: var(--murasaki-primary);
+        font-size: 13px;
+        flex-shrink: 0;
+      }
+      .proposal-name {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--murasaki-ink);
+      }
+      .proposal-detail {
+        font-size: 11px;
+        color: var(--murasaki-ink-3);
+        margin-top: 1px;
+      }
+      .proposal-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+        margin-left: 8px;
+      }
+      .proposal-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: var(--murasaki-radius-sm);
+        cursor: pointer;
+        border: none;
+        transition: background 120ms, transform 120ms;
+      }
+      .proposal-btn-accept {
+        background: var(--murasaki-state-success);
+        color: #fff;
+      }
+      .proposal-btn-accept:hover {
+        background: #15803d;
+        transform: scale(1.08);
+      }
+      .proposal-btn-reject {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink-3);
+      }
+      .proposal-btn-reject:hover {
+        background: var(--murasaki-neutral-300);
+        color: var(--murasaki-state-error);
+        transform: scale(1.08);
+      }
+
+      /* === Agent Input Area === */
+      #agent-input-area {
+        padding: 8px 10px 10px 10px;
+        border-top: 1px solid var(--murasaki-line);
+        background: var(--murasaki-background);
+        flex-shrink: 0;
+      }
+      .agent-input-wrapper {
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+        background: var(--murasaki-surface);
+        border: 1px solid var(--murasaki-line);
+        border-radius: var(--murasaki-radius-md);
+        padding: 8px 10px;
+        transition: border-color 120ms;
+      }
+      .agent-input-wrapper:focus-within {
+        border-color: var(--murasaki-ring);
+        box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.1);
+      }
+      .agent-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-family: "Inter", "Noto Sans SC", system-ui, sans-serif;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--murasaki-ink);
+        resize: none;
+        min-height: 32px;
+        max-height: 120px;
+        padding: 0;
+      }
+      .agent-input::placeholder {
+        color: var(--murasaki-ink-3);
+      }
+      .agent-send-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: var(--murasaki-radius-sm);
+        border: none;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background 120ms, transform 120ms;
+      }
+      .agent-send-btn:hover {
+        transform: scale(1.05);
+      }
+      .agent-send-btn-send {
+        background: var(--murasaki-primary);
+        color: #fff;
+      }
+      .agent-send-btn-send:hover {
+        background: var(--murasaki-purple-700);
+      }
+      .agent-send-btn-stop {
+        background: var(--murasaki-state-error);
+        color: #fff;
+      }
+      .agent-send-btn-stop:hover {
+        background: #b91c1c;
+      }
+    </style>
+</body>
+</html>

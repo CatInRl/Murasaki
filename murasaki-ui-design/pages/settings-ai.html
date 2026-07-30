@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - Murasaki</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <div id="settings-window" data-viewport-mode="settings-shell">
+
+      <!-- Title Bar -->
+      <div id="settings-title-bar">
+        <div class="title-bar-text">设置</div>
+        <button class="title-bar-close" type="button" aria-label="关闭">
+          <i data-lucide="x" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+
+      <!-- Sidebar -->
+      <div id="settings-sidebar">
+        <nav class="settings-category-list" aria-label="设置分类">
+          <a href="#" class="category-item">
+            <i data-lucide="settings" style="width:16px;height:16px"></i>
+            <span>常规</span>
+          </a>
+          <a href="#" class="category-item">
+            <i data-lucide="type" style="width:16px;height:16px"></i>
+            <span>编辑器</span>
+          </a>
+          <a href="#" class="category-item active" aria-current="page">
+            <i data-lucide="bot" style="width:16px;height:16px"></i>
+            <span>AI</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- Content -->
+      <div id="settings-content">
+        <div class="settings-content-inner">
+          <h1 class="settings-page-title">AI</h1>
+
+          <!-- Provider 管理 -->
+          <section class="settings-section provider-section">
+            <h2 class="settings-section-title">Provider 管理</h2>
+            <div class="provider-workspace">
+              <!-- Provider List -->
+              <aside class="provider-list">
+                <div class="provider-list-header">
+                  <span>Providers</span>
+                </div>
+                <div class="provider-items" role="radiogroup" aria-label="选择默认 Provider">
+                  <label class="provider-item selected">
+                    <input type="radio" name="default-provider" value="deepseek" checked class="provider-radio">
+                    <div class="provider-item-body">
+                      <div class="provider-item-main">
+                        <span class="provider-name">DeepSeek</span>
+                        <span class="provider-badge">默认</span>
+                      </div>
+                      <div class="provider-item-meta">OpenAI 兼容</div>
+                    </div>
+                  </label>
+                  <label class="provider-item">
+                    <input type="radio" name="default-provider" value="openai" class="provider-radio">
+                    <div class="provider-item-body">
+                      <div class="provider-item-main">
+                        <span class="provider-name">OpenAI</span>
+                      </div>
+                      <div class="provider-item-meta">OpenAI 兼容</div>
+                    </div>
+                  </label>
+                </div>
+                <div class="provider-list-footer">
+                  <button class="provider-add-btn" type="button">
+                    <i data-lucide="plus" style="width:14px;height:14px"></i>
+                    <span>添加 Provider</span>
+                  </button>
+                </div>
+              </aside>
+
+              <!-- Provider Editor -->
+              <div class="provider-editor">
+                <div class="provider-editor-header">
+                  <h3 class="provider-editor-title">API 设置</h3>
+                  <button class="provider-delete-btn" type="button" aria-label="删除 Provider">
+                    <i data-lucide="trash-2" style="width:15px;height:15px"></i>
+                  </button>
+                </div>
+
+                <form class="provider-form" onsubmit="return false;">
+                  <div class="setting-row provider-form-row">
+                    <div class="setting-label-column">
+                      <label for="provider-name-input" class="setting-label">名称</label>
+                      <span class="setting-description">用于在列表中识别该 Provider</span>
+                    </div>
+                    <div class="setting-control-column">
+                      <input id="provider-name-input" class="setting-input" type="text" value="DeepSeek" />
+                    </div>
+                  </div>
+
+                  <div class="setting-row provider-form-row">
+                    <div class="setting-label-column">
+                      <label for="provider-type-select" class="setting-label">类型</label>
+                      <span class="setting-description">API 兼容格式</span>
+                    </div>
+                    <div class="setting-control-column">
+                      <div class="select-wrapper">
+                        <select id="provider-type-select">
+                          <option selected>OpenAI 兼容</option>
+                          <option>Azure OpenAI</option>
+                        </select>
+                        <i data-lucide="chevron-right" style="width:14px;height:14px" class="select-chevron"></i>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-row provider-form-row">
+                    <div class="setting-label-column">
+                      <label for="provider-api-url" class="setting-label">API URL</label>
+                      <span class="setting-description">OpenAI 兼容端点的基础 URL</span>
+                    </div>
+                    <div class="setting-control-column">
+                      <input id="provider-api-url" class="setting-input wide-input" type="text" value="https://api.deepseek.com/v1" />
+                    </div>
+                  </div>
+
+                  <div class="setting-row provider-form-row">
+                    <div class="setting-label-column">
+                      <label for="provider-model" class="setting-label">Model</label>
+                      <span class="setting-description">默认调用的模型 ID</span>
+                    </div>
+                    <div class="setting-control-column">
+                      <input id="provider-model" class="setting-input" type="text" value="deepseek-v4-flash" />
+                    </div>
+                  </div>
+
+                  <div class="setting-row provider-form-row">
+                    <div class="setting-label-column">
+                      <label for="provider-api-key" class="setting-label">API Key</label>
+                      <span class="setting-description">仅在本地存储，不会上传</span>
+                    </div>
+                    <div class="setting-control-column">
+                      <div class="password-input-wrap">
+                        <input id="provider-api-key" class="setting-input password-input" type="password" value="sk-************************" />
+                        <button type="button" class="password-toggle" aria-label="显示 API Key">
+                          <i data-lucide="eye" style="width:14px;height:14px" class="toggle-visible"></i>
+                          <i data-lucide="eye-off" style="width:14px;height:14px" class="toggle-hidden"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="provider-form-actions">
+                    <button id="provider-test-btn" type="button" class="secondary-button">
+                      <i data-lucide="plug" style="width:14px;height:14px"></i>
+                      测试连接
+                    </button>
+                    <div class="provider-status">
+                      <span class="provider-status-dot"></span>
+                      <span class="provider-status-text">上次测试：成功</span>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </section>
+
+          <!-- 高级参数 -->
+          <section class="settings-section">
+            <details class="advanced-params" open>
+              <summary class="advanced-params-summary">
+                <span class="advanced-params-title">高级参数</span>
+                <span class="advanced-params-hint">Agent 循环、token 上限与提案确认阈值</span>
+                <i data-lucide="chevron-down" style="width:16px;height:16px" class="advanced-params-chevron"></i>
+              </summary>
+              <div class="advanced-params-body">
+                <div class="setting-row">
+                  <div class="setting-label-column">
+                    <label for="agent-max-rounds" class="setting-label">Agent 循环轮数上限</label>
+                    <span class="setting-description">单条消息最多允许的工具调用轮数</span>
+                  </div>
+                  <div class="setting-control-column">
+                    <input id="agent-max-rounds" class="setting-input number-input" type="number" min="1" max="50" value="15" />
+                  </div>
+                </div>
+
+                <div class="setting-row">
+                  <div class="setting-label-column">
+                    <label for="agent-max-request-tokens" class="setting-label">单次请求 token 上限</label>
+                    <span class="setting-description">单次发往 LLM 的最大 token 数</span>
+                  </div>
+                  <div class="setting-control-column">
+                    <input id="agent-max-request-tokens" class="setting-input number-input" type="number" min="1024" step="1024" value="16384" />
+                  </div>
+                </div>
+
+                <div class="setting-row">
+                  <div class="setting-label-column">
+                    <label for="agent-cumulative-soft-cap" class="setting-label">累计 token 软上限</label>
+                    <span class="setting-description">触发上下文压缩的累计 token 阈值</span>
+                  </div>
+                  <div class="setting-control-column">
+                    <input id="agent-cumulative-soft-cap" class="setting-input number-input" type="number" min="1024" step="1024" value="51200" />
+                  </div>
+                </div>
+
+                <div class="setting-row">
+                  <div class="setting-label-column">
+                    <label for="agent-replace-confirm-threshold" class="setting-label">propose_replace 二次确认阈值</label>
+                    <span class="setting-description">超过此行数的替换提案需要二次确认</span>
+                  </div>
+                  <div class="setting-control-column">
+                    <input id="agent-replace-confirm-threshold" class="setting-input number-input" type="number" min="1" value="50" />
+                  </div>
+                </div>
+              </div>
+            </details>
+          </section>
+        </div>
+
+        <!-- Footer -->
+        <div class="settings-footer">
+          <button class="secondary-button" type="button">恢复默认</button>
+          <button class="primary-button" type="button">保存</button>
+        </div>
+      </div>
+
+    </div>
+    <script>
+      lucide.createIcons();
+
+      // Password show/hide toggle
+      const keyInput = document.getElementById('provider-api-key');
+      const toggleBtn = document.querySelector('.password-toggle');
+      const visibleIcon = toggleBtn.querySelector('.toggle-visible');
+      const hiddenIcon = toggleBtn.querySelector('.toggle-hidden');
+
+      function updateToggle() {
+        if (keyInput.type === 'password') {
+          visibleIcon.style.display = 'inline-flex';
+          hiddenIcon.style.display = 'none';
+          toggleBtn.setAttribute('aria-label', '显示 API Key');
+        } else {
+          visibleIcon.style.display = 'none';
+          hiddenIcon.style.display = 'inline-flex';
+          toggleBtn.setAttribute('aria-label', '隐藏 API Key');
+        }
+      }
+
+      toggleBtn.addEventListener('click', () => {
+        keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+        updateToggle();
+      });
+
+      updateToggle();
+    </script>
+
+    <style id="critical-layout">
+      /* === Settings Window Shell === */
+      [data-viewport-mode="settings-shell"] {
+        display: grid;
+        grid-template-rows: 44px 1fr;
+        grid-template-columns: 200px 1fr;
+        grid-template-areas:
+          "titlebar titlebar"
+          "sidebar  content";
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        background: var(--murasaki-background);
+      }
+
+      /* === Title Bar === */
+      #settings-title-bar {
+        grid-area: titlebar;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        background: var(--murasaki-surface);
+        border-bottom: 1px solid var(--murasaki-line);
+        -webkit-app-region: drag;
+        user-select: none;
+      }
+      .title-bar-text {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--murasaki-ink);
+      }
+      .title-bar-close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: var(--murasaki-radius-md);
+        color: var(--murasaki-ink-3);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        -webkit-app-region: no-drag;
+        transition: background 120ms, color 120ms;
+      }
+      .title-bar-close:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink);
+      }
+      .title-bar-close:active {
+        background: var(--murasaki-neutral-300);
+      }
+
+      /* === Sidebar === */
+      #settings-sidebar {
+        grid-area: sidebar;
+        display: flex;
+        flex-direction: column;
+        background: var(--murasaki-surface);
+        border-right: 1px solid var(--murasaki-line);
+        overflow: hidden;
+      }
+      .settings-category-list {
+        display: flex;
+        flex-direction: column;
+        padding: 12px 10px;
+        gap: 2px;
+      }
+      .category-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: var(--murasaki-radius-md);
+        font-size: 13px;
+        color: var(--murasaki-ink-2);
+        text-decoration: none;
+        transition: background 120ms, color 120ms;
+        user-select: none;
+      }
+      .category-item:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink);
+      }
+      .category-item.active {
+        background: var(--murasaki-purple-50);
+        color: var(--murasaki-primary);
+        font-weight: 500;
+      }
+      .category-item svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
+
+      /* === Content === */
+      #settings-content {
+        grid-area: content;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--murasaki-background);
+      }
+      .settings-content-inner {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px 32px 16px;
+      }
+      .settings-content-inner::-webkit-scrollbar {
+        width: 8px;
+      }
+      .settings-content-inner::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .settings-content-inner::-webkit-scrollbar-thumb {
+        background: var(--murasaki-neutral-300);
+        border-radius: 4px;
+      }
+      .settings-content-inner::-webkit-scrollbar-thumb:hover {
+        background: var(--murasaki-neutral-400);
+      }
+      .settings-page-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--murasaki-ink);
+        margin: 0 0 24px 0;
+        letter-spacing: -0.02em;
+      }
+
+      /* === Settings Sections === */
+      .settings-section {
+        margin-bottom: 28px;
+      }
+      .settings-section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--murasaki-ink-2);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin: 0 0 12px 0;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--murasaki-line);
+      }
+
+      /* === Provider Workspace === */
+      .provider-workspace {
+        display: flex;
+        gap: 0;
+        border: 1px solid var(--murasaki-line);
+        border-radius: var(--murasaki-radius-lg);
+        overflow: hidden;
+        background: var(--murasaki-background);
+        min-height: 360px;
+      }
+
+      /* === Provider List === */
+      .provider-list {
+        width: 220px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        background: var(--murasaki-surface);
+        border-right: 1px solid var(--murasaki-line);
+        overflow: hidden;
+      }
+      .provider-list-header {
+        padding: 14px 14px 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--murasaki-ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        user-select: none;
+      }
+      .provider-items {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0 10px 8px;
+      }
+      .provider-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: var(--murasaki-radius-md);
+        cursor: pointer;
+        transition: background 120ms;
+        user-select: none;
+      }
+      .provider-item:hover {
+        background: var(--murasaki-neutral-200);
+      }
+      .provider-item.selected {
+        background: var(--murasaki-purple-50);
+      }
+      .provider-item.selected .provider-name {
+        color: var(--murasaki-primary);
+        font-weight: 500;
+      }
+      .provider-radio {
+        margin: 2px 0 0 0;
+        accent-color: var(--murasaki-primary);
+        flex-shrink: 0;
+      }
+      .provider-item-body {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .provider-item-main {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .provider-name {
+        font-size: 13px;
+        color: var(--murasaki-ink);
+      }
+      .provider-badge {
+        padding: 1px 5px;
+        border-radius: var(--murasaki-radius-sm);
+        background: var(--murasaki-purple-100);
+        color: var(--murasaki-purple-700);
+        font-size: 11px;
+        font-weight: 500;
+      }
+      .provider-item-meta {
+        font-size: 12px;
+        color: var(--murasaki-ink-3);
+      }
+      .provider-list-footer {
+        padding: 10px;
+        border-top: 1px solid var(--murasaki-line);
+      }
+      .provider-add-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        padding: 7px 10px;
+        border: 1px dashed var(--murasaki-line);
+        border-radius: var(--murasaki-radius-md);
+        background: transparent;
+        color: var(--murasaki-ink-2);
+        font-size: 13px;
+        cursor: pointer;
+        transition: background 120ms, border-color 120ms, color 120ms;
+      }
+      .provider-add-btn:hover {
+        background: var(--murasaki-neutral-100);
+        border-color: var(--murasaki-purple-300);
+        color: var(--murasaki-primary);
+      }
+
+      /* === Provider Editor === */
+      .provider-editor {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 20px 24px 24px;
+        overflow-y: auto;
+      }
+      .provider-editor-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .provider-editor-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--murasaki-ink);
+        margin: 0;
+      }
+      .provider-delete-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border: none;
+        border-radius: var(--murasaki-radius-sm);
+        background: transparent;
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+      }
+      .provider-delete-btn:hover {
+        background: var(--murasaki-state-error);
+        color: #ffffff;
+      }
+      .provider-delete-btn:active {
+        background: #b91c1c;
+      }
+      .provider-form {
+        display: flex;
+        flex-direction: column;
+      }
+      .provider-form-row {
+        padding: 12px 0;
+      }
+      .provider-form-row:first-child {
+        padding-top: 0;
+      }
+      .provider-form-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--murasaki-line);
+      }
+      .provider-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--murasaki-ink-2);
+        font-size: 12px;
+      }
+      .provider-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--murasaki-state-success);
+      }
+
+      /* === Setting Rows === */
+      .setting-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--murasaki-line);
+      }
+      .setting-row:last-child {
+        border-bottom: none;
+      }
+      .setting-label-column {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .setting-control-column {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .setting-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--murasaki-ink);
+        cursor: pointer;
+      }
+      .setting-description {
+        font-size: 12px;
+        color: var(--murasaki-ink-3);
+        line-height: 1.5;
+      }
+
+      /* === Inputs === */
+      .setting-input {
+        width: 200px;
+        height: 30px;
+        padding: 0 10px;
+        font-size: 13px;
+        color: var(--murasaki-ink);
+        background: var(--murasaki-background);
+        border: 1px solid var(--murasaki-border);
+        border-radius: var(--murasaki-radius-md);
+        transition: border-color 120ms, box-shadow 120ms;
+        box-sizing: border-box;
+      }
+      .setting-input::placeholder {
+        color: var(--murasaki-ink-3);
+      }
+      .setting-input:hover {
+        border-color: var(--murasaki-neutral-300);
+      }
+      .setting-input:focus-visible {
+        outline: none;
+        border-color: var(--murasaki-ring);
+        box-shadow: 0 0 0 2px var(--murasaki-ring);
+      }
+      .wide-input {
+        width: 280px;
+      }
+      .number-input {
+        width: 120px;
+        text-align: right;
+      }
+
+      /* === Select === */
+      .select-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      .select-wrapper select {
+        appearance: none;
+        min-width: 136px;
+        height: 30px;
+        padding: 0 28px 0 12px;
+        font-size: 13px;
+        color: var(--murasaki-ink);
+        background: var(--murasaki-background);
+        border: 1px solid var(--murasaki-border);
+        border-radius: var(--murasaki-radius-md);
+        cursor: pointer;
+        transition: border-color 120ms, box-shadow 120ms;
+      }
+      .select-wrapper select:hover {
+        border-color: var(--murasaki-neutral-300);
+      }
+      .select-wrapper select:focus-visible {
+        outline: none;
+        border-color: var(--murasaki-ring);
+        box-shadow: 0 0 0 2px var(--murasaki-ring);
+      }
+      .select-chevron {
+        position: absolute;
+        right: 10px;
+        color: var(--murasaki-ink-3);
+        transform: rotate(90deg);
+        pointer-events: none;
+      }
+
+      /* === Password Input === */
+      .password-input-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      .password-input {
+        padding-right: 34px;
+      }
+      .password-toggle {
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border: none;
+        border-radius: var(--murasaki-radius-sm);
+        background: transparent;
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+      }
+      .password-toggle:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink-2);
+      }
+
+      /* === Advanced Params Collapsible === */
+      .advanced-params {
+        border: 1px solid var(--murasaki-line);
+        border-radius: var(--murasaki-radius-lg);
+        background: var(--murasaki-background);
+        overflow: hidden;
+      }
+      .advanced-params-summary {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+        transition: background 120ms;
+      }
+      .advanced-params-summary::-webkit-details-marker {
+        display: none;
+      }
+      .advanced-params-summary:hover {
+        background: var(--murasaki-surface);
+      }
+      .advanced-params-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--murasaki-ink);
+      }
+      .advanced-params-hint {
+        font-size: 12px;
+        color: var(--murasaki-ink-3);
+        flex: 1;
+      }
+      .advanced-params-chevron {
+        color: var(--murasaki-ink-3);
+        transition: transform 120ms;
+      }
+      .advanced-params[open] .advanced-params-chevron {
+        transform: rotate(180deg);
+      }
+      .advanced-params-body {
+        padding: 0 18px;
+        border-top: 1px solid var(--murasaki-line);
+      }
+
+      /* === Buttons === */
+      .primary-button,
+      .secondary-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 30px;
+        padding: 0 14px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: var(--murasaki-radius-md);
+        cursor: pointer;
+        transition: background 120ms, border-color 120ms, color 120ms;
+        border: 1px solid transparent;
+      }
+      .primary-button {
+        color: var(--murasaki-primary-foreground);
+        background: var(--murasaki-primary);
+        border: 1px solid var(--murasaki-primary);
+      }
+      .primary-button:hover {
+        background: var(--murasaki-purple-700);
+        border-color: var(--murasaki-purple-700);
+      }
+      .primary-button:active {
+        background: var(--murasaki-purple-800);
+        border-color: var(--murasaki-purple-800);
+      }
+      .secondary-button {
+        color: var(--murasaki-ink-2);
+        background: var(--murasaki-background);
+        border: 1px solid var(--murasaki-border);
+      }
+      .secondary-button:hover {
+        background: var(--murasaki-muted);
+        color: var(--murasaki-ink);
+      }
+      .secondary-button:active {
+        background: var(--murasaki-neutral-200);
+      }
+
+      /* === Footer === */
+      .settings-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 32px;
+        background: var(--murasaki-surface);
+        border-top: 1px solid var(--murasaki-line);
+      }
+    </style>
+</body>
+</html>

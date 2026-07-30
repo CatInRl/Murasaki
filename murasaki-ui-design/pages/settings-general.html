@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - Murasaki</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <div id="settings-window" data-viewport-mode="settings-shell">
+
+      <!-- Title Bar -->
+      <div id="settings-title-bar">
+        <div class="title-bar-text">设置</div>
+        <button class="title-bar-close" type="button" aria-label="关闭">
+          <i data-lucide="x" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+
+      <!-- Sidebar -->
+      <div id="settings-sidebar">
+        <nav class="settings-category-list" aria-label="设置分类">
+          <a href="#" class="category-item active" aria-current="page">
+            <i data-lucide="settings" style="width:16px;height:16px"></i>
+            <span>常规</span>
+          </a>
+          <a href="#" class="category-item">
+            <i data-lucide="type" style="width:16px;height:16px"></i>
+            <span>编辑器</span>
+          </a>
+          <a href="#" class="category-item">
+            <i data-lucide="bot" style="width:16px;height:16px"></i>
+            <span>AI</span>
+          </a>
+          <a href="#" class="category-item">
+            <i data-lucide="palette" style="width:16px;height:16px"></i>
+            <span>主题</span>
+          </a>
+          <a href="#" class="category-item">
+            <i data-lucide="keyboard" style="width:16px;height:16px"></i>
+            <span>快捷键</span>
+          </a>
+        </nav>
+      </div>
+
+      <!-- Content -->
+      <div id="settings-content">
+        <div class="settings-content-inner">
+          <h1 class="settings-page-title">常规</h1>
+
+          <!-- 启动与行为 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title">启动与行为</h2>
+            <div class="settings-section-body">
+              <div class="setting-row">
+                <div class="setting-label-column">
+                  <label for="setting-open-last-workspace" class="setting-label">启动时打开上次工作区</label>
+                  <span class="setting-description">打开 Murasaki 时自动恢复上一次使用的工作区</span>
+                </div>
+                <div class="setting-control-column">
+                  <label class="toggle-switch">
+                    <input id="setting-open-last-workspace" type="checkbox" checked>
+                    <span class="toggle-track" aria-hidden="true"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="setting-row" id="setting-autosave">
+                <div class="setting-label-column">
+                  <label for="setting-autosave-interval" class="setting-label">自动保存间隔</label>
+                  <span class="setting-description">编辑器将在设定间隔后自动保存未保存的更改</span>
+                </div>
+                <div class="setting-control-column">
+                  <div class="select-wrapper">
+                    <select id="setting-autosave-interval">
+                      <option value="120">2分钟</option>
+                      <option value="300" selected>5分钟</option>
+                      <option value="600">10分钟</option>
+                    </select>
+                    <i data-lucide="chevron-right" style="width:14px;height:14px" class="select-chevron"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-label-column">
+                  <label for="setting-minimize-to-tray" class="setting-label">最小化到托盘</label>
+                  <span class="setting-description">关闭窗口时保留后台运行，可从系统托盘恢复</span>
+                </div>
+                <div class="setting-control-column">
+                  <label class="toggle-switch">
+                    <input id="setting-minimize-to-tray" type="checkbox">
+                    <span class="toggle-track" aria-hidden="true"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 文件处理 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title">文件处理</h2>
+            <div class="settings-section-body">
+              <div class="setting-row">
+                <div class="setting-label-column">
+                  <label for="setting-image-dir" class="setting-label">默认图片目录</label>
+                  <span class="setting-description">粘贴图片时默认保存到的相对目录</span>
+                </div>
+                <div class="setting-control-column">
+                  <div class="input-with-button">
+                    <input id="setting-image-dir" type="text" value="assets/images" placeholder="例如：assets/images">
+                    <button class="secondary-button" type="button">浏览</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-label-column">
+                  <label for="setting-delete-confirm" class="setting-label">删除确认</label>
+                  <span class="setting-description">删除文件或文件夹前弹出确认对话框</span>
+                </div>
+                <div class="setting-control-column">
+                  <label class="toggle-switch">
+                    <input id="setting-delete-confirm" type="checkbox" checked>
+                    <span class="toggle-track" aria-hidden="true"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 外观 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title">外观</h2>
+            <div class="settings-section-body">
+              <div class="setting-row" id="setting-theme">
+                <div class="setting-label-column">
+                  <span class="setting-label">主题选择</span>
+                  <span class="setting-description">选择 Murasaki 的界面显示模式</span>
+                </div>
+                <div class="setting-control-column">
+                  <div class="segmented-control" role="group" aria-label="主题选择">
+                    <button class="segmented-item" type="button">浅色</button>
+                    <button class="segmented-item active" type="button">深色</button>
+                    <button class="segmented-item" type="button">跟随系统</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-label-column">
+                  <label for="setting-language" class="setting-label">界面语言</label>
+                  <span class="setting-description">更改用户界面显示的语言</span>
+                </div>
+                <div class="setting-control-column">
+                  <div class="select-wrapper">
+                    <select id="setting-language">
+                      <option value="zh-CN" selected>简体中文</option>
+                      <option value="zh-TW">繁體中文</option>
+                      <option value="en">English</option>
+                      <option value="ja">日本語</option>
+                    </select>
+                    <i data-lucide="chevron-right" style="width:14px;height:14px" class="select-chevron"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Footer -->
+        <div class="settings-footer">
+          <button class="secondary-button" type="button">恢复默认</button>
+          <button class="primary-button" type="button">保存</button>
+        </div>
+      </div>
+
+    </div>
+    <script>lucide.createIcons();</script>
+
+    <style id="critical-layout">
+      /* === Settings Window Shell === */
+      [data-viewport-mode="settings-shell"] {
+        display: grid;
+        grid-template-rows: 44px 1fr;
+        grid-template-columns: 200px 1fr;
+        grid-template-areas:
+          "titlebar titlebar"
+          "sidebar  content";
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        background: var(--murasaki-background);
+      }
+
+      /* === Title Bar === */
+      #settings-title-bar {
+        grid-area: titlebar;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 16px;
+        background: var(--murasaki-surface);
+        border-bottom: 1px solid var(--murasaki-line);
+        -webkit-app-region: drag;
+        user-select: none;
+      }
+      .title-bar-text {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--murasaki-ink);
+      }
+      .title-bar-close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: var(--murasaki-radius-md);
+        color: var(--murasaki-ink-3);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        -webkit-app-region: no-drag;
+        transition: background 120ms, color 120ms;
+      }
+      .title-bar-close:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink);
+      }
+      .title-bar-close:active {
+        background: var(--murasaki-neutral-300);
+      }
+
+      /* === Sidebar === */
+      #settings-sidebar {
+        grid-area: sidebar;
+        display: flex;
+        flex-direction: column;
+        background: var(--murasaki-surface);
+        border-right: 1px solid var(--murasaki-line);
+        overflow: hidden;
+      }
+      .settings-category-list {
+        display: flex;
+        flex-direction: column;
+        padding: 12px 10px;
+        gap: 2px;
+      }
+      .category-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: var(--murasaki-radius-md);
+        font-size: 13px;
+        color: var(--murasaki-ink-2);
+        text-decoration: none;
+        transition: background 120ms, color 120ms;
+        user-select: none;
+      }
+      .category-item:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink);
+      }
+      .category-item.active {
+        background: var(--murasaki-purple-50);
+        color: var(--murasaki-primary);
+        font-weight: 500;
+      }
+      .category-item svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
+
+      /* === Content === */
+      #settings-content {
+        grid-area: content;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--murasaki-background);
+      }
+      .settings-content-inner {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px 32px 16px;
+      }
+      .settings-content-inner::-webkit-scrollbar {
+        width: 8px;
+      }
+      .settings-content-inner::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .settings-content-inner::-webkit-scrollbar-thumb {
+        background: var(--murasaki-neutral-300);
+        border-radius: 4px;
+      }
+      .settings-content-inner::-webkit-scrollbar-thumb:hover {
+        background: var(--murasaki-neutral-400);
+      }
+      .settings-page-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--murasaki-ink);
+        margin: 0 0 24px 0;
+        letter-spacing: -0.02em;
+      }
+
+      /* === Settings Sections === */
+      .settings-section {
+        margin-bottom: 28px;
+      }
+      .settings-section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--murasaki-ink-2);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin: 0 0 12px 0;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--murasaki-line);
+      }
+      .settings-section-body {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* === Setting Rows === */
+      .setting-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--murasaki-line);
+      }
+      .setting-row:last-child {
+        border-bottom: none;
+      }
+      .setting-label-column {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .setting-control-column {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+      }
+      .setting-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--murasaki-ink);
+        cursor: pointer;
+      }
+      .setting-description {
+        font-size: 12px;
+        color: var(--murasaki-ink-3);
+        line-height: 1.5;
+      }
+
+      /* === Toggle Switch === */
+      .toggle-switch {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        cursor: pointer;
+      }
+      .toggle-switch input {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .toggle-track {
+        display: block;
+        width: 40px;
+        height: 22px;
+        border-radius: 11px;
+        background: var(--murasaki-neutral-300);
+        transition: background 120ms;
+        position: relative;
+      }
+      .toggle-track::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--murasaki-background);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+        transition: transform 120ms;
+      }
+      .toggle-switch input:checked + .toggle-track {
+        background: var(--murasaki-primary);
+      }
+      .toggle-switch input:checked + .toggle-track::after {
+        transform: translateX(18px);
+      }
+      .toggle-switch input:focus-visible + .toggle-track {
+        outline: 2px solid var(--murasaki-ring);
+        outline-offset: 2px;
+      }
+
+      /* === Select === */
+      .select-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      .select-wrapper select {
+        appearance: none;
+        min-width: 136px;
+        height: 30px;
+        padding: 0 28px 0 12px;
+        font-size: 13px;
+        color: var(--murasaki-ink);
+        background: var(--murasaki-background);
+        border: 1px solid var(--murasaki-border);
+        border-radius: var(--murasaki-radius-md);
+        cursor: pointer;
+        transition: border-color 120ms, box-shadow 120ms;
+      }
+      .select-wrapper select:hover {
+        border-color: var(--murasaki-neutral-300);
+      }
+      .select-wrapper select:focus-visible {
+        outline: none;
+        border-color: var(--murasaki-ring);
+        box-shadow: 0 0 0 2px var(--murasaki-ring);
+      }
+      .select-chevron {
+        position: absolute;
+        right: 10px;
+        color: var(--murasaki-ink-3);
+        transform: rotate(90deg);
+        pointer-events: none;
+      }
+
+      /* === Text Input === */
+      .input-with-button {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .input-with-button input[type="text"] {
+        width: 200px;
+        height: 30px;
+        padding: 0 10px;
+        font-size: 13px;
+        color: var(--murasaki-ink);
+        background: var(--murasaki-background);
+        border: 1px solid var(--murasaki-border);
+        border-radius: var(--murasaki-radius-md);
+        transition: border-color 120ms, box-shadow 120ms;
+      }
+      .input-with-button input[type="text"]::placeholder {
+        color: var(--murasaki-ink-3);
+      }
+      .input-with-button input[type="text"]:hover {
+        border-color: var(--murasaki-neutral-300);
+      }
+      .input-with-button input[type="text"]:focus-visible {
+        outline: none;
+        border-color: var(--murasaki-ring);
+        box-shadow: 0 0 0 2px var(--murasaki-ring);
+      }
+
+      /* === Segmented Control === */
+      .segmented-control {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px;
+        background: var(--murasaki-surface-2);
+        border: 1px solid var(--murasaki-border);
+        border-radius: var(--murasaki-radius-md);
+      }
+      .segmented-item {
+        height: 26px;
+        padding: 0 12px;
+        font-size: 13px;
+        color: var(--murasaki-ink-2);
+        background: transparent;
+        border: none;
+        border-radius: var(--murasaki-radius-sm);
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+      }
+      .segmented-item:hover {
+        color: var(--murasaki-ink);
+      }
+      .segmented-item.active {
+        background: var(--murasaki-background);
+        color: var(--murasaki-primary);
+        font-weight: 500;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      }
+
+      /* === Buttons === */
+      .primary-button,
+      .secondary-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 30px;
+        padding: 0 14px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: var(--murasaki-radius-md);
+        cursor: pointer;
+        transition: background 120ms, border-color 120ms, color 120ms;
+      }
+      .primary-button {
+        color: var(--murasaki-primary-foreground);
+        background: var(--murasaki-primary);
+        border: 1px solid var(--murasaki-primary);
+      }
+      .primary-button:hover {
+        background: var(--murasaki-purple-700);
+        border-color: var(--murasaki-purple-700);
+      }
+      .primary-button:active {
+        background: var(--murasaki-purple-800);
+        border-color: var(--murasaki-purple-800);
+      }
+      .secondary-button {
+        color: var(--murasaki-ink-2);
+        background: var(--murasaki-background);
+        border: 1px solid var(--murasaki-border);
+      }
+      .secondary-button:hover {
+        background: var(--murasaki-muted);
+        color: var(--murasaki-ink);
+      }
+      .secondary-button:active {
+        background: var(--murasaki-neutral-200);
+      }
+
+      /* === Footer === */
+      .settings-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 32px;
+        background: var(--murasaki-surface);
+        border-top: 1px solid var(--murasaki-line);
+      }
+    </style>
+</body>
+</html>

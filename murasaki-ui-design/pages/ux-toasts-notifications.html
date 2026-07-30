@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UX - Toasts & Notifications</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main class="min-h-screen flex flex-col">
+      <!-- Fake app chrome strip -->
+      <div class="h-12 bg-card border-b border-border flex items-center px-4 justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-3 h-3 rounded-full bg-[var(--murasaki-state-error)]"></div>
+          <div class="w-3 h-3 rounded-full bg-[var(--murasaki-state-warning)]"></div>
+          <div class="w-3 h-3 rounded-full bg-[var(--murasaki-state-success)]"></div>
+          <span class="text-sm font-medium text-foreground ml-2">Murasaki</span>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          <span>note.md</span>
+        </div>
+      </div>
+
+      <!-- Page header -->
+      <header class="px-8 py-10">
+        <h1 class="text-3xl font-semibold text-foreground tracking-tight">Toasts / 提示</h1>
+        <p class="mt-2 text-muted-foreground">Murasaki 全局通知与反馈系统样式表</p>
+      </header>
+
+      <!-- Gallery canvas -->
+      <section class="flex-1 px-8 pb-8 min-h-0">
+        <div class="relative w-full h-full min-h-[560px] rounded-2xl border border-border bg-surface overflow-hidden">
+          <!-- Editor area placeholder -->
+          <div class="absolute inset-0 p-6">
+            <div class="max-w-xl space-y-3">
+              <div class="h-4 w-3/4 rounded bg-muted"></div>
+              <div class="h-4 w-full rounded bg-muted"></div>
+              <div class="h-4 w-5/6 rounded bg-muted"></div>
+              <div class="h-4 w-2/3 rounded bg-muted"></div>
+            </div>
+          </div>
+
+          <!-- Toast stack (top-right) -->
+          <div class="toast-stack absolute top-4 right-4 flex flex-col gap-3 z-10" style="width: 320px;">
+            <!-- Success toast -->
+            <div id="toast-success" class="relative flex items-start gap-3 rounded-lg border border-border bg-popover p-4 shadow-2 overflow-hidden transition-transform hover:-translate-y-0.5" style="border-left: 4px solid var(--murasaki-state-success);">
+              <div class="mt-0.5 shrink-0 text-[var(--murasaki-state-success)]">
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-popover-foreground">已保存 note.md</p>
+              </div>
+              <button class="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="关闭">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <!-- Info toast -->
+            <div id="toast-info" class="relative flex items-start gap-3 rounded-lg border border-border bg-popover p-4 shadow-2 overflow-hidden transition-transform hover:-translate-y-0.5" style="border-left: 4px solid var(--murasaki-state-info);">
+              <div class="mt-0.5 shrink-0 text-[var(--murasaki-state-info)]">
+                <i data-lucide="info" class="w-5 h-5"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-popover-foreground">自动保存已开启</p>
+              </div>
+              <button class="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring" aria-label="关闭">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <!-- Warning toast -->
+            <div id="toast-warning" class="relative flex items-start gap-3 rounded-lg border border-border bg-popover p-4 shadow-2 overflow-hidden transition-transform hover:-translate-y-0.5" style="border-left: 4px solid var(--murasaki-state-warning);">
+              <div class="mt-0.5 shrink-0 text-[var(--murasaki-state-warning)]">
+                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-popover-foreground">3 个孤立对话可清理</p>
+              </div>
+              <button class="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-[var(--murasaki-state-warning)] hover:bg-[var(--murasaki-state-warning)]/10 focus:outline-none focus:ring-2 focus:ring-ring">查看</button>
+            </div>
+
+            <!-- Error toast -->
+            <div id="toast-error" class="relative flex items-start gap-3 rounded-lg border border-border bg-popover p-4 shadow-2 overflow-hidden transition-transform hover:-translate-y-0.5" style="border-left: 4px solid var(--murasaki-state-error);">
+              <div class="mt-0.5 shrink-0 text-[var(--murasaki-state-error)]">
+                <i data-lucide="x-circle" class="w-5 h-5"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-popover-foreground">无法读取文件：权限不足</p>
+              </div>
+              <button class="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-[var(--murasaki-state-error)] hover:bg-[var(--murasaki-state-error)]/10 focus:outline-none focus:ring-2 focus:ring-ring">重试</button>
+            </div>
+
+            <!-- Progress toast -->
+            <div id="toast-progress" class="relative flex flex-col gap-3 rounded-lg border border-border bg-popover p-4 shadow-2 overflow-hidden transition-transform hover:-translate-y-0.5" style="border-left: 4px solid var(--murasaki-primary);">
+              <div class="flex items-start gap-3">
+                <div class="mt-0.5 shrink-0 text-primary">
+                  <i data-lucide="loader" class="w-5 h-5 animate-spin"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-popover-foreground">正在导出 HTML…</p>
+                </div>
+              </div>
+              <div class="h-1 w-full rounded-full bg-muted overflow-hidden">
+                <div class="h-full rounded-full bg-primary" style="width: 60%;"></div>
+              </div>
+            </div>
+
+            <!-- Deleted toast -->
+            <div id="toast-deleted" class="relative flex items-start gap-3 rounded-lg border border-border bg-popover p-4 shadow-2 overflow-hidden transition-transform hover:-translate-y-0.5" style="border-left: 4px solid var(--murasaki-neutral-500);">
+              <div class="mt-0.5 shrink-0 text-muted-foreground">
+                <i data-lucide="trash-2" class="w-5 h-5"></i>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-popover-foreground">note.md 已移至回收站</p>
+              </div>
+              <button class="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-ring">撤销</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Status bar -->
+      <div class="h-8 border-t border-border bg-card flex items-center justify-between px-4 text-xs text-muted-foreground shrink-0">
+        <div id="status-loading" class="flex items-center gap-2">
+          <i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i>
+          <span>正在保存…</span>
+        </div>
+        <button id="status-orphan" class="flex items-center gap-1.5 rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+          <span>3 个孤立对话可清理</span>
+          <span class="text-primary">· 清理</span>
+        </button>
+      </div>
+    </main>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

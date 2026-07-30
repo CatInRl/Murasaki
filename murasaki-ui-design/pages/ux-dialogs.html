@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UX - Dialogs</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main class="bg-background text-foreground">
+      <div class="max-w-7xl mx-auto px-8 py-10">
+        <header class="mb-10">
+          <h1 class="text-3xl font-semibold tracking-tight text-foreground">Dialogs / 弹窗</h1>
+          <p class="mt-2 text-sm text-muted-foreground">Murasaki 的桌面端对话框系统与交互规范</p>
+        </header>
+
+        <section class="dialog-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+          <!-- 保存确认 -->
+          <article id="dialog-unsaved" class="rounded-lg border border-border bg-card p-5 shadow-2xl flex flex-col gap-4">
+            <h2 class="text-sm font-medium text-muted-foreground">保存确认</h2>
+            <div class="w-full h-52 rounded-md bg-black/40 flex items-center justify-center p-6">
+              <div class="w-full max-w-sm bg-popover text-popover-foreground rounded-lg border border-border shadow-lg p-5">
+                <h3 class="text-base font-semibold text-foreground mb-2">保存更改？</h3>
+                <p class="text-sm text-muted-foreground mb-5">当前文件有未保存的更改，关闭前是否保存？</p>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button class="px-3 py-1.5 text-sm rounded-md bg-muted text-foreground hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">不保存</button>
+                  <button class="px-3 py-1.5 text-sm rounded-md border border-border bg-transparent text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">取消</button>
+                  <button class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-[var(--murasaki-purple-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">保存</button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- 删除确认 -->
+          <article id="dialog-delete" class="rounded-lg border border-border bg-card p-5 shadow-2xl flex flex-col gap-4">
+            <h2 class="text-sm font-medium text-muted-foreground">删除确认</h2>
+            <div class="w-full h-52 rounded-md bg-black/40 flex items-center justify-center p-6">
+              <div class="w-full max-w-sm bg-popover text-popover-foreground rounded-lg border border-border shadow-lg p-5">
+                <div class="flex items-start gap-3 mb-2">
+                  <i data-lucide="alert-triangle" class="w-5 h-5 text-[var(--murasaki-state-error)] mt-0.5"></i>
+                  <div>
+                    <h3 class="text-base font-semibold text-foreground">移至回收站？</h3>
+                    <p class="text-sm text-muted-foreground mt-1">文件 note.md 将被移至系统回收站。</p>
+                  </div>
+                </div>
+                <label class="flex items-center gap-2 my-4 text-sm text-foreground cursor-pointer">
+                  <input type="checkbox" class="w-4 h-4 accent-primary rounded focus-visible:ring-2 focus-visible:ring-ring">
+                  <span>不再询问</span>
+                </label>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button class="px-3 py-1.5 text-sm rounded-md border border-border bg-transparent text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">取消</button>
+                  <button class="px-3 py-1.5 text-sm rounded-md text-primary-foreground hover:brightness-95 active:brightness-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed" style="background-color: var(--murasaki-state-error);">移至回收站</button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- 覆盖冲突 -->
+          <article id="dialog-conflict" class="rounded-lg border border-border bg-card p-5 shadow-2xl flex flex-col gap-4">
+            <h2 class="text-sm font-medium text-muted-foreground">文件冲突</h2>
+            <div class="w-full h-52 rounded-md bg-black/40 flex items-center justify-center p-6">
+              <div class="w-full max-w-sm bg-popover text-popover-foreground rounded-lg border border-border shadow-lg p-5">
+                <h3 class="text-base font-semibold text-foreground mb-2">目标已存在</h3>
+                <p class="text-sm text-muted-foreground mb-5">assets/photo.png 已存在。</p>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button class="px-3 py-1.5 text-sm rounded-md border border-border bg-transparent text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">取消</button>
+                  <button class="px-3 py-1.5 text-sm rounded-md bg-muted text-foreground hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">重命名</button>
+                  <button class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-[var(--murasaki-purple-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">覆盖</button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- 外部修改 -->
+          <article id="dialog-external" class="rounded-lg border border-border bg-card p-5 shadow-2xl flex flex-col gap-4">
+            <h2 class="text-sm font-medium text-muted-foreground">外部变更</h2>
+            <div class="w-full h-52 rounded-md bg-black/40 flex items-center justify-center p-6">
+              <div class="w-full max-w-sm bg-popover text-popover-foreground rounded-lg border border-border shadow-lg p-5">
+                <div class="flex items-start gap-3 mb-4">
+                  <i data-lucide="file-warning" class="w-5 h-5 text-[var(--murasaki-state-warning)] mt-0.5"></i>
+                  <div>
+                    <h3 class="text-base font-semibold text-foreground">文件已在外部修改</h3>
+                    <p class="text-sm text-muted-foreground mt-1">note.md 在应用外部被修改。</p>
+                  </div>
+                </div>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button class="px-3 py-1.5 text-sm rounded-md border border-border bg-transparent text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">忽略</button>
+                  <button class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-[var(--murasaki-purple-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">重新加载</button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- 新建文件 -->
+          <article id="dialog-newfile" class="rounded-lg border border-border bg-card p-5 shadow-2xl flex flex-col gap-4">
+            <h2 class="text-sm font-medium text-muted-foreground">新建文件</h2>
+            <div class="w-full h-52 rounded-md bg-black/40 flex items-center justify-center p-6">
+              <div class="w-full max-w-sm bg-popover text-popover-foreground rounded-lg border border-border shadow-lg p-5">
+                <h3 class="text-base font-semibold text-foreground mb-2">新建文件</h3>
+                <p class="text-sm text-muted-foreground mb-4">选择保存位置</p>
+                <div class="flex items-center gap-2 mb-5">
+                  <input type="text" placeholder="/Users/用户名/Documents/untitled.md" class="flex-1 min-w-0 bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-primary">
+                  <button class="px-3 py-2 text-sm rounded-md border border-border bg-muted text-foreground hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" aria-label="浏览">
+                    <i data-lucide="folder-open" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button class="px-3 py-1.5 text-sm rounded-md border border-border bg-transparent text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">取消</button>
+                  <button class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-[var(--murasaki-purple-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">创建</button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- 导出 HTML -->
+          <article id="dialog-export" class="rounded-lg border border-border bg-card p-5 shadow-2xl flex flex-col gap-4">
+            <h2 class="text-sm font-medium text-muted-foreground">导出 HTML</h2>
+            <div class="w-full h-52 rounded-md bg-black/40 flex items-center justify-center p-6">
+              <div class="w-full max-w-sm bg-popover text-popover-foreground rounded-lg border border-border shadow-lg p-5">
+                <h3 class="text-base font-semibold text-foreground mb-2">导出 HTML</h3>
+                <p class="text-sm text-muted-foreground mb-4">选择导出位置</p>
+                <div class="flex items-center gap-2 mb-3">
+                  <input type="text" placeholder="/Users/用户名/Documents/export.html" class="flex-1 min-w-0 bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-primary">
+                  <button class="px-3 py-2 text-sm rounded-md border border-border bg-muted text-foreground hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" aria-label="浏览">
+                    <i data-lucide="folder-open" class="w-4 h-4"></i>
+                  </button>
+                </div>
+                <label class="flex items-center gap-2 mb-4 text-sm text-foreground cursor-pointer">
+                  <input type="checkbox" checked class="w-4 h-4 accent-primary rounded focus-visible:ring-2 focus-visible:ring-ring">
+                  <span>嵌入图片为 Base64</span>
+                </label>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button class="px-3 py-1.5 text-sm rounded-md border border-border bg-transparent text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">取消</button>
+                  <button class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-[var(--murasaki-purple-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">导出</button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- 大范围替换确认 -->
+          <article id="dialog-secondary" class="rounded-lg border border-border bg-card p-5 shadow-2xl flex flex-col gap-4">
+            <h2 class="text-sm font-medium text-muted-foreground">二次确认</h2>
+            <div class="w-full h-52 rounded-md bg-black/40 flex items-center justify-center p-6">
+              <div class="w-full max-w-sm bg-popover text-popover-foreground rounded-lg border border-border shadow-lg p-5">
+                <div class="flex items-start gap-3 mb-4">
+                  <i data-lucide="alert-circle" class="w-5 h-5 text-[var(--murasaki-state-warning)] mt-0.5"></i>
+                  <div>
+                    <h3 class="text-base font-semibold text-foreground">确认大范围替换？</h3>
+                    <p class="text-sm text-muted-foreground mt-1">替换涉及 68 行，请确认。</p>
+                  </div>
+                </div>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button class="px-3 py-1.5 text-sm rounded-md border border-border bg-transparent text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">取消</button>
+                  <button class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-[var(--murasaki-purple-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">确认替换</button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- 关于 -->
+          <article id="dialog-about" class="rounded-lg border border-border bg-card p-5 shadow-2xl flex flex-col gap-4">
+            <h2 class="text-sm font-medium text-muted-foreground">关于</h2>
+            <div class="w-full h-52 rounded-md bg-black/40 flex items-center justify-center p-6">
+              <div class="w-full max-w-sm bg-popover text-popover-foreground rounded-lg border border-border shadow-lg p-6 text-center">
+                <div class="w-12 h-12 mx-auto mb-3 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
+                  <i data-lucide="feather" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-xl font-semibold text-foreground">Murasaki</h3>
+                <p class="text-sm text-muted-foreground mt-1">v0.8.0 · 轻量 Markdown 编辑器</p>
+                <a href="#" class="inline-flex items-center gap-1.5 mt-4 text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+                  <i data-lucide="github" class="w-4 h-4"></i>
+                  <span>GitHub</span>
+                </a>
+                <div class="mt-5 flex justify-center">
+                  <button class="px-4 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-[var(--murasaki-purple-700)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">关闭</button>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+    </main>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

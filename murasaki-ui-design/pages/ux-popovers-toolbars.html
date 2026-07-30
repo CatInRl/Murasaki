@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UX - Popovers & Toolbars</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main>
+  <style>
+    .bg-surface { background-color: var(--murasaki-surface); }
+    .shadow-2 {
+      box-shadow:
+        0 20px 25px -5px rgb(from var(--murasaki-foreground) r g b / 0.1),
+        0 8px 10px -6px rgb(from var(--murasaki-foreground) r g b / 0.1);
+    }
+  </style>
+
+  <header class="px-8 pt-10 pb-6">
+    <h1 class="text-3xl font-semibold tracking-tight text-foreground">Popovers &amp; Toolbars / 浮层与工具栏</h1>
+    <p class="mt-2 text-base text-muted-foreground">Murasaki 的浮层、工具栏与内联编辑面板规范</p>
+  </header>
+
+  <section class="popover-grid grid grid-cols-1 gap-6 px-8 pb-12 md:grid-cols-2 xl:grid-cols-3">
+    <!-- 1. 插入链接浮层 -->
+    <article id="popover-link" class="rounded-xl border border-border bg-background p-5">
+      <h2 class="mb-3 text-sm font-medium text-muted-foreground">插入链接</h2>
+      <div class="rounded-lg border border-border bg-popover p-4 shadow-2">
+        <label class="mb-2 block text-sm font-medium text-foreground" for="link-url">链接地址</label>
+        <input id="link-url" type="text" placeholder="https://..." class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <label class="mt-3 flex items-center gap-2 text-sm text-foreground">
+          <input type="checkbox" class="h-4 w-4 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring">
+          在新标签页打开
+        </label>
+        <div class="mt-4 flex justify-end gap-2">
+          <button class="rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">取消</button>
+          <button class="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring active:bg-primary/80">确认</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- 2. 插入图片浮层 -->
+    <article id="popover-image" class="rounded-xl border border-border bg-background p-5">
+      <h2 class="mb-3 text-sm font-medium text-muted-foreground">插入图片</h2>
+      <div class="rounded-lg border border-border bg-popover p-4 shadow-2">
+        <label class="mb-2 block text-sm font-medium text-foreground" for="image-path">图片路径</label>
+        <input id="image-path" type="text" placeholder="/assets/figure.png" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <p class="mt-1.5 text-xs text-muted-foreground">支持相对路径或拖拽图片</p>
+        <div class="mt-4 flex justify-end gap-2">
+          <button class="rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">取消</button>
+          <button class="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring active:bg-primary/80">插入</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- 3. 插入表格浮层 -->
+    <article id="popover-table" class="rounded-xl border border-border bg-background p-5">
+      <h2 class="mb-3 text-sm font-medium text-muted-foreground">插入表格</h2>
+      <div class="rounded-lg border border-border bg-popover p-4 shadow-2">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="mb-1 block text-sm font-medium text-foreground" for="table-rows">行数</label>
+            <input id="table-rows" type="number" value="2" min="1" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-foreground" for="table-cols">列数</label>
+            <input id="table-cols" type="number" value="3" min="1" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          </div>
+        </div>
+        <div class="mt-4 flex justify-end gap-2">
+          <button class="rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">取消</button>
+          <button class="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring active:bg-primary/80">插入</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- 4. 标题选择下拉 -->
+    <article id="popover-heading" class="rounded-xl border border-border bg-background p-5">
+      <h2 class="mb-3 text-sm font-medium text-muted-foreground">标题层级</h2>
+      <div class="inline-block rounded-lg border border-border bg-popover p-1 shadow-2">
+        <button class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="type" class="h-4 w-4"></i>
+          <span>H1 标题</span>
+        </button>
+        <button class="flex w-full items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring active:bg-primary/80" aria-selected="true">
+          <i data-lucide="type" class="h-4 w-4"></i>
+          <span>H2 副标题</span>
+          <i data-lucide="check" class="ml-auto h-4 w-4"></i>
+        </button>
+        <button class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="type" class="h-4 w-4"></i>
+          <span>H3 小节</span>
+        </button>
+        <button class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="type" class="h-4 w-4"></i>
+          <span>H4 项目</span>
+        </button>
+        <button class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="type" class="h-4 w-4"></i>
+          <span>正文</span>
+        </button>
+        <button class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="quote" class="h-4 w-4"></i>
+          <span>引用</span>
+        </button>
+      </div>
+    </article>
+
+    <!-- 5. WYSIWYG 格式工具栏 -->
+    <article id="toolbar-wysiwyg" class="rounded-xl border border-border bg-background p-5">
+      <h2 class="mb-3 text-sm font-medium text-muted-foreground">格式化工具栏</h2>
+      <div class="flex flex-wrap items-center gap-1 rounded-t-lg border-b border-border bg-surface p-1.5">
+        <button title="加粗" aria-pressed="true" class="rounded-md bg-primary p-2 text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring active:bg-primary/80">
+          <i data-lucide="bold" class="h-4 w-4"></i>
+        </button>
+        <button title="斜体" class="rounded-md p-2 text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="italic" class="h-4 w-4"></i>
+        </button>
+        <button title="删除线" class="rounded-md p-2 text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="strikethrough" class="h-4 w-4"></i>
+        </button>
+        <button title="行内代码" class="rounded-md p-2 text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="code" class="h-4 w-4"></i>
+        </button>
+        <span class="mx-1 h-4 w-px bg-border"></span>
+        <button title="链接" class="rounded-md p-2 text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="link" class="h-4 w-4"></i>
+        </button>
+        <button title="标题" class="rounded-md p-2 text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="heading" class="h-4 w-4"></i>
+        </button>
+        <button title="引用" class="rounded-md p-2 text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="quote" class="h-4 w-4"></i>
+        </button>
+        <span class="mx-1 h-4 w-px bg-border"></span>
+        <button title="无序列表" class="rounded-md p-2 text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="list" class="h-4 w-4"></i>
+        </button>
+        <button title="有序列表" class="rounded-md p-2 text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="list-ordered" class="h-4 w-4"></i>
+        </button>
+        <button title="任务列表" class="rounded-md p-2 text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="check-square" class="h-4 w-4"></i>
+        </button>
+        <span class="mx-1 h-4 w-px bg-border"></span>
+        <button title="插入图片" class="rounded-md p-2 text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+          <i data-lucide="image" class="h-4 w-4"></i>
+        </button>
+      </div>
+    </article>
+
+    <!-- 6. 命令面板 / 快速打开 -->
+    <article id="popover-command" class="rounded-xl border border-border bg-background p-5 md:col-span-2 xl:col-span-1">
+      <h2 class="mb-3 text-sm font-medium text-muted-foreground">命令面板</h2>
+      <div class="rounded-xl border border-border bg-popover p-2 shadow-2">
+        <div class="flex items-center gap-2 border-b border-border px-3 py-2">
+          <i data-lucide="search" class="h-4 w-4 text-muted-foreground"></i>
+          <input type="text" placeholder="搜索命令或文件..." class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none">
+          <kbd class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">ESC</kbd>
+        </div>
+        <div class="max-h-48 overflow-auto py-1">
+          <div class="px-3 py-1 text-xs font-medium text-muted-foreground">最近打开</div>
+          <button class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+            <i data-lucide="clock" class="h-4 w-4 text-muted-foreground"></i>
+            <span>源氏物语笔记.md</span>
+          </button>
+          <div class="mt-1 px-3 py-1 text-xs font-medium text-muted-foreground">命令</div>
+          <button class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+            <i data-lucide="command" class="h-4 w-4 text-muted-foreground"></i>
+            <span><mark class="bg-transparent font-medium text-primary">打</mark>开命令面板</span>
+          </button>
+          <div class="mt-1 px-3 py-1 text-xs font-medium text-muted-foreground">文件</div>
+          <button class="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring active:bg-muted">
+            <i data-lucide="file-text" class="h-4 w-4 text-muted-foreground"></i>
+            <span>新建<mark class="bg-transparent font-medium text-primary">文件</mark></span>
+          </button>
+        </div>
+      </div>
+    </article>
+
+    <!-- 7. 表情选择器 -->
+    <article id="popover-emoji" class="rounded-xl border border-border bg-background p-5">
+      <h2 class="mb-3 text-sm font-medium text-muted-foreground">表情选择器</h2>
+      <div class="w-64 rounded-lg border border-border bg-popover p-3 shadow-2">
+        <div class="mb-2 flex gap-1 overflow-x-auto border-b border-border pb-2 no-scrollbar">
+          <button class="rounded p-1.5 text-xs text-muted-foreground hover:bg-muted">最近</button>
+          <button class="rounded p-1.5 text-xs font-medium text-foreground hover:bg-muted">表情</button>
+          <button class="rounded p-1.5 text-xs text-muted-foreground hover:bg-muted">符号</button>
+          <button class="rounded p-1.5 text-xs text-muted-foreground hover:bg-muted">旗帜</button>
+        </div>
+        <div class="grid grid-cols-7 gap-1 text-center text-sm text-foreground">
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">笑</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">心</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">礼</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">赞</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">喵</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">泪</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">困</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">怒</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">惊</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">思</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">吻</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">星</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">月</button>
+          <button class="aspect-square rounded hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">火</button>
+        </div>
+        <p class="mt-2 text-xs text-muted-foreground">最近使用：笑 · 心 · 礼</p>
+      </div>
+    </article>
+
+    <!-- 8. 主题选择器 -->
+    <article id="popover-theme" class="rounded-xl border border-border bg-background p-5">
+      <h2 class="mb-3 text-sm font-medium text-muted-foreground">主题选择</h2>
+      <div class="rounded-lg border border-border bg-popover p-4 shadow-2">
+        <div class="space-y-1">
+          <label class="flex cursor-pointer items-center gap-3 rounded-md p-2 hover:bg-muted focus-within:ring-2 focus-within:ring-ring">
+            <input type="radio" name="theme" value="light" checked class="h-4 w-4 border-border text-primary focus-visible:ring-2 focus-visible:ring-ring">
+            <i data-lucide="sun" class="h-4 w-4 text-foreground"></i>
+            <span class="text-sm text-foreground">浅色</span>
+          </label>
+          <label class="flex cursor-pointer items-center gap-3 rounded-md p-2 hover:bg-muted focus-within:ring-2 focus-within:ring-ring">
+            <input type="radio" name="theme" value="dark" class="h-4 w-4 border-border text-primary focus-visible:ring-2 focus-visible:ring-ring">
+            <i data-lucide="moon" class="h-4 w-4 text-foreground"></i>
+            <span class="text-sm text-foreground">深色</span>
+          </label>
+          <label class="flex cursor-pointer items-center gap-3 rounded-md p-2 hover:bg-muted focus-within:ring-2 focus-within:ring-ring">
+            <input type="radio" name="theme" value="system" class="h-4 w-4 border-border text-primary focus-visible:ring-2 focus-visible:ring-ring">
+            <i data-lucide="monitor" class="h-4 w-4 text-foreground"></i>
+            <span class="text-sm text-foreground">跟随系统</span>
+          </label>
+        </div>
+      </div>
+    </article>
+  </section>
+</main>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

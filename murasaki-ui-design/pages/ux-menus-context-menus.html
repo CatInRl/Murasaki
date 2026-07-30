@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UX - Menus & Context Menus</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main class="p-8 max-w-[1400px] mx-auto">
+        <header class="mb-10">
+            <h1 class="text-3xl font-semibold tracking-tight text-foreground">Menus / 菜单</h1>
+            <p class="mt-2 text-base text-muted-foreground">Murasaki 的菜单栏与右键菜单规范，统一使用弹出层面板、语义色板与清晰快捷键。</p>
+        </header>
+
+        <section class="menu-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <!-- 1. Menu bar -->
+            <article id="menu-bar" class="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground uppercase tracking-wide">Menu Bar / 菜单栏</h2>
+                <div class="rounded-lg border border-border bg-popover shadow-2 overflow-hidden">
+                    <nav class="flex items-center gap-1 border-b border-border bg-muted px-2 py-1">
+                        <button class="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground">文件</button>
+                        <button class="rounded-md px-3 py-1 text-sm text-popover-foreground hover:bg-muted">编辑</button>
+                        <button class="rounded-md px-3 py-1 text-sm text-popover-foreground hover:bg-muted">视图</button>
+                        <button class="rounded-md px-3 py-1 text-sm text-popover-foreground hover:bg-muted">帮助</button>
+                    </nav>
+                    <ul class="py-1 text-sm text-popover-foreground">
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="file-plus" class="w-4 h-4"></i> 新建文件</span>
+                            <span class="text-xs text-muted-foreground ml-6 group-hover:text-primary-foreground">Ctrl+N</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="folder-open" class="w-4 h-4"></i> 打开文件</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+O</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="folder" class="w-4 h-4"></i> 打开文件夹</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+Shift+O</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> 保存</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+S</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="save-all" class="w-4 h-4"></i> 另存为…</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+Shift+S</span>
+                        </li>
+                        <li class="border-t border-border my-1"></li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="file-code-2" class="w-4 h-4"></i> 导出 HTML</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="log-out" class="w-4 h-4"></i> 退出</span>
+                        </li>
+                    </ul>
+                </div>
+            </article>
+
+            <!-- 2. File tree context menu -->
+            <article id="menu-filetree" class="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground uppercase tracking-wide">File Tree / 文件树右键</h2>
+                <div class="w-full max-w-[260px] rounded-lg border border-border bg-popover shadow-2 py-1">
+                    <ul class="text-sm text-popover-foreground">
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="file-text" class="w-4 h-4"></i> 打开
+                        </li>
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="files" class="w-4 h-4"></i> 在新标签页打开
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="pencil" class="w-4 h-4"></i> 重命名</span>
+                            <span class="text-xs text-muted-foreground ml-6">F2</span>
+                        </li>
+                        <li class="border-t border-border my-1"></li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="scissors" class="w-4 h-4"></i> 剪切</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+X</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="copy" class="w-4 h-4"></i> 复制</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+C</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="clipboard-paste" class="w-4 h-4"></i> 粘贴</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+V</span>
+                        </li>
+                        <li class="border-t border-border my-1"></li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="trash-2" class="w-4 h-4"></i> 删除</span>
+                            <span class="text-xs text-muted-foreground ml-6">Del</span>
+                        </li>
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="external-link" class="w-4 h-4"></i> 在资源管理器中显示
+                        </li>
+                    </ul>
+                </div>
+            </article>
+
+            <!-- 3. Tab context menu -->
+            <article id="menu-tab" class="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground uppercase tracking-wide">Tab / 标签页右键</h2>
+                <div class="w-full max-w-[220px] rounded-lg border border-border bg-popover shadow-2 py-1">
+                    <ul class="text-sm text-popover-foreground">
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="x" class="w-4 h-4"></i> 关闭
+                        </li>
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="copy-x" class="w-4 h-4"></i> 关闭其他
+                        </li>
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="panel-right-close" class="w-4 h-4"></i> 关闭右侧
+                        </li>
+                        <li class="border-t border-border my-1"></li>
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="copy" class="w-4 h-4"></i> 复制路径
+                        </li>
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="external-link" class="w-4 h-4"></i> 在资源管理器中显示
+                        </li>
+                    </ul>
+                </div>
+            </article>
+
+            <!-- 4. Editor context menu -->
+            <article id="menu-editor" class="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground uppercase tracking-wide">Editor / 编辑器右键</h2>
+                <div class="w-full max-w-[240px] rounded-lg border border-border bg-popover shadow-2 py-1">
+                    <ul class="text-sm text-popover-foreground">
+                        <li class="flex items-center justify-between px-3 py-1.5 text-muted-foreground cursor-not-allowed" aria-disabled="true">
+                            <span class="flex items-center gap-2"><i data-lucide="rotate-ccw" class="w-4 h-4"></i> 撤销</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+Z</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="rotate-cw" class="w-4 h-4"></i> 重做</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+Y</span>
+                        </li>
+                        <li class="border-t border-border my-1"></li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="scissors" class="w-4 h-4"></i> 剪切</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+X</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="copy" class="w-4 h-4"></i> 复制</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+C</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="clipboard-paste" class="w-4 h-4"></i> 粘贴</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+V</span>
+                        </li>
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="clipboard-type" class="w-4 h-4"></i> 粘贴为纯文本
+                        </li>
+                        <li class="border-t border-border my-1"></li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="align-left" class="w-4 h-4"></i> 全选</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+A</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="search" class="w-4 h-4"></i> 查找</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+F</span>
+                        </li>
+                        <li class="flex items-center justify-between px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <span class="flex items-center gap-2"><i data-lucide="file-search" class="w-4 h-4"></i> 在文件中查找</span>
+                            <span class="text-xs text-muted-foreground ml-6">Ctrl+Shift+F</span>
+                        </li>
+                    </ul>
+                </div>
+            </article>
+
+            <!-- 5. Agent message context menu -->
+            <article id="menu-agent" class="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground uppercase tracking-wide">Agent Message / 智能体消息右键</h2>
+                <div class="w-full max-w-[220px] rounded-lg border border-border bg-popover shadow-2 py-1">
+                    <ul class="text-sm text-popover-foreground">
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="copy" class="w-4 h-4"></i> 复制
+                        </li>
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="mouse-pointer-click" class="w-4 h-4"></i> 插入到光标处
+                        </li>
+                        <li class="border-t border-border my-1"></li>
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="file-plus" class="w-4 h-4"></i> 创建新文件
+                        </li>
+                        <li class="flex items-center gap-2 px-3 py-1.5 hover:bg-primary hover:text-primary-foreground cursor-pointer">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i> 清空对话
+                        </li>
+                    </ul>
+                </div>
+            </article>
+        </section>
+
+        <section class="mt-10 rounded-xl border border-border bg-card p-6 shadow-sm">
+            <h2 class="mb-3 text-sm font-medium text-muted-foreground uppercase tracking-wide">State Legend / 状态说明</h2>
+            <div class="flex flex-wrap items-center gap-6 text-sm text-popover-foreground">
+                <div class="flex items-center gap-2">
+                    <span class="inline-block h-6 w-16 rounded-md bg-popover border border-border"></span>
+                    <span>默认</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-block h-6 w-16 rounded-md bg-primary"></span>
+                    <span>悬停 / Hover</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-block h-6 w-16 rounded-md bg-popover border border-border opacity-60"></span>
+                    <span>禁用 / Disabled</span>
+                </div>
+            </div>
+        </section>
+    </main>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

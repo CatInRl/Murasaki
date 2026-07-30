@@ -21,6 +21,7 @@ e2e/.workspace-*/
 # E2E debug artifacts
 e2e/.diag-source.html
 e2e/.test-log.txt
+e2e/search-diag.txt
 
 # E2E one-off diagnostic spec (manual debugging only)
 e2e/specs/inspect.spec.ts

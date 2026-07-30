@@ -1,0 +1,216 @@
+{
+  "success": true,
+  "outcome": "passed",
+  "repairable": true,
+  "terminalViolations": [],
+  "terminalBlockingSummary": null,
+  "skillProvenance": {
+    "name": "solo-design",
+    "version": "2026.07.06.8",
+    "version_source": "skill-release-manifest.json",
+    "runtime_skill_dir": null,
+    "recorded_at": null,
+    "expected_version": "2026.07.22.00.00.00",
+    "status": "mismatch",
+    "read_status": "ok"
+  },
+  "operatingMode": "free-explore",
+  "renderBlockingErrorCount": 0,
+  "softWarningCount": 8,
+  "renderBlockingErrors": [],
+  "errorSignatures": [],
+  "softWarnings": [
+    "[html-quality] editor-with-agent.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] main-editor.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] settings-ai.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] settings-editor.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] ux-markdown-structures.html: Tailwind named color utilities are forbidden (bg-purple-50, bg-neutral-900, text-neutral-400, bg-neutral-800, border-neutral-700, text-neutral-200). Use brand CSS variables instead.",
+    "[html-quality] ux-markdown-structures.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] wysiwyg-editor.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] wysiwyg-with-agent.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference."
+  ],
+  "repairPlanHints": [
+    {
+      "errorClass": "hardcoded-color-in-body",
+      "owner": "sub-agent",
+      "repairScope": "targeted-token-replace",
+      "strategy": "targeted_token_replace_once",
+      "affectedFiles": [
+        "editor-with-agent.html"
+      ],
+      "repairReportPath": null,
+      "repairAlreadyAttempted": false,
+      "allowSourceRead": "no-full-html-read",
+      "maxValidationRuns": 2
+    },
+    {
+      "errorClass": "hardcoded-color-in-body",
+      "owner": "sub-agent",
+      "repairScope": "targeted-token-replace",
+      "strategy": "targeted_token_replace_once",
+      "affectedFiles": [
+        "main-editor.html"
+      ],
+      "repairReportPath": null,
+      "repairAlreadyAttempted": false,
+      "allowSourceRead": "no-full-html-read",
+      "maxValidationRuns": 2
+    },
+    {
+      "errorClass": "hardcoded-color-in-body",
+      "owner": "sub-agent",
+      "repairScope": "targeted-token-replace",
+      "strategy": "targeted_token_replace_once",
+      "affectedFiles": [
+        "settings-ai.html"
+      ],
+      "repairReportPath": null,
+      "repairAlreadyAttempted": false,
+      "allowSourceRead": "no-full-html-read",
+      "maxValidationRuns": 2
+    },
+    {
+      "errorClass": "hardcoded-color-in-body",
+      "owner": "sub-agent",
+      "repairScope": "targeted-token-replace",
+      "strategy": "targeted_token_replace_once",
+      "affectedFiles": [
+        "settings-editor.html"
+      ],
+      "repairReportPath": null,
+      "repairAlreadyAttempted": false,
+      "allowSourceRead": "no-full-html-read",
+      "maxValidationRuns": 2
+    },
+    {
+      "errorClass": "hardcoded-color-in-body",
+      "owner": "sub-agent",
+      "repairScope": "targeted-token-replace",
+      "strategy": "targeted_token_replace_once",
+      "affectedFiles": [
+        "ux-markdown-structures.html"
+      ],
+      "repairReportPath": null,
+      "repairAlreadyAttempted": false,
+      "allowSourceRead": "no-full-html-read",
+      "maxValidationRuns": 2
+    },
+    {
+      "errorClass": "hardcoded-color-in-body",
+      "owner": "sub-agent",
+      "repairScope": "targeted-token-replace",
+      "strategy": "targeted_token_replace_once",
+      "affectedFiles": [
+        "wysiwyg-editor.html"
+      ],
+      "repairReportPath": null,
+      "repairAlreadyAttempted": false,
+      "allowSourceRead": "no-full-html-read",
+      "maxValidationRuns": 2
+    },
+    {
+      "errorClass": "hardcoded-color-in-body",
+      "owner": "sub-agent",
+      "repairScope": "targeted-token-replace",
+      "strategy": "targeted_token_replace_once",
+      "affectedFiles": [
+        "wysiwyg-with-agent.html"
+      ],
+      "repairReportPath": null,
+      "repairAlreadyAttempted": false,
+      "allowSourceRead": "no-full-html-read",
+      "maxValidationRuns": 2
+    }
+  ],
+  "repairActionTable": [],
+  "errorCount": 0,
+  "warningCount": 8,
+  "errors": [],
+  "warnings": [
+    "[html-quality] editor-with-agent.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] main-editor.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] settings-ai.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] settings-editor.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] ux-markdown-structures.html: Tailwind named color utilities are forbidden (bg-purple-50, bg-neutral-900, text-neutral-400, bg-neutral-800, border-neutral-700, text-neutral-200). Use brand CSS variables instead.",
+    "[html-quality] ux-markdown-structures.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] wysiwyg-editor.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+    "[html-quality] wysiwyg-with-agent.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference."
+  ],
+  "validationRunDisciplineStatus": {
+    "declared": true,
+    "restoreMode": false,
+    "maxFullValidationRuns": 2,
+    "validationHistoryCount": 0,
+    "repairLedgerCount": 0,
+    "softWarningsTriggerRepair": false,
+    "terminalState": null,
+    "nextAction": null,
+    "violations": [],
+    "success": true
+  },
+  "terminalState": null,
+  "nextCheck": {
+    "type": "finish-readiness",
+    "command": "node \"c:\\Users\\nail1\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs\" \"c:\\workspace\\markdown\\murasaki-ui-design\" --check=all",
+    "fullValidationAllowed": false,
+    "reason": "workspace validation passed; run complete finish readiness before final delivery"
+  },
+  "repairBatch": [],
+  "repairContextPacket": {
+    "schema_version": "1.0",
+    "purpose": "small-context repair packet; read this before full validation-report.json",
+    "success": true,
+    "terminalState": null,
+    "skillProvenance": {
+      "name": "solo-design",
+      "version": "2026.07.06.8",
+      "version_source": "skill-release-manifest.json",
+      "runtime_skill_dir": null,
+      "recorded_at": null,
+      "expected_version": "2026.07.22.00.00.00",
+      "status": "mismatch",
+      "read_status": "ok"
+    },
+    "renderBlockingErrorCount": 0,
+    "softWarningCount": 8,
+    "renderBlockingErrors": [],
+    "repairActionTable": [],
+    "nextCheck": {
+      "type": "finish-readiness",
+      "command": "node \"c:\\Users\\nail1\\.trae-cn\\builtin\\design\\default\\skills\\solo-design\\shared-runtime\\deterministic-tooling\\validate-finish-readiness.mjs\" \"c:\\workspace\\markdown\\murasaki-ui-design\" --check=all",
+      "fullValidationAllowed": false,
+      "reason": "workspace validation passed; run complete finish readiness before final delivery"
+    },
+    "forbidden": [
+      "do not read validator source",
+      "do not rerun full validation when nextCheck.fullValidationAllowed=false",
+      "do not start preview/browser unless user explicitly asks",
+      "do not hand-edit repair ledger fields"
+    ]
+  },
+  "projectFileHashes": {
+    "murasaki-ui.design": "043ad28cb75da93c6246ab0de13e99663b67096c4a024deb3e5e36c8b44db264",
+    "colors_and_type.css": "31dc730322bf6ac7ec2b7d0439f167297066287ef9b8ab77899564d4a8b0e56c",
+    "runtime-orchestration-summary.json": "5df588a3806a2f4d2784372a8daa6617c361db3a487e60ba57bbdd08ebaa0331",
+    "pages/editor-with-agent.html": "3842fc47a131f136e2bae689c3b68e5f8d179aeff3c099a151915a5928e26f5c",
+    "pages/main-editor.html": "b4894271d53bef93645e6579b1b201770c4f868436aab69c23fb9133e1ad317e",
+    "pages/settings-ai.html": "fb4281bb8d6109b9b3dcf4bb46af37bc91697d477d230eb7ace0634625fe160e",
+    "pages/settings-editor.html": "6a4038fcf8f290974ece65aaa2b8401222204c4765629dd60388875d1edeb7cf",
+    "pages/settings-general.html": "2cfc11b40ed709df3a6bfc85dab670d7a49aac0b4e3f100bdec8ed8264a45c9c",
+    "pages/ux-dialogs.html": "cda6852f5098ed88da4dc4f4c25650a503cb6f266d2e3cee07901b4ecefc6480",
+    "pages/ux-empty-error-states.html": "c027ad6dac0422460eaa63d2fd2ec8d40ea899303be4b8a492a8100a3e8788f1",
+    "pages/ux-interactions-states.html": "3a8a64877fa8974451f252b88eb029242f72eedb860ecf1ead2ec91ad01ad403",
+    "pages/ux-markdown-structures.html": "29b9cfc48c17f609f0e755bb9f91a61173dcccca40604d86a56eef50f89d2044",
+    "pages/ux-menus-context-menus.html": "b7594a0486225faa6f6aa5399e9d65d0411f9456235dc475b1f304731dc2d786",
+    "pages/ux-panels.html": "8d251929a4430f98c9c6926177f0aaaf45aa1ccae65064451599e24fd23fbc74",
+    "pages/ux-popovers-toolbars.html": "2d2f5df7d68437dd943e5690ec77a1f1f9ca05a0720ed537aad86664152f5b7a",
+    "pages/ux-toasts-notifications.html": "1434d661d32e8391c5f0aba142bd1d84dbf9ad5caf936858f6faa5eb3e0ebf55",
+    "pages/welcome-page.html": "257840fdef0c677a4772c129d91f6909870f4acd94aa9b670cc6e111163302b1",
+    "pages/wysiwyg-editor.html": "698a47948eec87819c0ff014c2d5462f0024a6758677ac4d77af454e9016c88e",
+    "pages/wysiwyg-with-agent.html": "58a1b09029320e49e12ae860b8b42a9049497e83223768c700a9db13dbaaa142"
+  },
+  "designDir": "c:\\workspace\\markdown\\murasaki-ui-design",
+  "expectedPages": null,
+  "requireInteractions": null,
+  "checkedAt": "2026-07-29T19:04:19.361Z"
+}

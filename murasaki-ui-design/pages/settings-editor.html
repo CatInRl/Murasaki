@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Murasaki Settings - 编辑器</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <div id="settings-window">
+
+      <!-- Title Bar -->
+      <div id="settings-title-bar">
+        <div class="title-left">
+          <i data-lucide="settings" style="width:16px;height:16px;color:var(--murasaki-primary)"></i>
+          <span>设置</span>
+        </div>
+        <button class="title-close" type="button" aria-label="关闭">
+          <i data-lucide="x" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+
+      <!-- Sidebar + Content -->
+      <div class="settings-body">
+        <nav id="settings-sidebar" aria-label="设置分类">
+          <a class="nav-item" href="#">
+            <i data-lucide="settings" style="width:16px;height:16px"></i>
+            <span>常规</span>
+          </a>
+          <a class="nav-item active" href="#" aria-current="page">
+            <i data-lucide="type" style="width:16px;height:16px"></i>
+            <span>编辑器</span>
+            <i data-lucide="chevron-right" class="nav-active-icon" style="width:14px;height:14px"></i>
+          </a>
+          <a class="nav-item" href="#">
+            <i data-lucide="bot" style="width:16px;height:16px"></i>
+            <span>AI</span>
+          </a>
+          <a class="nav-item" href="#">
+            <i data-lucide="palette" style="width:16px;height:16px"></i>
+            <span>主题</span>
+          </a>
+          <a class="nav-item" href="#">
+            <i data-lucide="keyboard" style="width:16px;height:16px"></i>
+            <span>快捷键</span>
+          </a>
+        </nav>
+
+        <!-- Right Content -->
+        <main id="settings-content">
+          <div class="content-inner">
+            <div class="content-header">
+              <h1>编辑器</h1>
+              <p class="text-muted-foreground">配置编辑与 Markdown 渲染行为</p>
+            </div>
+
+            <!-- 编辑模式 -->
+            <section class="setting-section" aria-labelledby="edit-mode-heading">
+              <h2 id="edit-mode-heading">编辑模式</h2>
+              <div class="setting-row" id="setting-edit-mode">
+                <div class="setting-label">
+                  <span class="setting-title">默认编辑模式</span>
+                  <span class="setting-desc">新建或打开文件时使用的默认视图</span>
+                </div>
+                <div class="setting-control">
+                  <div class="segmented-control" role="radiogroup" aria-label="默认编辑模式">
+                    <button class="segment" type="button" role="radio" aria-checked="false">源码</button>
+                    <button class="segment active" type="button" role="radio" aria-checked="true">分屏</button>
+                    <button class="segment" type="button" role="radio" aria-checked="false">所见即所得</button>
+                  </div>
+                  <span class="setting-caption">切换编辑模式后需重启应用生效</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- 编辑器显示 -->
+            <section class="setting-section" aria-labelledby="display-heading">
+              <h2 id="display-heading">编辑器显示</h2>
+              <div class="setting-row" id="setting-line-numbers">
+                <div class="setting-label">
+                  <span class="setting-title">显示行号</span>
+                  <span class="setting-desc">在源码编辑区左侧显示行号</span>
+                </div>
+                <div class="setting-control">
+                  <label class="switch">
+                    <input type="checkbox" checked>
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="setting-row" id="setting-soft-wrap">
+                <div class="setting-label">
+                  <span class="setting-title">软折行</span>
+                  <span class="setting-desc">超过编辑器宽度时自动换行显示</span>
+                </div>
+                <div class="setting-control">
+                  <label class="switch">
+                    <input type="checkbox" checked>
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span class="setting-title">字体大小</span>
+                  <span class="setting-desc">编辑器字体大小，范围 12–20 px</span>
+                </div>
+                <div class="setting-control">
+                  <div class="number-stepper">
+                    <button class="stepper-btn" type="button" aria-label="减小">−</button>
+                    <input class="stepper-input" type="number" min="12" max="20" value="14" aria-label="字体大小">
+                    <button class="stepper-btn" type="button" aria-label="增大">+</button>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span class="setting-title">行高</span>
+                  <span class="setting-desc">编辑器文本行间距</span>
+                </div>
+                <div class="setting-control">
+                  <div class="select-wrap">
+                    <select class="setting-select" aria-label="行高">
+                      <option value="1.4">1.4</option>
+                      <option value="1.6" selected>1.6</option>
+                      <option value="1.8">1.8</option>
+                      <option value="2.0">2.0</option>
+                    </select>
+                    <i data-lucide="chevron-right" style="width:14px;height:14px"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span class="setting-title">字体族</span>
+                  <span class="setting-desc">等宽字体用于源码编辑区</span>
+                </div>
+                <div class="setting-control">
+                  <div class="select-wrap">
+                    <select class="setting-select" aria-label="字体族">
+                      <option value="JetBrains Mono" selected>JetBrains Mono</option>
+                      <option value="Fira Code">Fira Code</option>
+                      <option value="Cascadia Code">Cascadia Code</option>
+                      <option value="Consolas">Consolas</option>
+                    </select>
+                    <i data-lucide="chevron-right" style="width:14px;height:14px"></i>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Markdown 渲染 -->
+            <section class="setting-section" aria-labelledby="render-heading">
+              <h2 id="render-heading">Markdown 渲染</h2>
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span class="setting-title">启用 Mermaid 图表</span>
+                  <span class="setting-desc">渲染 <code>mermaid</code> 代码块为图表</span>
+                </div>
+                <div class="setting-control">
+                  <label class="switch">
+                    <input type="checkbox" checked>
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span class="setting-title">启用 KaTeX 公式</span>
+                  <span class="setting-desc">渲染行内与块级 LaTeX 公式</span>
+                </div>
+                <div class="setting-control">
+                  <label class="switch">
+                    <input type="checkbox" checked>
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span class="setting-title">渲染任务列表复选框</span>
+                  <span class="setting-desc">在预览中将 <code>- [ ]</code> 渲染为可交互复选框</span>
+                </div>
+                <div class="setting-control">
+                  <label class="switch">
+                    <input type="checkbox" checked>
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Footer -->
+          <div class="settings-footer">
+            <button class="btn btn-secondary" type="button">恢复默认</button>
+            <button class="btn btn-primary" type="button">保存</button>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script>lucide.createIcons();</script>
+
+    <style id="critical-layout">
+      /* === Settings Window Shell === */
+      #settings-window {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        background: var(--murasaki-background);
+        color: var(--murasaki-ink);
+      }
+
+      /* === Title Bar === */
+      #settings-title-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        height: 44px;
+        padding: 0 12px 0 16px;
+        background: var(--murasaki-background);
+        border-bottom: 1px solid var(--murasaki-line);
+        user-select: none;
+      }
+      .title-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--murasaki-ink);
+      }
+      .title-close {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border: none;
+        border-radius: var(--murasaki-radius-sm);
+        background: transparent;
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+      }
+      .title-close:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink);
+      }
+      .title-close:active {
+        background: var(--murasaki-neutral-300);
+      }
+
+      /* === Body Layout === */
+      .settings-body {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* === Sidebar === */
+      #settings-sidebar {
+        width: 200px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 8px;
+        background: var(--murasaki-surface);
+        border-right: 1px solid var(--murasaki-line);
+        overflow-y: auto;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: var(--murasaki-radius-md);
+        font-size: 13px;
+        color: var(--murasaki-ink-2);
+        text-decoration: none;
+        transition: background 120ms, color 120ms;
+        position: relative;
+      }
+      .nav-item:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink);
+      }
+      .nav-item.active {
+        background: var(--murasaki-purple-50);
+        color: var(--murasaki-primary);
+        font-weight: 500;
+      }
+      .nav-item svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
+      .nav-active-icon {
+        margin-left: auto;
+        transform: rotate(0deg);
+      }
+
+      /* === Content === */
+      #settings-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--murasaki-background);
+      }
+      .content-inner {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px 32px;
+      }
+      .content-header {
+        margin-bottom: 24px;
+      }
+      .content-header h1 {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--murasaki-ink);
+        margin: 0 0 4px 0;
+        letter-spacing: -0.01em;
+      }
+      .content-header p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--murasaki-muted-foreground);
+      }
+
+      /* === Settings Sections === */
+      .setting-section {
+        margin-bottom: 28px;
+      }
+      .setting-section h2 {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--murasaki-ink-2);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin: 0 0 12px 0;
+      }
+      .setting-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--murasaki-line);
+      }
+      .setting-row:first-of-type {
+        padding-top: 0;
+      }
+      .setting-label {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .setting-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--murasaki-ink);
+      }
+      .setting-desc {
+        font-size: 12px;
+        color: var(--murasaki-muted-foreground);
+      }
+      .setting-desc code {
+        font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+        font-size: 11px;
+        padding: 1px 4px;
+        background: var(--murasaki-muted);
+        border-radius: var(--murasaki-radius-sm);
+        color: var(--murasaki-ink-2);
+      }
+      .setting-control {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .setting-caption {
+        font-size: 11px;
+        color: var(--murasaki-muted-foreground);
+      }
+
+      /* === Toggle Switch === */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 22px;
+        cursor: pointer;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .switch-track {
+        position: absolute;
+        inset: 0;
+        background: var(--murasaki-neutral-300);
+        border-radius: 999px;
+        transition: background 120ms;
+      }
+      .switch-track::before {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 18px;
+        height: 18px;
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+        transition: transform 120ms;
+      }
+      .switch input:checked + .switch-track {
+        background: var(--murasaki-primary);
+      }
+      .switch input:checked + .switch-track::before {
+        transform: translateX(18px);
+      }
+      .switch input:focus-visible + .switch-track {
+        box-shadow: 0 0 0 2px var(--murasaki-ring);
+      }
+
+      /* === Segmented Control === */
+      .segmented-control {
+        display: inline-flex;
+        padding: 3px;
+        background: var(--murasaki-muted);
+        border-radius: var(--murasaki-radius-md);
+        border: 1px solid var(--murasaki-border);
+      }
+      .segment {
+        padding: 5px 12px;
+        font-size: 13px;
+        color: var(--murasaki-ink-2);
+        background: transparent;
+        border: none;
+        border-radius: var(--murasaki-radius-sm);
+        cursor: pointer;
+        transition: background 120ms, color 120ms, box-shadow 120ms;
+      }
+      .segment:hover {
+        color: var(--murasaki-ink);
+      }
+      .segment.active {
+        background: var(--murasaki-background);
+        color: var(--murasaki-ink);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+      }
+      .segment:focus-visible {
+        outline: 2px solid var(--murasaki-ring);
+        outline-offset: 1px;
+      }
+
+      /* === Number Stepper === */
+      .number-stepper {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--murasaki-border);
+        border-radius: var(--murasaki-radius-md);
+        overflow: hidden;
+        background: var(--murasaki-background);
+      }
+      .stepper-btn {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: var(--murasaki-surface);
+        color: var(--murasaki-ink-2);
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+      }
+      .stepper-btn:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink);
+      }
+      .stepper-btn:active {
+        background: var(--murasaki-neutral-300);
+      }
+      .stepper-input {
+        width: 44px;
+        height: 28px;
+        border: none;
+        border-left: 1px solid var(--murasaki-border);
+        border-right: 1px solid var(--murasaki-border);
+        text-align: center;
+        font-size: 13px;
+        color: var(--murasaki-ink);
+        background: var(--murasaki-background);
+        outline: none;
+      }
+      .stepper-input:focus {
+        background: var(--murasaki-purple-50);
+      }
+
+      /* === Select === */
+      .select-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      .setting-select {
+        appearance: none;
+        min-width: 150px;
+        padding: 6px 28px 6px 10px;
+        font-size: 13px;
+        color: var(--murasaki-ink);
+        background: var(--murasaki-background);
+        border: 1px solid var(--murasaki-border);
+        border-radius: var(--murasaki-radius-md);
+        cursor: pointer;
+        outline: none;
+        transition: border-color 120ms, box-shadow 120ms;
+      }
+      .setting-select:hover {
+        border-color: var(--murasaki-neutral-300);
+      }
+      .setting-select:focus-visible {
+        border-color: var(--murasaki-ring);
+        box-shadow: 0 0 0 2px var(--murasaki-ring);
+      }
+      .select-wrap svg {
+        position: absolute;
+        right: 10px;
+        color: var(--murasaki-ink-3);
+        transform: rotate(90deg);
+        pointer-events: none;
+      }
+
+      /* === Footer === */
+      .settings-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        gap: 12px;
+        padding: 14px 32px;
+        background: var(--murasaki-background);
+        border-top: 1px solid var(--murasaki-line);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 32px;
+        padding: 0 16px;
+        border-radius: var(--murasaki-radius-md);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 120ms, color 120ms, border-color 120ms, box-shadow 120ms;
+        border: 1px solid transparent;
+      }
+      .btn-primary {
+        background: var(--murasaki-primary);
+        color: var(--murasaki-primary-foreground);
+      }
+      .btn-primary:hover {
+        background: var(--murasaki-purple-700);
+      }
+      .btn-primary:active {
+        background: var(--murasaki-purple-800);
+      }
+      .btn-secondary {
+        background: var(--murasaki-background);
+        color: var(--murasaki-ink-2);
+        border-color: var(--murasaki-border);
+      }
+      .btn-secondary:hover {
+        background: var(--murasaki-muted);
+        color: var(--murasaki-ink);
+      }
+      .btn-secondary:active {
+        background: var(--murasaki-neutral-200);
+      }
+      .btn:focus-visible {
+        box-shadow: 0 0 0 2px var(--murasaki-ring);
+        outline: none;
+      }
+
+      /* Scrollbars */
+      .content-inner::-webkit-scrollbar,
+      #settings-sidebar::-webkit-scrollbar {
+        width: 8px;
+      }
+      .content-inner::-webkit-scrollbar-track,
+      #settings-sidebar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .content-inner::-webkit-scrollbar-thumb,
+      #settings-sidebar::-webkit-scrollbar-thumb {
+        background: var(--murasaki-neutral-300);
+        border-radius: 4px;
+      }
+      .content-inner::-webkit-scrollbar-thumb:hover,
+      #settings-sidebar::-webkit-scrollbar-thumb:hover {
+        background: var(--murasaki-neutral-400);
+      }
+    </style>
+</body>
+</html>

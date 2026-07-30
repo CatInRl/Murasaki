@@ -1,0 +1,277 @@
+{
+  "skillProvenance": {
+    "name": "solo-design",
+    "version": "2026.07.06.8",
+    "version_source": "skill-release-manifest.json",
+    "read_status": "ok"
+  },
+  "project": {
+    "resolvedLane": "existing_edit_add_comparison",
+    "selectedIntentWorkflowRead": true,
+    "contextReadScope": {
+      "mainAgent": {
+        "forbiddenReads": [
+          "other intent-workflows/**",
+          "Sub-Agent implementation files before dispatch"
+        ]
+      },
+      "pageSubAgent": {
+        "allowedReads": [
+          "current lane page runtime guide",
+          "current lane dispatch contract excerpt",
+          "current Page Packet",
+          "supplementaryReads[] only"
+        ],
+        "forbiddenReads": [
+          "SKILL.md full re-read",
+          "other intent-workflows/**",
+          "full runtime-orchestration-summary.json unless explicitly sliced"
+        ]
+      },
+      "readScopeLedgerWriter": "shared-runtime/deterministic-tooling/build-page-dispatch-manifest.mjs"
+    },
+    "contextRequirementsLoaded": [
+      {
+        "path": "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/page-rendering-quality-gate.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/design-artifact-validation.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "delivery-quality/delivery-evidence-contract.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      },
+      {
+        "path": "visual-experience/visual-experience-guidelines.md",
+        "readStatus": "loaded",
+        "bodyRead": true
+      }
+    ],
+    "validationRunDiscipline": {
+      "maxFullValidationRuns": 2,
+      "softWarningsTriggerRepair": false,
+      "blockingRepairMode": "targeted-once",
+      "forbiddenRepairTriggers": [
+        "soft-warning-only",
+        "provenance-warning-only",
+        "style-warning-only"
+      ]
+    },
+    "lowValueCallWatchdog": {
+      "applies": true,
+      "noProgressSignals": [
+        "no_tool_call",
+        "no_artifact_diff",
+        "no_structured_decision"
+      ],
+      "noProgressNextAction": "enter_readiness_or_blocked_summary"
+    },
+    "cssPreflightEvidence": {
+      "applies": true,
+      "status": "passed",
+      "command": "node {SKILL_DIR}/shared-runtime/deterministic-tooling/apply-html-head-contract.mjs <css-path> <preflight-html> --title=\"Preflight\" --lang=zh --prefix=murasaki",
+      "brandPrefix": "murasaki",
+      "checks": {
+        "themeVars": "present",
+        "semanticTokenFallback": "present",
+        "themeInline": "present",
+        "tailwindCdn": "present",
+        "htmlClass": "present",
+        "semanticMappings": "resolved"
+      },
+      "retryCount": 0,
+      "blockingReason": null
+    },
+    "deviceType": "desktop",
+    "intentProfile": {
+      "caseFamily": "existing_edit_add_comparison",
+      "surface": "project",
+      "routingReason": "P1 existing_edit_add_comparison: add comprehensive UX surface pages (dialogs, menus, toasts, empty/error states, popovers, panels, interaction states) to existing Murasaki UI Design project"
+    },
+    "styleContinuityAnchors": [
+      "purple brand hue",
+      "warm gray neutral system",
+      "8px radius scale",
+      "Inter + Noto Sans SC type stack",
+      "surface layering over borders"
+    ],
+    "pageCompletenessGate": {
+      "expectedPages": [
+        "main-editor",
+        "welcome-page",
+        "editor-with-agent",
+        "settings-general",
+        "settings-editor",
+        "settings-ai",
+        "wysiwyg-editor",
+        "wysiwyg-with-agent",
+        "ux-dialogs",
+        "ux-menus-context-menus",
+        "ux-toasts-notifications",
+        "ux-empty-error-states",
+        "ux-popovers-toolbars",
+        "ux-panels",
+        "ux-interactions-states",
+        "ux-markdown-structures"
+      ],
+      "requiredStates": [],
+      "requiredInteractions": [],
+      "requiredNavigation": [],
+      "missingAllowed": []
+    },
+    "sharedProjectShellContract": {
+      "headerContract": "native-menu-bar",
+      "footerContract": "none",
+      "typeScale": [
+        "13px caption",
+        "14px body",
+        "16px body-lg",
+        "20px h3",
+        "24px h2",
+        "32px h1"
+      ]
+    },
+    "expectedDispatches": [
+      {"nodeId": "page-main-editor", "packetType": "FreePagePacket", "status": "completed", "changedFiles": ["pages/main-editor.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "main-agent-runtime-trace", "traceDigest": "skip"}},
+      {"nodeId": "page-welcome-page", "packetType": "FreePagePacket", "status": "completed", "changedFiles": ["pages/welcome-page.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "main-agent-runtime-trace", "traceDigest": "skip"}},
+      {"nodeId": "page-editor-with-agent", "packetType": "FreePagePacket", "status": "completed", "changedFiles": ["pages/editor-with-agent.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "agent-panel-comparison-page"}},
+      {"nodeId": "page-settings-general", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/settings-general.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "settings-general-page"}},
+      {"nodeId": "page-settings-editor", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/settings-editor.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "settings-editor-page"}},
+      {"nodeId": "page-settings-ai", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/settings-ai.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "settings-ai-page"}},
+      {"nodeId": "page-wysiwyg-editor", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/wysiwyg-editor.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "wysiwyg-editor-page"}},
+      {"nodeId": "page-wysiwyg-with-agent", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/wysiwyg-with-agent.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "wysiwyg-with-agent-page"}},
+      {"nodeId": "page-ux-dialogs", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-dialogs.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-dialogs-page"}},
+      {"nodeId": "page-ux-menus-context-menus", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-menus-context-menus.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-menus-context-menus-page"}},
+      {"nodeId": "page-ux-toasts-notifications", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-toasts-notifications.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-toasts-notifications-page"}},
+      {"nodeId": "page-ux-empty-error-states", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-empty-error-states.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-empty-error-states-page"}},
+      {"nodeId": "page-ux-popovers-toolbars", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-popovers-toolbars.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-popovers-toolbars-page"}},
+      {"nodeId": "page-ux-panels", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-panels.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-panels-page"}},
+      {"nodeId": "page-ux-interactions-states", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-interactions-states.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-interactions-states-page"}},
+      {"nodeId": "page-ux-markdown-structures", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-markdown-structures.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-markdown-structures-page"}}
+    ],
+    "mainAgentPostDispatchMutations": [
+      {
+        "file": "murasaki-ui.design",
+        "reason": "pre-register new page skeletons for settings and WYSIWYG comparison pages",
+        "actor": "main-agent",
+        "recordedAt": "2026-07-28T16:00:00.000Z"
+      },
+      {
+        "file": "murasaki-ui.design",
+        "reason": "pre-register UX surface pages: dialogs, menus, toasts, empty/error states, popovers, panels, interaction states",
+        "actor": "main-agent",
+        "recordedAt": "2026-07-29T08:45:00.000Z"
+      },
+      {
+        "file": "pages/settings-ai.html",
+        "reason": "in-place refresh of AI settings page UX per ADR-0009 and CONTEXT.md: Tauri multi-window shell, 3-category sidebar, explicit save footer, provider list+editor, default provider radio, advanced params collapsible",
+        "actor": "main-agent",
+        "recordedAt": "2026-07-29T16:35:00.000Z"
+      }
+    ],
+    "validationHistory": [],
+    "readScopeLedger": [
+      {
+        "actor": "main-agent",
+        "lane": "existing_edit_add_comparison",
+        "path": "shared-runtime/runtime-boundaries/lane-runtime-contracts.md",
+        "reason": "lane boundary contract",
+        "scopeClass": "lane-contract",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-07-28T16:00:00.000Z"
+      },
+      {
+        "actor": "main-agent",
+        "lane": "existing_edit_add_comparison",
+        "path": "shared-runtime/agent-dispatch-runtime/lane-dispatch-index.md",
+        "reason": "dispatch contract selection",
+        "scopeClass": "lane-contract",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-07-28T16:00:00.000Z"
+      },
+      {
+        "actor": "main-agent",
+        "lane": "existing_edit_add_comparison",
+        "path": "shared-runtime/agent-dispatch-runtime/shared-page-rendering-kernel.md",
+        "reason": "declared shared page rendering kernel",
+        "scopeClass": "lane-contract",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-07-28T16:00:00.000Z"
+      },
+      {
+        "actor": "main-agent",
+        "lane": "existing_edit_add_comparison",
+        "path": "delivery-quality/page-rendering-quality-gate.md",
+        "reason": "page quality gate",
+        "scopeClass": "delivery-quality",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-07-28T16:00:00.000Z"
+      },
+      {
+        "actor": "main-agent",
+        "lane": "existing_edit_add_comparison",
+        "path": "delivery-quality/design-artifact-validation.md",
+        "reason": "design artifact validation flow",
+        "scopeClass": "delivery-quality",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-07-28T16:00:00.000Z"
+      },
+      {
+        "actor": "main-agent",
+        "lane": "existing_edit_add_comparison",
+        "path": "delivery-quality/delivery-evidence-contract.md",
+        "reason": "delivery evidence contract",
+        "scopeClass": "delivery-quality",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-07-28T16:00:00.000Z"
+      },
+      {
+        "actor": "main-agent",
+        "lane": "existing_edit_add_comparison",
+        "path": "visual-experience/visual-experience-guidelines.md",
+        "reason": "visual continuity anchors",
+        "scopeClass": "visual-experience",
+        "declaredBeforeRead": true,
+        "recordedAt": "2026-07-28T16:00:00.000Z"
+      }
+    ]
+  },
+  "pages": [
+    {"nodeId": "page-main-editor", "htmlSrc": "pages/main-editor.html", "title": "Main Editor"},
+    {"nodeId": "page-welcome-page", "htmlSrc": "pages/welcome-page.html", "title": "Welcome Page"},
+    {"nodeId": "page-editor-with-agent", "htmlSrc": "pages/editor-with-agent.html", "title": "Editor + Agent Panel"},
+    {"nodeId": "page-settings-general", "htmlSrc": "pages/settings-general.html", "title": "Settings — General"},
+    {"nodeId": "page-settings-editor", "htmlSrc": "pages/settings-editor.html", "title": "Settings — Editor"},
+    {"nodeId": "page-settings-ai", "htmlSrc": "pages/settings-ai.html", "title": "Settings — AI"},
+    {"nodeId": "page-wysiwyg-editor", "htmlSrc": "pages/wysiwyg-editor.html", "title": "WYSIWYG Editor"},
+    {"nodeId": "page-wysiwyg-with-agent", "htmlSrc": "pages/wysiwyg-with-agent.html", "title": "WYSIWYG + Agent"},
+    {"nodeId": "page-ux-dialogs", "htmlSrc": "pages/ux-dialogs.html", "title": "UX — Dialogs"},
+    {"nodeId": "page-ux-menus-context-menus", "htmlSrc": "pages/ux-menus-context-menus.html", "title": "UX — Menus & Context Menus"},
+    {"nodeId": "page-ux-toasts-notifications", "htmlSrc": "pages/ux-toasts-notifications.html", "title": "UX — Toasts & Notifications"},
+    {"nodeId": "page-ux-empty-error-states", "htmlSrc": "pages/ux-empty-error-states.html", "title": "UX — Empty & Error States"},
+    {"nodeId": "page-ux-popovers-toolbars", "htmlSrc": "pages/ux-popovers-toolbars.html", "title": "UX — Popovers & Toolbars"},
+    {"nodeId": "page-ux-panels", "htmlSrc": "pages/ux-panels.html", "title": "UX — Panels"},
+    {"nodeId": "page-ux-interactions-states", "htmlSrc": "pages/ux-interactions-states.html", "title": "UX — Interaction States"},
+    {"nodeId": "page-ux-markdown-structures", "htmlSrc": "pages/ux-markdown-structures.html", "title": "UX — Markdown Structures"}
+  ]
+}

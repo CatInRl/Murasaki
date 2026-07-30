@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UX - Markdown Structures</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main class="bg-background text-foreground min-h-screen p-8">
+      <!-- Page Header -->
+      <header class="mb-8">
+        <h1 class="text-3xl font-semibold text-foreground">Markdown Structures / Markdown 结构族</h1>
+        <p class="mt-2 text-muted-foreground">Source / Split / WYSIWYG 三模式渲染对照 — WYSIWYG 列展示默认渲染态，关键结构附 dim 态 inset</p>
+      </header>
+
+      <!-- Structure Comparison Table -->
+      <section class="bg-card border border-border rounded-lg overflow-hidden">
+        <!-- Table Header -->
+        <div class="grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border bg-background">
+          <div class="px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">结构族</div>
+          <div class="px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide border-l border-border">Source 源码</div>
+          <div class="px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide border-l border-border">Split 分屏预览</div>
+          <div class="px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide border-l border-border">WYSIWYG 所见即所得</div>
+        </div>
+
+        <!-- Row 1: H1 -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">标题 H1</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5"># text</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded"># Murasaki 快速入门</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="text-[22px] font-bold text-foreground">Murasaki 快速入门</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → # 显现
+              </span>
+              <div class="text-[22px] font-bold text-foreground">Murasaki 快速入门</div>
+              <div class="mt-2 px-2.5 py-1.5 bg-surface-2 rounded border border-dashed border-border text-xs flex items-center gap-1.5">
+                <span class="text-[10px] text-muted-foreground/60 font-medium whitespace-nowrap">dim 态：</span>
+                <span class="marker text-muted-foreground/70 text-[82%] font-mono">#</span>
+                <span class="text-[22px] font-bold text-foreground leading-tight">Murasaki 快速入门</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: H2 -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">标题 H2</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">## text</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">## 核心特性</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="text-lg font-bold text-foreground">核心特性</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → ## 显现
+              </span>
+              <div class="text-lg font-bold text-foreground">核心特性</div>
+              <div class="mt-2 px-2.5 py-1.5 bg-surface-2 rounded border border-dashed border-border text-xs flex items-center gap-1.5">
+                <span class="text-[10px] text-muted-foreground/60 font-medium whitespace-nowrap">dim 态：</span>
+                <span class="marker text-muted-foreground/70 text-[82%] font-mono">##</span>
+                <span class="text-lg font-bold text-foreground leading-tight">核心特性</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: H3 -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">标题 H3</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">### text</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">### 安装步骤</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="text-[15px] font-semibold text-foreground">安装步骤</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → ### 显现
+              </span>
+              <div class="text-[15px] font-semibold text-foreground">安装步骤</div>
+              <div class="mt-2 px-2.5 py-1.5 bg-surface-2 rounded border border-dashed border-border text-xs flex items-center gap-1.5">
+                <span class="text-[10px] text-muted-foreground/60 font-medium whitespace-nowrap">dim 态：</span>
+                <span class="marker text-muted-foreground/70 text-[82%] font-mono">###</span>
+                <span class="text-[15px] font-semibold text-foreground leading-tight">安装步骤</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 4: Bold -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">粗体</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">**text**</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">**重要内容**</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <span class="font-bold text-foreground">重要内容</span>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → ** 显现
+              </span>
+              <span class="font-bold text-foreground">重要内容</span>
+              <div class="mt-2 px-2.5 py-1.5 bg-surface-2 rounded border border-dashed border-border text-xs flex items-center gap-1.5">
+                <span class="text-[10px] text-muted-foreground/60 font-medium whitespace-nowrap">dim 态：</span>
+                <span class="marker text-muted-foreground/70 text-[82%] font-mono">**</span><span class="font-bold text-foreground">重要内容</span><span class="marker text-muted-foreground/70 text-[82%] font-mono">**</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 5: Italic -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">斜体</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">*text*</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">*强调文字*</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <span class="italic text-foreground">强调文字</span>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → * 显现
+              </span>
+              <span class="italic text-foreground">强调文字</span>
+              <div class="mt-2 px-2.5 py-1.5 bg-surface-2 rounded border border-dashed border-border text-xs flex items-center gap-1.5">
+                <span class="text-[10px] text-muted-foreground/60 font-medium whitespace-nowrap">dim 态：</span>
+                <span class="marker text-muted-foreground/70 text-[82%] font-mono">*</span><span class="italic text-foreground">强调文字</span><span class="marker text-muted-foreground/70 text-[82%] font-mono">*</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 6: Strikethrough -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">删除线</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">~~text~~</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">~~废弃内容~~</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <span class="line-through text-muted-foreground">废弃内容</span>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → ~~ 显现
+              </span>
+              <span class="line-through text-muted-foreground">废弃内容</span>
+              <div class="mt-2 px-2.5 py-1.5 bg-surface-2 rounded border border-dashed border-border text-xs flex items-center gap-1.5">
+                <span class="text-[10px] text-muted-foreground/60 font-medium whitespace-nowrap">dim 态：</span>
+                <span class="marker text-muted-foreground/70 text-[82%] font-mono">~~</span><span class="line-through text-muted-foreground">废弃内容</span><span class="marker text-muted-foreground/70 text-[82%] font-mono">~~</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 7: Inline Code -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">行内代码</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">`code`</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">`npm run dev`</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-[13px] bg-surface-2 px-1.5 py-0.5 rounded font-mono text-primary">npm run dev</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → ` 显现
+              </span>
+              <code class="text-[13px] bg-surface-2 px-1.5 py-0.5 rounded font-mono text-primary">npm run dev</code>
+              <div class="mt-2 px-2.5 py-1.5 bg-surface-2 rounded border border-dashed border-border text-xs flex items-center gap-1.5">
+                <span class="text-[10px] text-muted-foreground/60 font-medium whitespace-nowrap">dim 态：</span>
+                <span class="marker text-muted-foreground/70 text-[82%] font-mono">`</span><code class="text-[13px] bg-surface-2 px-1.5 py-0.5 rounded font-mono text-primary">npm run dev</code><span class="marker text-muted-foreground/70 text-[82%] font-mono">`</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 8: Link -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">链接</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">[t](url)</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">[官网](https://...)</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <a href="#" class="text-primary underline">官网</a>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → []() 显现
+              </span>
+              <a href="#" class="text-primary underline">官网</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 9: Image -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">图片</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">![alt](src)</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">![截图](assets/x.png)</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="inline-flex items-center gap-2 bg-surface-2 border border-border rounded px-3 py-2 text-xs text-muted-foreground">
+              <i data-lucide="image" class="w-4 h-4"></i>
+              <span>截图</span>
+            </div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → ![]() 显现
+              </span>
+              <div class="inline-flex items-center gap-2 bg-surface-2 border border-border rounded px-3 py-2 text-xs text-muted-foreground">
+                <i data-lucide="image" class="w-4 h-4"></i>
+                <span>截图</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 10: Blockquote -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">引用块</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">&gt; text</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">&gt; 这是一段引用</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="border-l-[3px] border-primary pl-3 py-1 bg-purple-50 rounded-r text-sm text-muted-foreground italic" style="background:var(--murasaki-purple-50);border-color:var(--murasaki-purple-300)">这是一段引用</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → &gt; 显现
+              </span>
+              <div class="border-l-[3px] border-primary pl-3 py-1 rounded-r text-sm text-muted-foreground italic" style="background:var(--murasaki-purple-50);border-color:var(--murasaki-purple-300)">这是一段引用</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 11: Unordered List -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">无序列表</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">- item</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">- 第一项<br>- 第二项</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <ul class="list-disc pl-5 text-sm text-muted-foreground space-y-0.5">
+              <li>第一项</li>
+              <li>第二项</li>
+            </ul>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → - 显现
+              </span>
+              <ul class="list-disc pl-5 text-sm text-muted-foreground space-y-0.5">
+                <li>第一项</li>
+                <li>第二项</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 12: Ordered List -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">有序列表</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">1. item</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">1. 步骤一<br>2. 步骤二</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <ol class="list-decimal pl-5 text-sm text-muted-foreground space-y-0.5">
+              <li>步骤一</li>
+              <li>步骤二</li>
+            </ol>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → 1. 显现
+              </span>
+              <ol class="list-decimal pl-5 text-sm text-muted-foreground space-y-0.5">
+                <li>步骤一</li>
+                <li>步骤二</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 13: Task List -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">任务列表</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">- [ ] item</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">- [x] 已完成<br>- [ ] 待办</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="flex items-center gap-2 text-sm text-muted-foreground"><input type="checkbox" checked class="accent-primary w-3.5 h-3.5"> 已完成</div>
+            <div class="flex items-center gap-2 text-sm text-muted-foreground mt-0.5"><input type="checkbox" class="accent-primary w-3.5 h-3.5"> 待办</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → - [ ] 显现
+              </span>
+              <div class="flex items-center gap-2 text-sm text-muted-foreground"><input type="checkbox" checked class="accent-primary w-3.5 h-3.5"> 已完成</div>
+              <div class="flex items-center gap-2 text-sm text-muted-foreground mt-0.5"><input type="checkbox" class="accent-primary w-3.5 h-3.5"> 待办</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 14: Code Block (syntax highlight) -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">代码块</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">```lang</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">```rust<br>fn main() {}<br>```</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="bg-neutral-900 rounded-md overflow-hidden">
+              <div class="px-3.5 py-1.5 text-[11px] text-neutral-400 bg-neutral-800 uppercase tracking-wide border-b border-neutral-700">rust</div>
+              <pre class="px-3.5 py-2.5 text-[12px] font-mono leading-relaxed text-neutral-200"><span style="color:#c084fc">fn </span><span style="color:#60a5fa">main</span>() {}</pre>
+            </div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → ``` 显现
+              </span>
+              <div class="bg-neutral-900 rounded-md overflow-hidden">
+                <div class="px-3.5 py-1.5 text-[11px] text-neutral-400 bg-neutral-800 uppercase tracking-wide border-b border-neutral-700">rust</div>
+                <pre class="px-3.5 py-2.5 text-[12px] font-mono leading-relaxed text-neutral-200"><span style="color:#c084fc">fn </span><span style="color:#60a5fa">main</span>() {}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 15: Mermaid Diagram (code + preview) -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">Mermaid 图表</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">```mermaid</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">```mermaid<br>graph LR<br>A-->B<br>```</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="bg-neutral-900 rounded-md overflow-hidden mb-2">
+              <div class="px-3.5 py-1.5 text-[11px] text-neutral-400 bg-neutral-800 uppercase tracking-wide border-b border-neutral-700">mermaid</div>
+              <pre class="px-3.5 py-2.5 text-[12px] font-mono leading-relaxed text-neutral-200">graph LR
+  A-->B</pre>
+            </div>
+            <div class="text-[10px] text-muted-foreground flex items-center gap-1 mb-1.5">
+              <i data-lucide="eye" class="w-3 h-3"></i>
+              <span>渲染预览</span>
+            </div>
+            <div class="bg-white border border-border rounded-md p-3 flex items-center justify-center">
+              <svg viewBox="0 0 200 60" class="w-full max-w-[240px]">
+                <rect x="10" y="15" width="60" height="30" rx="4" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.5"/>
+                <text x="40" y="34" text-anchor="middle" font-size="13" fill="#581c87" font-family="sans-serif">A</text>
+                <line x1="72" y1="30" x2="118" y2="30" stroke="#9333ea" stroke-width="1.5" marker-end="url(#arrow)"/>
+                <rect x="120" y="15" width="60" height="30" rx="4" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.5"/>
+                <text x="150" y="34" text-anchor="middle" font-size="13" fill="#581c87" font-family="sans-serif">B</text>
+                <defs>
+                  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#9333ea"/>
+                  </marker>
+                </defs>
+              </svg>
+            </div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → ``` 显现
+              </span>
+              <div class="bg-neutral-900 rounded-md overflow-hidden">
+                <div class="px-3.5 py-1.5 text-[11px] text-neutral-400 bg-neutral-800 uppercase tracking-wide border-b border-neutral-700">mermaid</div>
+                <pre class="px-3.5 py-2.5 text-[12px] font-mono leading-relaxed text-neutral-200">graph LR
+  A-->B</pre>
+              </div>
+              <div class="mt-2 bg-white border border-border rounded-md p-3 flex items-center justify-center">
+                <svg viewBox="0 0 200 60" class="w-full max-w-[200px]">
+                  <rect x="10" y="15" width="60" height="30" rx="4" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.5"/>
+                  <text x="40" y="34" text-anchor="middle" font-size="13" fill="#581c87" font-family="sans-serif">A</text>
+                  <line x1="72" y1="30" x2="118" y2="30" stroke="#9333ea" stroke-width="1.5" marker-end="url(#arrow2)"/>
+                  <rect x="120" y="15" width="60" height="30" rx="4" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.5"/>
+                  <text x="150" y="34" text-anchor="middle" font-size="13" fill="#581c87" font-family="sans-serif">B</text>
+                  <defs>
+                    <marker id="arrow2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                      <path d="M0,0 L0,6 L9,3 z" fill="#9333ea"/>
+                    </marker>
+                  </defs>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 16: Table -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">表格</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">| a | b |</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-[11px] text-foreground bg-muted px-1.5 py-0.5 rounded">| 名称 | 值 |<br>|---|---|<br>| A | 1 |</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <table class="border-collapse text-[13px]">
+              <thead>
+                <tr><th class="border border-border px-3 py-1 bg-surface-2 font-semibold">名称</th><th class="border border-border px-3 py-1 bg-surface-2 font-semibold">值</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="border border-border px-3 py-1">A</td><td class="border border-border px-3 py-1">1</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → | 显现
+              </span>
+              <table class="border-collapse text-[13px]">
+                <thead>
+                  <tr><th class="border border-border px-3 py-1 bg-surface-2 font-semibold">名称</th><th class="border border-border px-3 py-1 bg-surface-2 font-semibold">值</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="border border-border px-3 py-1">A</td><td class="border border-border px-3 py-1">1</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 17: Horizontal Rule -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">分隔线</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">---</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">---</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <hr class="border-t-2 border-border my-2">
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → --- 显现
+              </span>
+              <hr class="border-t-2 border-border my-2">
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 18: Inline Math -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 border-b border-border hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">行内公式</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">$x^2$</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">$E=mc^2$</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <span class="italic text-state-info" style="font-family:'Cambria Math','Times New Roman',serif">E=mc<sup class="text-[75%]">2</sup></span>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → $ 显现
+              </span>
+              <span class="italic text-state-info" style="font-family:'Cambria Math','Times New Roman',serif">E=mc<sup class="text-[75%]">2</sup></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 19: Block Math -->
+        <div class="struct-row grid grid-cols-[140px_1fr_1fr_1.2fr] gap-0 hover:bg-muted/30 transition-colors">
+          <div class="px-4 py-3.5">
+            <div class="text-sm font-semibold text-foreground">块级公式</div>
+            <div class="text-xs text-muted-foreground/60 font-mono mt-0.5">$$...$$</div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <code class="text-xs text-foreground bg-muted px-1.5 py-0.5 rounded">$$\sum_{i=1}^n x_i$$</code>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="text-center py-2">
+              <span class="italic text-state-info" style="font-family:'Cambria Math','Times New Roman',serif">∑<sup class="text-[60%]">n</sup><sub class="text-[60%]">i=1</sub> x<sub class="text-[60%]">i</sub></span>
+            </div>
+          </div>
+          <div class="px-4 py-3.5 border-l border-border">
+            <div class="wysiwyg-cell relative bg-card rounded-md border border-border p-3 min-h-[48px]">
+              <span class="cursor-label absolute top-1.5 right-2 text-[10px] text-muted-foreground/60 bg-muted px-2 py-0.5 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-muted-foreground/40"></span>光标进入 → $$ 显现
+              </span>
+              <div class="text-center py-2">
+                <span class="italic text-state-info" style="font-family:'Cambria Math','Times New Roman',serif">∑<sup class="text-[60%]">n</sup><sub class="text-[60%]">i=1</sub> x<sub class="text-[60%]">i</sub></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Legend -->
+      <section class="mt-6 flex items-center gap-6 text-xs text-muted-foreground">
+        <div class="flex items-center gap-2">
+          <div class="w-4 h-4 rounded border border-dashed border-border bg-surface-2"></div>
+          <span>dim 态 inset — 关键结构标记差异预览</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 rounded-full bg-muted text-[10px] text-muted-foreground">光标进入 → # 显现</span>
+          <span>WYSIWYG 光标行为标签</span>
+        </div>
+      </section>
+
+    </main>
+    <script>lucide.createIcons();</script>
+    <style id="critical-layout">
+      .wysiwyg-cell .marker {
+        color: var(--murasaki-purple-400);
+        opacity: 0.7;
+      }
+      .bg-surface-2 { background-color: var(--murasaki-surface-2); }
+    </style>
+</body>
+</html>

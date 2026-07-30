@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Murasaki Editor</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <div data-viewport-mode="app-shell">
+
+      <!-- Menu Bar -->
+      <div id="menu-bar">
+        <div class="menu-brand">
+          <i data-lucide="feather" style="width:15px;height:15px;color:var(--murasaki-primary)"></i>
+          Murasaki
+        </div>
+        <div class="menu-item">&#x6587;&#x4EF6;(F)</div>
+        <div class="menu-item">&#x7F16;&#x8F91;(E)</div>
+        <div class="menu-item">&#x6BB5;&#x843D;(P)</div>
+        <div class="menu-item">&#x4E3B;&#x9898;(T)</div>
+        <div class="menu-item">&#x5E2E;&#x52A9;(H)</div>
+      </div>
+
+      <!-- Sidebar -->
+      <div id="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-tab active" id="sidebar-tab-tree" title="文件树">
+            <i data-lucide="folder-tree" style="width:16px;height:16px"></i>
+          </div>
+          <div class="sidebar-tab" id="sidebar-tab-outline" title="大纲">
+            <i data-lucide="list" style="width:16px;height:16px"></i>
+          </div>
+        </div>
+
+        <!-- File Tree Panel -->
+        <div class="sidebar-content">
+          <div class="sidebar-panel active" id="panel-tree">
+            <!-- Root: my-docs/ expanded -->
+            <div class="tree-item" style="padding-left:6px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="chevron-right" class="arrow" style="color:var(--murasaki-ink-3)"></i>
+              <i data-lucide="folder-open" style="color:var(--murasaki-primary);width:14px;height:14px;margin-right:5px"></i>
+              <span class="label" style="font-weight:500;">my-docs</span>
+            </div>
+            <!-- notes/ expanded -->
+            <div class="tree-item" style="padding-left:22px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="chevron-right" class="arrow" style="color:var(--murasaki-ink-3)"></i>
+              <i data-lucide="folder-open" style="color:var(--murasaki-primary);width:14px;height:14px;margin-right:5px"></i>
+              <span class="label">notes</span>
+            </div>
+            <!-- 快速入门.md selected -->
+            <div class="tree-item selected" style="padding-left:44px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="file-text" style="width:14px;height:14px;margin-right:5px"></i>
+              <span class="label">&#x5FEB;&#x901F;&#x5165;&#x95E8;.md</span>
+            </div>
+            <!-- 开发日志.md -->
+            <div class="tree-item" style="padding-left:44px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="file-text" style="width:14px;height:14px;margin-right:5px;color:var(--murasaki-ink-3)"></i>
+              <span class="label">&#x5F00;&#x53D1;&#x65E5;&#x5FD7;.md</span>
+            </div>
+            <!-- README.md -->
+            <div class="tree-item" style="padding-left:44px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="file-text" style="width:14px;height:14px;margin-right:5px;color:var(--murasaki-ink-3)"></i>
+              <span class="label">README.md</span>
+            </div>
+            <!-- 会议记录.md -->
+            <div class="tree-item" style="padding-left:44px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="file-text" style="width:14px;height:14px;margin-right:5px;color:var(--murasaki-ink-3)"></i>
+              <span class="label">&#x4F1A;&#x8BAE;&#x8BB0;&#x5F55;.md</span>
+            </div>
+            <!-- assets/ collapsed -->
+            <div class="tree-item" style="padding-left:22px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="chevron-right" class="arrow collapsed" style="color:var(--murasaki-ink-3)"></i>
+              <i data-lucide="image" style="width:14px;height:14px;margin-right:5px;color:var(--murasaki-ink-3)"></i>
+              <span class="label">assets</span>
+            </div>
+            <!-- spec.md -->
+            <div class="tree-item" style="padding-left:22px;">
+              <span class="indent" style="width:0"></span>
+              <i data-lucide="file-text" style="width:14px;height:14px;margin-right:5px;color:var(--murasaki-ink-3)"></i>
+              <span class="label">spec.md</span>
+            </div>
+          </div>
+
+          <!-- Outline Panel (hidden) -->
+          <div class="sidebar-panel" id="panel-outline">
+            <div class="outline-item h1">
+              <span class="outline-dot"></span>
+              Murasaki &#x5FEB;&#x901F;&#x5165;&#x95E8;
+            </div>
+            <div class="outline-item h2">
+              <span class="outline-dot"></span>
+              &#x6838;&#x5FC3;&#x7279;&#x6027;
+            </div>
+            <div class="outline-item h2">
+              <span class="outline-dot"></span>
+              &#x5F00;&#x59CB;&#x4F7F;&#x7528;
+            </div>
+            <div class="outline-item h3">
+              <span class="outline-dot"></span>
+              &#x793A;&#x4F8B;&#x4EE3;&#x7801;&#x5757;
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Bar -->
+      <div id="tab-bar">
+        <div class="tab-list">
+          <!-- Active tab with dirty indicator -->
+          <div class="tab-item active">
+            <i data-lucide="file-text" class="tab-icon"></i>
+            <span>&#x5FEB;&#x901F;&#x5165;&#x95E8;.md</span>
+            <span class="dirty-dot"></span>
+            <span class="close-btn"><i data-lucide="x"></i></span>
+          </div>
+          <div class="tab-item">
+            <i data-lucide="file-text" class="tab-icon"></i>
+            <span>&#x5F00;&#x53D1;&#x65E5;&#x5FD7;.md</span>
+            <span class="close-btn"><i data-lucide="x"></i></span>
+          </div>
+          <div class="tab-item">
+            <i data-lucide="file-text" class="tab-icon"></i>
+            <span>README.md</span>
+            <span class="close-btn"><i data-lucide="x"></i></span>
+          </div>
+        </div>
+        <div class="tab-add-btn" title="新建标签页">
+          <i data-lucide="plus"></i>
+        </div>
+      </div>
+
+      <!-- Main Editor Area -->
+      <div id="main-area">
+
+        <!-- Source Editor -->
+        <div id="source-editor">
+          <div class="line-numbers">
+            <div class="ln active-line">1</div>
+            <div class="ln">2</div>
+            <div class="ln">3</div>
+            <div class="ln">4</div>
+            <div class="ln">5</div>
+            <div class="ln">6</div>
+            <div class="ln">7</div>
+            <div class="ln">8</div>
+            <div class="ln">9</div>
+            <div class="ln">10</div>
+            <div class="ln">11</div>
+            <div class="ln">12</div>
+            <div class="ln">13</div>
+            <div class="ln">14</div>
+            <div class="ln">15</div>
+            <div class="ln">16</div>
+            <div class="ln">17</div>
+            <div class="ln">18</div>
+            <div class="ln">19</div>
+            <div class="ln">20</div>
+            <div class="ln">21</div>
+            <div class="ln">22</div>
+            <div class="ln">23</div>
+            <div class="ln">24</div>
+            <div class="ln">25</div>
+            <div class="ln">26</div>
+          </div>
+          <div class="editor-content" data-scroll-region="primary">
+            <div class="editor-line active"><span class="tok-hash"># </span><span class="tok-heading">Murasaki &#x5FEB;&#x901F;&#x5165;&#x95E8;</span></div>
+            <div class="editor-line"></div>
+            <div class="editor-line">&#x6B22;&#x8FCE;&#x4F7F;&#x7528; Murasaki&#xFF0C;&#x4E00;&#x6B3E;&#x8F7B;&#x91CF;&#x7EA7;&#x7684;</div>
+            <div class="editor-line">&#x672C;&#x5730; Markdown &#x7F16;&#x8F91;&#x5668;&#x3002;</div>
+            <div class="editor-line"></div>
+            <div class="editor-line"><span class="tok-hash">## </span><span class="tok-heading">&#x6838;&#x5FC3;&#x7279;&#x6027;</span></div>
+            <div class="editor-line"></div>
+            <div class="editor-line"><span class="tok-list-marker">- </span>&#x5206;&#x5C4F;&#x7F16;&#x8F91;&#x4E0E;&#x5B9E;&#x65F6;&#x9884;&#x89C8;</div>
+            <div class="editor-line"><span class="tok-list-marker">- </span>&#x6587;&#x4EF6;&#x6811;&#x7BA1;&#x7406;&#x4E0E;&#x5927;&#x7EB2;&#x5BFC;&#x822A;</div>
+            <div class="editor-line"><span class="tok-list-marker">- </span>&#x56DB;&#x5957; Markdown &#x4E3B;&#x9898;&#x5207;&#x6362;</div>
+            <div class="editor-line"><span class="tok-list-marker">- </span>Mermaid &#x56FE;&#x8868;&#x4E0E; KaTeX &#x516C;&#x5F0F;</div>
+            <div class="editor-line"></div>
+            <div class="editor-line"><span class="tok-hash">## </span><span class="tok-heading">&#x5F00;&#x59CB;&#x4F7F;&#x7528;</span></div>
+            <div class="editor-line"></div>
+            <div class="editor-line">&#x6253;&#x5F00;&#x4E00;&#x4E2A;&#x6587;&#x4EF6;&#x5939;&#x4F5C;&#x4E3A;&#x5DE5;&#x4F5C;&#x533A;&#xFF0C;</div>
+            <div class="editor-line">&#x5373;&#x53EF;&#x5F00;&#x59CB;&#x7BA1;&#x7406;&#x4F60;&#x7684; Markdown &#x6587;&#x4EF6;&#x3002;</div>
+            <div class="editor-line"></div>
+            <div class="editor-line"><span class="tok-code-block">```python</span></div>
+            <div class="editor-line"><span class="tok-code-comment"># &#x793A;&#x4F8B;&#x4EE3;&#x7801;&#x5757;</span></div>
+            <div class="editor-line"><span class="tok-code-keyword">def </span><span class="tok-code-func">hello</span>():</div>
+            <div class="editor-line">    <span class="tok-code-func">print</span>(<span class="tok-code-string">"Hello, Murasaki!"</span>)</div>
+            <div class="editor-line"><span class="tok-code-block">```</span></div>
+            <div class="editor-line"></div>
+            <div class="editor-line"><span class="tok-blockquote">&gt; Murasaki &#x4EE5;&#x7D2B;&#x5F0F;&#x90E8;&#x547D;&#x540D;&#xFF0C;</span></div>
+            <div class="editor-line"><span class="tok-blockquote">&gt; &#x5979;&#x662F;&#x4EBA;&#x7C7B;&#x5386;&#x53F2;&#x4E0A;&#x7B2C;&#x4E00;&#x4F4D;</span></div>
+            <div class="editor-line"><span class="tok-blockquote">&gt; &#x957F;&#x7BC7;&#x5C0F;&#x8BF4;&#x4F5C;&#x5BB6;&#x3002;</span></div>
+          </div>
+        </div>
+
+        <!-- Split Divider -->
+        <div class="split-divider"></div>
+
+        <!-- Preview Pane -->
+        <div id="preview-pane" data-scroll-region="primary">
+          <div class="preview">
+            <h1>Murasaki &#x5FEB;&#x901F;&#x5165;&#x95E8;</h1>
+            <p>&#x6B22;&#x8FCE;&#x4F7F;&#x7528; Murasaki&#xFF0C;&#x4E00;&#x6B3E;&#x8F7B;&#x91CF;&#x7EA7;&#x7684;&#x672C;&#x5730; Markdown &#x7F16;&#x8F91;&#x5668;&#x3002;</p>
+            <h2>&#x6838;&#x5FC3;&#x7279;&#x6027;</h2>
+            <ul>
+              <li>&#x5206;&#x5C4F;&#x7F16;&#x8F91;&#x4E0E;&#x5B9E;&#x65F6;&#x9884;&#x89C8;</li>
+              <li>&#x6587;&#x4EF6;&#x6811;&#x7BA1;&#x7406;&#x4E0E;&#x5927;&#x7EB2;&#x5BFC;&#x822A;</li>
+              <li>&#x56DB;&#x5957; Markdown &#x4E3B;&#x9898;&#x5207;&#x6362;</li>
+              <li>Mermaid &#x56FE;&#x8868;&#x4E0E; KaTeX &#x516C;&#x5F0F;</li>
+            </ul>
+            <h2>&#x5F00;&#x59CB;&#x4F7F;&#x7528;</h2>
+            <p>&#x6253;&#x5F00;&#x4E00;&#x4E2A;&#x6587;&#x4EF6;&#x5939;&#x4F5C;&#x4E3A;&#x5DE5;&#x4F5C;&#x533A;&#xFF0C;&#x5373;&#x53EF;&#x5F00;&#x59CB;&#x7BA1;&#x7406;&#x4F60;&#x7684; Markdown &#x6587;&#x4EF6;&#x3002;</p>
+            <pre><code><span class="hl-comment"># &#x793A;&#x4F8B;&#x4EE3;&#x7801;&#x5757;</span>
+<span class="hl-keyword">def </span><span class="hl-func">hello</span>():
+    <span class="hl-func">print</span>(<span class="hl-string">"Hello, Murasaki!"</span>)</code></pre>
+            <blockquote>
+              <p>Murasaki &#x4EE5;&#x7D2B;&#x5F0F;&#x90E8;&#x547D;&#x540D;&#xFF0C;&#x5979;&#x662F;&#x4EBA;&#x7C7B;&#x5386;&#x53F2;&#x4E0A;&#x7B2C;&#x4E00;&#x4F4D;&#x957F;&#x7BC7;&#x5C0F;&#x8BF4;&#x4F5C;&#x5BB6;&#x3002;</p>
+            </blockquote>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Status Bar -->
+      <div id="status-bar">
+        <div class="status-left">
+          <span>&#x5FEB;&#x901F;&#x5165;&#x95E8;.md</span>
+          <span style="color:var(--murasaki-ink-3)">notes/</span>
+        </div>
+        <div class="status-right">
+          <span>&#x884C; 1, &#x5217; 1</span>
+          <span>&#x5B57;&#x7B26; 286</span>
+          <span>&#x5B57;&#x6570; 234</span>
+        </div>
+      </div>
+
+    </div>
+    <script>lucide.createIcons();</script>
+
+    <style id="critical-layout">
+      /* === App Shell Grid === */
+      [data-viewport-mode="app-shell"] {
+        display: grid;
+        grid-template-rows: 32px 36px 1fr 24px;
+        grid-template-columns: 260px 1fr;
+        grid-template-areas:
+          "menubar  menubar"
+          "sidebar  tabbar"
+          "sidebar  main"
+          "statusbar statusbar";
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        background: var(--murasaki-background);
+      }
+
+      /* === Menu Bar === */
+      #menu-bar {
+        grid-area: menubar;
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        background: var(--murasaki-background);
+        border-bottom: 1px solid var(--murasaki-line);
+        gap: 2px;
+        user-select: none;
+      }
+      #menu-bar .menu-item {
+        padding: 4px 10px;
+        font-size: 12px;
+        color: var(--murasaki-ink-2);
+        border-radius: var(--murasaki-radius-sm);
+        cursor: default;
+        transition: background 120ms, color 120ms;
+      }
+      #menu-bar .menu-item:hover {
+        background: var(--murasaki-muted);
+        color: var(--murasaki-ink);
+      }
+      .menu-brand {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--murasaki-primary);
+        margin-right: 12px;
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .menu-brand svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      /* === Sidebar === */
+      #sidebar {
+        grid-area: sidebar;
+        display: flex;
+        flex-direction: column;
+        background: var(--murasaki-surface);
+        border-right: 1px solid var(--murasaki-line);
+        overflow: hidden;
+      }
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        padding: 6px 8px;
+        gap: 2px;
+        border-bottom: 1px solid var(--murasaki-line);
+      }
+      .sidebar-tab {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 28px;
+        border-radius: var(--murasaki-radius-sm);
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+        position: relative;
+      }
+      .sidebar-tab:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink-2);
+      }
+      .sidebar-tab.active {
+        color: var(--murasaki-primary);
+      }
+      .sidebar-tab.active::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 16px;
+        height: 2px;
+        background: var(--murasaki-primary);
+        border-radius: 1px;
+      }
+      .sidebar-tab svg {
+        width: 16px;
+        height: 16px;
+      }
+      .sidebar-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px 0;
+      }
+      .sidebar-panel {
+        display: none;
+        flex-direction: column;
+        height: 100%;
+      }
+      .sidebar-panel.active {
+        display: flex;
+      }
+
+      /* File Tree */
+      .tree-item {
+        display: flex;
+        align-items: center;
+        padding: 3px 8px 3px 0;
+        font-size: 13px;
+        color: var(--murasaki-ink-2);
+        cursor: pointer;
+        transition: background 120ms;
+        white-space: nowrap;
+        user-select: none;
+      }
+      .tree-item:hover {
+        background: var(--murasaki-neutral-200);
+      }
+      .tree-item.selected {
+        background: var(--murasaki-purple-50);
+        color: var(--murasaki-primary);
+      }
+      .tree-item .indent {
+        display: inline-block;
+        flex-shrink: 0;
+      }
+      .tree-item svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        margin-right: 5px;
+      }
+      .tree-item .arrow {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        margin-right: 2px;
+        color: var(--murasaki-ink-3);
+      }
+      .tree-item .arrow.collapsed {
+        transform: rotate(-90deg);
+      }
+      .tree-item .label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Outline */
+      .outline-item {
+        display: flex;
+        align-items: center;
+        padding: 4px 12px;
+        font-size: 13px;
+        color: var(--murasaki-ink-2);
+        cursor: pointer;
+        transition: background 120ms;
+      }
+      .outline-item:hover {
+        background: var(--murasaki-neutral-200);
+      }
+      .outline-item.h1 {
+        font-weight: 600;
+        color: var(--murasaki-ink);
+      }
+      .outline-item.h2 {
+        padding-left: 24px;
+      }
+      .outline-item.h3 {
+        padding-left: 36px;
+        font-size: 12px;
+        color: var(--murasaki-ink-3);
+      }
+      .outline-item .outline-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--murasaki-ink-3);
+        margin-right: 8px;
+        flex-shrink: 0;
+      }
+      .outline-item.h1 .outline-dot {
+        width: 6px;
+        height: 6px;
+        background: var(--murasaki-primary);
+      }
+
+      /* === Tab Bar === */
+      #tab-bar {
+        grid-area: tabbar;
+        display: flex;
+        align-items: flex-end;
+        background: var(--murasaki-surface);
+        border-bottom: 1px solid var(--murasaki-line);
+        overflow: hidden;
+        padding: 0 4px;
+      }
+      .tab-list {
+        display: flex;
+        align-items: flex-end;
+        flex: 1;
+        overflow-x: auto;
+        overflow-y: hidden;
+      }
+      .tab-list::-webkit-scrollbar {
+        display: none;
+      }
+      .tab-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        font-size: 13px;
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: background 120ms, color 120ms, border-color 120ms;
+        white-space: nowrap;
+        flex-shrink: 0;
+        position: relative;
+        user-select: none;
+      }
+      .tab-item:hover {
+        color: var(--murasaki-ink-2);
+        background: var(--murasaki-neutral-100);
+      }
+      .tab-item.active {
+        color: var(--murasaki-ink);
+        background: var(--murasaki-background);
+        border-bottom-color: var(--murasaki-primary);
+      }
+      .tab-item svg.tab-icon {
+        width: 13px;
+        height: 13px;
+        color: var(--murasaki-ink-3);
+        flex-shrink: 0;
+      }
+      .tab-item.active svg.tab-icon {
+        color: var(--murasaki-primary);
+      }
+      .tab-item .dirty-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--murasaki-primary);
+        flex-shrink: 0;
+      }
+      .tab-item .close-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border-radius: var(--murasaki-radius-sm);
+        opacity: 0;
+        transition: opacity 120ms, background 120ms;
+        color: var(--murasaki-ink-3);
+        flex-shrink: 0;
+        margin-left: 2px;
+      }
+      .tab-item:hover .close-btn {
+        opacity: 1;
+      }
+      .tab-item .close-btn:hover {
+        background: var(--murasaki-neutral-300);
+        color: var(--murasaki-ink);
+      }
+      .tab-item .close-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+      .tab-add-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        margin-bottom: 2px;
+        border-radius: var(--murasaki-radius-sm);
+        color: var(--murasaki-ink-3);
+        cursor: pointer;
+        transition: background 120ms, color 120ms;
+        flex-shrink: 0;
+      }
+      .tab-add-btn:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink-2);
+      }
+      .tab-add-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      /* === Main Editor Area === */
+      #main-area {
+        grid-area: main;
+        display: flex;
+        overflow: hidden;
+      }
+
+      /* Source Editor */
+      #source-editor {
+        flex: 1 1 50%;
+        display: flex;
+        overflow: hidden;
+        background: var(--murasaki-background);
+      }
+      .line-numbers {
+        width: 40px;
+        flex-shrink: 0;
+        padding: 12px 0;
+        background: var(--murasaki-surface);
+        border-right: 1px solid var(--murasaki-line);
+        font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+        font-size: 13px;
+        line-height: 1.65;
+        color: var(--murasaki-ink-3);
+        text-align: right;
+        user-select: none;
+        overflow: hidden;
+      }
+      .line-numbers .ln {
+        padding-right: 10px;
+        height: 21.45px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+      }
+      .line-numbers .ln.active-line {
+        color: var(--murasaki-primary);
+        font-weight: 500;
+      }
+      .editor-content {
+        flex: 1;
+        padding: 12px 16px;
+        overflow: auto;
+        font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+        font-size: 13px;
+        line-height: 1.65;
+        color: var(--murasaki-ink);
+        tab-size: 4;
+      }
+      .editor-content::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      .editor-content::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .editor-content::-webkit-scrollbar-thumb {
+        background: var(--murasaki-neutral-300);
+        border-radius: 4px;
+      }
+      .editor-content::-webkit-scrollbar-thumb:hover {
+        background: var(--murasaki-neutral-400);
+      }
+      .editor-line {
+        height: 21.45px;
+        padding: 0;
+        position: relative;
+        white-space: pre;
+      }
+      .editor-line.active {
+        background: var(--murasaki-purple-50);
+      }
+      .editor-line.active::before {
+        content: '';
+        position: absolute;
+        left: -16px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--murasaki-primary);
+        border-radius: 0 1px 1px 0;
+      }
+      /* Syntax coloring */
+      .tok-heading {
+        color: var(--murasaki-purple-700);
+        font-weight: 600;
+      }
+      .tok-hash {
+        color: var(--murasaki-purple-400);
+      }
+      .tok-strong {
+        font-weight: 700;
+        color: var(--murasaki-ink);
+      }
+      .tok-list-marker {
+        color: var(--murasaki-primary);
+      }
+      .tok-blockquote {
+        color: var(--murasaki-purple-600);
+        font-style: italic;
+      }
+      .tok-code-block {
+        background: var(--murasaki-neutral-100);
+        color: var(--murasaki-neutral-800);
+        border-radius: 2px;
+      }
+      .tok-code-keyword {
+        color: #7e22ce;
+        font-weight: 600;
+      }
+      .tok-code-func {
+        color: #2563eb;
+      }
+      .tok-code-string {
+        color: #16a34a;
+      }
+      .tok-code-comment {
+        color: var(--murasaki-ink-3);
+        font-style: italic;
+      }
+
+      /* Split Divider */
+      .split-divider {
+        width: 1px;
+        flex-shrink: 0;
+        background: var(--murasaki-line);
+        position: relative;
+        cursor: col-resize;
+      }
+      .split-divider::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: -3px;
+        transform: translateY(-50%);
+        width: 7px;
+        height: 32px;
+        border-radius: 4px;
+      }
+      .split-divider:hover::after {
+        background: var(--murasaki-primary);
+        opacity: 0.15;
+      }
+
+      /* Preview Pane */
+      #preview-pane {
+        flex: 1 1 50%;
+        overflow-y: auto;
+        padding: 24px 32px;
+        background: var(--murasaki-background);
+        font-family: "Inter", "Noto Sans SC", system-ui, sans-serif;
+        font-size: 14px;
+        line-height: 1.75;
+        color: var(--murasaki-ink);
+      }
+      #preview-pane::-webkit-scrollbar {
+        width: 8px;
+      }
+      #preview-pane::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      #preview-pane::-webkit-scrollbar-thumb {
+        background: var(--murasaki-neutral-300);
+        border-radius: 4px;
+      }
+      #preview-pane::-webkit-scrollbar-thumb:hover {
+        background: var(--murasaki-neutral-400);
+      }
+      .preview h1 {
+        font-size: 26px;
+        font-weight: 700;
+        color: var(--murasaki-ink);
+        margin: 0 0 16px 0;
+        letter-spacing: -0.02em;
+        line-height: 1.3;
+      }
+      .preview p {
+        margin: 0 0 12px 0;
+        color: var(--murasaki-ink-2);
+      }
+      .preview h2 {
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--murasaki-ink);
+        margin: 20px 0 10px 0;
+        letter-spacing: -0.01em;
+        line-height: 1.35;
+      }
+      .preview ul {
+        margin: 0 0 12px 0;
+        padding-left: 24px;
+      }
+      .preview li {
+        margin-bottom: 4px;
+        color: var(--murasaki-ink-2);
+      }
+      .preview li::marker {
+        color: var(--murasaki-primary);
+      }
+      .preview pre {
+        background: var(--murasaki-neutral-900);
+        border-radius: var(--murasaki-radius-md);
+        padding: 16px 20px;
+        margin: 12px 0 16px 0;
+        overflow-x: auto;
+      }
+      .preview pre code {
+        font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #e5e7eb;
+      }
+      .preview pre .hl-keyword { color: #c084fc; }
+      .preview pre .hl-func { color: #60a5fa; }
+      .preview pre .hl-string { color: #4ade80; }
+      .preview pre .hl-comment { color: #6b7280; font-style: italic; }
+      .preview blockquote {
+        border-left: 3px solid var(--murasaki-primary);
+        margin: 12px 0;
+        padding: 8px 16px;
+        background: var(--murasaki-purple-50);
+        border-radius: 0 var(--murasaki-radius-sm) var(--murasaki-radius-sm) 0;
+        color: var(--murasaki-ink-2);
+      }
+      .preview blockquote p {
+        margin: 0;
+      }
+
+      /* === Status Bar === */
+      #status-bar {
+        grid-area: statusbar;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        background: var(--murasaki-surface);
+        border-top: 1px solid var(--murasaki-line);
+        font-size: 12px;
+        color: var(--murasaki-ink-3);
+        user-select: none;
+      }
+      .status-left,
+      .status-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .status-right span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+    </style>
+</body>
+</html>

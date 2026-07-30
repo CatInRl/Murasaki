@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UX - Interaction States</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main class="p-8 max-w-7xl mx-auto">
+        <header class="mb-10">
+            <h1 class="text-3xl font-semibold tracking-tight text-foreground">Interaction States / 交互状态</h1>
+            <p class="mt-2 text-muted-foreground">全局组件交互状态与反馈样式参考</p>
+        </header>
+
+        <div class="state-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+            <section id="state-button-primary" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">主要按钮 / Primary Button</h2>
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="flex flex-col items-center gap-2">
+                        <button class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">保存</button>
+                        <span class="text-xs text-muted-foreground">默认</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <button class="rounded-md bg-primary/90 px-4 py-2 text-sm font-medium text-primary-foreground">保存</button>
+                        <span class="text-xs text-muted-foreground">悬停</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <button class="rounded-md bg-primary/80 px-4 py-2 text-sm font-medium text-primary-foreground">保存</button>
+                        <span class="text-xs text-muted-foreground">按下</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <button class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-2 ring-ring ring-offset-2">保存</button>
+                        <span class="text-xs text-muted-foreground">聚焦</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <button disabled class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground opacity-50 cursor-not-allowed">保存</button>
+                        <span class="text-xs text-muted-foreground">禁用</span>
+                    </div>
+                </div>
+            </section>
+
+            <section id="state-button-secondary" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">次要按钮 / Secondary Button</h2>
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="flex flex-col items-center gap-2">
+                        <button class="rounded-md border border-border bg-muted px-4 py-2 text-sm font-medium text-foreground">取消</button>
+                        <span class="text-xs text-muted-foreground">默认</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <button class="rounded-md border border-border bg-muted/80 px-4 py-2 text-sm font-medium text-foreground">取消</button>
+                        <span class="text-xs text-muted-foreground">悬停</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <button class="rounded-md border border-border bg-muted/60 px-4 py-2 text-sm font-medium text-foreground">取消</button>
+                        <span class="text-xs text-muted-foreground">按下</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <button class="rounded-md border border-border bg-muted px-4 py-2 text-sm font-medium text-foreground ring-2 ring-ring ring-offset-2">取消</button>
+                        <span class="text-xs text-muted-foreground">聚焦</span>
+                    </div>
+                    <div class="flex flex-col items-center gap-2">
+                        <button disabled class="rounded-md border border-border bg-muted px-4 py-2 text-sm font-medium text-foreground opacity-50 cursor-not-allowed">取消</button>
+                        <span class="text-xs text-muted-foreground">禁用</span>
+                    </div>
+                </div>
+            </section>
+
+            <section id="state-link" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">文本链接 / Text Link</h2>
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-center gap-4">
+                        <a href="#" class="text-sm text-primary">打开文档</a>
+                        <span class="text-xs text-muted-foreground">默认</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <a href="#" class="text-sm text-primary underline underline-offset-2">打开文档</a>
+                        <span class="text-xs text-muted-foreground">悬停</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <a href="#" class="text-sm text-[var(--murasaki-purple-800)] underline underline-offset-2">打开文档</a>
+                        <span class="text-xs text-muted-foreground">已访问</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <a href="#" class="text-sm text-primary ring-2 ring-ring ring-offset-2 rounded-sm px-1">打开文档</a>
+                        <span class="text-xs text-muted-foreground">聚焦</span>
+                    </div>
+                </div>
+            </section>
+
+            <section id="state-input" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">输入框 / Input</h2>
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <label class="mb-1 block text-xs text-muted-foreground">默认</label>
+                        <input type="text" value="紫式部" class="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground" readonly>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs text-muted-foreground">悬停</label>
+                        <input type="text" value="紫式部" class="w-full rounded-md border border-muted-foreground bg-background px-3 py-2 text-sm text-foreground" readonly>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs text-muted-foreground">聚焦</label>
+                        <input type="text" value="紫式部" class="w-full rounded-md border border-primary bg-background px-3 py-2 text-sm text-foreground ring-2 ring-ring" readonly>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs text-[var(--murasaki-state-error)]">错误</label>
+                        <input type="text" value="紫式部" class="w-full rounded-md border border-[var(--murasaki-state-error)] bg-background px-3 py-2 text-sm text-foreground" readonly>
+                        <p class="mt-1 text-xs text-[var(--murasaki-state-error)]">文件名不能为空</p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs text-muted-foreground">禁用</label>
+                        <input type="text" value="紫式部" disabled class="w-full rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground opacity-50 cursor-not-allowed">
+                    </div>
+                </div>
+            </section>
+
+            <section id="state-checkbox" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">复选框与开关 / Checkbox & Switch</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-5 w-5 items-center justify-center rounded-sm border border-border bg-background"></div>
+                        <span class="text-sm text-foreground">未选中</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-5 w-5 items-center justify-center rounded-sm border border-primary bg-primary text-primary-foreground">
+                            <i data-lucide="check" class="h-3.5 w-3.5"></i>
+                        </div>
+                        <span class="text-sm text-foreground">已选中</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-5 w-5 items-center justify-center rounded-sm border border-border bg-muted opacity-50"></div>
+                        <span class="text-sm text-muted-foreground">禁用</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-5 w-5 items-center justify-center rounded-sm border border-primary bg-primary text-primary-foreground">
+                            <i data-lucide="minus" class="h-3.5 w-3.5"></i>
+                        </div>
+                        <span class="text-sm text-foreground">不确定</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="relative h-5 w-9 rounded-full bg-muted">
+                            <div class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-background shadow"></div>
+                        </div>
+                        <span class="text-sm text-foreground">关</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="relative h-5 w-9 rounded-full bg-primary">
+                            <div class="absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-primary-foreground shadow"></div>
+                        </div>
+                        <span class="text-sm text-foreground">开</span>
+                    </div>
+                </div>
+            </section>
+
+            <section id="state-radio" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">单选组 / Radio Group</h2>
+                <p class="mb-3 text-xs text-muted-foreground">主题选择</p>
+                <div class="flex flex-col gap-3">
+                    <label class="flex items-center gap-3 rounded-md border border-border bg-background p-3 hover:bg-muted/50">
+                        <div class="flex h-4 w-4 items-center justify-center rounded-full border border-border bg-background">
+                            <div class="h-2 w-2 rounded-full bg-primary"></div>
+                        </div>
+                        <span class="text-sm text-foreground">浅色</span>
+                    </label>
+                    <label class="flex items-center gap-3 rounded-md border border-border bg-background p-3 hover:bg-muted/50">
+                        <div class="flex h-4 w-4 items-center justify-center rounded-full border border-border bg-background"></div>
+                        <span class="text-sm text-foreground">深色</span>
+                    </label>
+                    <label class="flex items-center gap-3 rounded-md border border-border bg-background p-3 hover:bg-muted/50">
+                        <div class="flex h-4 w-4 items-center justify-center rounded-full border border-border bg-background"></div>
+                        <span class="text-sm text-foreground">跟随系统</span>
+                    </label>
+                </div>
+            </section>
+
+            <section id="state-listrow" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">列表行 / List Row</h2>
+                <div class="flex flex-col rounded-md border border-border overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-3 bg-background">
+                        <span class="text-sm text-foreground">notes.md</span>
+                        <span class="text-xs text-muted-foreground">默认</span>
+                    </div>
+                    <div class="flex items-center justify-between px-4 py-3 bg-muted/50">
+                        <span class="text-sm text-foreground">draft.md</span>
+                        <span class="text-xs text-muted-foreground">悬停</span>
+                    </div>
+                    <div class="flex items-center justify-between px-4 py-3 bg-primary/10">
+                        <span class="text-sm text-primary font-medium">README.md</span>
+                        <span class="text-xs text-primary">已选中</span>
+                    </div>
+                    <div class="flex items-center justify-between px-4 py-3 bg-primary/20">
+                        <span class="text-sm text-primary font-medium">todo.md</span>
+                        <span class="text-xs text-primary">按下</span>
+                    </div>
+                </div>
+            </section>
+
+            <section id="state-dragdrop" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">拖放反馈 / Drag & Drop</h2>
+                <div class="mb-4 flex flex-col gap-2">
+                    <div class="flex items-center gap-3 rounded-md border border-dashed border-primary bg-primary/5 px-4 py-3">
+                        <i data-lucide="file-text" class="h-4 w-4 text-muted-foreground"></i>
+                        <span class="text-sm text-foreground">chapter-1.md</span>
+                        <span class="ml-auto text-xs text-primary">拖入中</span>
+                    </div>
+                    <div class="flex items-center gap-3 rounded-md border border-primary bg-primary/10 px-4 py-3">
+                        <i data-lucide="folder" class="h-4 w-4 text-primary"></i>
+                        <span class="text-sm text-primary font-medium">目标文件夹</span>
+                        <span class="ml-auto text-xs text-primary">放置目标</span>
+                    </div>
+                </div>
+                <div class="rounded-lg border-2 border-dashed border-border bg-muted/30 p-6 text-center">
+                    <p class="text-sm text-muted-foreground">拖入此处</p>
+                    <p class="mt-1 text-xs text-muted-foreground">支持 Markdown 文件与图片</p>
+                </div>
+            </section>
+
+            <section id="state-skeleton" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">加载骨架 / Skeleton</h2>
+                <div class="mb-6 flex flex-col gap-3">
+                    <div class="h-4 w-1/3 rounded bg-muted animate-pulse"></div>
+                    <div class="flex items-center gap-3">
+                        <div class="h-8 w-8 rounded bg-muted animate-pulse"></div>
+                        <div class="flex-1 space-y-2">
+                            <div class="h-3 w-3/4 rounded bg-muted animate-pulse"></div>
+                            <div class="h-3 w-1/2 rounded bg-muted animate-pulse"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="h-8 w-8 rounded bg-muted animate-pulse"></div>
+                        <div class="flex-1 space-y-2">
+                            <div class="h-3 w-2/3 rounded bg-muted animate-pulse"></div>
+                            <div class="h-3 w-1/3 rounded bg-muted animate-pulse"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="h-8 w-8 rounded bg-muted animate-pulse"></div>
+                        <div class="flex-1 space-y-2">
+                            <div class="h-3 w-3/4 rounded bg-muted animate-pulse"></div>
+                            <div class="h-3 w-1/2 rounded bg-muted animate-pulse"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="h-8 w-8 rounded bg-muted animate-pulse"></div>
+                        <div class="flex-1 space-y-2">
+                            <div class="h-3 w-2/3 rounded bg-muted animate-pulse"></div>
+                            <div class="h-3 w-1/3 rounded bg-muted animate-pulse"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="h-8 w-8 rounded bg-muted animate-pulse"></div>
+                        <div class="flex-1 space-y-2">
+                            <div class="h-3 w-3/4 rounded bg-muted animate-pulse"></div>
+                            <div class="h-3 w-1/2 rounded bg-muted animate-pulse"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <div class="h-3 w-full rounded bg-muted animate-pulse"></div>
+                    <div class="h-3 w-full rounded bg-muted animate-pulse"></div>
+                    <div class="h-3 w-5/6 rounded bg-muted animate-pulse"></div>
+                    <div class="h-3 w-full rounded bg-muted animate-pulse"></div>
+                    <div class="h-3 w-4/5 rounded bg-muted animate-pulse"></div>
+                </div>
+                <p class="mt-3 text-xs text-muted-foreground">文件列表骨架（5 行）与编辑器骨架</p>
+            </section>
+
+            <section id="state-progress" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">进度指示 / Progress</h2>
+                <div class="flex flex-col gap-5">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="loader" class="h-5 w-5 animate-spin text-primary"></i>
+                        <span class="text-sm text-muted-foreground">加载中</span>
+                    </div>
+                    <div>
+                        <div class="mb-1 flex justify-between text-xs text-muted-foreground">
+                            <span>同步进度</span>
+                            <span>60%</span>
+                        </div>
+                        <div class="h-2 w-full rounded-full bg-muted">
+                            <div class="h-2 w-[60%] rounded-full bg-primary"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="mb-1 text-xs text-muted-foreground">不确定进度</div>
+                        <div class="h-2 w-full overflow-hidden rounded-full bg-muted">
+                            <div class="h-2 w-1/3 rounded-full bg-primary/70 animate-pulse"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="state-focus" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">聚焦环 / Focus Rings</h2>
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-center gap-4">
+                        <button class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-2 ring-ring ring-offset-2">按钮</button>
+                        <span class="text-xs text-muted-foreground">按钮聚焦</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <input type="text" value="紫式部" class="rounded-md border border-primary bg-background px-3 py-2 text-sm text-foreground ring-2 ring-ring" readonly>
+                        <span class="text-xs text-muted-foreground">输入框聚焦</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <a href="#" class="text-sm text-primary ring-2 ring-ring ring-offset-2 rounded-sm px-1">文本链接</a>
+                        <span class="text-xs text-muted-foreground">链接聚焦</span>
+                    </div>
+                </div>
+            </section>
+
+            <section id="state-selection" class="rounded-lg border border-border bg-card p-6">
+                <h2 class="mb-4 text-sm font-medium text-muted-foreground">编辑器选区 / Editor Selection</h2>
+                <div class="rounded-md border border-border bg-background p-4 font-mono text-sm leading-relaxed text-foreground">
+                    <p>
+                        <span class="text-foreground">紫式部是日本平安时代的女作家，其代表作《源氏物语》被誉为世界文学史上的第一部小说。</span><span class="bg-primary/30 text-foreground">这段文字被选中</span><span class="text-foreground">，选区使用柔和的紫色背景。</span>
+                    </p>
+                </div>
+                <p class="mt-2 text-xs text-muted-foreground">编辑器内选中文字使用紫色半透明背景</p>
+            </section>
+
+        </div>
+    </main>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UX - Panels</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <main class="bg-background text-foreground min-h-screen p-8">
+      <!-- Page Header -->
+      <header class="mb-8">
+        <h1 class="text-3xl font-semibold text-foreground">Panels / 面板</h1>
+        <p class="mt-2 text-muted-foreground">Murasaki 桌面编辑器面板系统 UX 规格</p>
+      </header>
+
+      <!-- Panel Gallery -->
+      <section class="panel-grid grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- 1. Search Results Bottom Panel -->
+        <article id="panel-search" class="bg-card border border-border rounded-lg overflow-hidden flex flex-col">
+          <div class="flex items-center gap-2 px-4 py-3 border-b border-border bg-background">
+            <i data-lucide="search" class="w-4 h-4 text-muted-foreground"></i>
+            <span class="text-sm font-medium">搜索结果</span>
+          </div>
+          <div class="p-4 space-y-3">
+            <div class="flex items-center gap-3">
+              <div class="flex-1 flex items-center gap-2 px-3 py-2 bg-background border border-border rounded-md">
+                <i data-lucide="search" class="w-4 h-4 text-muted-foreground"></i>
+                <span class="text-sm text-foreground">markdown</span>
+              </div>
+              <button class="px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition-colors">正则</button>
+              <button class="px-3 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition-colors">仅文件名</button>
+            </div>
+            <div class="border border-border rounded-md divide-y divide-border">
+              <div class="px-3 py-2.5 hover:bg-muted/50 transition-colors cursor-pointer">
+                <div class="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                  <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                  <span>docs/spec.md</span>
+                  <span class="ml-auto">第 42 行</span>
+                </div>
+                <p class="text-sm text-foreground">...支持 <span class="bg-primary/10 text-primary px-1 rounded">markdown</span> 实时预览...</p>
+              </div>
+              <div class="px-3 py-2.5 hover:bg-muted/50 transition-colors cursor-pointer">
+                <div class="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                  <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                  <span>src/components/Editor.vue</span>
+                  <span class="ml-auto">第 128 行</span>
+                </div>
+                <p class="text-sm text-foreground">...const input = <span class="bg-primary/10 text-primary px-1 rounded">markdown</span>.parse(content)...</p>
+              </div>
+              <div class="px-3 py-2.5 hover:bg-muted/50 transition-colors cursor-pointer">
+                <div class="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                  <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                  <span>README.md</span>
+                  <span class="ml-auto">第 7 行</span>
+                </div>
+                <p class="text-sm text-foreground">...一款轻量的 <span class="bg-primary/10 text-primary px-1 rounded">markdown</span> 编辑器...</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- 2. Outline Side Panel -->
+        <article id="panel-outline" class="bg-card border border-border rounded-lg overflow-hidden flex flex-col">
+          <div class="flex items-center gap-2 px-4 py-3 border-b border-border bg-background">
+            <i data-lucide="list" class="w-4 h-4 text-muted-foreground"></i>
+            <span class="text-sm font-medium">大纲</span>
+          </div>
+          <div class="p-4">
+            <ul class="space-y-1 text-sm">
+              <li class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer">
+                <span class="text-muted-foreground">H1</span>
+                <span class="text-foreground font-medium">项目计划</span>
+              </li>
+              <li class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer ml-4">
+                <span class="text-muted-foreground">H2</span>
+                <span class="text-foreground">目标</span>
+              </li>
+              <li class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer ml-4">
+                <span class="text-muted-foreground">H2</span>
+                <span class="text-foreground">任务</span>
+              </li>
+              <li class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-primary/10 text-primary cursor-pointer ml-8">
+                <span class="text-primary/70">H3</span>
+                <span class="font-medium">子任务 A</span>
+              </li>
+              <li class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer ml-8">
+                <span class="text-muted-foreground">H3</span>
+                <span class="text-foreground">子任务 B</span>
+              </li>
+              <li class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer ml-4">
+                <span class="text-muted-foreground">H2</span>
+                <span class="text-foreground">时间线</span>
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- 3. File Tree Side Panel -->
+        <article id="panel-filetree" class="bg-card border border-border rounded-lg overflow-hidden flex flex-col">
+          <div class="flex items-center gap-2 px-4 py-3 border-b border-border bg-background">
+            <i data-lucide="folder-tree" class="w-4 h-4 text-muted-foreground"></i>
+            <span class="text-sm font-medium">文件树</span>
+          </div>
+          <div class="p-4">
+            <ul class="space-y-1 text-sm relative">
+              <li class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer">
+                <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                <i data-lucide="folder-open" class="w-4 h-4 text-primary"></i>
+                <span class="text-foreground">murasaki</span>
+              </li>
+              <li class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer ml-6">
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                <i data-lucide="folder" class="w-4 h-4 text-muted-foreground"></i>
+                <span class="text-foreground">src</span>
+              </li>
+              <li class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-primary text-primary-foreground cursor-pointer ml-6">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                <span>README.md</span>
+              </li>
+              <li class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer ml-6 relative">
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                <i data-lucide="folder" class="w-4 h-4 text-muted-foreground"></i>
+                <span class="text-foreground">docs</span>
+                <!-- Context menu hint -->
+                <div class="absolute left-full top-0 ml-2 w-32 bg-popover border border-border rounded-md shadow-sm py-1 z-10">
+                  <button class="w-full text-left px-3 py-1.5 text-xs hover:bg-muted">重命名</button>
+                  <button class="w-full text-left px-3 py-1.5 text-xs hover:bg-muted text-state-error">删除</button>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </article>
+
+        <!-- 4. Agent Side Panel -->
+        <article id="panel-agent" class="bg-card border border-border rounded-lg overflow-hidden flex flex-col">
+          <div class="flex items-center gap-2 px-4 py-3 border-b border-border bg-background">
+            <i data-lucide="bot" class="w-4 h-4 text-muted-foreground"></i>
+            <span class="text-sm font-medium">AI 助手</span>
+          </div>
+          <div class="p-4 space-y-4">
+            <div class="space-y-3">
+              <div class="flex gap-2">
+                <div class="w-7 h-7 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <i data-lucide="user" class="w-4 h-4 text-muted-foreground"></i>
+                </div>
+                <div class="bg-muted px-3 py-2 rounded-lg text-sm text-foreground">把这段改成列表</div>
+              </div>
+              <div class="flex gap-2">
+                <div class="w-7 h-7 rounded-full bg-primary flex items-center justify-center shrink-0">
+                  <i data-lucide="bot" class="w-4 h-4 text-primary-foreground"></i>
+                </div>
+                <div class="bg-background border border-border px-3 py-2 rounded-lg text-sm text-foreground">已转换为无序列表，请查看编辑器。</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-2 bg-background border border-border rounded-md">
+              <input type="text" placeholder="输入指令..." class="bg-transparent outline-none text-sm flex-1 text-foreground placeholder:text-muted-foreground" />
+              <i data-lucide="send" class="w-4 h-4 text-muted-foreground"></i>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-2 bg-muted/50 border border-border rounded-md">
+              <i data-lucide="file-text" class="w-4 h-4 text-muted-foreground"></i>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs text-foreground truncate">项目计划.md</p>
+                <p class="text-xs text-muted-foreground">上下文 · 2,847 tokens</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- 5. Status Bar -->
+        <article id="panel-statusbar" class="lg:col-span-2 bg-card border border-border rounded-lg overflow-hidden">
+          <div class="flex items-center gap-2 px-4 py-3 border-b border-border bg-background">
+            <i data-lucide="layout-panel-bottom" class="w-4 h-4 text-muted-foreground"></i>
+            <span class="text-sm font-medium">状态栏</span>
+          </div>
+          <div class="px-4 py-3">
+            <div class="flex items-center gap-4 text-xs text-foreground bg-background border-t border-border px-3 py-2 rounded-md">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <i data-lucide="file-text" class="w-3.5 h-3.5 text-muted-foreground shrink-0"></i>
+                <span class="truncate">murasaki/docs/spec.md</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="align-left" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                <span>行 128, 列 24</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="type" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                <span>8,432 字符</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-state-success">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                <span>已保存</span>
+              </div>
+              <div class="flex items-center gap-1.5 ml-auto">
+                <i data-lucide="message-square" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                <span>2 个未归附会话</span>
+              </div>
+              <div class="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 text-primary rounded">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span>Doubao</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+      </section>
+    </main>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

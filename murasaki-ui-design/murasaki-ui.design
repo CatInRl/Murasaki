@@ -1,0 +1,378 @@
+{
+  "data": [
+    {
+      "id": "page-main-editor",
+      "title": "Main Editor",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753689600000,
+      "canvasData": {
+        "x": -156,
+        "y": -252,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-eb4c72f3",
+          "measuredAt": 1785334907303
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/main-editor.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-welcome-page",
+      "title": "Welcome Page",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753689600000,
+      "canvasData": {
+        "x": -156,
+        "y": -528,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-8ac44716",
+          "measuredAt": 1785334907303
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/welcome-page.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-editor-with-agent",
+      "title": "Editor + Agent Panel",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753776000000,
+      "canvasData": {
+        "x": -156,
+        "y": 36,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-e0b3e886",
+          "measuredAt": 1785334907303
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/editor-with-agent.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-settings-general",
+      "title": "Settings — General",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753776100000,
+      "canvasData": {
+        "x": 732,
+        "y": -528,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-c35bb7f7",
+          "measuredAt": 1785334907303
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/settings-general.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-settings-editor",
+      "title": "Settings — Editor",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753776100000,
+      "canvasData": {
+        "x": 732,
+        "y": -240,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 906,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-8584e518",
+          "measuredAt": 1785351369898
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/settings-editor.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-settings-ai",
+      "title": "Settings — AI",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753776100000,
+      "canvasData": {
+        "x": 732,
+        "y": 48,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1068,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-9eacb6c7",
+          "measuredAt": 1785351369898
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/settings-ai.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-wysiwyg-editor",
+      "title": "WYSIWYG Editor",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753776200000,
+      "canvasData": {
+        "x": 288,
+        "y": -528,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 924,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-d09544fa",
+          "measuredAt": 1785351369898
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/wysiwyg-editor.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-wysiwyg-with-agent",
+      "title": "WYSIWYG + Agent",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753776200000,
+      "canvasData": {
+        "x": 288,
+        "y": -252,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-b2c441b5",
+          "measuredAt": 1785334907303
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/wysiwyg-with-agent.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-ux-dialogs",
+      "title": "UX — Dialogs",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753781100000,
+      "canvasData": {
+        "x": 1176,
+        "y": -528,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1106,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-f44cc553",
+          "measuredAt": 1785351369898
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/ux-dialogs.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-ux-menus-context-menus",
+      "title": "UX — Menus & Context Menus",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753781100000,
+      "canvasData": {
+        "x": 1176,
+        "y": -240,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1098,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-48c85ab2",
+          "measuredAt": 1785351369898
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/ux-menus-context-menus.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-ux-toasts-notifications",
+      "title": "UX — Toasts & Notifications",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753781100000,
+      "canvasData": {
+        "x": 1176,
+        "y": 48,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-4acd13b8",
+          "measuredAt": 1785334907303
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/ux-toasts-notifications.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-ux-empty-error-states",
+      "title": "UX — Empty & Error States",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753781100000,
+      "canvasData": {
+        "x": 1176,
+        "y": 336,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1550,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-9bcaada6",
+          "measuredAt": 1785351369898
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/ux-empty-error-states.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-ux-popovers-toolbars",
+      "title": "UX — Popovers & Toolbars",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753781100000,
+      "canvasData": {
+        "x": 1620,
+        "y": -528,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1029,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-e893fa3e",
+          "measuredAt": 1785351369898
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/ux-popovers-toolbars.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-ux-panels",
+      "title": "UX — Panels",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753781100000,
+      "canvasData": {
+        "x": 1620,
+        "y": -240,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 918,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-721a8ddd",
+          "measuredAt": 1785351369898
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/ux-panels.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-ux-interactions-states",
+      "title": "UX — Interaction States",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753781100000,
+      "canvasData": {
+        "x": 1620,
+        "y": 48,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1609,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-3537ad66",
+          "measuredAt": 1785351369898
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/ux-interactions-states.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-ux-markdown-structures",
+      "title": "UX — Markdown Structures",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753992000000,
+      "canvasData": {
+        "x": 2064,
+        "y": -528,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 2358,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-b5869cd9",
+          "measuredAt": 1785351369898
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/ux-markdown-structures.html",
+        "interactions": []
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": false,
+    "deviceType": "desktop",
+    "projectName": "Murasaki UI Design",
+    "visualEditorEnabled": false
+  }
+}
