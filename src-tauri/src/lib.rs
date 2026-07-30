@@ -9,6 +9,7 @@ use commands::drafts;
 use commands::files;
 use commands::menu::{self, RecentMenuState};
 use commands::outline;
+use commands::search;
 use commands::settings;
 use commands::watcher::{self, WatcherState};
 
@@ -269,6 +270,7 @@ pub fn run() {
             files::path_exists,
             files::path_type,
             files::reveal_in_explorer,
+            search::search_workspace,
             outline::parse_outline,
             outline::invalidate_outline_cache,
             outline::clear_outline_cache,

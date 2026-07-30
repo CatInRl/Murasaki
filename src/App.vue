@@ -19,7 +19,6 @@ import SearchPanel from "./components/SearchPanel.vue";
 import StatusBar from "./components/StatusBar.vue";
 import ConflictDialog from "./components/ConflictDialog.vue";
 import TableInsertDialog from "./components/TableInsertDialog.vue";
-import SettingsWindow from "./components/SettingsWindow.vue";
 import CompareWindow from "./components/CompareWindow.vue";
 import ImagePreviewModal from "./components/ImagePreviewModal.vue";
 import AgentPanel from "./components/AgentPanel.vue";
@@ -134,9 +133,6 @@ const conflictState = ref<{
 // ===== 表格插入对话框 =====
 const tableDialogVisible = ref(false);
 
-// ===== 设置窗口 =====
-const settingsWindowVisible = ref(false);
-
 // ===== 图片预览弹窗 =====
 const imagePreviewVisible = ref(false);
 const imagePreviewPath = ref<string | null>(null);
@@ -149,6 +145,16 @@ function onPreviewImage(path: string): void {
 // ===== 收起 Agent 面板 =====
 async function onCollapseAgentPanel(): Promise<void> {
   await persistence.updateSettings({ showAgentPanel: false } as Partial<SettingsState>);
+}
+
+// ===== 打开设置窗口（Tauri 多窗口，见 ADR-0009） =====
+async function openSettings(): Promise<void> {
+  try {
+    await invoke("open_settings");
+  } catch (err) {
+    console.error("打开设置窗口失败:", err);
+    dialog.alert({ message: `打开设置窗口失败: ${err}`, variant: "error" });
+  }
 }
 
 // ===== 对比窗口（外部修改合并） =====
@@ -750,35 +756,6 @@ function onDropImagePath(absolutePath: string): void {
   imagePaste.insertExistingImage(absolutePath);
 }
 
-// ===== 设置变更处理 =====
-// 同步设置到应用状态：主题、行号、软折行立即生效；其他需重启
-function onSettingsChange(
-  field: keyof typeof persistence.settings,
-  value: unknown
-): void {
-  switch (field) {
-    case "markdownTheme":
-      currentTheme.value = value as string;
-      break;
-    case "showHiddenFiles":
-      // 切换后刷新文件树（若工作区已打开）
-      if (workspace.hasWorkspace) {
-        void workspace.refreshTree();
-      }
-      break;
-    case "showLineNumbers":
-    case "softWrap":
-      // 这些通过 persistence.settings 响应式传递给 EditorPane（v-bind :show-line-numbers / :soft-wrap）
-      break;
-    case "uiMode":
-      // 需重启应用完全生效（仅在设置窗口提示，不在此处处理）
-      break;
-    case "editorMode":
-      // 运行时生效：由 watch(persistence.settings.editorMode) 同步到 editorBridge
-      break;
-  }
-}
-
 // ===== TabBar 批量关闭（右键菜单触发）=====
 // 批量关闭使用 doCloseTab：未保存修改自动写入草稿，避免连续弹多个确认框
 async function onCloseOthers(tabId: string): Promise<void> {
@@ -824,17 +801,33 @@ async function onEditorContextAction(
     return;
   }
   if (action === "insert-link") {
-    const url = prompt("链接地址：");
+    const url = await dialog.prompt({
+      title: "插入链接",
+      message: "请输入链接地址：",
+      placeholder: "https://example.com",
+    });
     if (!url) return;
-    const text = prompt("链接文字：", "") ?? "";
-    insertMarkdownAtCursor(`[${text}](${url})`);
+    const text = await dialog.prompt({
+      title: "插入链接",
+      message: "请输入链接文字：",
+      placeholder: "链接文字",
+    });
+    insertMarkdownAtCursor(`[${text ?? ""}](${url})`);
     return;
   }
   if (action === "insert-image") {
-    const url = prompt("图片地址：");
+    const url = await dialog.prompt({
+      title: "插入图片",
+      message: "请输入图片地址：",
+      placeholder: "https://example.com/image.png",
+    });
     if (!url) return;
-    const alt = prompt("替代文字（可选）：", "") ?? "";
-    insertMarkdownAtCursor(`![${alt}](${url})`);
+    const alt = await dialog.prompt({
+      title: "插入图片",
+      message: "请输入替代文字（可选）：",
+      placeholder: "替代文字",
+    });
+    insertMarkdownAtCursor(`![${alt ?? ""}](${url})`);
     return;
   }
 }
@@ -1115,7 +1108,7 @@ async function handleMenuEvent(menuId: string): Promise<void> {
       searchStore.visible = true;
       break;
     case "settings":
-      settingsWindowVisible.value = true;
+      await openSettings();
       break;
     case "theme-github":
       currentTheme.value = "github";
@@ -1223,7 +1216,7 @@ async function handleMenuEvent(menuId: string): Promise<void> {
       break;
     }
     case "about": {
-      dialog.alert({ title: "关于 Murasaki", message: "Murasaki v0.1.0\n轻量级本地 Markdown 文件管理编辑器\n基于 Tauri 2.x + Vue 3 + CodeMirror 6" });
+      dialog.alert({ title: "关于 Murasaki", message: "Murasaki v0.3.0\n轻量级本地 Markdown 文件管理编辑器\n基于 Tauri 2.x + Vue 3 + CodeMirror 6" });
       break;
     }
     case "check-updates": {
@@ -1323,7 +1316,7 @@ async function exportCurrentHtml(): Promise<void> {
             @open-file="onOpenFile"
             @new-file="onNewFile"
             @open-recent="onOpenRecent"
-            @open-settings="settingsWindowVisible = true"
+            @open-settings="openSettings"
           />
           <EditorPane
             v-else
@@ -1369,7 +1362,7 @@ async function exportCurrentHtml(): Promise<void> {
         v-if="persistence.settings.showAgentPanel"
         @collapse="onCollapseAgentPanel"
         @open-folder-dialog="onOpenFolder"
-        @open-settings="settingsWindowVisible = true"
+        @open-settings="openSettings"
       />
     </div>
 
@@ -1393,13 +1386,6 @@ async function exportCurrentHtml(): Promise<void> {
       :visible="tableDialogVisible"
       @confirm="onTableInsertConfirm"
       @cancel="tableDialogVisible = false"
-    />
-
-    <!-- 设置窗口 -->
-    <SettingsWindow
-      :visible="settingsWindowVisible"
-      @close="settingsWindowVisible = false"
-      @change="onSettingsChange"
     />
 
     <!-- 对比窗口（外部修改合并） -->

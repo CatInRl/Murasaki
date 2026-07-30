@@ -10,17 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "label": "settings",
-        "url": "settings.html",
-        "title": "设置",
-        "width": 800,
-        "height": 600,
-        "visible": false,
-        "resizable": true
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }
