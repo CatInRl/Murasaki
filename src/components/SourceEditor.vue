@@ -35,56 +35,63 @@ import { useProposalsStore } from "../stores/useProposalsStore";
 import { wysiwygExtensions } from "../editor/wysiwyg/wysiwygPlugin";
 
 /**
- * Murasaki light syntax theme — purple-tinted, writing-first.
- * Inspired by the design draft: purple headings/markers, ink-2 body,
- * colored code tokens that read well on a white background.
+ * Murasaki syntax theme — purple-tinted, writing-first (ADR-0006).
+ *
+ * 所有颜色引用 --murasaki-* token（来自 src/styles/theme.css），
+ * 不再硬编码 hex 值。语义 token（--murasaki-ink / ink-2 / ink-3 /
+ * muted-foreground）会随浅色/深色主题自动切换；调色板 token
+ * （--murasaki-purple-* / --murasaki-state-*）在两种模式下通用。
+ *
+ * HighlightStyle.define 与 EditorView.theme 一样通过 StyleModule 生成
+ * CSS 规则，因此 var(--murasaki-*) 字符串在运行时解析为具体颜色值，
+ * 主题切换时无需重建 HighlightStyle。
  */
 const murasakiHighlightStyle = HighlightStyle.define([
   // Headings: purple-700, bold
-  { tag: t.heading1, color: "#7e22ce", fontWeight: "700", fontSize: "1.25em" },
-  { tag: t.heading2, color: "#7e22ce", fontWeight: "700", fontSize: "1.15em" },
-  { tag: t.heading3, color: "#9333ea", fontWeight: "600", fontSize: "1.05em" },
-  { tag: [t.heading4, t.heading5, t.heading6], color: "#9333ea", fontWeight: "600" },
+  { tag: t.heading1, color: "var(--murasaki-purple-700)", fontWeight: "700", fontSize: "1.25em" },
+  { tag: t.heading2, color: "var(--murasaki-purple-700)", fontWeight: "700", fontSize: "1.15em" },
+  { tag: t.heading3, color: "var(--murasaki-purple-600)", fontWeight: "600", fontSize: "1.05em" },
+  { tag: [t.heading4, t.heading5, t.heading6], color: "var(--murasaki-purple-600)", fontWeight: "600" },
   // ATX heading markers (#, ##): purple-400
-  { tag: t.heading, color: "#c084fc" },
-  // Emphasis
-  { tag: t.strong, color: "#171717", fontWeight: "700" },
-  { tag: t.emphasis, color: "#525252", fontStyle: "italic" },
-  { tag: t.strikethrough, color: "#a3a3a3", textDecoration: "line-through" },
+  { tag: t.heading, color: "var(--murasaki-purple-400)" },
+  // Emphasis — 语义 token，随主题切换
+  { tag: t.strong, color: "var(--murasaki-ink)", fontWeight: "700" },
+  { tag: t.emphasis, color: "var(--murasaki-ink-2)", fontStyle: "italic" },
+  { tag: t.strikethrough, color: "var(--murasaki-ink-3)", textDecoration: "line-through" },
   // Links
-  { tag: t.link, color: "#7e22ce", textDecoration: "underline" },
-  { tag: t.url, color: "#2563eb" },
+  { tag: t.link, color: "var(--murasaki-purple-700)", textDecoration: "underline" },
+  { tag: t.url, color: "var(--murasaki-state-info)" },
   // Inline code & code blocks
-  { tag: t.monospace, color: "#6b21a8", backgroundColor: "rgba(147, 51, 234, 0.08)" },
+  { tag: t.monospace, color: "var(--murasaki-purple-800)", backgroundColor: "rgba(147, 51, 234, 0.08)" },
   // Lists: purple marker
-  { tag: t.list, color: "#9333ea" },
+  { tag: t.list, color: "var(--murasaki-purple-600)" },
   // Quotes: purple-600 italic
-  { tag: t.quote, color: "#9333ea", fontStyle: "italic" },
+  { tag: t.quote, color: "var(--murasaki-purple-600)", fontStyle: "italic" },
   // HR
-  { tag: t.separator, color: "#d4d4d4" },
+  { tag: t.separator, color: "var(--murasaki-neutral-300)" },
   // URLs in angle brackets
-  { tag: t.angleBracket, color: "#a3a3a3" },
+  { tag: t.angleBracket, color: "var(--murasaki-ink-3)" },
   // YAML frontmatter
-  { tag: t.meta, color: "#737373" },
+  { tag: t.meta, color: "var(--murasaki-muted-foreground)" },
   // Code block keywords
-  { tag: t.keyword, color: "#7e22ce", fontWeight: "600" },
-  { tag: t.atom, color: "#2563eb" },
-  { tag: t.bool, color: "#2563eb" },
-  { tag: t.number, color: "#2563eb" },
-  { tag: t.string, color: "#16a34a" },
-  { tag: t.escape, color: "#d97706" },
-  { tag: t.comment, color: "#a3a3a3", fontStyle: "italic" },
-  { tag: t.tagName, color: "#7e22ce" },
-  { tag: t.attributeName, color: "#9333ea" },
-  { tag: t.attributeValue, color: "#16a34a" },
-  { tag: t.definitionOperator, color: "#7e22ce" },
-  { tag: t.operator, color: "#525252" },
-  { tag: t.variableName, color: "#171717" },
-  { tag: t.propertyName, color: "#9333ea" },
-  { tag: t.typeName, color: "#2563eb" },
-  { tag: t.className, color: "#7e22ce" },
-  { tag: t.function(t.variableName), color: "#2563eb" },
-  { tag: t.labelName, color: "#9333ea" },
+  { tag: t.keyword, color: "var(--murasaki-purple-700)", fontWeight: "600" },
+  { tag: t.atom, color: "var(--murasaki-state-info)" },
+  { tag: t.bool, color: "var(--murasaki-state-info)" },
+  { tag: t.number, color: "var(--murasaki-state-info)" },
+  { tag: t.string, color: "var(--murasaki-state-success)" },
+  { tag: t.escape, color: "var(--murasaki-state-warning)" },
+  { tag: t.comment, color: "var(--murasaki-ink-3)", fontStyle: "italic" },
+  { tag: t.tagName, color: "var(--murasaki-purple-700)" },
+  { tag: t.attributeName, color: "var(--murasaki-purple-600)" },
+  { tag: t.attributeValue, color: "var(--murasaki-state-success)" },
+  { tag: t.definitionOperator, color: "var(--murasaki-purple-700)" },
+  { tag: t.operator, color: "var(--murasaki-ink-2)" },
+  { tag: t.variableName, color: "var(--murasaki-ink)" },
+  { tag: t.propertyName, color: "var(--murasaki-purple-600)" },
+  { tag: t.typeName, color: "var(--murasaki-state-info)" },
+  { tag: t.className, color: "var(--murasaki-purple-700)" },
+  { tag: t.function(t.variableName), color: "var(--murasaki-state-info)" },
+  { tag: t.labelName, color: "var(--murasaki-purple-600)" },
 ]);
 
 const murasakiTheme = EditorView.theme({

@@ -4,12 +4,14 @@ import { X, Copy, FolderOpen } from "lucide-vue-next";
 import { useTabsStore } from "../stores/useTabsStore";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
+import { useDialogStore } from "../stores/useDialogStore";
 import type { MenuItem } from "../stores/useContextMenuStore";
 import type { Tab } from "../types";
 
 const tabsStore = useTabsStore();
 const fileOps = useFileOpsStore();
 const contextMenu = useContextMenuStore();
+const dialog = useDialogStore();
 
 const emit = defineEmits<{
   (e: "new-tab"): void;
@@ -84,7 +86,7 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
         try {
           await fileOps.copyAbsolutePath(tab.path);
         } catch (err) {
-          alert(`复制路径失败: ${err}`);
+          void dialog.alert({ title: "错误", message: `复制路径失败: ${err}`, variant: "error" });
         }
       },
     },
@@ -97,7 +99,7 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
         try {
           await fileOps.revealInExplorer(tab.path);
         } catch (err) {
-          alert(`无法在资源管理器中显示: ${err}`);
+          void dialog.alert({ title: "错误", message: `无法在资源管理器中显示: ${err}`, variant: "error" });
         }
       },
     },

@@ -66,9 +66,6 @@ class HrWidget extends WidgetType {
 
 // ===== T7.2 块级 Widgets =====
 
-/** Mermaid 渲染 id 计数器（保证 SVG id 唯一）。 */
-let mermaidIdCounter = 0;
-
 /**
  * 代码块 widget：替换整个 FencedCode，用 Shiki 异步高亮渲染。
  * toDOM 先返回 <pre><code> 占位，codeToHtml 完成后替换为高亮 HTML。
@@ -110,9 +107,11 @@ class CodeBlockWidget extends WidgetType {
 /**
  * Mermaid widget：替换 ```mermaid 代码块，用 mermaid.js 异步渲染 SVG。
  * toDOM 先返回带源码占位的容器，render 完成后注入 SVG。
+ *
+ * id 由调用方传入（来自 WysiwygPluginValue 实例计数器），保证 SVG id 唯一。
  */
 class MermaidWidget extends WidgetType {
-  constructor(private code: string) {
+  constructor(private code: string, private id: string) {
     super();
   }
   eq(other: MermaidWidget): boolean {
@@ -123,9 +122,8 @@ class MermaidWidget extends WidgetType {
     container.className = "murasaki-wysiwyg-mermaid";
     // 占位：出错时显示源码，便于排错
     container.textContent = this.code;
-    const id = `murasaki-mermaid-${mermaidIdCounter++}`;
     void mermaid
-      .render(id, this.code)
+      .render(this.id, this.code)
       .then(({ svg }) => {
         if (container.isConnected) container.innerHTML = svg;
       })
@@ -243,12 +241,12 @@ class MathWidget extends WidgetType {
 }
 
 /** 根据块级 widget 描述符构造对应 WidgetType 实例。 */
-function createBlockWidget(d: BlockWidgetDeco): WidgetType {
+function createBlockWidget(d: BlockWidgetDeco, nextMermaidId: () => string): WidgetType {
   switch (d.widget) {
     case "codeBlock":
       return new CodeBlockWidget(d.lang, d.code);
     case "mermaid":
-      return new MermaidWidget(d.code);
+      return new MermaidWidget(d.code, nextMermaidId());
     case "link":
       return new LinkWidget(d.text, d.url);
     case "image":
@@ -262,7 +260,7 @@ function createBlockWidget(d: BlockWidgetDeco): WidgetType {
 
 // ===== 描述符 → CodeMirror Decoration =====
 
-function toDecorationSet(decos: ComputedDeco[]): DecorationSet {
+function toDecorationSet(decos: ComputedDeco[], nextMermaidId: () => string): DecorationSet {
   const ranges = decos.map((d) => {
     if (d.type === "mark") {
       const cls =
@@ -277,7 +275,7 @@ function toDecorationSet(decos: ComputedDeco[]): DecorationSet {
       return Decoration.mark({ class: d.cssClass }).range(d.from, d.to);
     }
     // blockWidget：用渲染 widget 替换原始 markdown
-    return Decoration.replace({ widget: createBlockWidget(d) }).range(d.from, d.to);
+    return Decoration.replace({ widget: createBlockWidget(d, nextMermaidId) }).range(d.from, d.to);
   });
   return Decoration.set(ranges, true);
 }
@@ -298,6 +296,8 @@ class WysiwygPluginValue {
   decorations: DecorationSet;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
+  /** Mermaid 渲染 id 计数器（实例字段，保证 SVG id 唯一且避免模块级可变状态） */
+  private mermaidIdCounter = 0;
 
   constructor(view: EditorView) {
     this.decorations = this.compute(view);
@@ -315,7 +315,8 @@ class WysiwygPluginValue {
           ? { from: view.viewport.from, to: view.viewport.to }
           : undefined,
     });
-    return toDecorationSet(decos);
+    const nextMermaidId = (): string => `murasaki-mermaid-${this.mermaidIdCounter++}`;
+    return toDecorationSet(decos, nextMermaidId);
   }
 
   update(u: ViewUpdate): void {
