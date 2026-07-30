@@ -105,6 +105,14 @@ murasaki/
   - `.scratch/`（临时调试脚本）
   - 任何机器特定路径配置
 
+## 版本发布约定
+
+- **发布流程**：更新版本号（package.json / Cargo.toml / tauri.conf.json）→ 提交推送 → 打 `vX.Y.Z` tag → 推送 tag 触发 `release.yml` → 关闭 milestone → 同步更新 [CHANGELOG.md](CHANGELOG.md) 和本文件变更记录部分
+- **Release 必须包含 CHANGELOG 内容**：`release.yml` 会用 `awk` 从 `CHANGELOG.md` 提取 `## [VERSION]` 段落，拼接到 Release Notes（安装说明 + 变更记录）。因此打 tag 前必须先在 CHANGELOG.md 写好对应版本条目，否则 Release Notes 的"变更记录"章节为空
+- **重新发布同版本**：删除旧 release（`gh release delete vX.Y.Z --yes --cleanup-tag`）→ 删除本地 tag（`git tag -d vX.Y.Z`）→ 提交修复代码并推送 → 重新打 tag 并推送触发构建
+- **构建产物**：Windows / Ubuntu / macOS arm64 / macOS x64 多平台包，构建约需 10 分钟，进度在 GitHub Actions 页面查看
+- **发布后验证**：构建完成后确认 release 产物完整、Release Notes 含 CHANGELOG 内容、CHANGELOG.md 和 AGENTS.md 变更记录已更新
+
 ## Issue 跟踪约定
 
 - **所有功能/spec 必须有 GitHub issue 跟踪**：用 `/to-spec` skill 生成 spec 并发布到 issue tracker，应用 `ready-for-agent` label

@@ -39,31 +39,68 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=${TAG#v}" >> $GITHUB_OUTPUT
 
+      - name: 从 CHANGELOG.md 提取本版本变更记录
+        id: changelog
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          # 提取 ## [VERSION] 行之后到下一个 ## [ 行之前的所有内容（不含版本标题行）
+          # 若找不到该版本则输出空字符串
+          CONTENT=$(awk -v ver="$VERSION" '
+            /^## \[/ {
+              if ($0 ~ "^## \\[" ver "\\]") { in_section=1; next }
+              else { in_section=0 }
+            }
+            in_section { print }
+          ' CHANGELOG.md)
+          # 写入临时文件，避免多行字符串在 GitHub Actions output 中的转义问题
+          echo "$CONTENT" > /tmp/changelog-section.md
+          echo "filepath=/tmp/changelog-section.md" >> $GITHUB_OUTPUT
+          # 输出预览（前 20 行）便于调试
+          echo "=== 提取的 CHANGELOG 内容预览 ==="
+          head -n 20 /tmp/changelog-section.md
+          echo "================================"
+
+      - name: 生成 Release Notes（安装说明 + CHANGELOG）
+        id: notes
+        run: |
+          # 拼接安装说明 + CHANGELOG 内容，写入单一文件供 body_path 使用
+          {
+            echo "# Murasaki ${{ steps.vars.outputs.tag }}"
+            echo ""
+            echo "## 安装"
+            echo ""
+            echo "### Windows"
+            echo "- \`Murasaki_*_x64-setup.exe\` — NSIS 安装包（推荐）"
+            echo "- \`Murasaki_*_x64_en-US.msi\` — MSI 安装包"
+            echo ""
+            echo "### macOS"
+            echo "- \`Murasaki_*_aarch64.dmg\` — Apple Silicon"
+            echo "- \`Murasaki_*_x64.dmg\` — Intel"
+            echo ""
+            echo "### Linux"
+            echo "- \`Murasaki_*_amd64.deb\` — Debian/Ubuntu"
+            echo "- \`Murasaki_*_amd64.AppImage\` — 便携版"
+            echo ""
+            echo "## 校验"
+            echo "下载后请比对 \`*.sig\` 签名文件。"
+            echo ""
+            echo "---"
+            echo ""
+            echo "## 变更记录"
+            echo ""
+            cat "${{ steps.changelog.outputs.filepath }}"
+          } > /tmp/release-notes.md
+          echo "filepath=/tmp/release-notes.md" >> $GITHUB_OUTPUT
+          echo "=== 最终 Release Notes 行数 ==="
+          wc -l /tmp/release-notes.md
+
       - name: 创建 Release
         id: create-release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.vars.outputs.tag }}
           name: Murasaki ${{ steps.vars.outputs.tag }}
-          body: |
-            # Murasaki ${{ steps.vars.outputs.tag }}
-
-            ## 安装
-
-            ### Windows
-            - `Murasaki_*_x64-setup.exe` — NSIS 安装包（推荐）
-            - `Murasaki_*_x64_en-US.msi` — MSI 安装包
-
-            ### macOS
-            - `Murasaki_*_aarch64.dmg` — Apple Silicon
-            - `Murasaki_*_x64.dmg` — Intel
-
-            ### Linux
-            - `Murasaki_*_amd64.deb` — Debian/Ubuntu
-            - `Murasaki_*_amd64.AppImage` — 便携版
-
-            ## 校验
-            下载后请比对 `*.sig` 签名文件。
+          body_path: ${{ steps.notes.outputs.filepath }}
           draft: false
           prerelease: false
         env:
