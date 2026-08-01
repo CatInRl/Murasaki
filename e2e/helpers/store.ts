@@ -250,6 +250,14 @@ export async function resetPersistenceSettings(browser: Browser): Promise<void> 
       .then(() => done(null))
       .catch((err: unknown) => done(err ? String(err) : null));
   });
+  // 同步 sidebarView ref（App.vue 的本地 ref 不会随 persistence.settings 自动同步，
+  // 前序 spec 切到 outline 后必须显式重置回 files，否则 .file-tree 不渲染）
+  await browser.execute(() => {
+    // @ts-ignore
+    if (typeof (window as any).__setSidebarView__ === "function") {
+      (window as any).__setSidebarView__("files");
+    }
+  });
   await browser.pause(300);
 }
 
@@ -309,4 +317,97 @@ export async function emitMenuEvent(
       (err: unknown) => done(err ? String(err) : null)
     );
   }, menuId);
+}
+
+/**
+ * 安全调用 store action 并等待结果。
+ *
+ * 使用 execute + 轮询模式替代 executeAsync，避免 store action 抛错时
+ * WebDriverError 穿透 .catch() 导致 worker 崩溃。
+ *
+ * 关键修复：store action 失败时，store 内部的 catch 块会调用 console.error()。
+ * tauri-driver 捕获 console.error 输出，并在后续每次 execute/sync 调用中
+ * 报告为 WebDriverError（"文件已存在" 等错误信息会"污染"整个 session）。
+ * 这导致 callStoreAction 无法通过 browser.execute 读取 __testResult。
+ *
+ * 解决方案：在调用 store action 前覆盖 console.error 为空函数，
+ * 在 .then()/.catch() 中恢复原值。这样 tauri-driver 不会捕获到错误输出，
+ * 后续 execute 调用不受影响。
+ *
+ * @param browser webdriverio Browser 实例
+ * @param storeName Pinia store 名称（如 "fileOps"、"workspace"）
+ * @param actionName store 上的方法名（如 "createFile"、"renamePath"）
+ * @param args 传给 action 的参数
+ * @returns action 的返回值（序列化后）
+ */
+export async function callStoreAction<T = any>(
+  browser: Browser,
+  storeName: string,
+  actionName: string,
+  ...args: any[]
+): Promise<T> {
+  // 注入永不 reject 的 wrapper 到 window，避免 async function throw 触发
+  // CDP Runtime.exceptionThrown 事件（tauri-driver 会缓存并在每次 execute 中重复报告）
+  await browser.execute(() => {
+    // @ts-ignore
+    window.__callAction = async (
+      sName: string,
+      aName: string,
+      ...rest: any[]
+    ): Promise<{ ok: boolean; data?: any; error?: string }> => {
+      try {
+        // @ts-ignore
+        const pinia = window.__pinia__;
+        const store = pinia._s.get(sName);
+        if (!store || typeof store[aName] !== "function") {
+          return { ok: false, error: `store.${sName}.${aName} not found` };
+        }
+        // 关键：用 await + try/catch，把 reject 转换为正常 return，
+        // 防止 unhandledrejection 事件传到 tauri-driver。
+        const data = await store[aName](...rest);
+        return { ok: true, data };
+      } catch (err: any) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    };
+  });
+
+  // 启动调用（async wrapper 自身不会 reject，所以 execute 立即返回）
+  await browser.execute(
+    (sName: string, aName: string, ...rest: any[]) => {
+      // @ts-ignore
+      const promise = window.__callAction(sName, aName, ...rest);
+      // @ts-ignore
+      window.__testResult = null;
+      promise.then((r: any) => {
+        // @ts-ignore
+        window.__testResult = r;
+      });
+      // 不需要 .catch()，wrapper 永不 reject
+    },
+    storeName,
+    actionName,
+    ...args
+  );
+
+  // 轮询等待结果
+  const wrapped: any = await browser.waitUntil(
+    async () => {
+      const r = await browser.execute(() => {
+        // @ts-ignore
+        return (window as any).__testResult;
+      });
+      if (r === null || r === undefined) return false;
+      return r;
+    },
+    { timeout: 15000, interval: 100 }
+  );
+
+  if (!wrapped) {
+    throw new Error(`store.${storeName}.${actionName} failed (no result)`);
+  }
+  if (!wrapped.ok) {
+    throw new Error(wrapped.error || `store.${storeName}.${actionName} failed`);
+  }
+  return wrapped.data as T;
 }

@@ -2,7 +2,16 @@
  * 测试夹具：准备工作区目录和文件
  * 每次调用 resetWorkspace 会清空并重建
  */
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import {
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  existsSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+  rmdirSync,
+} from "node:fs";
 import { resolve } from "node:path";
 
 const WORKSPACE_ROOT = resolve(process.cwd(), "e2e/.workspace");
@@ -13,34 +22,93 @@ export interface FixtureFile {
   content: string;
 }
 
+/**
+ * 删除目录内容（文件和子目录），但保留目录本身。
+ *
+ * Windows 上 murasaki.exe 进程可能持有 .workspace 目录的句柄，
+ * 导致 rmSync(directory) 静默失败（不抛错但目录仍在）。
+ * 但目录内的文件和子目录仍可正常删除。
+ */
+function deleteContents(dir: string): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return; // 目录不存在或不可读
+  }
+  for (const entry of entries) {
+    const fullPath = resolve(dir, entry);
+    let isDir: boolean;
+    try {
+      isDir = statSync(fullPath).isDirectory();
+    } catch {
+      continue; // 跳过无法 stat 的条目
+    }
+    if (isDir) {
+      // 递归删除子目录内容，然后删除子目录本身
+      deleteContents(fullPath);
+      try {
+        rmdirSync(fullPath);
+      } catch {
+        /* 子目录可能被锁定，跳过 */
+      }
+    } else {
+      try {
+        unlinkSync(fullPath);
+      } catch {
+        /* 文件可能被锁定，跳过 */
+      }
+    }
+  }
+}
+
 /** 重置工作区目录，写入指定文件 */
 export function resetWorkspace(files: FixtureFile[] = []): string {
   if (existsSync(WORKSPACE_ROOT)) {
-    // 前序测试的 murasaki.exe 进程可能仍持有 .workspace 目录的文件句柄
-    // （file watcher 释放需要时间），导致 rmSync 遇到 EPERM。
-    // 重试最多 3 次，每次失败后等待 500ms。
-    let lastErr: unknown = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        rmSync(WORKSPACE_ROOT, { recursive: true, force: true });
-        lastErr = null;
-        break;
-      } catch (err) {
-        lastErr = err;
-        // 等待 500ms 让 murasaki 释放文件句柄
+    // 策略 1：尝试用 rmSync 删除整个目录（最快，大多数情况有效）
+    let deleted = false;
+    try {
+      rmSync(WORKSPACE_ROOT, {
+        recursive: true,
+        force: true,
+        maxRetries: 3,
+        retryDelay: 200,
+      });
+      deleted = !existsSync(WORKSPACE_ROOT);
+    } catch {
+      deleted = false;
+    }
+
+    // 策略 2：如果 rmSync 失败（目录被进程锁定），删除目录内容但保留目录本身
+    if (!deleted) {
+      // 重试 3 次，每次间隔 300ms
+      for (let attempt = 0; attempt < 3; attempt++) {
+        deleteContents(WORKSPACE_ROOT);
+        // 验证：只保留空目录
+        const remaining = readdirSync(WORKSPACE_ROOT);
+        if (remaining.length === 0) {
+          deleted = true;
+          break;
+        }
+        // 等待 300ms 后重试
         const start = Date.now();
-        while (Date.now() - start < 500) { /* busy wait */ }
+        while (Date.now() - start < 300) {
+          /* busy wait */
+        }
+      }
+      if (!deleted) {
+        // 仍然有残留文件 — 记录警告但继续（fixture 文件会覆盖同名文件）
+        const remaining = readdirSync(WORKSPACE_ROOT);
+        console.warn(
+          `resetWorkspace: ${remaining.length} files could not be deleted: ${remaining.join(", ")}`
+        );
       }
     }
-    if (lastErr) {
-      // 最后一次尝试仍失败：抛出清晰错误
-      throw new Error(
-        `resetWorkspace: rmSync failed after 3 retries (EPERM?): ${String(lastErr)}.\n` +
-        "可能原因：前序测试的 murasaki.exe 进程仍持有 .workspace 文件句柄。"
-      );
-    }
+  } else {
+    mkdirSync(WORKSPACE_ROOT, { recursive: true });
   }
-  mkdirSync(WORKSPACE_ROOT, { recursive: true });
+
+  // 确保 fixture 文件存在（覆盖同名文件）
   for (const f of files) {
     const fullPath = resolve(WORKSPACE_ROOT, f.path);
     mkdirSync(resolve(fullPath, ".."), { recursive: true });
