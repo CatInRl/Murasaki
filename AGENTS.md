@@ -132,20 +132,19 @@ murasaki/
 
 完整 changelog 详见 [CHANGELOG.md](CHANGELOG.md)。版本发布时必须同步更新该文件。
 
-### 当前版本：0.3.0（2026-07-30）
+### 当前版本：0.3.1（2026-08-01）
 
-**整体 UX 对齐 + WYSIWYG 模式**：8 个议题簇 25 个子 issue 全部完成。
+**架构改进与测试稳定性修复**：无用户可见功能变更，聚焦代码可维护性与可测试性。
 
-- 设计系统：lucide 图标 + naive-ui themeOverrides + `--murasaki-*` token + 硬编码颜色清理
-- 反馈系统：Toast / Dialog / ContextMenu 三套自建全局 store，替换 36 处原生弹窗
-- 状态展示：EmptyState + ErrorState + Skeleton 三兄弟替换 naive-ui 默认
-- WYSIWYG 模式：CodeMirror 6 内 Typora 路线，source/split/wysiwyg 三模式运行时切换
-- 设置窗口：Tauri 多窗口 + 3 分类（常规/编辑器/AI）+ 显式 Save 模型
-- Markdown 样式统一：`markdown-content.css` 共享 CSS，5 套主题，Murasaki 紫色品牌主题为默认
-- Agent 面板全量视觉对齐 + WYSIWYG 原生兼容 Agent 提案
+- 模块边界：新建 `src/services/fileSystem.ts` 集中 Tauri 文件操作；`useFileOpsStore` 提取 `checkAndResolveConflict` 消除 4 处重复冲突解析
+- 循环依赖：`useProposalsStore` 和 `agent/tools.ts` 用静态 import 替换动态 `await import()`
+- 死代码清理：删除未使用的 `usePromiseModal`；测试工具从 `useEditorCommands` 迁移到独立 `src/test/editorTestUtils.ts`
+- 测试接口：移除 `useImagePaste` 的 `__test__` 导出改为命名导出；`tools.test.ts` 规范化 mock 模式（静态 import + `vi.mocked`）
+- E2E 修复：F11 全屏测试与弱断言声明一致化（移除错误的 `.cm-editor.waitForExist` 强断言）
 
 ### 历史版本
 
+- 0.3.0（2026-07-30）：整体 UX 对齐 + WYSIWYG 模式（设计系统 + 反馈系统 + 状态展示三兄弟 + WYSIWYG + 设置窗口 + Markdown 样式统一 + Agent 面板对齐）
 - 0.2.0（2026-07-29）：Agent 能力（OpenAI 兼容端点 BYOK 助手 + 流式输出 + 提案 + 对话持久化 + 三层上下文压缩）
 - 0.1.0（2026-07-23）：首个正式版本（工作区 + 文件树 + 多 tab + CM6 编辑 + 实时预览 + 跨文件搜索 + HTML 导出）
 

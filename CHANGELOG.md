@@ -4,6 +4,26 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-01
+
+本版本为架构改进与测试稳定性修复版本，无用户可见功能变更。聚焦深化模块边界、消除循环依赖、清理死代码、重塑测试接口，提升代码可维护性与可测试性。
+
+### Changed
+
+- **新建 fileSystem 适配器**：`src/services/fileSystem.ts` 集中所有 Tauri 文件操作（readText / writeText / getMtime / exists / pathType / createFile / createDirectory / deletePath / renamePath / copyFile / revealInExplorer / writeAgentFile / resolveAgentPath），消除 useFileOpsStore / useFileActions / useProposalsStore 中散落的 `invoke` 调用。
+- **统一冲突解析**：`useFileOpsStore` 提取 `checkAndResolveConflict` 辅助函数，消除 renamePath / copyPath 等 4 处重复的 exists + pathType + conflictResolver 模式。
+- **消除循环依赖隐患**：`useProposalsStore` 和 `agent/tools.ts` 用静态 `import` 替换动态 `await import()`，移除运行时 import() 调用。
+- **测试接口 seam 重塑**：移除 `useImagePaste` 的 `__test__` 导出，将 `isImageExt` / `relativePath` 提升为正式命名导出（纯工具函数，属合法模块 API）；`tools.test.ts` 规范化 mock 模式，11 处动态 `await import("@tauri-apps/api/core")` 替换为静态 import + `vi.mocked(invoke)` 习惯用法。
+
+### Removed
+
+- 删除死代码 `usePromiseModal` composable 及其测试（项目未使用）。
+- 移除 `useEditorCommands` 中的测试专用工具函数，迁移到独立的 `src/test/editorTestUtils.ts`。
+
+### Fixed
+
+- 修复 F11 全屏切换 E2E 测试与弱断言声明不一致：测试名声明"不验证 OS 全屏状态"，但代码却做 `.cm-editor.waitForExist` 强断言。`beforeEach` 调用 `closeAllTabs` 后无 tab 残留，根据 `App.vue` 的 `v-if="!tabsStore.hasTabs"` 逻辑此时渲染 WelcomePage 而非 EditorPane，`.cm-editor` 不存在必然超时。改为与测试名一致的 `document.readyState` 弱断言。
+
 ## [0.3.0] - 2026-07-30
 
 本版本进行整体 UX 对齐与 WYSIWYG 模式实现，建立设计系统基础、反馈系统基础设施、状态展示三兄弟、Agent 面板全量视觉对齐、WYSIWYG 模式（CodeMirror 6 内 Typora 路线）、设置页单入口路由、Markdown 渲染样式统一。
