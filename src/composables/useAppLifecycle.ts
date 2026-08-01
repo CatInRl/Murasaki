@@ -8,6 +8,8 @@ export interface AppLifecycleDeps {
     /** Pinia store 暴露的未包装 state；watcher 通过 getter 访问以跟踪响应式 */
     tabs: readonly unknown[];
     activeTabId: string | null;
+    /** 是否正在从持久化恢复（true 时 watcher 跳过 persist，避免覆盖 tabs.json） */
+    restoring: boolean;
     persist(): Promise<unknown>;
   };
   persistence: {
@@ -68,10 +70,11 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
   // ===== 5 个 watcher =====
 
   // 1. Tab 状态变化时持久化（gated）
+  //    restoring=true 时跳过（clearAll/restore 期间不 persist，避免覆盖 tabs.json）
   watch(
     () => [tabsStore.tabs, tabsStore.activeTabId],
     () => {
-      if (initialized.value) {
+      if (initialized.value && !tabsStore.restoring) {
         void tabsStore.persist();
       }
     },

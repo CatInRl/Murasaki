@@ -24,6 +24,7 @@ function makeDeps(overrides: Partial<AppLifecycleDeps> = {}): AppLifecycleDeps {
     tabsStore: reactive({
       tabs: [] as unknown[],
       activeTabId: null as string | null,
+      restoring: false,
       persist: vi.fn().mockResolvedValue(undefined),
     }) as never,
     persistence: {

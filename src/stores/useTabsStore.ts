@@ -75,10 +75,12 @@ export const useTabsStore = defineStore("tabs", () => {
       const hasDraft = await invoke<boolean>("draft_exists", { path }).catch(() => false);
       if (hasDraft) {
         // 读取草稿与保存时的 knownMtime
-        const [draftContent, knownMtime] = await invoke<[string, number]>("read_draft", { path });
+        // 注意：read_draft 返回 (String, DraftMeta)，DraftMeta 是对象 {path, draftPath, knownMtime, savedAt}
+        // 不是数字，必须从对象中取 knownMtime 字段
+        const [draftContent, draftMeta] = await invoke<[string, { knownMtime: number }]>("read_draft", { path });
         // 仅当草稿基于的 mtime 与当前文件 mtime 一致时才采用草稿内容
         // 否则磁盘已被外部修改，草稿过期，回退到磁盘内容
-        if (knownMtime === mtime) {
+        if (draftMeta.knownMtime === mtime) {
           finalContent = draftContent;
           isDirty = true;
         } else {
@@ -462,10 +464,18 @@ export const useTabsStore = defineStore("tabs", () => {
 
   /**
    * 清除所有 tabs（不写草稿，用于"关闭工作区"等场景）
+   *
+   * 关键：本方法不触发 persist（否则会覆盖 tabs.json 为空数组，导致 restore 读不到数据）。
+   * 通过临时设置 restoring=true，让 useAppLifecycle 的 watcher 在 tabs 变化时跳过 persist。
+   * restoring 在下一个 macrotask 恢复（setTimeout 0），确保 Vue 的 microtask watcher
+   * 在 restoring=true 时触发。
    */
   function clearAll(): void {
+    restoring.value = true;
     tabs.value = [];
     activeTabId.value = null;
+    // 用 setTimeout 在下一个 macrotask 恢复，确保 Vue watcher（microtask）在 restoring=true 时触发
+    setTimeout(() => { restoring.value = false; }, 0);
   }
 
   return {
