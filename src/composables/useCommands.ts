@@ -27,6 +27,7 @@ export interface CommandsDeps {
   saveAsCurrentFile: () => Promise<void>;
   reloadCurrentFile: () => Promise<void>;
   exportCurrentHtml: () => Promise<void>;
+  copyRichText: () => Promise<void>;
 
   // Tab 关闭（来自 useTabClose）
   onCloseTabRequest: (tabId: string) => Promise<void>;
@@ -90,7 +91,7 @@ export interface CommandsDeps {
 export function useCommands(deps: CommandsDeps) {
   const {
     onNewTab, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
-    reloadCurrentFile, exportCurrentHtml,
+    reloadCurrentFile, exportCurrentHtml, copyRichText,
     onCloseTabRequest,
     workspace, tabsStore, searchStore, fileOps, dialog,
     editorRef, currentTheme, sidebarView, statusBarVisible,
@@ -129,6 +130,9 @@ export function useCommands(deps: CommandsDeps) {
         break;
       case "export-html":
         await exportCurrentHtml();
+        break;
+      case "copy-rich-text":
+        await copyRichText();
         break;
       case "find-in-files":
         searchStore.visible = true;

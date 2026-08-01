@@ -57,6 +57,7 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .text("save-as", "另存为…\tCtrl+Shift+S")
         .separator()
         .text("export-html", "导出 HTML…")
+        .text("copy-rich-text", "复制为富文本")
         .separator()
         .text("close-tab", "关闭标签页\tCtrl+W")
         .text("reload-file", "重新加载文件\tCtrl+R")

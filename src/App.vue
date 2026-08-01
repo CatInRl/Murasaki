@@ -29,10 +29,12 @@ import { useAgentStore } from "./stores/useAgentStore";
 import { useEditorBridgeStore } from "./stores/useEditorBridgeStore";
 import { useProposalsStore } from "./stores/useProposalsStore";
 import { useDialogStore } from "./stores/useDialogStore";
+import { useToastStore } from "./stores/useToastStore";
 import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
 import { useRecentMenuSync } from "./composables/useRecentMenuSync";
 import { useFileActions } from "./composables/useFileActions";
+import { useCopyRichText } from "./composables/useCopyRichText";
 import { exportHtml } from "./composables/useHtmlExport";
 import { useEditorNavigation } from "./composables/useEditorNavigation";
 import { useCompareWindow } from "./composables/useCompareWindow";
@@ -60,6 +62,7 @@ const agentStore = useAgentStore();
 const editorBridge = useEditorBridgeStore();
 const proposalsStore = useProposalsStore();
 const dialog = useDialogStore();
+const toastStore = useToastStore();
 
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
@@ -100,6 +103,14 @@ const {
   reloadCurrentFile, exportCurrentHtml, onNewTab, onNewFile,
   onOpenFolder, onOpenFile, onOpenRecent,
 } = useFileActions({ tabsStore, workspace, persistence, dialog, activeTab, currentTheme });
+
+// ===== 复制为富文本 composable（issue #108，复用 exportHtml 管线，走剪贴板而非文件）=====
+const { copyRichText } = useCopyRichText({
+  activeTab,
+  currentTheme,
+  workspace,
+  toast: toastStore,
+});
 
 // ===== 对比窗口 + 外部修改处理 composable（三选一对话框改走 dialog store）=====
 const {
@@ -359,7 +370,7 @@ async function toggleFullscreen(): Promise<void> {
 // ===== 命令分发（菜单事件 + 全局快捷键）=====
 const { handleMenuEvent, onKeyDown } = useCommands({
   onNewTab, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
-  reloadCurrentFile, exportCurrentHtml,
+  reloadCurrentFile, exportCurrentHtml, copyRichText,
   onCloseTabRequest,
   workspace, tabsStore, searchStore, fileOps, dialog,
   editorRef, currentTheme, sidebarView, statusBarVisible,
