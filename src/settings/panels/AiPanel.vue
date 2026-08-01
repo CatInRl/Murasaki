@@ -14,6 +14,7 @@
  * ADR-0011: 支持 OpenAI 兼容 + Anthropic 双协议（createProvider 工厂按 type 路由）。
  */
 import { ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Plus, Trash2, Plug, ChevronDown, Eye, EyeOff, Check, X } from "lucide-vue-next";
 import { useAiProvidersStore, type TestConnectionResult } from "../../stores/useAiProvidersStore";
 import { usePersistenceStore } from "../../stores/usePersistenceStore";
@@ -24,6 +25,7 @@ import { AI_PROVIDER_PRESETS, type AiProvider } from "../../types";
 const store = useAiProvidersStore();
 const persistence = usePersistenceStore();
 const dialog = useDialogStore();
+const { t } = useI18n();
 
 /** 当前选中编辑的 provider id */
 const selectedId = ref<string | null>(null);
@@ -88,10 +90,10 @@ const displayStatus = computed<"idle" | "testing" | "success" | "error">(() => {
 });
 
 const displayMessage = computed(() => {
-  if (testStatus.value === "testing") return "测试中…";
+  if (testStatus.value === "testing") return t("settings.ai.testing");
   if (testStatus.value === "success" || testStatus.value === "error") return testMessage.value;
   if (lastTestResult.value) {
-    return lastTestResult.value.message ?? (lastTestResult.value.success ? "连接成功" : "连接失败");
+    return lastTestResult.value.message ?? (lastTestResult.value.success ? t("settings.ai.connectSuccess") : t("settings.ai.connectFailed"));
   }
   return "";
 });
@@ -163,10 +165,10 @@ async function handleDeleteProvider(): Promise<void> {
   const provider = selectedProvider.value;
   if (!provider) return;
   const confirmed = await dialog.confirm({
-    title: "删除 Provider",
-    message: `确定删除 Provider "${provider.name}"？此操作不可撤销。`,
+    title: t("settings.ai.deleteProviderTitle"),
+    message: t("settings.ai.deleteProviderMessage", { name: provider.name }),
     danger: true,
-    confirmText: "删除",
+    confirmText: t("settings.ai.deleteConfirm"),
   });
   if (!confirmed) return;
   await store.deleteProvider(provider.id);
@@ -192,22 +194,22 @@ async function handleSaveProvider(): Promise<void> {
 async function handleTestConnection(): Promise<void> {
   if (!selectedProvider.value) return;
   testStatus.value = "testing";
-  testMessage.value = "测试中…";
+  testMessage.value = t("settings.ai.testing");
   try {
     const result = await store.testProvider(selectedProvider.value.id);
     testStatus.value = result.success ? "success" : "error";
-    testMessage.value = result.message ?? (result.success ? "连接成功" : "连接失败");
+    testMessage.value = result.message ?? (result.success ? t("settings.ai.connectSuccess") : t("settings.ai.connectFailed"));
     lastTestResult.value = result;
   } catch {
     // testProvider 不抛出异常，此处为防御性处理
     testStatus.value = "error";
-    testMessage.value = "测试失败";
+    testMessage.value = t("settings.ai.testFailed");
   }
 }
 
 function typeLabel(type: AiProvider["type"]): string {
   const preset = AI_PROVIDER_PRESETS.find((p) => p.type === type);
-  return preset?.label ?? "自定义";
+  return preset?.label ?? t("settings.ai.customType");
 }
 </script>
 
@@ -217,15 +219,15 @@ function typeLabel(type: AiProvider["type"]): string {
 
     <!-- Provider 管理 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">Provider 管理</h2>
+      <h2 class="settings-section-title">{{ $t('settings.ai.providerManagement') }}</h2>
 
       <div class="provider-workspace">
         <!-- Provider List -->
         <aside class="provider-list">
           <div class="provider-list-header">
-            <span>Providers</span>
+            <span>{{ $t('settings.ai.providersHeader') }}</span>
           </div>
-          <div class="provider-items" role="radiogroup" aria-label="选择默认 Provider">
+          <div class="provider-items" role="radiogroup" :aria-label="$t('settings.ai.providerListAria')">
             <label
               v-for="p in store.providers"
               :key="p.id"
@@ -242,7 +244,7 @@ function typeLabel(type: AiProvider["type"]): string {
               <div class="provider-item-body" @click="selectProvider(p.id)">
                 <div class="provider-item-main">
                   <span class="provider-name">{{ p.name }}</span>
-                  <span v-if="p.isActive" class="provider-badge">默认</span>
+                  <span v-if="p.isActive" class="provider-badge">{{ $t('settings.ai.defaultBadge') }}</span>
                 </div>
                 <div class="provider-item-meta">{{ typeLabel(p.type) }}</div>
               </div>
@@ -251,7 +253,7 @@ function typeLabel(type: AiProvider["type"]): string {
           <div class="provider-list-footer">
             <button class="provider-add-btn" type="button" @click="handleAddProvider">
               <Plus :size="14" />
-              <span>添加 Provider</span>
+              <span>{{ $t('settings.ai.addProvider') }}</span>
             </button>
           </div>
         </aside>
@@ -259,11 +261,11 @@ function typeLabel(type: AiProvider["type"]): string {
         <!-- Provider Editor -->
         <div v-if="selectedProvider" class="provider-editor">
           <div class="provider-editor-header">
-            <h3 class="provider-editor-title">API 设置</h3>
+            <h3 class="provider-editor-title">{{ $t('settings.ai.apiSettings') }}</h3>
             <button
               class="provider-delete-btn"
               type="button"
-              aria-label="删除 Provider"
+              :aria-label="$t('settings.ai.deleteProviderAria')"
               @click="handleDeleteProvider"
             >
               <Trash2 :size="15" />
@@ -273,23 +275,23 @@ function typeLabel(type: AiProvider["type"]): string {
           <form class="provider-form" @submit.prevent="handleSaveProvider">
             <div class="setting-row provider-form-row">
               <div class="setting-label-column">
-                <label class="setting-label">名称</label>
-                <span class="setting-description">用于在列表中识别该 Provider</span>
+                <label class="setting-label">{{ $t('settings.ai.nameLabel') }}</label>
+                <span class="setting-description">{{ $t('settings.ai.nameDesc') }}</span>
               </div>
               <div class="setting-control-column">
                 <input
                   v-model="form.name"
                   class="setting-input"
                   type="text"
-                  placeholder="例如：DeepSeek"
+                  :placeholder="$t('settings.ai.namePlaceholder')"
                 />
               </div>
             </div>
 
             <div class="setting-row provider-form-row">
               <div class="setting-label-column">
-                <label class="setting-label">类型</label>
-                <span class="setting-description">选择 API 协议（OpenAI 兼容或 Anthropic）</span>
+                <label class="setting-label">{{ $t('settings.ai.typeLabel') }}</label>
+                <span class="setting-description">{{ $t('settings.ai.typeDesc') }}</span>
               </div>
               <div class="setting-control-column">
                 <div class="select-wrapper">
@@ -307,8 +309,8 @@ function typeLabel(type: AiProvider["type"]): string {
 
             <div class="setting-row provider-form-row">
               <div class="setting-label-column">
-                <label class="setting-label">API URL</label>
-                <span class="setting-description">API 端点的基础 URL</span>
+                <label class="setting-label">{{ $t('settings.ai.apiUrlLabel') }}</label>
+                <span class="setting-description">{{ $t('settings.ai.apiUrlDesc') }}</span>
               </div>
               <div class="setting-control-column">
                 <input
@@ -322,8 +324,8 @@ function typeLabel(type: AiProvider["type"]): string {
 
             <div class="setting-row provider-form-row">
               <div class="setting-label-column">
-                <label class="setting-label">Model</label>
-                <span class="setting-description">默认调用的模型 ID</span>
+                <label class="setting-label">{{ $t('settings.ai.modelLabel') }}</label>
+                <span class="setting-description">{{ $t('settings.ai.modelDesc') }}</span>
               </div>
               <div class="setting-control-column">
                 <input
@@ -337,8 +339,8 @@ function typeLabel(type: AiProvider["type"]): string {
 
             <div class="setting-row provider-form-row">
               <div class="setting-label-column">
-                <label class="setting-label">API Key</label>
-                <span class="setting-description">仅在本地加密存储，不会上传</span>
+                <label class="setting-label">{{ $t('settings.ai.apiKeyLabel') }}</label>
+                <span class="setting-description">{{ $t('settings.ai.apiKeyDesc') }}</span>
               </div>
               <div class="setting-control-column">
                 <div class="password-input-wrap">
@@ -346,12 +348,12 @@ function typeLabel(type: AiProvider["type"]): string {
                     v-model="form.apiKey"
                     class="setting-input password-input"
                     :type="showApiKey ? 'text' : 'password'"
-                    placeholder="输入 API Key"
+                    :placeholder="$t('settings.ai.apiKeyPlaceholder')"
                   />
                   <button
                     type="button"
                     class="password-toggle"
-                    :aria-label="showApiKey ? '隐藏 API Key' : '显示 API Key'"
+                    :aria-label="showApiKey ? $t('settings.ai.hideApiKeyAria') : $t('settings.ai.showApiKeyAria')"
                     @click="showApiKey = !showApiKey"
                   >
                     <Eye v-if="!showApiKey" :size="14" />
@@ -364,9 +366,9 @@ function typeLabel(type: AiProvider["type"]): string {
             <div class="provider-form-actions">
               <button type="button" class="secondary-button" @click="handleTestConnection">
                 <Plug :size="14" />
-                测试连接
+                {{ $t('settings.ai.testConnection') }}
               </button>
-              <button type="submit" class="primary-button">保存 Provider</button>
+              <button type="submit" class="primary-button">{{ $t('settings.ai.saveProvider') }}</button>
               <div v-if="displayStatus !== 'idle'" class="provider-status">
                 <Check
                   v-if="displayStatus === 'success'"
@@ -390,7 +392,7 @@ function typeLabel(type: AiProvider["type"]): string {
 
         <!-- Empty state -->
         <div v-else class="provider-editor-empty">
-          <p>点击左侧「添加 Provider」创建第一个 AI Provider</p>
+          <p>{{ $t('settings.ai.emptyEditorHint') }}</p>
         </div>
       </div>
     </section>
@@ -400,14 +402,14 @@ function typeLabel(type: AiProvider["type"]): string {
       <details class="advanced-params">
         <summary class="advanced-params-summary">
           <ChevronDown :size="16" class="advanced-params-chevron" />
-          <span class="advanced-params-title">高级参数</span>
-          <span class="advanced-params-hint">所有 Provider 共用（Agent 循环、token 上限与提案确认阈值）</span>
+          <span class="advanced-params-title">{{ $t('settings.ai.advancedParams') }}</span>
+          <span class="advanced-params-hint">{{ $t('settings.ai.advancedParamsHint') }}</span>
         </summary>
         <div class="advanced-params-body">
           <div class="setting-row">
             <div class="setting-label-column">
-              <label class="setting-label">Agent 循环轮数上限</label>
-              <span class="setting-description">单次对话中工具调用循环的最大轮数</span>
+              <label class="setting-label">{{ $t('settings.ai.agentMaxRounds') }}</label>
+              <span class="setting-description">{{ $t('settings.ai.agentMaxRoundsDesc') }}</span>
             </div>
             <div class="setting-control-column">
               <input
@@ -422,8 +424,8 @@ function typeLabel(type: AiProvider["type"]): string {
 
           <div class="setting-row">
             <div class="setting-label-column">
-              <label class="setting-label">单次请求 token 上限</label>
-              <span class="setting-description">超出后截断较旧消息（软限制）</span>
+              <label class="setting-label">{{ $t('settings.ai.singleRequestTokenLimit') }}</label>
+              <span class="setting-description">{{ $t('settings.ai.singleRequestTokenLimitDesc') }}</span>
             </div>
             <div class="setting-control-column">
               <input
@@ -438,8 +440,8 @@ function typeLabel(type: AiProvider["type"]): string {
 
           <div class="setting-row">
             <div class="setting-label-column">
-              <label class="setting-label">累计 token 软上限</label>
-              <span class="setting-description">超出后发出软警告（不阻塞对话）</span>
+              <label class="setting-label">{{ $t('settings.ai.cumulativeTokenSoftLimit') }}</label>
+              <span class="setting-description">{{ $t('settings.ai.cumulativeTokenSoftLimitDesc') }}</span>
             </div>
             <div class="setting-control-column">
               <input
@@ -454,8 +456,8 @@ function typeLabel(type: AiProvider["type"]): string {
 
           <div class="setting-row">
             <div class="setting-label-column">
-              <label class="setting-label">propose_replace 二次确认阈值</label>
-              <span class="setting-description">替换行数超过该值时需用户二次确认</span>
+              <label class="setting-label">{{ $t('settings.ai.proposeReplaceConfirmThreshold') }}</label>
+              <span class="setting-description">{{ $t('settings.ai.proposeReplaceConfirmThresholdDesc') }}</span>
             </div>
             <div class="setting-control-column">
               <input

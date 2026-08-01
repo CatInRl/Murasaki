@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { RotateCw, FolderOpen } from "lucide-vue-next";
 import { NScrollbar, NButton, NDropdown, NInput } from "naive-ui";
 import type { DropdownOption } from "naive-ui";
@@ -13,6 +14,7 @@ import Skeleton from "./Skeleton.vue";
 const workspace = useWorkspaceStore();
 const fileOps = useFileOpsStore();
 const dialog = useDialogStore();
+const { t } = useI18n();
 
 const emit = defineEmits<{
   (e: "select-file", path: string): void;
@@ -29,10 +31,10 @@ const emptyMenuVisible = ref(false);
 const emptyMenuX = ref(0);
 const emptyMenuY = ref(0);
 
-const emptyMenuOptions: DropdownOption[] = [
-  { label: "新建文件", key: "new-file" },
-  { label: "新建文件夹", key: "new-folder" },
-];
+const emptyMenuOptions = computed<DropdownOption[]>(() => [
+  { label: t("common.newFile"), key: "new-file" },
+  { label: t("common.newFolder"), key: "new-folder" },
+]);
 
 function onEmptyContextMenu(e: MouseEvent): void {
   if (!workspace.hasWorkspace) return;
@@ -74,7 +76,7 @@ async function submitRootCreating(): Promise<void> {
       await fileOps.createDirectory(workspace.workspacePath, name);
     }
   } catch (err) {
-    dialog.alert({ message: `新建失败: ${err}`, variant: "error" });
+    dialog.alert({ message: t("common.error.createFailed", { error: err }), variant: "error" });
   } finally {
     rootCreating.value = false;
     rootCreatingName.value = "";
@@ -101,7 +103,7 @@ async function onOpenWorkspace(): Promise<void> {
         size="tiny"
         quaternary
         circle
-        title="刷新"
+        :title="$t('editor.fileTree.refresh')"
         :loading="workspace.loading"
         @click="workspace.refreshTree()"
       >
@@ -118,9 +120,9 @@ async function onOpenWorkspace(): Promise<void> {
       <EmptyState
         v-else-if="!workspace.hasWorkspace"
         :icon="FolderOpen"
-        title="未打开工作区"
-        description="打开一个文件夹开始编辑"
-        action-text="打开文件夹"
+        :title="$t('editor.fileTree.noWorkspace')"
+        :description="$t('editor.fileTree.noWorkspaceDesc')"
+        :action-text="$t('editor.fileTree.openFolder')"
         :action-icon="FolderOpen"
         @action="onOpenWorkspace"
       />
@@ -148,7 +150,7 @@ async function onOpenWorkspace(): Promise<void> {
             v-model:value="rootCreatingName"
             size="tiny"
             autofocus
-            :placeholder="rootCreatingType === 'file' ? '新文件名.md' : '新文件夹名'"
+            :placeholder="rootCreatingType === 'file' ? t('editor.fileTree.newFilePlaceholder') : t('editor.fileTree.newFolderPlaceholder')"
             @keyup.enter="submitRootCreating"
             @keyup.escape="cancelRootCreating"
             @blur="submitRootCreating"

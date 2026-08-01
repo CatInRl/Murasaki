@@ -82,5 +82,24 @@
     "copyMarkdown": "复制 Markdown 源码",
     "insertToEditor": "插入到编辑器",
     "regenerate": "从当前消息重新生成"
+  },
+  "tools": {
+    "unknownError": "未知错误",
+    "unknownTool": "未知工具: {name}",
+    "invalidJson": "参数 JSON 解析失败",
+    "docChars": "已获取 {count} 字符",
+    "docCharsTruncated": "已获取 {count}+ 字符（截断）",
+    "noSelection": "无选区",
+    "selectionChars": "已获取 {count} 字符选区",
+    "outlineCount": "{count} 个标题",
+    "filesCount": "{count} 个文件",
+    "readChars": "{count} 字符",
+    "readCharsTruncated": "{count}+ 字符（截断）",
+    "searchHits": "{count} 命中",
+    "searchHitsTruncated": "{count}+ 命中（截断）",
+    "insertLines": "插入 {count} 行",
+    "replaceLines": "替换 {count} 行",
+    "replaceLinesConfirm": "替换 {count} 行（需二次确认）",
+    "newFileProposal": "提议新文件 {path} ({count} 行)"
   }
 }

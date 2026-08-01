@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { NModal, NButton, NSpace, NText, NSpin } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
 import { basename, extname } from "../utils/path";
@@ -20,6 +21,7 @@ const emit = defineEmits<{
 }>();
 
 const dialog = useDialogStore();
+const { t } = useI18n();
 
 const dataUrl = ref<string>("");
 const loading = ref(false);
@@ -52,7 +54,7 @@ async function loadImage(path: string): Promise<void> {
       const text = await invoke<string>("read_text_file", { path });
       dataUrl.value = `data:image/svg+xml;utf8,${encodeURIComponent(text)}`;
     } catch (err) {
-      errorMsg.value = `读取失败: ${err}`;
+      errorMsg.value = t("editor.imagePreview.readFailed", { error: err });
     } finally {
       loading.value = false;
     }
@@ -63,7 +65,7 @@ async function loadImage(path: string): Promise<void> {
   try {
     const bytes = await invoke<number[]>("read_binary_file", { path });
     if (!bytes || bytes.length === 0) {
-      errorMsg.value = "图片为空或读取失败";
+      errorMsg.value = t("editor.imagePreview.emptyOrFailed");
       return;
     }
     // 二进制转 Base64：分块拼接避免 String.fromCharCode 一次性堆栈溢出
@@ -76,7 +78,7 @@ async function loadImage(path: string): Promise<void> {
     const base64 = btoa(binary);
     dataUrl.value = `data:${mimeOf(path)};base64,${base64}`;
   } catch (err) {
-    errorMsg.value = `读取失败: ${err}`;
+    errorMsg.value = t("editor.imagePreview.readFailed", { error: err });
   } finally {
     loading.value = false;
   }
@@ -126,7 +128,7 @@ async function revealInExplorer(): Promise<void> {
   try {
     await invoke("reveal_in_explorer", { path: props.path });
   } catch (err) {
-    dialog.alert({ message: `无法在资源管理器中显示: ${err}`, variant: "error" });
+    dialog.alert({ message: t("common.error.revealFailed", { error: err }), variant: "error" });
   }
 }
 </script>
@@ -137,7 +139,7 @@ async function revealInExplorer(): Promise<void> {
     :mask-closable="true"
     :close-on-esc="true"
     preset="card"
-    :title="fileName || '图片预览'"
+    :title="fileName || $t('editor.imagePreview.title')"
     style="width: min(960px, 92vw); max-height: 88vh"
     @update:show="(v: boolean) => !v && emit('close')"
     @esc="emit('close')"
@@ -155,7 +157,7 @@ async function revealInExplorer(): Promise<void> {
         />
       </div>
       <div v-else class="empty-block">
-        <NText depth="3">无图片可预览</NText>
+        <NText depth="3">{{ $t('editor.imagePreview.noImage') }}</NText>
       </div>
 
       <div v-if="props.path" class="path-line" :title="props.path">
@@ -165,9 +167,9 @@ async function revealInExplorer(): Promise<void> {
 
     <template #footer>
       <NSpace justify="end" :size="8">
-        <NButton size="small" @click="copyPath">复制路径</NButton>
-        <NButton size="small" @click="revealInExplorer">在资源管理器中显示</NButton>
-        <NButton size="small" type="primary" @click="emit('close')">关闭</NButton>
+        <NButton size="small" @click="copyPath">{{ $t('common.copyPath') }}</NButton>
+        <NButton size="small" @click="revealInExplorer">{{ $t('common.revealInExplorer') }}</NButton>
+        <NButton size="small" type="primary" @click="emit('close')">{{ $t('common.close') }}</NButton>
       </NSpace>
     </template>
   </NModal>

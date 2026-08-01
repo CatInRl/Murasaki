@@ -44,6 +44,7 @@ import { useCommands } from "./composables/useCommands";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
 import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
 import { setLocale } from "./i18n";
+import { useI18n } from "vue-i18n";
 import {
   fieldsForCategory,
   isDirty,
@@ -66,6 +67,7 @@ const editorBridge = useEditorBridgeStore();
 const proposalsStore = useProposalsStore();
 const dialog = useDialogStore();
 const toastStore = useToastStore();
+const { t } = useI18n();
 
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
@@ -200,7 +202,7 @@ async function openSettings(): Promise<void> {
     await invoke("open_settings");
   } catch (err) {
     console.error("打开设置窗口失败:", err);
-    dialog.alert({ message: `打开设置窗口失败: ${err}`, variant: "error" });
+    dialog.alert({ message: t("common.error.openSettingsFailed", { error: err }), variant: "error" });
   }
 }
 

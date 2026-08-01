@@ -102,6 +102,13 @@
     "colsLabel": "Columns",
     "insert": "Insert"
   },
+  "contextMenu": {
+    "selectAll": "Select All",
+    "findReplace": "Find & Replace",
+    "link": "Link",
+    "image": "Image",
+    "pastePlainText": "Paste as Plain Text"
+  },
   "compare": {
     "title": "Compare & Merge — {filename}",
     "diffLabel": "Diff:",
@@ -132,5 +139,11 @@
     "newFolderPrompt": "Enter a folder name:",
     "newFolderPlaceholder": "Folder name",
     "openFileFirst": "Please open a file first"
+  },
+  "imagePreview": {
+    "title": "Image Preview",
+    "noImage": "No image to preview",
+    "readFailed": "Failed to load: {error}",
+    "emptyOrFailed": "Image is empty or failed to load"
   }
 }

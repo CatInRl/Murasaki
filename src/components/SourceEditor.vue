@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { EditorState, Compartment, Transaction } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, selectAll } from "@codemirror/commands";
@@ -8,7 +9,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from "@codemirror/search";
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
-import { tags as t } from "@lezer/highlight";
+import { tags } from "@lezer/highlight";
 import {
   Scissors,
   Copy,
@@ -48,50 +49,50 @@ import { wysiwygExtensions } from "../editor/wysiwyg/wysiwygPlugin";
  */
 const murasakiHighlightStyle = HighlightStyle.define([
   // Headings: purple-700, bold
-  { tag: t.heading1, color: "var(--murasaki-purple-700)", fontWeight: "700", fontSize: "1.25em" },
-  { tag: t.heading2, color: "var(--murasaki-purple-700)", fontWeight: "700", fontSize: "1.15em" },
-  { tag: t.heading3, color: "var(--murasaki-purple-600)", fontWeight: "600", fontSize: "1.05em" },
-  { tag: [t.heading4, t.heading5, t.heading6], color: "var(--murasaki-purple-600)", fontWeight: "600" },
+  { tag: tags.heading1, color: "var(--murasaki-purple-700)", fontWeight: "700", fontSize: "1.25em" },
+  { tag: tags.heading2, color: "var(--murasaki-purple-700)", fontWeight: "700", fontSize: "1.15em" },
+  { tag: tags.heading3, color: "var(--murasaki-purple-600)", fontWeight: "600", fontSize: "1.05em" },
+  { tag: [tags.heading4, tags.heading5, tags.heading6], color: "var(--murasaki-purple-600)", fontWeight: "600" },
   // ATX heading markers (#, ##): purple-400
-  { tag: t.heading, color: "var(--murasaki-purple-400)" },
+  { tag: tags.heading, color: "var(--murasaki-purple-400)" },
   // Emphasis — 语义 token，随主题切换
-  { tag: t.strong, color: "var(--murasaki-ink)", fontWeight: "700" },
-  { tag: t.emphasis, color: "var(--murasaki-ink-2)", fontStyle: "italic" },
-  { tag: t.strikethrough, color: "var(--murasaki-ink-3)", textDecoration: "line-through" },
+  { tag: tags.strong, color: "var(--murasaki-ink)", fontWeight: "700" },
+  { tag: tags.emphasis, color: "var(--murasaki-ink-2)", fontStyle: "italic" },
+  { tag: tags.strikethrough, color: "var(--murasaki-ink-3)", textDecoration: "line-through" },
   // Links
-  { tag: t.link, color: "var(--murasaki-purple-700)", textDecoration: "underline" },
-  { tag: t.url, color: "var(--murasaki-state-info)" },
+  { tag: tags.link, color: "var(--murasaki-purple-700)", textDecoration: "underline" },
+  { tag: tags.url, color: "var(--murasaki-state-info)" },
   // Inline code & code blocks
-  { tag: t.monospace, color: "var(--murasaki-purple-800)", backgroundColor: "rgba(147, 51, 234, 0.08)" },
+  { tag: tags.monospace, color: "var(--murasaki-purple-800)", backgroundColor: "rgba(147, 51, 234, 0.08)" },
   // Lists: purple marker
-  { tag: t.list, color: "var(--murasaki-purple-600)" },
+  { tag: tags.list, color: "var(--murasaki-purple-600)" },
   // Quotes: purple-600 italic
-  { tag: t.quote, color: "var(--murasaki-purple-600)", fontStyle: "italic" },
+  { tag: tags.quote, color: "var(--murasaki-purple-600)", fontStyle: "italic" },
   // HR
-  { tag: t.separator, color: "var(--murasaki-neutral-300)" },
+  { tag: tags.separator, color: "var(--murasaki-neutral-300)" },
   // URLs in angle brackets
-  { tag: t.angleBracket, color: "var(--murasaki-ink-3)" },
+  { tag: tags.angleBracket, color: "var(--murasaki-ink-3)" },
   // YAML frontmatter
-  { tag: t.meta, color: "var(--murasaki-muted-foreground)" },
+  { tag: tags.meta, color: "var(--murasaki-muted-foreground)" },
   // Code block keywords
-  { tag: t.keyword, color: "var(--murasaki-purple-700)", fontWeight: "600" },
-  { tag: t.atom, color: "var(--murasaki-state-info)" },
-  { tag: t.bool, color: "var(--murasaki-state-info)" },
-  { tag: t.number, color: "var(--murasaki-state-info)" },
-  { tag: t.string, color: "var(--murasaki-state-success)" },
-  { tag: t.escape, color: "var(--murasaki-state-warning)" },
-  { tag: t.comment, color: "var(--murasaki-ink-3)", fontStyle: "italic" },
-  { tag: t.tagName, color: "var(--murasaki-purple-700)" },
-  { tag: t.attributeName, color: "var(--murasaki-purple-600)" },
-  { tag: t.attributeValue, color: "var(--murasaki-state-success)" },
-  { tag: t.definitionOperator, color: "var(--murasaki-purple-700)" },
-  { tag: t.operator, color: "var(--murasaki-ink-2)" },
-  { tag: t.variableName, color: "var(--murasaki-ink)" },
-  { tag: t.propertyName, color: "var(--murasaki-purple-600)" },
-  { tag: t.typeName, color: "var(--murasaki-state-info)" },
-  { tag: t.className, color: "var(--murasaki-purple-700)" },
-  { tag: t.function(t.variableName), color: "var(--murasaki-state-info)" },
-  { tag: t.labelName, color: "var(--murasaki-purple-600)" },
+  { tag: tags.keyword, color: "var(--murasaki-purple-700)", fontWeight: "600" },
+  { tag: tags.atom, color: "var(--murasaki-state-info)" },
+  { tag: tags.bool, color: "var(--murasaki-state-info)" },
+  { tag: tags.number, color: "var(--murasaki-state-info)" },
+  { tag: tags.string, color: "var(--murasaki-state-success)" },
+  { tag: tags.escape, color: "var(--murasaki-state-warning)" },
+  { tag: tags.comment, color: "var(--murasaki-ink-3)", fontStyle: "italic" },
+  { tag: tags.tagName, color: "var(--murasaki-purple-700)" },
+  { tag: tags.attributeName, color: "var(--murasaki-purple-600)" },
+  { tag: tags.attributeValue, color: "var(--murasaki-state-success)" },
+  { tag: tags.definitionOperator, color: "var(--murasaki-purple-700)" },
+  { tag: tags.operator, color: "var(--murasaki-ink-2)" },
+  { tag: tags.variableName, color: "var(--murasaki-ink)" },
+  { tag: tags.propertyName, color: "var(--murasaki-purple-600)" },
+  { tag: tags.typeName, color: "var(--murasaki-state-info)" },
+  { tag: tags.className, color: "var(--murasaki-purple-700)" },
+  { tag: tags.function(tags.variableName), color: "var(--murasaki-state-info)" },
+  { tag: tags.labelName, color: "var(--murasaki-purple-600)" },
 ]);
 
 const murasakiTheme = EditorView.theme({
@@ -258,6 +259,7 @@ const hostRef = ref<HTMLDivElement | null>(null);
 const viewRef = shallowRef<EditorView | null>(null);
 
 const contextMenu = useContextMenuStore();
+const { t } = useI18n();
 
 // 标记正在进行外部值同步（避免 dispatch 触发 update:modelValue 污染 dirty 状态）
 let isApplyingExternalValue = false;
@@ -566,16 +568,16 @@ function onContextMenu(e: MouseEvent): void {
 
 function buildEditorMenuItems(): MenuItem[] {
   return [
-    { label: "剪切", icon: Scissors, shortcut: "Ctrl+X", action: () => runExecCommand("cut") },
-    { label: "复制", icon: Copy, shortcut: "Ctrl+C", action: () => runExecCommand("copy") },
-    { label: "粘贴", icon: ClipboardPaste, shortcut: "Ctrl+V", action: () => runExecCommand("paste") },
-    { label: "全选", icon: TextSelect, shortcut: "Ctrl+A", action: () => runSelectAll() },
+    { label: t("common.cut"), icon: Scissors, shortcut: "Ctrl+X", action: () => runExecCommand("cut") },
+    { label: t("common.copy"), icon: Copy, shortcut: "Ctrl+C", action: () => runExecCommand("copy") },
+    { label: t("common.paste"), icon: ClipboardPaste, shortcut: "Ctrl+V", action: () => runExecCommand("paste") },
+    { label: t("editor.contextMenu.selectAll"), icon: TextSelect, shortcut: "Ctrl+A", action: () => runSelectAll() },
     { separator: true },
-    { label: "查找替换", icon: Search, shortcut: "Ctrl+F", action: () => runFindReplace() },
-    { label: "插入表格", icon: Table, action: () => emit("context-action", "insert-table") },
-    { label: "链接", icon: LinkIcon, action: () => emit("context-action", "insert-link") },
-    { label: "图片", icon: ImageIcon, action: () => emit("context-action", "insert-image") },
-    { label: "粘贴为纯文本", icon: Clipboard, action: () => runPastePlainText() },
+    { label: t("editor.contextMenu.findReplace"), icon: Search, shortcut: "Ctrl+F", action: () => runFindReplace() },
+    { label: t("editor.toolbar.insertTable"), icon: Table, action: () => emit("context-action", "insert-table") },
+    { label: t("editor.contextMenu.link"), icon: LinkIcon, action: () => emit("context-action", "insert-link") },
+    { label: t("editor.contextMenu.image"), icon: ImageIcon, action: () => emit("context-action", "insert-image") },
+    { label: t("editor.contextMenu.pastePlainText"), icon: Clipboard, action: () => runPastePlainText() },
   ];
 }
 

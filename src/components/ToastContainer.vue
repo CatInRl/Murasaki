@@ -57,7 +57,7 @@ function onAction(id: string, onClick: () => void): void {
 
 <template>
   <Teleport to="body">
-    <div class="toast-container" role="region" aria-label="通知" aria-live="polite">
+    <div class="toast-container" role="region" :aria-label="$t('common.toast.regionAriaLabel')" aria-live="polite">
       <transition-group name="toast">
         <div
           v-for="toast in toasts"
@@ -101,7 +101,7 @@ function onAction(id: string, onClick: () => void): void {
             <button
               type="button"
               class="toast-close-btn"
-              aria-label="关闭通知"
+              :aria-label="$t('common.toast.closeAriaLabel')"
               @click="toastStore.dismiss(toast.id)"
             >
               <X :size="14" />

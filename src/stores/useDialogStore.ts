@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed, reactive } from "vue";
+import { i18n } from "../i18n";
 
 /**
  * 对话框 Store（Ticket #66 / T2.2）
@@ -116,6 +117,9 @@ export const useDialogStore = defineStore("dialog", () => {
   /** 模态栈：queue[0] 为当前显示的对话框 */
   const queue = ref<DialogState[]>([]);
 
+  // i18n 全局翻译函数（store 在组件外使用，需走全局实例）
+  const t = i18n.global.t.bind(i18n.global);
+
   // ===== Getters =====
   /** 当前显示的对话框（同时只显示一个） */
   const current = computed<DialogState | null>(() => queue.value[0] ?? null);
@@ -151,7 +155,7 @@ export const useDialogStore = defineStore("dialog", () => {
         title: options.title ?? defaultTitleForVariant(variant),
         message: options.message,
         variant,
-        confirmText: options.confirmText ?? "确定",
+        confirmText: options.confirmText ?? t("common.ok"),
         cancelText: "",
         neutralText: "",
         danger: false,
@@ -172,11 +176,11 @@ export const useDialogStore = defineStore("dialog", () => {
     return new Promise<boolean>((resolve) => {
       enqueue({
         kind: "confirm",
-        title: options.title ?? "确认",
+        title: options.title ?? t("common.dialog.confirmTitle"),
         message: options.message,
         variant: "info",
-        confirmText: options.confirmText ?? "确定",
-        cancelText: options.cancelText ?? "取消",
+        confirmText: options.confirmText ?? t("common.ok"),
+        cancelText: options.cancelText ?? t("common.cancel"),
         neutralText: "",
         danger: options.danger ?? false,
         placeholder: "",
@@ -196,11 +200,11 @@ export const useDialogStore = defineStore("dialog", () => {
     return new Promise<string | null>((resolve) => {
       enqueue({
         kind: "prompt",
-        title: options.title ?? "输入",
+        title: options.title ?? t("common.dialog.promptTitle"),
         message: options.message ?? "",
         variant: "info",
-        confirmText: options.confirmText ?? "确定",
-        cancelText: options.cancelText ?? "取消",
+        confirmText: options.confirmText ?? t("common.ok"),
+        cancelText: options.cancelText ?? t("common.cancel"),
         neutralText: "",
         danger: false,
         placeholder: options.placeholder ?? "",
@@ -222,13 +226,13 @@ export const useDialogStore = defineStore("dialog", () => {
       enqueue({
         kind: "conflict",
         title: options.title ?? defaultConflictTitle(options.operation),
-        message: `目标已存在：${options.filename}`,
+        message: t("common.dialog.conflictMessage", { filename: options.filename }),
         variant: "warning",
-        confirmText: "覆盖",
-        cancelText: "取消",
+        confirmText: t("common.overwrite"),
+        cancelText: t("common.cancel"),
         neutralText: "",
         danger: true,
-        placeholder: "输入新名称",
+        placeholder: t("common.dialog.conflictRenamePlaceholder"),
         inputValue: options.filename,
         validationError: null,
         filename: options.filename,
@@ -251,12 +255,12 @@ export const useDialogStore = defineStore("dialog", () => {
     return new Promise<UnsavedChangesResult>((resolve) => {
       enqueue({
         kind: "unsaved",
-        title: options.title ?? "未保存的修改",
-        message: options.message ?? "有未保存的修改，是否保存？",
+        title: options.title ?? t("common.dialog.unsavedTitle"),
+        message: options.message ?? t("common.dialog.unsavedMessage"),
         variant: "warning",
-        confirmText: options.saveText ?? "保存",
-        cancelText: options.cancelText ?? "取消",
-        neutralText: options.discardText ?? "不保存",
+        confirmText: options.saveText ?? t("common.save"),
+        cancelText: options.cancelText ?? t("common.cancel"),
+        neutralText: options.discardText ?? t("common.discard"),
         danger: false,
         placeholder: "",
         inputValue: "",
@@ -345,7 +349,7 @@ export const useDialogStore = defineStore("dialog", () => {
       const newName = item.inputValue.trim();
       if (!newName) return;
       if (newName === item.filename) {
-        item.validationError = "新名称与原名称相同";
+        item.validationError = t("common.dialog.conflictSameNameError");
         return;
       }
       resolveCurrent({ action: "rename", newName });
@@ -379,24 +383,24 @@ export const useDialogStore = defineStore("dialog", () => {
   function defaultTitleForVariant(variant: AlertVariant): string {
     switch (variant) {
       case "warning":
-        return "警告";
+        return t("common.dialog.warningTitle");
       case "error":
-        return "错误";
+        return t("common.dialog.errorTitle");
       default:
-        return "提示";
+        return t("common.dialog.infoTitle");
     }
   }
 
   function defaultConflictTitle(operation?: "rename" | "copy" | "save-as"): string {
     switch (operation) {
       case "rename":
-        return "重命名冲突";
+        return t("common.dialog.conflictRenameTitle");
       case "copy":
-        return "复制冲突";
+        return t("common.dialog.conflictCopyTitle");
       case "save-as":
-        return "另存为冲突";
+        return t("common.dialog.conflictSaveAsTitle");
       default:
-        return "文件冲突";
+        return t("common.dialog.conflictTitle");
     }
   }
 

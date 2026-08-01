@@ -1,5 +1,6 @@
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { basename } from "../utils/path";
+import { i18n } from "../i18n";
 import type { AlertVariant } from "../stores/useDialogStore";
 
 // ===== 依赖类型切片 =====
@@ -67,6 +68,7 @@ export interface TabCloseDeps {
 export function useTabClose(deps: TabCloseDeps) {
   const { tabsStore, agentStore, dialog } = deps;
   const workspace = deps.workspace ?? { workspacePath: null };
+  const t = i18n.global.t.bind(i18n.global);
 
   /**
    * 保存 tab 到磁盘（有路径走 saveTab，无路径走 saveDialog + saveTabAs）。
@@ -78,13 +80,13 @@ export function useTabClose(deps: TabCloseDeps) {
         await tabsStore.saveTab(tabId);
         return true;
       } catch (err) {
-        await dialog.alert({ message: `保存失败: ${err}`, variant: "error" });
+        await dialog.alert({ message: t("common.error.saveFailed", { error: err }), variant: "error" });
         return false;
       }
     }
     const selected = await saveDialog({
       filters: [{ name: "Markdown", extensions: ["md"] }],
-      title: "另存为",
+      title: t("common.saveAs"),
       defaultPath: workspace.workspacePath ?? undefined,
     });
     if (typeof selected !== "string" || !selected) return false;
@@ -92,7 +94,7 @@ export function useTabClose(deps: TabCloseDeps) {
       await tabsStore.saveTabAs(tabId, selected);
       return true;
     } catch (err) {
-      await dialog.alert({ message: `另存为失败: ${err}`, variant: "error" });
+      await dialog.alert({ message: t("common.error.saveAsFailed", { error: err }), variant: "error" });
       return false;
     }
   }
@@ -112,16 +114,16 @@ export function useTabClose(deps: TabCloseDeps) {
     const isActiveTab = tabsStore.activeTabId === tabId;
     const agentRunning = agentStore.isThinking && isActiveTab;
     const hasUnsavedChanges = tab.isDirty;
-    const fileName = tab.path ? basename(tab.path) : "未命名";
+    const fileName = tab.path ? basename(tab.path) : t("common.untitled");
 
     // Case 1: Agent 运行中 + 关闭活动 tab + 有未保存修改 → 合并对话框（3 选项）
     if (agentRunning && hasUnsavedChanges) {
       const choice = await dialog.unsavedChanges({
-        title: "Agent 运行中 · 未保存的修改",
-        message: `Agent 正在为 "${fileName}" 处理请求。\n该文件有未保存的修改。关闭 tab 将中断 Agent 并保留已生成的部分回答到对话历史。`,
-        saveText: "保存并关闭",
-        discardText: "不保存关闭",
-        cancelText: "取消",
+        title: t("common.dialog.agentRunningUnsavedTitle"),
+        message: t("common.dialog.agentRunningUnsavedMessage", { name: fileName }),
+        saveText: t("common.saveAndClose"),
+        discardText: t("common.closeWithoutSaving"),
+        cancelText: t("common.cancel"),
       });
       if (choice === "cancel") return;
 
@@ -140,11 +142,11 @@ export function useTabClose(deps: TabCloseDeps) {
     // Case 2: Agent 运行中 + 关闭活动 tab + 无未保存修改 → 简单确认（2 选项）
     if (agentRunning) {
       const shouldClose = await dialog.confirm({
-        title: "Agent 运行中",
-        message: `Agent 正在为 "${fileName}" 处理请求。\n关闭 tab 将中断 Agent 并保留已生成的部分回答到对话历史。`,
+        title: t("common.dialog.agentRunningTitle"),
+        message: t("common.dialog.agentRunningMessage", { name: fileName }),
         danger: true,
-        confirmText: "强制关闭",
-        cancelText: "取消",
+        confirmText: t("common.forceClose"),
+        cancelText: t("common.cancel"),
       });
       if (!shouldClose) return;
 
@@ -161,7 +163,7 @@ export function useTabClose(deps: TabCloseDeps) {
 
     // 有未保存修改：弹出三选一对话框
     const choice = await dialog.unsavedChanges({
-      message: `"${fileName}" 有未保存的修改。是否在关闭前保存？`,
+      message: t("common.dialog.unsavedBeforeCloseMessage", { name: fileName }),
     });
     if (choice === "cancel") return;
 

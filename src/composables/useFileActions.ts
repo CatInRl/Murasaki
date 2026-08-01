@@ -2,6 +2,7 @@ import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialo
 import { basename } from "../utils/path";
 import { exportHtml } from "./useHtmlExport";
 import { fileSystem } from "../services/fileSystem";
+import { i18n } from "../i18n";
 import type { Ref } from "vue";
 import type { Tab } from "../types";
 
@@ -47,6 +48,7 @@ export interface FileActionsDeps {
  */
 export function useFileActions(deps: FileActionsDeps) {
   const { tabsStore, workspace, persistence, dialog, toast, activeTab, currentTheme } = deps;
+  const t = i18n.global.t.bind(i18n.global);
 
   async function openFile(path: string): Promise<void> {
     try {
@@ -59,14 +61,14 @@ export function useFileActions(deps: FileActionsDeps) {
       if (!exists) {
         const fileName = basename(path);
         const shouldRemove = await dialog.confirm({
-          message: `文件 "${fileName}" 不存在或已被移动。\n\n是否从"最近打开"列表中移除？`,
+          message: t("common.dialog.fileNotFoundRemove", { name: fileName }),
           danger: true,
         });
         if (shouldRemove) {
           await persistence.removeRecent(path);
         }
       } else {
-        dialog.alert({ message: `打开文件失败: ${err}`, variant: "error" });
+        dialog.alert({ message: t("common.error.openFileFailed", { error: err }), variant: "error" });
       }
     }
   }
@@ -75,7 +77,7 @@ export function useFileActions(deps: FileActionsDeps) {
     const selected = await openDialog({
       multiple: false,
       filters: [{ name: "Markdown", extensions: ["md", "markdown", "mdown", "mkd"] }],
-      title: "打开 Markdown 文件",
+      title: t("common.openMarkdownTitle"),
     });
     if (typeof selected === "string" && selected) {
       await openFile(selected);
@@ -92,7 +94,7 @@ export function useFileActions(deps: FileActionsDeps) {
       await tabsStore.saveTab(activeTab.value.id);
     } catch (err) {
       console.error("保存失败:", err);
-      dialog.alert({ message: `保存失败: ${err}`, variant: "error" });
+      dialog.alert({ message: t("common.error.saveFailed", { error: err }), variant: "error" });
     }
   }
 
@@ -102,7 +104,7 @@ export function useFileActions(deps: FileActionsDeps) {
       directory: false,
       save: true,
       filters: [{ name: "Markdown", extensions: ["md"] }],
-      title: "另存为",
+      title: t("common.saveAs"),
       defaultPath: workspace.workspacePath ?? undefined,
     });
     if (typeof selected === "string" && selected) {
@@ -111,7 +113,7 @@ export function useFileActions(deps: FileActionsDeps) {
         await persistence.addRecent(selected, "file");
       } catch (err) {
         console.error("另存为失败:", err);
-        dialog.alert({ message: `另存为失败: ${err}`, variant: "error" });
+        dialog.alert({ message: t("common.error.saveAsFailed", { error: err }), variant: "error" });
       }
     }
   }
@@ -123,13 +125,13 @@ export function useFileActions(deps: FileActionsDeps) {
       await tabsStore.reloadFromDisk(path);
     } catch (err) {
       console.error("重新加载失败:", err);
-      dialog.alert({ message: `重新加载失败: ${err}`, variant: "error" });
+      dialog.alert({ message: t("common.error.reloadFailed", { error: err }), variant: "error" });
     }
   }
 
   async function exportCurrentHtml(): Promise<void> {
     if (!activeTab.value) {
-      dialog.alert({ message: "请先打开一个文件", variant: "warning" });
+      dialog.alert({ message: t("common.dialog.openFileFirst"), variant: "warning" });
       return;
     }
     const tab = activeTab.value;
@@ -139,7 +141,7 @@ export function useFileActions(deps: FileActionsDeps) {
     const selected = await saveDialog({
       defaultPath: defaultName,
       filters: [{ name: "HTML", extensions: ["html"] }],
-      title: "导出 HTML",
+      title: t("common.exportHtmlTitle"),
     });
     if (typeof selected !== "string" || !selected) return;
     try {
@@ -152,13 +154,13 @@ export function useFileActions(deps: FileActionsDeps) {
       await fileSystem.writeText(selected, html);
     } catch (err) {
       console.error("导出 HTML 失败:", err);
-      dialog.alert({ message: `导出 HTML 失败: ${err}`, variant: "error" });
+      dialog.alert({ message: t("common.error.exportHtmlFailed", { error: err }), variant: "error" });
     }
   }
 
   async function exportCurrentPdf(): Promise<void> {
     if (!activeTab.value) {
-      dialog.alert({ message: "请先打开一个文件", variant: "warning" });
+      dialog.alert({ message: t("common.dialog.openFileFirst"), variant: "warning" });
       return;
     }
     const tab = activeTab.value;
@@ -168,7 +170,7 @@ export function useFileActions(deps: FileActionsDeps) {
     const selected = await saveDialog({
       defaultPath: defaultName,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
-      title: "导出 PDF",
+      title: t("common.exportPdfTitle"),
     });
     if (typeof selected !== "string" || !selected) return;
     try {
@@ -179,10 +181,10 @@ export function useFileActions(deps: FileActionsDeps) {
         filePath: tab.path,
       });
       await fileSystem.exportPdf(html, selected);
-      toast.success("已导出 PDF");
+      toast.success(t("common.exportPdfSuccess"));
     } catch (err) {
       console.error("导出 PDF 失败:", err);
-      toast.error(`导出 PDF 失败: ${err}`);
+      toast.error(t("common.error.exportPdfFailed", { error: err }));
     }
   }
 
@@ -212,14 +214,14 @@ export function useFileActions(deps: FileActionsDeps) {
         if (!exists) {
           const folderName = basename(path);
           const shouldRemove = await dialog.confirm({
-            message: `文件夹 "${folderName}" 不存在或已被移动。\n\n是否从"最近打开"列表中移除？`,
+            message: t("common.dialog.folderNotFoundRemove", { name: folderName }),
             danger: true,
           });
           if (shouldRemove) {
             await persistence.removeRecent(path);
           }
         } else {
-          dialog.alert({ message: `打开工作区失败: ${err}`, variant: "error" });
+          dialog.alert({ message: t("common.error.openWorkspaceFailed", { error: err }), variant: "error" });
         }
       }
     } else {

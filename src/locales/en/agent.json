@@ -82,5 +82,24 @@
     "copyMarkdown": "Copy Markdown source",
     "insertToEditor": "Insert into editor",
     "regenerate": "Regenerate from this message"
+  },
+  "tools": {
+    "unknownError": "Unknown error",
+    "unknownTool": "Unknown tool: {name}",
+    "invalidJson": "Failed to parse arguments JSON",
+    "docChars": "Retrieved {count} chars",
+    "docCharsTruncated": "Retrieved {count}+ chars (truncated)",
+    "noSelection": "No selection",
+    "selectionChars": "Retrieved {count}-char selection",
+    "outlineCount": "{count} headings",
+    "filesCount": "{count} files",
+    "readChars": "{count} chars",
+    "readCharsTruncated": "{count}+ chars (truncated)",
+    "searchHits": "{count} matches",
+    "searchHitsTruncated": "{count}+ matches (truncated)",
+    "insertLines": "Insert {count} lines",
+    "replaceLines": "Replace {count} lines",
+    "replaceLinesConfirm": "Replace {count} lines (confirmation required)",
+    "newFileProposal": "Propose new file {path} ({count} lines)"
   }
 }

@@ -159,7 +159,7 @@ function onRenameInput(e: Event): void {
             <template v-if="dialog.current.kind === 'conflict'">
               <p class="dialog-message">{{ dialog.current.message }}</p>
               <p v-if="dialog.current.sourcePath" class="dialog-source">
-                源：{{ dialog.current.sourcePath }}
+                {{ $t('common.dialog.sourceLabel', { path: dialog.current.sourcePath }) }}
               </p>
               <div v-if="dialog.current.showRenameInput" class="conflict-rename">
                 <input
@@ -236,7 +236,7 @@ function onRenameInput(e: Event): void {
                 @click="dialog.conflictRename()"
               >
                 <Pencil :size="14" />
-                {{ dialog.current.showRenameInput ? "确认重命名" : "重命名" }}
+                {{ dialog.current.showRenameInput ? $t('common.confirmRename') : $t('common.rename') }}
               </button>
               <button
                 ref="confirmBtnRef"

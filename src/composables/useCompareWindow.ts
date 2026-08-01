@@ -1,6 +1,7 @@
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { basename } from "../utils/path";
+import { i18n } from "../i18n";
 
 /** useTabsStore 的接口切片 */
 export interface TabsStoreLike {
@@ -43,6 +44,7 @@ export interface CompareWindowDeps {
  */
 export function useCompareWindow(deps: CompareWindowDeps) {
   const { tabsStore, dialog } = deps;
+  const t = i18n.global.t.bind(i18n.global);
 
   const compareState = ref<CompareState>({
     visible: false,
@@ -59,9 +61,9 @@ export function useCompareWindow(deps: CompareWindowDeps) {
     if (mtime === null) {
       tabsStore.markExternalChange(path, true);
       if (!tab.isDirty) {
-        dialog.alert({ message: `文件已被外部删除：${path}`, variant: "warning" });
+        dialog.alert({ message: t("common.dialog.fileDeletedExternal", { path }), variant: "warning" });
       } else {
-        dialog.alert({ message: `文件已被外部删除（草稿已保留）：${path}`, variant: "warning" });
+        dialog.alert({ message: t("common.dialog.fileDeletedExternalDraftKept", { path }), variant: "warning" });
       }
       return;
     }
@@ -74,11 +76,11 @@ export function useCompareWindow(deps: CompareWindowDeps) {
     // 三选一对话框改走 dialog store（unsavedChanges）
     // 映射：save → 加载磁盘版本 / discard → 保留本地版本 / cancel → 对比并合并
     const choice = await dialog.unsavedChanges({
-      title: "文件已被外部修改",
-      message: `"${fileName}" 已被外部程序修改，但当前标签页有未保存的修改。请选择如何处理：`,
-      saveText: "加载磁盘版本",
-      discardText: "保留本地版本",
-      cancelText: "对比并合并",
+      title: t("common.dialog.fileModifiedExternalTitle"),
+      message: t("common.dialog.fileModifiedExternalMessage", { name: fileName }),
+      saveText: t("common.loadDiskVersion"),
+      discardText: t("common.keepLocalVersion"),
+      cancelText: t("common.compareAndMerge"),
     });
     if (choice === "save") {
       await tabsStore.applyExternalResolution(path, "load-disk", externalContent);
@@ -101,7 +103,7 @@ export function useCompareWindow(deps: CompareWindowDeps) {
       await tabsStore.writeMergedContent(filePath, mergedContent);
     } catch (err) {
       console.error("保存合并结果失败:", err);
-      dialog.alert({ message: `保存合并结果失败: ${err}`, variant: "error" });
+      dialog.alert({ message: t("common.error.saveMergeFailed", { error: err }), variant: "error" });
     }
     compareState.value = { ...compareState.value, visible: false };
   }

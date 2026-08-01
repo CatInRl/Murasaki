@@ -102,6 +102,13 @@
     "colsLabel": "列数",
     "insert": "插入"
   },
+  "contextMenu": {
+    "selectAll": "全选",
+    "findReplace": "查找替换",
+    "link": "链接",
+    "image": "图片",
+    "pastePlainText": "粘贴为纯文本"
+  },
   "compare": {
     "title": "对比合并 — {filename}",
     "diffLabel": "差异：",
@@ -132,5 +139,11 @@
     "newFolderPrompt": "请输入文件夹名称：",
     "newFolderPlaceholder": "文件夹名称",
     "openFileFirst": "请先打开一个文件"
+  },
+  "imagePreview": {
+    "title": "图片预览",
+    "noImage": "无图片可预览",
+    "readFailed": "读取失败: {error}",
+    "emptyOrFailed": "图片为空或读取失败"
   }
 }

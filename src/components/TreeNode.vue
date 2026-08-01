@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   Pencil,
   Scissors,
@@ -43,6 +44,7 @@ const emit = defineEmits<{
 const fileOps = useFileOpsStore();
 const dialog = useDialogStore();
 const contextMenu = useContextMenuStore();
+const { t } = useI18n();
 
 const expanded = ref(false); // 默认收起所有子文件夹
 
@@ -138,7 +140,7 @@ async function onDrop(e: DragEvent): Promise<void> {
     try {
       await fileOps.moveInto(internalPath, targetDir);
     } catch (err) {
-      dialog.alert({ message: `移动失败: ${err}`, variant: "error" });
+      dialog.alert({ message: t("common.error.moveFailed", { error: err }), variant: "error" });
     }
     return;
   }
@@ -152,7 +154,7 @@ async function onDrop(e: DragEvent): Promise<void> {
       try {
         await fileOps.copyInto(externalPath, targetDir);
       } catch (err) {
-        dialog.alert({ message: `复制失败: ${err}`, variant: "error" });
+        dialog.alert({ message: t("common.error.copyFailed", { error: err }), variant: "error" });
       }
     }
   }
@@ -176,13 +178,13 @@ function buildMenuItems(): MenuItem[] {
   if (isFile) {
     if (isMarkdownFile(props.node.name)) {
       items.push({
-        label: "打开",
+        label: t("common.open"),
         icon: FileText,
         action: () => emit("select-file", props.node.path),
       });
     } else if (isImageFile(props.node.name)) {
       items.push({
-        label: "预览",
+        label: t("common.preview"),
         icon: ImageIcon,
         action: () => emit("preview-image", props.node.path),
       });
@@ -191,7 +193,7 @@ function buildMenuItems(): MenuItem[] {
 
   if (isDir) {
     items.push({
-      label: "新建文件",
+      label: t("common.newFile"),
       icon: FilePlus,
       action: () => {
         creatingType.value = "file";
@@ -200,7 +202,7 @@ function buildMenuItems(): MenuItem[] {
       },
     });
     items.push({
-      label: "新建文件夹",
+      label: t("common.newFolder"),
       icon: FolderPlus,
       action: () => {
         creatingType.value = "directory";
@@ -213,7 +215,7 @@ function buildMenuItems(): MenuItem[] {
   if (items.length > 0) items.push({ separator: true });
 
   items.push({
-    label: "重命名",
+    label: t("common.rename"),
     icon: Pencil,
     action: () => {
       renameValue.value = props.node.name;
@@ -221,25 +223,25 @@ function buildMenuItems(): MenuItem[] {
     },
   });
   items.push({
-    label: "剪切",
+    label: t("common.cut"),
     icon: Scissors,
     action: () => fileOps.cut(props.node.path),
   });
   items.push({
-    label: "复制",
+    label: t("common.copy"),
     icon: Copy,
     action: () => fileOps.copy(props.node.path),
   });
 
   if (isDir && fileOps.hasClipboard()) {
     items.push({
-      label: "粘贴",
+      label: t("common.paste"),
       icon: Clipboard,
       action: async () => {
         try {
           await fileOps.paste(props.node.path);
         } catch (err) {
-          dialog.alert({ message: `粘贴失败: ${err}`, variant: "error" });
+          dialog.alert({ message: t("common.error.pasteFailed", { error: err }), variant: "error" });
         }
       },
     });
@@ -247,51 +249,51 @@ function buildMenuItems(): MenuItem[] {
 
   items.push({ separator: true });
   items.push({
-    label: "复制路径",
+    label: t("common.copyPath"),
     icon: Link2,
     action: async () => {
       try {
         await fileOps.copyAbsolutePath(props.node.path);
       } catch (err) {
-        dialog.alert({ message: `复制路径失败: ${err}`, variant: "error" });
+        dialog.alert({ message: t("common.error.copyPathFailed", { error: err }), variant: "error" });
       }
     },
   });
   items.push({
-    label: "复制相对路径",
+    label: t("common.copyRelativePath"),
     icon: Link,
     action: async () => {
       try {
         await fileOps.copyRelativePath(props.node.path);
       } catch (err) {
-        dialog.alert({ message: `复制相对路径失败: ${err}`, variant: "error" });
+        dialog.alert({ message: t("common.error.copyRelativePathFailed", { error: err }), variant: "error" });
       }
     },
   });
 
   items.push({ separator: true });
   items.push({
-    label: "删除",
+    label: t("common.delete"),
     icon: Trash2,
     danger: true,
     action: async () => {
-      if (await dialog.confirm({ message: `确定要删除 "${props.node.name}" 吗？（移至回收站）`, danger: true })) {
+      if (await dialog.confirm({ message: t("common.deleteConfirm", { name: props.node.name }), danger: true })) {
         try {
           await fileOps.deletePath(props.node.path);
         } catch (err) {
-          dialog.alert({ message: `删除失败: ${err}`, variant: "error" });
+          dialog.alert({ message: t("common.error.deleteFailed", { error: err }), variant: "error" });
         }
       }
     },
   });
   items.push({
-    label: "在文件资源管理器中显示",
+    label: t("common.revealInExplorer"),
     icon: FolderOpen,
     action: async () => {
       try {
         await fileOps.revealInExplorer(props.node.path);
       } catch (err) {
-        dialog.alert({ message: `无法在资源管理器中显示: ${err}`, variant: "error" });
+        dialog.alert({ message: t("common.error.revealFailed", { error: err }), variant: "error" });
       }
     },
   });
@@ -309,7 +311,7 @@ async function submitRename(): Promise<void> {
   try {
     await fileOps.renamePath(props.node.path, newName);
   } catch (err) {
-    dialog.alert({ message: `重命名失败: ${err}`, variant: "error" });
+    dialog.alert({ message: t("common.error.renameFailed", { error: err }), variant: "error" });
   } finally {
     renaming.value = false;
   }
@@ -338,7 +340,7 @@ async function submitCreating(): Promise<void> {
       expanded.value = true;
     }
   } catch (err) {
-    dialog.alert({ message: `新建失败: ${err}`, variant: "error" });
+    dialog.alert({ message: t("common.error.createFailed", { error: err }), variant: "error" });
   } finally {
     creating.value = false;
     creatingName.value = "";
@@ -481,7 +483,7 @@ function cancelCreating(): void {
         v-model:value="creatingName"
         size="tiny"
         autofocus
-        :placeholder="creatingType === 'file' ? '新文件名.md' : '新文件夹名'"
+        :placeholder="creatingType === 'file' ? $t('editor.fileTree.newFilePlaceholder') : $t('editor.fileTree.newFolderPlaceholder')"
         @keyup.enter="submitCreating"
         @keyup.escape="cancelCreating"
         @blur="submitCreating"
