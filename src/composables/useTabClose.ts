@@ -62,8 +62,7 @@ export interface TabCloseDeps {
  * - 单个关闭：未保存检查 / agent 运行中合并对话框（Ticket #24c）
  * - 批量关闭：使用 doCloseTab 避免连续弹框（草稿自动写入）
  *
- * 所有对话框均改走 dialog store（unsavedChanges / confirm），
- * 不再使用 App.vue 内联 NModal 或 usePromiseModal。
+ * 所有对话框均改走 dialog store（unsavedChanges / confirm）。
  */
 export function useTabClose(deps: TabCloseDeps) {
   const { tabsStore, agentStore, dialog } = deps;

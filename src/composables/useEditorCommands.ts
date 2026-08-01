@@ -1,7 +1,9 @@
 import type { Extension } from "@codemirror/state";
-import { EditorState } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
+
+// 测试工具函数已迁移至 src/test/editorTestUtils.ts（createTestView / setSelection / getDoc）
+// 避免污染生产模块接口
 
 /**
  * 段落格式化命令
@@ -384,7 +386,7 @@ export function insertTable(view: EditorView, rows: number, cols: number): void 
  * - 引用块内含列表标记：交给默认处理器（insertNewlineContinueMarkup 处理列表续行）
  * - 非引用块行：返回 false 交给默认处理器
  */
-function handleEnterInBlockquote(view: EditorView): boolean {
+export function handleEnterInBlockquote(view: EditorView): boolean {
   const sel = view.state.selection.main;
   // 只处理光标（无选区）场景
   if (sel.from !== sel.to) return false;
@@ -572,35 +574,4 @@ export function paragraphKeymap(): Extension {
       },
     ])
   );
-}
-
-/**
- * 用于测试：从字符串创建 EditorView（附加到 jsdom DOM）
- */
-export function createTestView(doc: string, extensions: Extension[] = []): EditorView {
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  return new EditorView({
-    state: EditorState.create({
-      doc,
-      extensions: [keymap.of([]), ...extensions],
-    }),
-    parent: host,
-  });
-}
-
-/**
- * 用于测试：在指定位置设置选区
- */
-export function setSelection(view: EditorView, anchor: number, head?: number): void {
-  view.dispatch({
-    selection: { anchor, head: head ?? anchor },
-  });
-}
-
-/**
- * 用于测试：获取当前文档内容
- */
-export function getDoc(view: EditorView): string {
-  return view.state.doc.toString();
 }

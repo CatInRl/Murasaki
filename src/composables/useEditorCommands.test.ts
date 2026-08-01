@@ -12,10 +12,8 @@ import {
   insertLink,
   insertImage,
   getActiveFormats,
-  createTestView,
-  setSelection,
-  getDoc,
 } from "./useEditorCommands";
+import { createTestView, setSelection, getDoc } from "../test/editorTestUtils";
 
 /**
  * 创建测试用 EditorView（附加到 jsdom DOM，避免 viewport 计算失败）
