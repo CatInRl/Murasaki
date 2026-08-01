@@ -28,6 +28,7 @@ import {
   isDirty,
   isCategoryDirty,
   restoreCategoryDefaults,
+  fieldsForCategory,
 } from "./settingsLogic";
 
 const persistence = usePersistenceStore();
@@ -65,6 +66,9 @@ onMounted(async () => {
   draft.value = { ...persistence.settings };
   snapshot.value = { ...persistence.settings };
   await aiProviders.load();
+  // E2E test hook：release 构建后 dynamic import 不可用，暴露纯函数供测试调用
+  // @ts-ignore
+  window.__settingsLogic__ = { fieldsForCategory, isDirty, isCategoryDirty, restoreCategoryDefaults };
 });
 
 function selectCategory(cat: SettingsCategory): void {

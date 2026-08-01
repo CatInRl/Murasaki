@@ -33,11 +33,18 @@ import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
 import { useRecentMenuSync } from "./composables/useRecentMenuSync";
 import { useFileActions } from "./composables/useFileActions";
+import { exportHtml } from "./composables/useHtmlExport";
 import { useEditorNavigation } from "./composables/useEditorNavigation";
 import { useCompareWindow } from "./composables/useCompareWindow";
 import { useTabClose } from "./composables/useTabClose";
 import { useCommands } from "./composables/useCommands";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
+import {
+  fieldsForCategory,
+  isDirty,
+  isCategoryDirty,
+  restoreCategoryDefaults,
+} from "./settings/settingsLogic";
 import { basename } from "./utils/path";
 import { DEFAULT_THEME } from "./composables/useTheme";
 import { useNaiveTheme } from "./composables/useNaiveTheme";
@@ -251,7 +258,7 @@ onMounted(async () => {
 
   initialized.value = true;
 
-  // E2E 测试辅助：暴露 editorRef 到 window
+  // E2E 测试辅助：暴露 editorRef + test hooks 到 window
   // 桌面应用 WebView 内部仅应用代码可访问，无 XSS 风险
   // 测试通过 window.__editorRef__.getView() 直接调用 CodeMirror API
   // 注意：editorRef 是 Vue ref，EditorPane 用 v-else 渲染（无 tab 时不挂载）
@@ -270,6 +277,21 @@ onMounted(async () => {
       const view = editorRef.value?.getView();
       if (view) { view.focus(); cmRedo(view); }
     },
+  };
+  // E2E test hooks：release 构建后 dynamic import 不可用，暴露纯函数/设置器供测试调用
+  // @ts-ignore
+  window.__exportHtml__ = exportHtml;
+  // @ts-ignore
+  window.__setTheme__ = (theme: string) => { currentTheme.value = theme; };
+  // @ts-ignore
+  window.__setSidebarView__ = (view: SidebarView) => { sidebarView.value = view; };
+  // 暴露 settingsLogic 纯函数：设置窗口未打开时主窗口也能被 E2E 测试访问到
+  // @ts-ignore
+  window.__settingsLogic__ = {
+    fieldsForCategory,
+    isDirty,
+    isCategoryDirty,
+    restoreCategoryDefaults,
   };
 });
 
