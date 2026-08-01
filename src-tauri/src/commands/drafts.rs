@@ -13,9 +13,9 @@ pub struct DraftMeta {
     /// 草稿文件的绝对路径
     pub draft_path: String,
     /// 上次已知 mtime（毫秒级 Unix 时间戳），用于启动时冲突检测
-    pub known_mtime: u128,
+    pub known_mtime: u64,
     /// 草稿保存时间（毫秒级 Unix 时间戳）
-    pub saved_at: u128,
+    pub saved_at: u64,
 }
 
 /// 获取 Murasaki app data 目录：%APPDATA%\murasaki\
@@ -64,7 +64,7 @@ fn draft_meta_path_for(original_path: &str) -> Result<PathBuf, String> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DraftMetaFile {
-    known_mtime: u128,
+    known_mtime: u64,
 }
 
 /// 保存草稿：将内容写入草稿文件，返回草稿元数据
@@ -75,7 +75,7 @@ struct DraftMetaFile {
 pub fn save_draft(
     path: String,
     content: String,
-    known_mtime: u128,
+    known_mtime: u64,
 ) -> Result<DraftMeta, String> {
     let draft_path = draft_path_for(&path)?;
     // 确保草稿目录存在
@@ -91,7 +91,7 @@ pub fn save_draft(
     let saved_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
-        .as_millis();
+        .as_millis() as u64;
     Ok(DraftMeta {
         path,
         draft_path: draft_path.to_string_lossy().to_string(),
@@ -117,7 +117,7 @@ pub fn read_draft(path: String) -> Result<(String, DraftMeta), String> {
         .map_err(|e| e.to_string())?
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
-        .as_millis();
+        .as_millis() as u64;
     // 从 sidecar 元数据文件读取 known_mtime
     let meta_path = draft_meta_path_for(&path)?;
     let known_mtime = if meta_path.exists() {
@@ -172,7 +172,7 @@ pub fn get_app_data_dir() -> Result<String, String> {
 /// 获取文件的当前 mtime（毫秒级 Unix 时间戳）
 /// 若文件不存在返回错误
 #[tauri::command]
-pub fn get_file_mtime(path: String) -> Result<u128, String> {
+pub fn get_file_mtime(path: String) -> Result<u64, String> {
     let p = Path::new(&path);
     if !p.exists() {
         return Err(format!("文件不存在: {}", path));
@@ -183,6 +183,6 @@ pub fn get_file_mtime(path: String) -> Result<u128, String> {
         .map_err(|e| e.to_string())?
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
-        .as_millis();
+        .as_millis() as u64;
     Ok(mtime)
 }
