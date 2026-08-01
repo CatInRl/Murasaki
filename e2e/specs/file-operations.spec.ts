@@ -20,6 +20,7 @@ import {
   waitForPinia,
   dismissAllDialogs,
   resetPersistenceSettings,
+  callStoreAction,
 } from "../helpers/store";
 import { existsSync, statSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -39,7 +40,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
 
   beforeEach(async () => {
     await resetPersistenceSettings(browser);
-    wsPath = resetWorkspace(defaultFixtureFiles());
+    // 先关闭工作区（停止文件监听），再重置磁盘，避免 EPERM 和残留文件
     try {
       await closeAllTabs(browser);
     } catch {
@@ -50,6 +51,8 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     } catch {
       /* ignore */
     }
+    await browser.pause(200); // 等待 file watcher 释放句柄
+    wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
     // 等待文件树就绪
     await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
@@ -146,17 +149,10 @@ describe("文件树右键菜单 + 文件操作安全", () => {
   // ===== H2: 文件操作闭环 =====
 
   it("新建文件：fileOps.createFile 后文件树刷新显示新文件", async () => {
-    const result = await browser.executeAsync((dirPath: string, done: (res: unknown) => void) => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const fileOps = pinia._s.get("fileOps");
-      Promise.resolve(fileOps.createFile(dirPath, "new-file.md"))
-        .then((node: any) => done({ ok: true, node: node ? { name: node.name, path: node.path, type: node.type } : null }))
-        .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-    }, wsPath);
+    const node = await callStoreAction<any>(browser, "fileOps", "createFile", wsPath, "new-file.md");
 
-    expect(result as any).toMatchObject({ ok: true });
-    expect((result as any).node.name).toBe("new-file.md");
+    expect(node).toBeTruthy();
+    expect(node.name).toBe("new-file.md");
 
     // 文件应真实存在于磁盘
     const filePath = resolve(wsPath, "new-file.md");
@@ -171,17 +167,10 @@ describe("文件树右键菜单 + 文件操作安全", () => {
   });
 
   it("新建文件夹：fileOps.createDirectory 后文件树刷新显示新目录", async () => {
-    const result = await browser.executeAsync((dirPath: string, done: (res: unknown) => void) => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const fileOps = pinia._s.get("fileOps");
-      Promise.resolve(fileOps.createDirectory(dirPath, "new-folder"))
-        .then((node: any) => done({ ok: true, node: node ? { name: node.name, type: node.type } : null }))
-        .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-    }, wsPath);
+    const node = await callStoreAction<any>(browser, "fileOps", "createDirectory", wsPath, "new-folder");
 
-    expect(result as any).toMatchObject({ ok: true });
-    expect((result as any).node.type).toBe("directory");
+    expect(node).toBeTruthy();
+    expect(node.type).toBe("directory");
 
     const dirPath = resolve(wsPath, "new-folder");
     expect(existsSync(dirPath)).toBe(true);
@@ -199,20 +188,11 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     const newRelPath = "intro-renamed.md";
     expect(existsSync(oldPath)).toBe(true);
 
-    const result = await browser.executeAsync(
-      (old: string, newName: string, done: (res: unknown) => void) => {
-        // @ts-ignore
-        const pinia = window.__pinia__;
-        const fileOps = pinia._s.get("fileOps");
-        Promise.resolve(fileOps.renamePath(old, newName))
-          .then((node: any) => done({ ok: true, node: node ? { name: node.name } : null }))
-          .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-      },
+    const node = await callStoreAction<any>(
+      browser, "fileOps", "renamePath",
       oldPath.replace(/\\/g, "/"),
       newRelPath
     );
-
-    expect(result as any).toMatchObject({ ok: true });
 
     // 旧文件不存在，新文件存在
     expect(existsSync(oldPath)).toBe(false);
@@ -230,16 +210,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     const filePath = resolve(wsPath, "notes.md");
     expect(existsSync(filePath)).toBe(true);
 
-    const result = await browser.executeAsync((path: string, done: (res: unknown) => void) => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const fileOps = pinia._s.get("fileOps");
-      Promise.resolve(fileOps.deletePath(path))
-        .then(() => done({ ok: true }))
-        .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-    }, filePath.replace(/\\/g, "/"));
-
-    expect(result as any).toMatchObject({ ok: true });
+    await callStoreAction(browser, "fileOps", "deletePath", filePath.replace(/\\/g, "/"));
 
     // 磁盘上文件已被删除
     expect(existsSync(filePath)).toBe(false);
@@ -257,7 +228,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     const targetDir = resolve(wsPath, "sub");
     expect(existsSync(srcPath)).toBe(true);
 
-    // 剪切 intro.md
+    // 剪切 intro.md（同步操作，无需等待）
     await browser.execute((path: string) => {
       // @ts-ignore
       const pinia = window.__pinia__;
@@ -266,16 +237,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     }, srcPath.replace(/\\/g, "/"));
 
     // 粘贴到 sub/
-    const result = await browser.executeAsync((dir: string, done: (res: unknown) => void) => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const fileOps = pinia._s.get("fileOps");
-      Promise.resolve(fileOps.paste(dir))
-        .then(() => done({ ok: true }))
-        .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-    }, targetDir.replace(/\\/g, "/"));
-
-    expect(result as any).toMatchObject({ ok: true });
+    await callStoreAction(browser, "fileOps", "paste", targetDir.replace(/\\/g, "/"));
 
     // 源文件不存在，目标存在
     expect(existsSync(srcPath)).toBe(false);
@@ -302,7 +264,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     const targetDir = resolve(wsPath, "sub");
     const originalContent = readFileSync(srcPath, "utf-8");
 
-    // 复制 notes.md
+    // 复制 notes.md（同步操作，无需等待）
     await browser.execute((path: string) => {
       // @ts-ignore
       const pinia = window.__pinia__;
@@ -311,16 +273,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     }, srcPath.replace(/\\/g, "/"));
 
     // 粘贴到 sub/
-    const result = await browser.executeAsync((dir: string, done: (res: unknown) => void) => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const fileOps = pinia._s.get("fileOps");
-      Promise.resolve(fileOps.paste(dir))
-        .then(() => done({ ok: true }))
-        .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-    }, targetDir.replace(/\\/g, "/"));
-
-    expect(result as any).toMatchObject({ ok: true });
+    await callStoreAction(browser, "fileOps", "paste", targetDir.replace(/\\/g, "/"));
 
     // 源文件仍存在（复制语义）
     expect(existsSync(srcPath)).toBe(true);
@@ -335,7 +288,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
   it("重命名到已存在文件名：触发冲突对话框，选择取消则不修改", async () => {
     // 模拟将 intro.md 重命名为 notes.md（已存在）
     // 需要注入冲突 resolver：因为 setConflictResolver 由 App.vue 注入，E2E 中需要重新注入
-    await browser.executeAsync((done: (res: unknown) => void) => {
+    await browser.execute(() => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const fileOps = pinia._s.get("fileOps");
@@ -349,30 +302,29 @@ describe("文件树右键菜单 + 文件操作安全", () => {
           operation: operation as any,
         });
       });
-      done(null);
     });
 
-    // 启动重命名（异步，会等待对话框 resolve）
     const oldPath = resolve(wsPath, "intro.md");
-    const renamePromise = browser.executeAsync(
-      (old: string, newName: string, done: (res: unknown) => void) => {
-        // @ts-ignore
-        const pinia = window.__pinia__;
-        const fileOps = pinia._s.get("fileOps");
-        Promise.resolve(fileOps.renamePath(old, newName))
-          .then((node: any) => done({ ok: true, node: node ? { name: node.name } : null }))
-          .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-      },
-      oldPath.replace(/\\/g, "/"),
-      "notes.md"
-    );
 
-    // 等待冲突对话框出现（用 waitForExist 而非 waitForDisplayed，Vue Transition 会让元素
-    // 存在但 opacity:0 延迟显示，waitForDisplayed 可能误判）
+    // 1. Start rename without blocking — executeAsync 会阻塞 session 直到 done 被调用，
+    //    导致后续 button click 命令无法送达浏览器（script timeout 死锁）。
+    //    改用同步 execute 启动异步操作，结果暂存到 window.__testResult。
+    await browser.execute((old: string, newName: string) => {
+      // @ts-ignore
+      const pinia = window.__pinia__;
+      const fileOps = pinia._s.get("fileOps");
+      (window as any).__testResult = null;
+      Promise.resolve(fileOps.renamePath(old, newName))
+        .then((node: any) => { (window as any).__testResult = { ok: true, node: node ? { name: node.name } : null }; })
+        .catch((err: any) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
+    }, oldPath.replace(/\\/g, "/"), "notes.md");
+
+    // 2. 等待冲突对话框出现（用 waitForExist 而非 waitForDisplayed，Vue Transition 会让元素
+    //    存在但 opacity:0 延迟显示，waitForDisplayed 可能误判）
     const dialogEl = await browser.$(".dialog-overlay");
     await dialogEl.waitForExist({ timeout: 5000 });
 
-    // 点击取消按钮（conflict footer 第一个非 primary/非 danger 按钮，cancelText="取消"）
+    // 3. 点击取消按钮（conflict footer 第一个非 primary/非 danger 按钮，cancelText="取消"）
     const cancelBtn = await browser.$(".dialog-footer .dialog-btn:not(.primary):not(.danger)");
     if (await cancelBtn.isExisting()) {
       await cancelBtn.click();
@@ -386,7 +338,13 @@ describe("文件树右键菜单 + 文件操作安全", () => {
       });
     }
 
-    const result = await renamePromise;
+    // 4. Poll for result（对话框 resolve 后 renamePath promise 才会 settle）
+    await browser.waitUntil(
+      async () => await browser.execute(() => (window as any).__testResult),
+      { timeout: 5000, interval: 100 }
+    );
+    const result = await browser.execute(() => (window as any).__testResult);
+
     expect((result as any).ok).toBe(true);
     expect((result as any).node).toBeNull();
 
@@ -396,7 +354,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
   });
 
   it("重命名到已存在文件名：选择覆盖则源文件替换目标", async () => {
-    await browser.executeAsync((done: (res: unknown) => void) => {
+    await browser.execute(() => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const fileOps = pinia._s.get("fileOps");
@@ -408,33 +366,31 @@ describe("文件树右键菜单 + 文件操作安全", () => {
           operation: operation as any,
         });
       });
-      done(null);
     });
 
     const srcPath = resolve(wsPath, "intro.md");
     const targetName = "notes.md";
     const originalIntro = readFileSync(srcPath, "utf-8");
 
-    // 启动重命名（异步等待对话框）
-    const renamePromise = browser.executeAsync(
-      (old: string, newName: string, done: (res: unknown) => void) => {
-        // @ts-ignore
-        const pinia = window.__pinia__;
-        const fileOps = pinia._s.get("fileOps");
-        Promise.resolve(fileOps.renamePath(old, newName))
-          .then((node: any) => done({ ok: true, node: node ? { name: node.name } : null }))
-          .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-      },
-      srcPath.replace(/\\/g, "/"),
-      targetName
-    );
+    // 1. Start rename without blocking — executeAsync 会阻塞 session 直到 done 被调用，
+    //    导致后续 button click 命令无法送达浏览器（script timeout 死锁）。
+    //    改用同步 execute 启动异步操作，结果暂存到 window.__testResult。
+    await browser.execute((old: string, newName: string) => {
+      // @ts-ignore
+      const pinia = window.__pinia__;
+      const fileOps = pinia._s.get("fileOps");
+      (window as any).__testResult = null;
+      Promise.resolve(fileOps.renamePath(old, newName))
+        .then((node: any) => { (window as any).__testResult = { ok: true, node: node ? { name: node.name } : null }; })
+        .catch((err: any) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
+    }, srcPath.replace(/\\/g, "/"), targetName);
 
-    // 等待对话框出现并点击"覆盖"（用 waitForExist 而非 waitForDisplayed，Vue Transition
-    // 会让元素存在但 opacity:0 延迟显示）
+    // 2. 等待对话框出现并点击"覆盖"（用 waitForExist 而非 waitForDisplayed，Vue Transition
+    //    会让元素存在但 opacity:0 延迟显示）
     const dialogEl = await browser.$(".dialog-overlay");
     await dialogEl.waitForExist({ timeout: 5000 });
 
-    // 点击覆盖按钮（conflict 默认 confirmText="覆盖"，class 含 danger）
+    // 3. 点击覆盖按钮（conflict 默认 confirmText="覆盖"，class 含 danger）
     const overwriteBtn = await browser.$(".dialog-footer .dialog-btn.danger");
     if (await overwriteBtn.isExisting()) {
       await overwriteBtn.click();
@@ -448,7 +404,13 @@ describe("文件树右键菜单 + 文件操作安全", () => {
       });
     }
 
-    const result = await renamePromise;
+    // 4. Poll for result（对话框 resolve 后 renamePath promise 才会 settle）
+    await browser.waitUntil(
+      async () => await browser.execute(() => (window as any).__testResult),
+      { timeout: 5000, interval: 100 }
+    );
+    const result = await browser.execute(() => (window as any).__testResult);
+
     expect((result as any).ok).toBe(true);
 
     // intro.md 已不存在（被重命名走）
@@ -459,6 +421,13 @@ describe("文件树右键菜单 + 文件操作安全", () => {
   });
 
   it("目录覆盖被禁止：重命名到已存在目录时报错", async () => {
+    // 先关闭工作区（停止文件监听），再重置磁盘
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
+    await browser.pause(200);
     // 在 wsPath 下创建两个目录，尝试将 one 重命名为 two（two 已存在）
     resetWorkspace([
       ...defaultFixtureFiles(),
@@ -466,32 +435,24 @@ describe("文件树右键菜单 + 文件操作安全", () => {
       { path: "two/file.md", content: "# two" },
     ]);
     // 重新打开工作区以加载新 fixture
-    try {
-      await closeWorkspace(browser);
-    } catch {
-      /* ignore */
-    }
     await openWorkspace(browser, wsPath);
     await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
 
     const srcPath = resolve(wsPath, "one");
     const targetName = "two";
 
-    const result = await browser.executeAsync(
-      (old: string, newName: string, done: (res: unknown) => void) => {
-        // @ts-ignore
-        const pinia = window.__pinia__;
-        const fileOps = pinia._s.get("fileOps");
-        Promise.resolve(fileOps.renamePath(old, newName))
-          .then(() => done({ ok: true }))
-          .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-      },
-      srcPath.replace(/\\/g, "/"),
-      targetName
-    );
+    // fileOps.renamePath 对目录目标抛出 "无法覆盖目录" 错误。
+    // callStoreAction 内部用 execute + 轮询模式，错误会被 .catch() 捕获并存入
+    // window.__testResult，然后 callStoreAction 将其转为 thrown Error。
+    let caughtError: Error | null = null;
+    try {
+      await callStoreAction(browser, "fileOps", "renamePath", srcPath.replace(/\\/g, "/"), targetName);
+    } catch (err: unknown) {
+      caughtError = err instanceof Error ? err : new Error(String(err));
+    }
 
-    expect((result as any).ok).toBe(false);
-    expect((result as any).error).toContain("目录");
+    expect(caughtError).not.toBeNull();
+    expect(caughtError!.message).toContain("目录");
 
     // 两个目录都应仍存在
     expect(existsSync(resolve(wsPath, "one"))).toBe(true);

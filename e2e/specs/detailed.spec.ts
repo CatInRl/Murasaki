@@ -7,7 +7,15 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
-import { openWorkspace, closeWorkspace, openFileInTab, getTabsState } from "../helpers/store";
+import {
+  openWorkspace,
+  closeWorkspace,
+  openFileInTab,
+  getTabsState,
+  ensureSplitMode,
+  resetPersistenceSettings,
+  dismissAllDialogs,
+} from "../helpers/store";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -79,6 +87,11 @@ afterAll(async () => {
 beforeEach(async () => {
   // 每个 case 前重置文件内容（避免上一个 case 的修改残留）
   resetWsFiles();
+  // 重置持久化设置到默认值（前序 spec 如 wysiwyg-full 可能将 editorMode 改为 wysiwyg，
+  // 导致本 spec 的 math.md/diagram.md 在 WYSIWYG 模式下 KaTeX/Mermaid widget
+  // 干扰 CodeMirror 文本插入，cmInsertText 失效）
+  await resetPersistenceSettings(browser);
+  await ensureSplitMode(browser);
   // 关闭所有 tab（通过 clearAll）
   try {
     await browser.executeAsync((done) => {
@@ -95,6 +108,8 @@ beforeEach(async () => {
   } catch {
     // ignore
   }
+  // 清除残留对话框（前序 spec 可能遗留 dirty tab 确认对话框）
+  await dismissAllDialogs(browser);
 });
 
 // ===== 辅助函数 =====

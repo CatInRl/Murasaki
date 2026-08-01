@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
-import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
+import { resetWorkspace, defaultFixtureFiles, getWorkspaceRoot } from "../helpers/fixtures";
 import {
   openWorkspace,
   closeWorkspace,
@@ -284,12 +284,18 @@ describe("Agent 面板视觉对齐", () => {
   it("工具调用条目状态 class 正确（done 状态）", async () => {
     await injectMessages(browser);
 
-    // 先展开
-    const header = await browser.$(".tool-call-card-header");
-    await header.click();
-    await browser.pause(300);
+    // 确保卡片展开：前序测试可能已展开同一 msgId（"msg-assistant-1"）的卡片，
+    // expandedToolCalls 是 AgentPanel.vue 本地 ref（不在 store 中，不会随 messages 清空而重置），
+    // 直接 click 会折叠卡片。先检测 .tool-call-card-body 是否存在，仅在未展开时点击。
+    const body = await browser.$(".tool-call-card-body");
+    if (!(await body.isExisting())) {
+      const header = await browser.$(".tool-call-card-header");
+      await header.click();
+      await browser.pause(300);
+    }
 
-    // 应有 done 状态的条目
+    // 应有 done 状态的条目（AgentPanel.vue 对 status==='done' 应用
+    // 'tool-call-done tool-call-item-done' 两个 class）
     const doneItems = await browser.$$(".tool-call-item-done");
     expect(doneItems.length).toBe(2);
   });
@@ -299,17 +305,24 @@ describe("Agent 面板视觉对齐", () => {
   it("有提案时渲染 .agent-proposal-list", async () => {
     await injectMessages(browser);
 
+    // 打开文件以注册 EditorView（proposals.addProposal 内部需要 bridge.editorView，
+    // 否则会 early return，提案不会进入 proposals.value，.agent-proposal-list 不渲染）
+    const wsPath = getWorkspaceRoot();
+    await openFileInTab(browser, `${wsPath}\\intro.md`);
+    await browser.$(".cm-editor").waitForExist({ timeout: 10000 });
+    await browser.waitUntil(
+      async () =>
+        await browser.execute(() => {
+          // @ts-ignore
+          return !!window.__pinia__._s.get("editorBridge")?.editorView;
+        }),
+      { timeout: 10000, timeoutMsg: "EditorView 未在时限内注册" }
+    );
+
     // 注入提案到 proposals store
     await browser.execute(() => {
       // @ts-ignore
       const proposals = window.__pinia__._s.get("proposals");
-      const editorBridge = window.__pinia__._s.get("editorBridge");
-      const view = editorBridge.editorView;
-      if (!view) return;
-
-      // 通过 StateEffect 添加提案
-      const { addProposalEffect } = proposals;
-      // 直接调用 addProposal action
       proposals.addProposal({
         id: "prop-test-1",
         type: "replace",
@@ -336,6 +349,19 @@ describe("Agent 面板视觉对齐", () => {
 
   it("提案条目状态 class（pending/accepted/rejected）", async () => {
     await injectMessages(browser);
+
+    // 打开文件以注册 EditorView（同上，addProposal 需要 bridge.editorView）
+    const wsPath = getWorkspaceRoot();
+    await openFileInTab(browser, `${wsPath}\\intro.md`);
+    await browser.$(".cm-editor").waitForExist({ timeout: 10000 });
+    await browser.waitUntil(
+      async () =>
+        await browser.execute(() => {
+          // @ts-ignore
+          return !!window.__pinia__._s.get("editorBridge")?.editorView;
+        }),
+      { timeout: 10000, timeoutMsg: "EditorView 未在时限内注册" }
+    );
 
     await browser.execute(() => {
       // @ts-ignore

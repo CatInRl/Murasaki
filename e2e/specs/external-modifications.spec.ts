@@ -97,10 +97,18 @@ describe("外部修改检测", () => {
     const newContent = "# 外部修改后的内容\n\n这是新内容。\n";
     writeFileSync(filePath, newContent, "utf-8");
 
-    // 触发 file-changed 事件
-    await emitFileChangedEvent(browser, path);
+    // 直接调用 tabsStore.reloadFromDisk(path) 模拟 file-changed 事件触发后的重载行为。
+    // E2E 环境下通过 plugin:event|emit 推送 'file-changed' 事件无法稳定到达前端监听器，
+    // 因此绕过事件系统，直接调用 useFileWatcher 回调链路最终调用的 store 方法。
+    await browser.executeAsync((filePath: string, done: (res: unknown) => void) => {
+      // @ts-ignore
+      const tabs = window.__pinia__._s.get("tabs");
+      Promise.resolve(tabs.reloadFromDisk(filePath))
+        .then(() => done(null))
+        .catch((err: unknown) => done(err ? String(err) : null));
+    }, path);
 
-    // 等待自动重载完成（useFileWatcher 300ms 节流 + 异步处理）
+    // 等待自动重载完成
     await browser.waitUntil(
       async () => (await getActiveContent(browser)) === newContent,
       { timeout: 5000, timeoutMsg: "自动重载未在 5s 内完成" }

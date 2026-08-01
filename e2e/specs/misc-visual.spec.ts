@@ -59,15 +59,11 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
   // ============ M18: 设置分类导航 ============
 
   it("settingsLogic.fieldsForCategory('general') 返回 4 个字段", async () => {
-    const result = await browser.executeAsync((done: (res: unknown) => void) => {
-      // 动态 import settingsLogic 模块
-      import("/src/settings/settingsLogic.ts")
-        .then((mod) => {
-          const fields = mod.fieldsForCategory("general");
-          done({ fields });
-        })
-        .catch((err: unknown) => done({ error: String(err) }));
-    });
+    const result = await browser.execute((category: string) => {
+      const logic = (window as any).__settingsLogic__;
+      if (!logic) return { error: "window.__settingsLogic__ not exposed" };
+      return { fields: logic.fieldsForCategory(category) };
+    }, "general");
     expect((result as any).error).toBeUndefined();
     expect((result as any).fields).toEqual([
       "uiMode",
@@ -78,14 +74,11 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
   });
 
   it("settingsLogic.fieldsForCategory('editor') 返回 6 个字段", async () => {
-    const result = await browser.executeAsync((done: (res: unknown) => void) => {
-      import("/src/settings/settingsLogic.ts")
-        .then((mod) => {
-          const fields = mod.fieldsForCategory("editor");
-          done({ fields });
-        })
-        .catch((err: unknown) => done({ error: String(err) }));
-    });
+    const result = await browser.execute((category: string) => {
+      const logic = (window as any).__settingsLogic__;
+      if (!logic) return { error: "window.__settingsLogic__ not exposed" };
+      return { fields: logic.fieldsForCategory(category) };
+    }, "editor");
     expect((result as any).error).toBeUndefined();
     expect((result as any).fields).toEqual([
       "editorMode",
@@ -98,63 +91,56 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
   });
 
   it("settingsLogic.fieldsForCategory('ai') 返回空数组（独立持久化）", async () => {
-    const result = await browser.executeAsync((done: (res: unknown) => void) => {
-      import("/src/settings/settingsLogic.ts")
-        .then((mod) => {
-          const fields = mod.fieldsForCategory("ai");
-          done({ fields });
-        })
-        .catch((err: unknown) => done({ error: String(err) }));
-    });
+    const result = await browser.execute((category: string) => {
+      const logic = (window as any).__settingsLogic__;
+      if (!logic) return { error: "window.__settingsLogic__ not exposed" };
+      return { fields: logic.fieldsForCategory(category) };
+    }, "ai");
     expect((result as any).error).toBeUndefined();
     expect((result as any).fields).toEqual([]);
   });
 
   it("settingsLogic.isCategoryDirty 检测 general 分类未保存改动", async () => {
-    const result = await browser.executeAsync((done: (res: unknown) => void) => {
-      import("/src/settings/settingsLogic.ts")
-        .then((mod) => {
-          // draft 与 snapshot 在 uiMode 上不同 → dirty=true
-          const dirty = mod.isCategoryDirty(
-            { uiMode: "dark" } as any,
-            { uiMode: "light" } as any,
-            "general"
-          );
-          // 完全相同 → dirty=false
-          const clean = mod.isCategoryDirty(
-            { uiMode: "dark" } as any,
-            { uiMode: "dark" } as any,
-            "general"
-          );
-          done({ dirty, clean });
-        })
-        .catch((err: unknown) => done({ error: String(err) }));
+    const result = await browser.execute(() => {
+      const logic = (window as any).__settingsLogic__;
+      if (!logic) return { error: "window.__settingsLogic__ not exposed" };
+      // draft 与 snapshot 在 uiMode 上不同 → dirty=true
+      const dirty = logic.isCategoryDirty(
+        { uiMode: "dark" } as any,
+        { uiMode: "light" } as any,
+        "general"
+      );
+      // 完全相同 → dirty=false
+      const clean = logic.isCategoryDirty(
+        { uiMode: "dark" } as any,
+        { uiMode: "dark" } as any,
+        "general"
+      );
+      return { dirty, clean };
     });
     expect((result as any).dirty).toBe(true);
     expect((result as any).clean).toBe(false);
   });
 
   it("settingsLogic.restoreCategoryDefaults 将编辑器分类重置为默认值", async () => {
-    const result = await browser.executeAsync((done: (res: unknown) => void) => {
-      import("/src/settings/settingsLogic.ts")
-        .then((mod) => {
-          // 构造一个被修改的 draft
-          const draft = {
-            editorMode: "wysiwyg",
-            editorFontSize: 20,
-            editorLineHeight: 1.8,
-            editorFontFamily: "monospace",
-            showLineNumbers: false,
-            softWrap: false,
-          } as any;
-          const restored = mod.restoreCategoryDefaults(draft, "editor");
-          done({
-            editorMode: restored.editorMode,
-            showLineNumbers: restored.showLineNumbers,
-            softWrap: restored.softWrap,
-          });
-        })
-        .catch((err: unknown) => done({ error: String(err) }));
+    const result = await browser.execute(() => {
+      const logic = (window as any).__settingsLogic__;
+      if (!logic) return { error: "window.__settingsLogic__ not exposed" };
+      // 构造一个被修改的 draft
+      const draft = {
+        editorMode: "wysiwyg",
+        editorFontSize: 20,
+        editorLineHeight: 1.8,
+        editorFontFamily: "monospace",
+        showLineNumbers: false,
+        softWrap: false,
+      } as any;
+      const restored = logic.restoreCategoryDefaults(draft, "editor");
+      return {
+        editorMode: restored.editorMode,
+        showLineNumbers: restored.showLineNumbers,
+        softWrap: restored.softWrap,
+      };
     });
     expect((result as any).error).toBeUndefined();
     // 恢复后应为默认值（split / true / true）
@@ -333,7 +319,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
     expect(whiteSpace).not.toBeNull();
     // CodeMirror 6 的 lineWrapping 设置 .cm-line 的 white-space: pre-wrap
     // 或在 .cm-content 上设置 white-space: pre-wrap
-    expect(whiteSpace).toMatch(/wrap|pre/);
+    expect(whiteSpace).toMatch(/wrap|pre|break-spaces/);
   });
 
   it("关闭软折行后编辑器不折行", async () => {

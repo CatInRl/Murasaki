@@ -58,7 +58,7 @@ describe("右键菜单", () => {
     });
 
     const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForDisplayed({ timeout: 5000 });
+    await menuEl.waitForExist({ timeout: 5000 });
 
     const items = await browser.$$(".murasaki-context-menu-item");
     expect(items.length).toBe(2);

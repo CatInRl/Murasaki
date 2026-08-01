@@ -147,19 +147,20 @@ describe("设置显式 Save 模型", () => {
 
   it("dialog.unsavedChanges 返回 save/discard/cancel 三选一", async () => {
     // 通过 store 调用 unsavedChanges，验证三按钮逻辑
-    // 由于是异步 Promise，需要并行：启动 promise + 点击按钮 + 验证返回值
+    // 使用 execute（同步）启动异步操作并存到 window.__testResult，避免 executeAsync 阻塞会话
 
-    // 启动 unsavedChanges promise（异步等待 resolver）
-    const promise = browser.executeAsync((done: (res: unknown) => void) => {
+    // 1. 启动 unsavedChanges（不阻塞会话）
+    await browser.execute(() => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const dialog = pinia._s.get("dialog");
+      (window as any).__testResult = null;
       dialog.unsavedChanges({ message: "测试未保存" })
-        .then((res: string) => done({ ok: true, res }))
-        .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
+        .then((res: string) => { (window as any).__testResult = { ok: true, res }; })
+        .catch((err: unknown) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
     });
 
-    // 等待对话框出现
+    // 2. 等待对话框出现
     const dialogEl = await browser.$(".dialog-overlay");
     await dialogEl.waitForExist({ timeout: 5000 });
 
@@ -192,21 +193,29 @@ describe("设置显式 Save 模型", () => {
       });
     }
 
-    const result = await promise;
+    // 3. 轮询结果
+    await browser.waitUntil(
+      async () => await browser.execute(() => (window as any).__testResult),
+      { timeout: 5000, interval: 100 }
+    );
+    const result = await browser.execute(() => (window as any).__testResult);
     expect((result as any).ok).toBe(true);
     expect((result as any).res).toBe("discard");
   });
 
   it("dialog.unsavedChanges 选择 \"保存\" 返回 save", async () => {
-    const promise = browser.executeAsync((done: (res: unknown) => void) => {
+    // 1. 启动 unsavedChanges（不阻塞会话）
+    await browser.execute(() => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const dialog = pinia._s.get("dialog");
+      (window as any).__testResult = null;
       dialog.unsavedChanges({ message: "测试保存" })
-        .then((res: string) => done({ ok: true, res }))
-        .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
+        .then((res: string) => { (window as any).__testResult = { ok: true, res }; })
+        .catch((err: unknown) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
     });
 
+    // 2. 等待对话框出现
     const dialogEl = await browser.$(".dialog-overlay");
     await dialogEl.waitForExist({ timeout: 5000 });
 
@@ -230,28 +239,44 @@ describe("设置显式 Save 模型", () => {
       });
     }
 
-    const result = await promise;
+    // 3. 轮询结果
+    await browser.waitUntil(
+      async () => await browser.execute(() => (window as any).__testResult),
+      { timeout: 5000, interval: 100 }
+    );
+    const result = await browser.execute(() => (window as any).__testResult);
     expect((result as any).ok).toBe(true);
     expect((result as any).res).toBe("save");
   });
 
   it("dialog.unsavedChanges Escape 取消返回 cancel", async () => {
-    const promise = browser.executeAsync((done: (res: unknown) => void) => {
+    // 1. 启动 unsavedChanges（不阻塞会话）
+    await browser.execute(() => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const dialog = pinia._s.get("dialog");
+      (window as any).__testResult = null;
       dialog.unsavedChanges({ message: "测试取消" })
-        .then((res: string) => done({ ok: true, res }))
-        .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
+        .then((res: string) => { (window as any).__testResult = { ok: true, res }; })
+        .catch((err: unknown) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
     });
 
+    // 2. 等待对话框出现
     const dialogEl = await browser.$(".dialog-overlay");
     await dialogEl.waitForExist({ timeout: 5000 });
 
-    // 按 Escape
-    await browser.keys(["Escape"]);
+    // 在 dialog overlay 上派发 Escape keydown 事件
+    await browser.execute(() => {
+      const el = document.querySelector('.dialog-overlay');
+      el?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
 
-    const result = await promise;
+    // 3. 轮询结果
+    await browser.waitUntil(
+      async () => await browser.execute(() => (window as any).__testResult),
+      { timeout: 5000, interval: 100 }
+    );
+    const result = await browser.execute(() => (window as any).__testResult);
     expect((result as any).ok).toBe(true);
     expect((result as any).res).toBe("cancel");
   });
@@ -287,36 +312,36 @@ describe("设置显式 Save 模型", () => {
     expect(testProvider).toBeDefined();
 
     // 启动删除流程（AiPanel.vue 中调用 dialog.confirm 后才真正删除）
-    const deletePromise = browser.executeAsync(
-      (id: string, done: (res: unknown) => void) => {
-        // @ts-ignore
-        const pinia = window.__pinia__;
-        const aiProviders = pinia._s.get("aiProviders");
-        const dialog = pinia._s.get("dialog");
+    // 使用 execute（同步）启动异步操作并存到 window.__testResult，避免 executeAsync 阻塞会话
+    // @ts-ignore - webdriverio execute 类型签名较严，运行时支持任意 JSON 可序列化参数
+    await browser.execute((id: string) => {
+      // @ts-ignore
+      const pinia = window.__pinia__;
+      const aiProviders = pinia._s.get("aiProviders");
+      const dialog = pinia._s.get("dialog");
+      (window as any).__testResult = null;
 
-        // 模拟 AiPanel.vue 的删除流程：先弹 confirm，确认后调 deleteProvider
-        dialog.confirm({
-          title: "删除 Provider",
-          message: '确定删除 Provider "Test Provider"？此操作不可撤销。',
-          danger: true,
-          confirmText: "删除",
-        })
-          .then(async (confirmed: boolean) => {
-            if (confirmed) {
-              try {
-                await aiProviders.deleteProvider(id);
-                done({ ok: true, confirmed: true, deleted: true });
-              } catch (err: unknown) {
-                done({ ok: true, confirmed: true, deleted: false, error: err ? String(err) : null });
-              }
-            } else {
-              done({ ok: true, confirmed: false, deleted: false });
+      // 模拟 AiPanel.vue 的删除流程：先弹 confirm，确认后调 deleteProvider
+      dialog.confirm({
+        title: "删除 Provider",
+        message: '确定删除 Provider "Test Provider"？此操作不可撤销。',
+        danger: true,
+        confirmText: "删除",
+      })
+        .then(async (confirmed: boolean) => {
+          if (confirmed) {
+            try {
+              await aiProviders.deleteProvider(id);
+              (window as any).__testResult = { ok: true, confirmed: true, deleted: true };
+            } catch (err: unknown) {
+              (window as any).__testResult = { ok: true, confirmed: true, deleted: false, error: err ? String(err) : null };
             }
-          })
-          .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-      },
-      testProvider.id
-    );
+          } else {
+            (window as any).__testResult = { ok: true, confirmed: false, deleted: false };
+          }
+        })
+        .catch((err: unknown) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
+    }, testProvider.id);
 
     // 等待 confirm 对话框出现
     const dialogEl = await browser.$(".dialog-overlay");
@@ -347,7 +372,12 @@ describe("设置显式 Save 模型", () => {
       });
     }
 
-    const result = await deletePromise;
+    // 轮询结果
+    await browser.waitUntil(
+      async () => await browser.execute(() => (window as any).__testResult),
+      { timeout: 5000, interval: 100 }
+    );
+    const result = await browser.execute(() => (window as any).__testResult);
     expect((result as any).ok).toBe(true);
     expect((result as any).confirmed).toBe(true);
     expect((result as any).deleted).toBe(true);
@@ -381,28 +411,31 @@ describe("设置显式 Save 模型", () => {
     expect(addResult as any).toMatchObject({ ok: true });
 
     // 启动删除流程但选取消
-    const deletePromise = browser.executeAsync(
-      (name: string, done: (res: unknown) => void) => {
-        // @ts-ignore
-        const pinia = window.__pinia__;
-        const aiProviders = pinia._s.get("aiProviders");
-        const dialog = pinia._s.get("dialog");
-        const provider = aiProviders.providers.find((p: any) => p.name === name);
-        if (!provider) return done({ ok: false, error: "provider not found" });
+    // 使用 execute（同步）启动异步操作并存到 window.__testResult，避免 executeAsync 阻塞会话
+    // @ts-ignore - webdriverio execute 类型签名较严，运行时支持任意 JSON 可序列化参数
+    await browser.execute((name: string) => {
+      // @ts-ignore
+      const pinia = window.__pinia__;
+      const aiProviders = pinia._s.get("aiProviders");
+      const dialog = pinia._s.get("dialog");
+      const provider = aiProviders.providers.find((p: any) => p.name === name);
+      (window as any).__testResult = null;
+      if (!provider) {
+        (window as any).__testResult = { ok: false, error: "provider not found" };
+        return;
+      }
 
-        dialog.confirm({
-          title: "删除 Provider",
-          message: `确定删除 Provider "${name}"？此操作不可撤销。`,
-          danger: true,
-          confirmText: "删除",
+      dialog.confirm({
+        title: "删除 Provider",
+        message: `确定删除 Provider "${name}"？此操作不可撤销。`,
+        danger: true,
+        confirmText: "删除",
+      })
+        .then((confirmed: boolean) => {
+          (window as any).__testResult = { ok: true, confirmed };
         })
-          .then((confirmed: boolean) => {
-            done({ ok: true, confirmed });
-          })
-          .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
-      },
-      "Cancel Test Provider"
-    );
+        .catch((err: unknown) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
+    }, "Cancel Test Provider");
 
     // 等待对话框出现
     const dialogEl = await browser.$(".dialog-overlay");
@@ -428,7 +461,12 @@ describe("设置显式 Save 模型", () => {
       });
     }
 
-    const result = await deletePromise;
+    // 轮询结果
+    await browser.waitUntil(
+      async () => await browser.execute(() => (window as any).__testResult),
+      { timeout: 5000, interval: 100 }
+    );
+    const result = await browser.execute(() => (window as any).__testResult);
     expect((result as any).ok).toBe(true);
     expect((result as any).confirmed).toBe(false);
 

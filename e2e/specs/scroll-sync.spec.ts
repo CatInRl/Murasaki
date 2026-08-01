@@ -46,23 +46,23 @@ describe("编辑器预览双向滚动同步", () => {
       "",
       "## 第一节",
       "",
-      "这是第一节的内容。" + "测试内容 ".repeat(50),
+      "这是第一节的内容。" + "测试内容 ".repeat(80),
       "",
       "## 第二节",
       "",
-      "这是第二节的内容。" + "测试内容 ".repeat(50),
+      "这是第二节的内容。" + "测试内容 ".repeat(80),
       "",
       "## 第三节",
       "",
-      "这是第三节的内容。" + "测试内容 ".repeat(50),
+      "这是第三节的内容。" + "测试内容 ".repeat(80),
       "",
       "## 第四节",
       "",
-      "这是第四节的内容。" + "测试内容 ".repeat(50),
+      "这是第四节的内容。" + "测试内容 ".repeat(80),
       "",
       "## 第五节",
       "",
-      "这是第五节的内容。" + "测试内容 ".repeat(50),
+      "这是第五节的内容。" + "测试内容 ".repeat(80),
       "",
     ].join("\n");
 
@@ -127,26 +127,25 @@ describe("编辑器预览双向滚动同步", () => {
       return el ? el.scrollTop : 0;
     });
 
-    // 通过 CodeMirror API 滚动编辑器到文档底部
+    // 通过 __editorRef__.scrollToLine 滚动编辑器到文档底部
+    // EditorView 未暴露在 window 上，故使用 SourceEditor 暴露的 scrollToLine
     await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
-      const view = window.__editorRef__?.getView?.();
-      if (!view) return done("no editor view");
+      const ref = window.__editorRef__;
+      if (!ref) return done("no editor ref");
       try {
+        const view = ref.getView?.();
+        if (!view) return done("no editor view");
         const lastLine = view.state.doc.lines;
-        const lastLinePos = view.state.doc.line(lastLine).from;
-        view.dispatch({
-          effects: (window as any).EditorView?.scrollIntoView?.(lastLinePos, { y: "start" })
-            ?? view.state.scrollIntoView(lastLinePos),
-        });
+        ref.scrollToLine?.(lastLine);
         done(null);
       } catch (e) {
         done(String(e));
       }
     });
 
-    // 等待 scrollSync 节流（50ms）+ 滚动动画
-    await browser.pause(500);
+    // 等待 scrollSync 节流（50ms）+ 滚动动画 + 渲染
+    await browser.pause(2000);
 
     // 验证预览 scrollTop 变化
     const finalPreviewScroll = await browser.execute(() => {

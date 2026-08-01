@@ -88,7 +88,8 @@ describe("跨文件搜索结果跳转", () => {
     expect(result as any).toMatchObject({ ok: true });
     // abc123 应在 file-a.md 和 sub/file-c.md 中找到
     expect((result as any).resultsCount).toBeGreaterThanOrEqual(2);
-    const filePaths = (result as any).results.map((r: any) => r.filePath);
+    const filePaths = (result as any).results
+      .map((r: any) => r.filePath.replace(/\\/g, "/"));
     expect(filePaths).toEqual(expect.arrayContaining([
       resolve(wsPath, "file-a.md").replace(/\\/g, "/"),
       resolve(wsPath, "sub/file-c.md").replace(/\\/g, "/"),

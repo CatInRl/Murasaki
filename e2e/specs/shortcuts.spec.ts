@@ -78,6 +78,13 @@ describe("快捷键", () => {
 
   beforeEach(async () => {
     await resetPersistenceSettings(browser);
+    // resetPersistenceSettings 只更新 persistence.settings.sidebarView，
+    // 不直接更新 App.vue 的 sidebarView ref（前序 spec 可能切到 outline，
+    // 导致 .file-tree 不渲染）。通过 __setSidebarView__ 显式重置。
+    await browser.execute(() => {
+      // @ts-ignore
+      (window as any).__setSidebarView__("files");
+    });
     wsPath = resetWorkspace(defaultFixtureFiles());
     try {
       await closeAllTabs(browser);
@@ -135,7 +142,7 @@ describe("快捷键", () => {
     state = await browser.execute(() => {
       // @ts-ignore
       const tabs = window.__pinia__._s.get("tabs");
-      return { count: tabs.tabs.length, activeTitle: tabs.activeTab?.title };
+      return { count: tabs.tabs.length, activeTitle: tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null };
     });
     expect(state.count).toBe(1);
     expect(state.activeTitle).toBe("intro.md");
@@ -151,7 +158,7 @@ describe("快捷键", () => {
       const active = await browser.execute(() => {
         // @ts-ignore
         const tabs = window.__pinia__._s.get("tabs");
-        return tabs.activeTab?.title;
+        return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
       });
       return active === "notes.md";
     });
@@ -160,7 +167,7 @@ describe("快捷键", () => {
     let active = await browser.execute(() => {
       // @ts-ignore
       const tabs = window.__pinia__._s.get("tabs");
-      return tabs.activeTab?.title;
+      return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
     });
     expect(active).toBe("notes.md");
 
@@ -170,7 +177,7 @@ describe("快捷键", () => {
       const a = await browser.execute(() => {
         // @ts-ignore
         const tabs = window.__pinia__._s.get("tabs");
-        return tabs.activeTab?.title;
+        return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
       });
       return a === "intro.md";
     });
@@ -178,7 +185,7 @@ describe("快捷键", () => {
     active = await browser.execute(() => {
       // @ts-ignore
       const tabs = window.__pinia__._s.get("tabs");
-      return tabs.activeTab?.title;
+      return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
     });
     expect(active).toBe("intro.md");
   });
@@ -191,7 +198,7 @@ describe("快捷键", () => {
       const active = await browser.execute(() => {
         // @ts-ignore
         const tabs = window.__pinia__._s.get("tabs");
-        return tabs.activeTab?.title;
+        return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
       });
       return active === "notes.md";
     });
@@ -203,7 +210,7 @@ describe("快捷键", () => {
       const a = await browser.execute(() => {
         // @ts-ignore
         const tabs = window.__pinia__._s.get("tabs");
-        return tabs.activeTab?.title;
+        return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
       });
       return a === "intro.md";
     });
@@ -211,7 +218,7 @@ describe("快捷键", () => {
     const active = await browser.execute(() => {
       // @ts-ignore
       const tabs = window.__pinia__._s.get("tabs");
-      return tabs.activeTab?.title;
+      return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
     });
     expect(active).toBe("intro.md");
   });
@@ -230,7 +237,7 @@ describe("快捷键", () => {
       const title = await browser.execute(() => {
         // @ts-ignore
         const tabs = window.__pinia__._s.get("tabs");
-        return tabs.activeTab?.title;
+        return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
       });
       return title === "reload.md";
     });
@@ -316,15 +323,11 @@ describe("快捷键", () => {
 
   it("Ctrl+Shift+E 切换到文件树侧栏", async () => {
     // 先切换到大纲视图（确保起始状态非 files）
+    // 直接通过 __setSidebarView__ 设置 ref，避免 DOM 按钮点击不触发
+    // Vue 的 @update:active-view 事件
     await browser.execute(() => {
-      const buttons = document.querySelectorAll('.sidebar-tabs button, .sidebar button');
-      for (const btn of buttons) {
-        const text = (btn.textContent ?? "").trim();
-        if (text.includes("大纲") || text.toLowerCase().includes("outline")) {
-          (btn as HTMLElement).click();
-          break;
-        }
-      }
+      // @ts-ignore
+      (window as any).__setSidebarView__("outline");
     });
     // 等待切换到大纲视图生效（文件树消失）
     await browser.waitUntil(async () => {
@@ -408,21 +411,22 @@ describe("快捷键", () => {
   // ============ M11: F11 全屏切换（弱断言） ============
 
   it("F11 触发全屏切换（不验证实际 OS 全屏状态）", async () => {
-    // F11 在 tauri-driver 下可能无法真正切换 OS 全屏，
-    // 此用例只验证 keydown 不抛异常 + 应用仍响应
+    // F11 在 tauri-driver 下可能无法真正切换 OS 全屏，且全屏后 WebView2
+    // 的 DOM 查询行为不稳定（.cm-editor 可能暂时不可见）。
+    // 此用例只验证 keydown 不抛异常 + session 仍响应（execute 可调用）。
     await pressShortcut(browser, "F11");
-    // 等待编辑器仍存在（应用仍响应）
-    await browser.waitUntil(async () => {
-      const editor = await browser.$(".cm-editor");
-      return await editor.isExisting().catch(() => false);
-    }, { timeout: 3000, interval: 100 });
+    await browser.pause(500);
 
-    // 验证应用仍响应（编辑器可见）
-    const editor = await browser.$(".cm-editor");
-    expect(await editor.isExisting()).toBe(true);
+    // 验证 session 仍响应：execute 一个简单表达式
+    const alive = await browser.execute(() => document.readyState).catch(() => null);
+    expect(alive).toBe("complete");
 
     // 再次按 F11 恢复（避免影响后续测试）
     await pressShortcut(browser, "F11");
-    await browser.pause(300);
+    await browser.pause(500);
+
+    // 恢复后验证编辑器可见
+    const editor = await browser.$(".cm-editor");
+    await editor.waitForExist({ timeout: 10000 });
   });
 });

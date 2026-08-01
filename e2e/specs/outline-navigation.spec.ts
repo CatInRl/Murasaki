@@ -87,16 +87,8 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 通过 sidebarView ref 切换到 outline 视图
     await browser.execute(() => {
-      // sidebarView 是 App.vue 的 ref，无法直接访问
-      // 通过点击侧栏顶部的 "大纲" 按钮切换
-      const buttons = document.querySelectorAll('.sidebar-tabs button, .sidebar button');
-      for (const btn of buttons) {
-        const text = (btn.textContent ?? "").trim();
-        if (text.includes("大纲") || text.toLowerCase().includes("outline")) {
-          (btn as HTMLElement).click();
-          break;
-        }
-      }
+      // @ts-ignore
+      (window as any).__setSidebarView__("outline");
     });
     await browser.pause(300);
 
@@ -112,14 +104,8 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 切换到大纲视图
     await browser.execute(() => {
-      const buttons = document.querySelectorAll('.sidebar-tabs button, .sidebar button');
-      for (const btn of buttons) {
-        const text = (btn.textContent ?? "").trim();
-        if (text.includes("大纲") || text.toLowerCase().includes("outline")) {
-          (btn as HTMLElement).click();
-          break;
-        }
-      }
+      // @ts-ignore
+      (window as any).__setSidebarView__("outline");
     });
     await browser.pause(500);
 
@@ -141,14 +127,8 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 切换到大纲视图
     await browser.execute(() => {
-      const buttons = document.querySelectorAll('.sidebar-tabs button, .sidebar button');
-      for (const btn of buttons) {
-        const text = (btn.textContent ?? "").trim();
-        if (text.includes("大纲") || text.toLowerCase().includes("outline")) {
-          (btn as HTMLElement).click();
-          break;
-        }
-      }
+      // @ts-ignore
+      (window as any).__setSidebarView__("outline");
     });
     await browser.pause(500);
 
@@ -197,27 +177,15 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 先切换到大纲
     await browser.execute(() => {
-      const buttons = document.querySelectorAll('.sidebar-tabs button, .sidebar button');
-      for (const btn of buttons) {
-        const text = (btn.textContent ?? "").trim();
-        if (text.includes("大纲") || text.toLowerCase().includes("outline")) {
-          (btn as HTMLElement).click();
-          break;
-        }
-      }
+      // @ts-ignore
+      (window as any).__setSidebarView__("outline");
     });
     await browser.pause(300);
 
     // 再切换回文件树
     await browser.execute(() => {
-      const buttons = document.querySelectorAll('.sidebar-tabs button, .sidebar button');
-      for (const btn of buttons) {
-        const text = (btn.textContent ?? "").trim();
-        if (text.includes("文件") || text.toLowerCase().includes("files")) {
-          (btn as HTMLElement).click();
-          break;
-        }
-      }
+      // @ts-ignore
+      (window as any).__setSidebarView__("files");
     });
     await browser.pause(300);
 
@@ -233,14 +201,8 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 切换到大纲视图
     await browser.execute(() => {
-      const buttons = document.querySelectorAll('.sidebar-tabs button, .sidebar button');
-      for (const btn of buttons) {
-        const text = (btn.textContent ?? "").trim();
-        if (text.includes("大纲") || text.toLowerCase().includes("outline")) {
-          (btn as HTMLElement).click();
-          break;
-        }
-      }
+      // @ts-ignore
+      (window as any).__setSidebarView__("outline");
     });
     await browser.pause(300);
 

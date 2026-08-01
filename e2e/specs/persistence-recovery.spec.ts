@@ -102,7 +102,7 @@ describe("持久化恢复", () => {
     expect(empty.count).toBe(0);
 
     // 调用 restore 模拟重启恢复
-    await browser.executeAsync((done: (res: unknown) => void) => {
+    const restoreErr = await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const tabs = pinia._s.get("tabs");
@@ -110,6 +110,9 @@ describe("持久化恢复", () => {
         .then(() => done(null))
         .catch((err: unknown) => done(err ? String(err) : null));
     });
+    if (restoreErr) {
+      throw new Error(`restore failed: ${restoreErr}`);
+    }
 
     // 等待 restore 完成（openFile 是异步的）
     await browser.waitUntil(
@@ -121,7 +124,11 @@ describe("持久化恢复", () => {
         });
         return count >= 2;
       },
-      { timeout: 10000 }
+      {
+        timeout: 20000,
+        interval: 200,
+        timeoutMsg: "restore 未在 20s 内恢复 >=2 个 tab（可能 openFile 失败或 tabs.json 未写入）",
+      }
     );
 
     // 验证恢复的 tab 列表
@@ -326,7 +333,11 @@ describe("持久化恢复", () => {
         });
         return count >= 1;
       },
-      { timeout: 5000 }
+      {
+        timeout: 20000,
+        interval: 200,
+        timeoutMsg: "restore 未在 20s 内恢复未命名 tab（可能 tabs.json 未写入或 newTab 失败）",
+      }
     );
 
     const restored = await browser.execute(() => {

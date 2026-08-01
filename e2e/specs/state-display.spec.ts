@@ -45,6 +45,16 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
 
   beforeEach(async () => {
     await resetPersistenceSettings(browser);
+    // 清空最近打开记录，确保 WelcomePage 的 EmptyState（"暂无最近文件"）能渲染
+    // resetPersistenceSettings 只重置 settings，不清理 recentEntries
+    await browser.execute(() => {
+      // @ts-ignore
+      const pinia = window.__pinia__;
+      const persistence = pinia._s.get("persistence");
+      if (persistence) {
+        persistence.recentEntries = [];
+      }
+    });
     wsPath = resetWorkspace(defaultFixtureFiles());
     try {
       await closeAllTabs(browser);
@@ -87,9 +97,11 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     await ensureSplitMode(browser);
 
     // 触发搜索：查询一个不存在的内容
+    // 必须先设置 search.visible = true，否则 SearchPanel 不会挂载（App.vue: v-if="searchStore.visible"）
     await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
+      search.visible = true;
       search.setQuery("zzz_no_match_keyword_xyz_12345");
       Promise.resolve(search.search())
         .then(() => done(null))
@@ -124,21 +136,11 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     await openFileInTab(browser, mdPath);
     await browser.pause(500);
 
-    // 切换到大纲视图
+    // 切换到大纲视图（通过 App.vue 暴露的 test hook）
+    // Sidebar 切换按钮使用 aria-label 而非 textContent，DOM 文本匹配无法命中
     await browser.execute(() => {
-      const buttons = document.querySelectorAll(
-        '.sidebar-tabs button, .sidebar button'
-      );
-      for (const btn of buttons) {
-        const text = (btn.textContent ?? "").trim();
-        if (
-          text.includes("大纲") ||
-          text.toLowerCase().includes("outline")
-        ) {
-          (btn as HTMLElement).click();
-          break;
-        }
-      }
+      // @ts-ignore
+      window.__setSidebarView__("outline");
     });
     await browser.pause(500);
 
@@ -206,9 +208,11 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     // 触发搜索并立即检查 Skeleton（在 search 完成前）
     // search() 内部会设 loading=true，Rust 命令返回后置 false
     // 由于搜索很快，我们手动设置 loading=true 模拟加载中状态
+    // 必须先设置 search.visible = true，否则 SearchPanel 不会挂载（App.vue: v-if="searchStore.visible"）
     await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
+      search.visible = true;
       search.query = "简介";
       search.loading = true;
     });
@@ -231,6 +235,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
       const search = window.__pinia__._s.get("search");
       search.loading = false;
       search.query = "";
+      search.visible = false;
     });
   });
 
@@ -244,21 +249,10 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     await openFileInTab(browser, mdPath);
     await browser.pause(300);
 
-    // 切换到大纲视图
+    // 切换到大纲视图（通过 App.vue 暴露的 test hook）
     await browser.execute(() => {
-      const buttons = document.querySelectorAll(
-        '.sidebar-tabs button, .sidebar button'
-      );
-      for (const btn of buttons) {
-        const text = (btn.textContent ?? "").trim();
-        if (
-          text.includes("大纲") ||
-          text.toLowerCase().includes("outline")
-        ) {
-          (btn as HTMLElement).click();
-          break;
-        }
-      }
+      // @ts-ignore
+      window.__setSidebarView__("outline");
     });
     await browser.pause(300);
 
@@ -309,6 +303,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
+      search.visible = true;
       search.query = "测试";
       search.loading = true;
     });
@@ -328,6 +323,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
       const search = window.__pinia__._s.get("search");
       search.loading = false;
       search.query = "";
+      search.visible = false;
     });
   });
 });

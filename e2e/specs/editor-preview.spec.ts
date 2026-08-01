@@ -104,43 +104,35 @@ describe("编辑器 + 预览 同步", () => {
     expect(await checkbox.isDisplayed()).toBe(true);
   });
 
-  it("切换主题后预览根元素类名变化", async () => {
+  it("切换主题后预览根元素主题属性变化", async () => {
     const ws = resetWorkspace(defaultFixtureFiles());
     await openFileInTab(browser, `${ws}/intro.md`);
 
-    // 默认主题
+    // 默认主题（PreviewPane 通过 data-md-theme 属性驱动主题，非 class）
     const preview = await browser.$(".preview-pane");
     await preview.waitForExist({ timeout: 10000 });
-    const initialClass = (await preview.getAttribute("class")).split(/\s+/);
+    const initialTheme = await preview.getAttribute("data-md-theme");
 
-    // 通过 Tauri event API 触发 menu-event（模拟用户点击"主题 -> night"菜单）
-    // 走真实代码路径：App.vue listen -> handleMenuEvent -> currentTheme.value = "night"
-    await browser.executeAsync((theme, done) => {
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "menu-event",
-        payload: `theme-${theme}`
-      }).then(
-        () => done(null),
-        (err) => done(err ? String(err) : null)
-      );
+    // 通过 App.vue 暴露的 __setTheme__ 设置器切换主题（走真实响应式代码路径）
+    // E2E 中 Tauri plugin:event|emit 无法到达前端监听器，故直接调用设置器
+    await browser.execute((theme: string) => {
+      (window as any).__setTheme__?.(theme);
     }, "night");
 
-    // 等待 .theme-night 出现
+    // 等待 data-md-theme 变为 night
     await browser.waitUntil(
       async () => {
-        const cls = (await preview.getAttribute("class")).split(/\s+/);
-        return cls.includes("theme-night");
+        const theme = await preview.getAttribute("data-md-theme");
+        return theme === "night";
       },
       { timeout: 5000 }
     );
 
-    const newClass = (await preview.getAttribute("class")).split(/\s+/);
-    expect(newClass).toContain("theme-night");
-    // 之前的主题类应该被替换
-    const initialTheme = initialClass.find(c => c.startsWith("theme-") && c !== "theme-night");
-    if (initialTheme) {
-      expect(newClass).not.toContain(initialTheme);
+    const newTheme = await preview.getAttribute("data-md-theme");
+    expect(newTheme).toBe("night");
+    // 之前的主题应该被替换
+    if (initialTheme && initialTheme !== "night") {
+      expect(newTheme).not.toBe(initialTheme);
     }
   });
 });

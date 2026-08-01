@@ -39,22 +39,18 @@ async function callExportHtml(
 ): Promise<string> {
   const result = await browser.executeAsync(
     (src: string, t: string, ws: string | null, fp: string | null, done: (res: unknown) => void) => {
-      // @ts-ignore
-      import("/src/composables/useHtmlExport.ts")
-        .then(async (mod: any) => {
-          try {
-            const html = await mod.exportHtml({
-              source: src,
-              theme: t,
-              workspacePath: ws,
-              filePath: fp,
-            });
-            done({ ok: true, html });
-          } catch (err: unknown) {
-            done({ ok: false, error: err ? String(err) : null });
-          }
-        })
-        .catch((err: unknown) => done({ ok: false, error: `import failed: ${err ? String(err) : null}` }));
+      const fn = (window as any).__exportHtml__;
+      if (!fn) {
+        done({ ok: false, error: "window.__exportHtml__ not exposed" });
+        return;
+      }
+      try {
+        fn({ source: src, theme: t, workspacePath: ws, filePath: fp })
+          .then((html: string) => done({ ok: true, html }))
+          .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
+      } catch (err: unknown) {
+        done({ ok: false, error: err ? String(err) : null });
+      }
     },
     source,
     theme,
@@ -105,8 +101,9 @@ describe("HTML 导出", () => {
     expect(html).toContain("</html>");
     expect(html).toContain("<style>");
     expect(html).toContain("markdown-body");
-    // markdown-it 渲染：# 测试标题 → <h1>测试标题</h1>
-    expect(html).toContain("<h1>测试标题</h1>");
+    // markdown-it 渲染：# 测试标题 → <h1 ...>测试标题</h1>
+    // （attachSourceLinePlugin 给块级元素加 data-source-line 属性，断言用宽松匹配）
+    expect(html).toMatch(/<h1[^>]*>测试标题<\/h1>/);
     // 加粗渲染
     expect(html).toContain("<strong>加粗</strong>");
   });
@@ -200,6 +197,7 @@ describe("HTML 导出", () => {
     expect(existsSync(outPath)).toBe(true);
     const fileContent = readFileSync(outPath, "utf-8");
     expect(fileContent).toBe(html);
-    expect(fileContent).toContain("# 磁盘写入测试");
+    // markdown 已被渲染为 <h1>，不应残留 # 源码标记
+    expect(fileContent).toMatch(/<h1[^>]*>磁盘写入测试<\/h1>/);
   });
 });

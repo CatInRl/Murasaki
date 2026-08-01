@@ -16,14 +16,33 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
-import { resetWorkspace, defaultFixtureFiles, setupActiveProvider, teardownActiveProvider } from "../helpers/fixtures";
+import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, dismissAllDialogs, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
 
 let browser: Browser;
 
-// 工具调用可见性测试需要 provider 配置才能渲染对话区
-// （AgentPanel 在 showNoProvider=true 时显示"未配置 AI 服务"空状态，遮挡消息列表）
-const API_KEY = process.env.MURASAKI_E2E_API_KEY ?? "";
+/**
+ * 注入 mock AI provider，使 AgentPanel 渲染对话区而非"未配置 AI 服务"空状态。
+ * 不依赖真实 API key（与 agent-panel-visual.spec.ts 中 injectMockProvider 同一模式）。
+ */
+async function injectMockProvider(browser: Browser): Promise<void> {
+  await browser.execute(() => {
+    // @ts-ignore
+    const aiProviders = window.__pinia__._s.get("aiProviders");
+    aiProviders.providers = [
+      {
+        id: "mock-provider",
+        name: "Mock Provider",
+        type: "deepseek",
+        baseUrl: "https://api.mock.test",
+        model: "mock-model",
+        apiKeyEnc: "",
+        isActive: true,
+      },
+    ];
+  });
+  await browser.pause(200);
+}
 
 describe("Agent 上下文 + 工具调用可见性", () => {
   beforeAll(async () => {
@@ -33,7 +52,6 @@ describe("Agent 上下文 + 工具调用可见性", () => {
 
   afterAll(async () => {
     if (browser) {
-      try { await teardownActiveProvider(browser); } catch { /* ignore */ }
       await closeSession(browser);
     }
   });
@@ -57,25 +75,9 @@ describe("Agent 上下文 + 工具调用可见性", () => {
       const agent = pinia._s.get("agent");
       if (agent) agent.clearConversation();
     });
-    // 配置 provider，确保 AgentPanel 渲染对话区而非"未配置 AI 服务"空状态
+    // 注入 mock provider，确保 AgentPanel 渲染对话区而非"未配置 AI 服务"空状态
     // 工具调用可见性测试（test 6/7/8）依赖对话区渲染
-    try { await teardownActiveProvider(browser); } catch { /* ignore */ }
-    if (API_KEY) {
-      try {
-        await setupActiveProvider(browser, API_KEY);
-        // 验证 provider 已配置
-        const hasProvider = await browser.execute(() => {
-          // @ts-ignore
-          return window.__pinia__._s.get("aiProviders").hasProvider;
-        });
-        console.log(`[beforeEach] setupActiveProvider ok, hasProvider=${hasProvider}`);
-      } catch (err) {
-        console.error(`[beforeEach] setupActiveProvider failed:`, err instanceof Error ? err.message : String(err));
-        throw err;
-      }
-    } else {
-      console.warn(`[beforeEach] API_KEY is empty, skipping provider setup`);
-    }
+    await injectMockProvider(browser);
   });
 
   it("无工作区时显示「打开工作区后启用 Agent」空状态", async () => {
@@ -172,7 +174,7 @@ describe("Agent 上下文 + 工具调用可见性", () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
-    // provider 已在 beforeEach 中通过 setupActiveProvider 配置，
+    // provider 已在 beforeEach 中通过 injectMockProvider 配置，
     // AgentPanel 渲染对话区而非"未配置 AI 服务"空状态。
 
     // 调试：检查 AgentPanel 状态
