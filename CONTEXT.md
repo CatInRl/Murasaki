@@ -45,6 +45,8 @@ murasaki/
 - 保存（`Ctrl+S`）
 - 另存为…（`Ctrl+Shift+S`）
 - 导出 HTML… —— 导出当前 tab 为独立 HTML，弹出"另存为"对话框。
+- 导出 PDF… —— 导出当前 tab 为 PDF（WebView2 PrintToPdf 静默导出，0.4.0 起）。
+- 复制为富文本 —— 将当前 tab 渲染后的富文本（含格式）复制到系统剪贴板，粘贴到 Word/飞书等保留格式（0.4.0 起）。
 - 关闭标签页（`Ctrl+W`）
 - 重新加载文件（`Ctrl+R`）—— 手动刷新外部修改
 - 关闭工作区 —— 关闭后回到欢迎页（空状态），显示打开入口与最近打开列表。
@@ -96,7 +98,7 @@ markdown 格式操作菜单：
 
 - 查看文档 —— 打开项目 GitHub Pages 或本地 README
 - 关于 Murasaki
-- 检查更新… —— 当前为占位，点击提示"暂不支持自动更新，请手动下载"。后续用 Tauri `updater` plugin 实现
+- 检查更新… —— 检查是否有新版本，有则弹对话框显示版本号与发布说明，可选「立即更新 / 稍后」。0.4.0 起通过 Tauri `updater` plugin + GitHub Releases 实现（详见 [ADR-0012](docs/adr/0012-auto-update-via-tauri-updater-with-github-releases.md)）。启动时静默检查更新（可在设置关闭），有新版本时菜单图标显示红点提示。
 
 ## 编辑模式 (Edit Mode)
 
@@ -118,6 +120,16 @@ markdown 格式操作菜单：
 - **P0（必须）**：行级语法标记隐藏 + 基础渲染（标题/粗体/斜体/删除线/行内代码/列表/引用/分隔线）
 - **P1（应该）**：块级元素 widget（代码块/链接/图片/表格/数学公式/Mermaid）
 - **P2/P3（遗留后续版本）**：YAML frontmatter 卡片 / emoji 短代码替换 / 脚注 / TOC / HTML 内联
+
+### WYSIWYG 补全项（0.4.0）
+
+0.4.0 补齐 0.3.0 遗留的 P2/P3 项（除 TOC 移至 0.5.0）：
+
+- **Emoji 短代码替换** —— WYSIWYG 模式下 `:smile:` 等短代码直接渲染为 emoji 字符（修改源码替换为 emoji 字符，非仅视觉隐藏）。详见 issue #99。
+- **YAML frontmatter 卡片交互** —— frontmatter 渲染为卡片，点击切源码模式并定位到 frontmatter 起始行。详见 issue #100。
+- **脚注定义原位渲染** —— `[^1]` 脚注定义在原位渲染为脚注列表项（而非文末汇聚），点击引用跳转。详见 issue #101。
+- **内联 HTML 安全渲染** —— 通过 DOMPurify 净化 + 白名单标签渲染内联 HTML，防 XSS。详见 issue #103。
+- **TOC 支持** —— 移至 0.5.0（当前已有大纲视图覆盖导航需求）。详见 issue #102。
 
 ### WYSIWYG 光标行为
 
@@ -146,11 +158,11 @@ markdown 渲染样式的预设组合，影响预览区的内容外观（标题�
 
 应用级配置入口，形态为**独立的 Tauri 多窗口**（0.3.0 起，详见 [ADR-0009](docs/adr/0009-settings-window-as-tauri-multi-window.md)）。左侧分类导航，右侧表单。通过"文件 → 设置…"打开，作为独立 OS 窗口存在（可独立最小化/关闭，主窗口不被遮挡）。
 
-### 设置分类（0.3.0，3 个）
+### 设置分类（0.4.0，3 个）
 
-- **常规** —— UI 模式（亮色/暗色/跟随系统）/ 显示隐藏文件 / 显示 Agent 面板 / 默认图片目录
+- **常规** —— UI 模式（亮色/暗色/跟随系统）/ 显示隐藏文件 / 显示 Agent 面板 / 默认图片目录 / 语言（中文/English，0.4.0 起，详见 [ADR-0013](docs/adr/0013-i18n-via-vue-i18n-with-zh-cn-and-en-bilingual.md)）/ 启动时检查更新（0.4.0 起，默认开）
 - **编辑器** —— 编辑模式（source/split/wysiwyg）/ 字体大小 / 行高 / 字体族 / 显示行号 / 软折行
-- **AI** —— Provider 列表 + 编辑表单 / 默认 Provider / 高级参数折叠区（4 项统一设置：Agent 循环轮数上限 / 单次请求 token 上限 / 累计 token 软上限 / propose_replace 二次确认阈值）
+- **AI** —— Provider 列表 + 编辑表单（类型含 OpenAI 兼容与 Anthropic，0.4.0 起，详见 [ADR-0011](docs/adr/0011-provider-interface-abstraction-with-openai-and-anthropic-dual-implementation.md)）/ 默认 Provider / 高级参数折叠区（4 项统一设置：Agent 循环轮数上限 / 单次请求 token 上限 / 累计 token 软上限 / propose_replace 二次确认阈值）
 
 不再设置「主题」分类（markdown 主题通过 OS 原生菜单切换）和「快捷键」分类（后续版本）。
 
@@ -474,19 +486,33 @@ LaTeX 语法的数学公式支持，使用 KaTeX 渲染（轻量、快速）。
 
 ## 导出 (Export)
 
-支持将当前 tab 的 markdown 内容导出为独立 HTML 文件。入口："文件 → 导出 HTML…"，弹出"另存为"对话框选择输出路径。
+支持将当前 tab 的 markdown 内容导出为多种格式。入口集中在"文件"菜单。
 
-### HTML 导出规则
+### HTML 导出
+
+入口："文件 → 导出 HTML…"，弹出"另存为"对话框选择输出路径。
 
 - 将预览区渲染结果嵌入 HTML 模板，引入当前 markdown 主题的 CSS，保证预览与导出一致。
 - Shiki 代码高亮的 CSS 内联写入（不依赖外部文件）。
 - 外部图片（`![](assets/a.png)` 等）自动读取并转为 Base64 内联，确保 HTML 文件独立可分发。
 - 仅导出当前激活的 tab。
 
-### 后续计划
+### PDF 导出（0.4.0 起）
 
-- PDF 导出（使用浏览器打印 API 或外部工具，当前不做，用户可用 HTML 在浏览器中自助打印）。
-- 复制为富文本（粘贴到 Word/飞书时保留格式，留到后续版本）。
+入口："文件 → 导出 PDF…"，弹出"另存为"对话框选择输出路径。
+
+- 采用 WebView2 PrintToPdf API 静默导出（Windows 优先），复用 `exportHtml()` 产出的 HTML，保证导出 PDF = 预览外观。
+- 默认 A4 + 标准边距，0.4.0 不暴露页边距/纸张大小设置项。
+- macOS/Linux 后续版本用 `window.print()` 打印对话框降级。
+- 详见 [ADR-0010](docs/adr/0010-pdf-export-via-webview2-printtopdf.md)。
+
+### 复制为富文本（0.4.0 起）
+
+入口："文件 → 复制为富文本"（专用命令，复制整篇当前 tab）。
+
+- 将当前 tab 渲染后的 HTML（含内联样式）作为富文本写入系统剪贴板，粘贴到 Word/飞书/邮件等保留格式。
+- 复制范围：整篇当前 tab 内容（与导出 HTML 同源，但走剪贴板而非文件）。
+- 不弹对话框，操作完成后 toast 提示"已复制富文本到剪贴板"。
 
 ## Agent (Agent Capability)
 
@@ -539,6 +565,36 @@ LaTeX 语法的数学公式支持，使用 KaTeX 渲染（轻量、快速）。
   - **内容匹配** —— 每个命中文件展开后显示匹配行 + 上下文。
 - 点击结果项跳转到对应文件（若无 tab 则新开）并定位到匹配行。
 - 实现路径：Rust 端遍历工作区 `.md` 文件，用 `regex` crate 匹配，返回命中行 + 上下文。
+
+### 跨文件搜索重构（0.4.0）
+
+issue #104 范围：性能修复 + UX 导航。
+
+- **性能**：搜索改为异步可取消（AbortSignal）、结果上限（避免超大工作区卡顿）、增量返回（边搜边显示）。
+- **UX**：结果折叠/展开导航优化、搜索进度指示、命中行号显示。
+- 不改变搜索入口与基本能力（正则/大小写/整词）。
+
+## 自动更新 (Auto Update)
+
+0.4.0 起支持应用内自动检查与安装更新。详见 [ADR-0012](docs/adr/0012-auto-update-via-tauri-updater-with-github-releases.md)。
+
+- **分发渠道**：GitHub Releases（`latest.json` manifest + `.sig` 签名文件，由 tauri-action 在 release 构建时自动生成）。
+- **签名机制**：Tauri ed25519 签名密钥对（本地生成，与 Windows 代码签名证书独立）。私钥存 GitHub Actions secret，公钥 baked in 到客户端验签。
+- **检查入口**：「帮助 → 检查更新…」手动检查；启动时静默检查（可在设置关闭）。
+- **更新流程**：检查到新版本 → 弹自定义对话框显示版本号与发布说明 → 「立即更新」下载并安装 → 重启应用。
+- **代码签名证书**（#15/#16）：stretch goal，非阻塞。证书就绪后只在 release.yml 加环境变量，updater 配置不变。
+- **首次启用限制**：0.3.1 及更早版本无 updater plugin，无法自动升级到 0.4.0，用户需手动下载一次。
+
+## 国际化 (Internationalization, i18n)
+
+0.4.0 起支持中英双语 UI。详见 [ADR-0013](docs/adr/0013-i18n-via-vue-i18n-with-zh-cn-and-en-bilingual.md)。
+
+- **框架**：vue-i18n 9.x（前端）+ Rust 端小型翻译表（菜单文案）。
+- **支持语言**：`zh-CN`（中文，默认）/ `en`（英文）。
+- **切换入口**：系统设置 → 常规 → 语言。切换即时生效（前端 vue-i18n 运行时切换 + Rust 菜单重建），无需重启。
+- **持久化**：`settings.json` 的 `language` 字段。
+- **不翻译的内容**：markdown 主题名（GitHub/Newsprint 等）、代码块语言标签、Agent 工具名、markdown 语法。
+- **已知折衷**：前端 vue-i18n 与 Rust 翻译表是两套独立翻译源（0.4.0 仅 30 项菜单文案，可接受；语言数 ≥3 时评估统一方案）。
 
 ## 设计系统基础 (Design System Foundation)
 
