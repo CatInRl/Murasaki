@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
-import { FileText, SearchX } from "lucide-vue-next";
+import { computed, ref, watch } from "vue";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Loader2,
+  SearchX,
+  Square,
+  TriangleAlert,
+} from "lucide-vue-next";
 import { NInput, NCheckbox, NButton, NScrollbar } from "naive-ui";
 import EmptyState from "./EmptyState.vue";
 import Skeleton from "./Skeleton.vue";
@@ -142,12 +150,16 @@ const totalMatches = computed(() => {
   );
 });
 
-const hasResults = computed(
+/**
+ * 是否有任何结果（含增量）—— 与 loading 状态独立
+ * 用于决定 Skeleton vs 结果列表 vs 空态
+ */
+const hasAnyResults = computed(
   () =>
-    (searchStore.results.length > 0 ||
-      searchStore.filenameResults.length > 0) &&
-    !searchStore.loading
+    searchStore.results.length > 0 || searchStore.filenameResults.length > 0
 );
+
+const hasResults = computed(() => hasAnyResults.value && !searchStore.loading);
 
 const showEmpty = computed(
   () =>
@@ -155,6 +167,68 @@ const showEmpty = computed(
     searchStore.results.length === 0 &&
     searchStore.filenameResults.length === 0 &&
     searchStore.query.trim() !== ""
+);
+
+/**
+ * 进度文本：搜索中显示扫描进度与命中数
+ * 完成后显示文件数与命中数（无 total_files）
+ */
+const progressText = computed<string>(() => {
+  if (searchStore.loading) {
+    const total = searchStore.totalFiles;
+    const scanned = searchStore.scannedFiles;
+    const matched = searchStore.matchedCount;
+    if (total > 0) {
+      return `扫描中 ${scanned}/${total} 文件，已找到 ${matched} 处`;
+    }
+    return `扫描中… 已找到 ${matched} 处`;
+  }
+  if (hasResults.value) {
+    return `${searchStore.results.length + searchStore.filenameResults.length} 个文件 / ${totalMatches.value} 处匹配`;
+  }
+  return "";
+});
+
+// ===== 折叠/展开 =====
+/**
+ * 折叠的文件路径集合（用户主动折叠的）
+ * 默认行为：前 DEFAULT_EXPANDED 个文件展开，其余折叠
+ */
+const DEFAULT_EXPANDED = 3;
+const collapsedFiles = ref<Set<string>>(new Set());
+
+/**
+ * 判断分组是否应展开
+ * - 用户显式折叠（在 collapsedFiles 中）→ 折叠
+ * - 用户显式展开（不在 collapsedFiles 中）→ 展开
+ * 初始：前 DEFAULT_EXPANDED 个展开，其余自动折叠
+ */
+function isGroupExpanded(filePath: string, index: number): boolean {
+  if (collapsedFiles.value.has(filePath)) return false;
+  // 未在 collapsed 集合中：默认前 N 个展开，其余折叠
+  // 但只要用户曾经操作过（集合非空），就以集合为准
+  if (collapsedFiles.value.size === 0 && index >= DEFAULT_EXPANDED) {
+    return false;
+  }
+  return true;
+}
+
+function toggleGroup(filePath: string): void {
+  const next = new Set(collapsedFiles.value);
+  if (next.has(filePath)) {
+    next.delete(filePath);
+  } else {
+    next.add(filePath);
+  }
+  collapsedFiles.value = next;
+}
+
+// 搜索开始时重置折叠状态
+watch(
+  () => searchStore.cancelToken,
+  () => {
+    collapsedFiles.value = new Set();
+  }
 );
 
 // ===== 选项切换 =====
@@ -181,6 +255,11 @@ function onClose(): void {
 // ===== 清空搜索（无结果态操作）=====
 function onClearSearch(): void {
   searchStore.clear();
+}
+
+// ===== 取消搜索 =====
+function onCancelSearch(): void {
+  void searchStore.cancelSearch();
 }
 
 // ===== 选中匹配行 =====
@@ -249,9 +328,25 @@ watch(
           全词
         </NCheckbox>
       </div>
-      <span v-if="hasResults" class="search-summary">
-        {{ searchStore.results.length + searchStore.filenameResults.length }} 个文件 / {{ totalMatches }} 处匹配
+      <span v-if="progressText" class="search-summary">
+        <Loader2
+          v-if="searchStore.loading"
+          :size="11"
+          class="spinner-icon"
+          aria-hidden="true"
+        />
+        {{ progressText }}
       </span>
+      <NButton
+        v-if="searchStore.loading"
+        size="tiny"
+        quaternary
+        :title="'取消搜索'"
+        class="cancel-btn"
+        @click="onCancelSearch"
+      >
+        <Square :size="11" aria-hidden="true" />
+      </NButton>
       <NButton
         size="tiny"
         quaternary
@@ -264,10 +359,16 @@ watch(
       </NButton>
     </div>
 
+    <!-- 截断提示 -->
+    <div v-if="searchStore.truncated" class="truncation-banner">
+      <TriangleAlert :size="12" class="truncation-icon" aria-hidden="true" />
+      <span>结果已截断（超过 1000 处命中），请细化查询</span>
+    </div>
+
     <!-- 结果区 -->
     <div class="search-results">
       <NScrollbar>
-        <Skeleton v-if="searchStore.loading" :lines="4" :icon="FileText" />
+        <Skeleton v-if="searchStore.loading && !hasAnyResults" :lines="4" :icon="FileText" />
         <EmptyState
           v-else-if="showEmpty"
           :icon="SearchX"
@@ -275,7 +376,7 @@ watch(
           action-text="清空搜索"
           @action="onClearSearch"
         />
-        <div v-else-if="hasResults" class="results-content">
+        <div v-else-if="hasAnyResults" class="results-content">
           <!-- 文件名匹配分组（展示在内容匹配之前） -->
           <div
             v-if="groupedFilenameResults.length > 0"
@@ -308,34 +409,49 @@ watch(
             </div>
           </div>
 
-          <!-- 内容匹配分组 -->
+          <!-- 内容匹配分组（可折叠） -->
           <div
-            v-for="group in groupedResults"
+            v-for="(group, gIdx) in groupedResults"
             :key="group.filePath"
             class="result-group"
           >
-            <div class="group-header" :title="group.filePath">
+            <div
+              class="group-header group-header--clickable"
+              :title="group.filePath"
+              @click="toggleGroup(group.filePath)"
+            >
+              <component
+                :is="isGroupExpanded(group.filePath, gIdx) ? ChevronDown : ChevronRight"
+                :size="12"
+                class="chevron-icon"
+                aria-hidden="true"
+              />
               <span class="group-path">{{ group.displayPath }}</span>
               <span class="group-count">{{ group.matches.length }}</span>
             </div>
             <div
-              v-for="(match, idx) in group.matches"
-              :key="idx"
-              class="match-line"
-              @click="onSelectMatch(group.filePath, match.lineNumber)"
+              v-if="isGroupExpanded(group.filePath, gIdx)"
+              class="group-matches"
             >
-              <span class="line-number">{{ match.lineNumber }}</span>
-              <span class="line-content">
-                <template
-                  v-for="(seg, sIdx) in highlightLine(match.lineContent)"
-                  :key="sIdx"
-                >
-                  <mark v-if="seg.matched" class="match-highlight">{{
-                    seg.text
-                  }}</mark>
-                  <template v-else>{{ seg.text }}</template>
-                </template>
-              </span>
+              <div
+                v-for="(match, idx) in group.matches"
+                :key="idx"
+                class="match-line"
+                @click="onSelectMatch(group.filePath, match.lineNumber)"
+              >
+                <span class="line-number">{{ match.lineNumber }}</span>
+                <span class="line-content">
+                  <template
+                    v-for="(seg, sIdx) in highlightLine(match.lineContent)"
+                    :key="sIdx"
+                  >
+                    <mark v-if="seg.matched" class="match-highlight">{{
+                      seg.text
+                    }}</mark>
+                    <template v-else>{{ seg.text }}</template>
+                  </template>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -380,10 +496,42 @@ watch(
   color: var(--murasaki-muted-foreground);
   flex-shrink: 0;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
+.spinner-icon {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.cancel-btn,
 .close-btn {
   flex-shrink: 0;
+}
+.close-btn {
   font-size: 16px;
+}
+.truncation-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: color-mix(in srgb, var(--murasaki-warning, #f59e0b) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--murasaki-warning, #f59e0b) 30%, transparent);
+  color: var(--murasaki-foreground);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.truncation-icon {
+  color: var(--murasaki-warning, #f59e0b);
+  flex-shrink: 0;
 }
 .search-results {
   flex: 1;
@@ -410,11 +558,24 @@ watch(
   top: 0;
   z-index: 1;
 }
+.group-header--clickable {
+  cursor: pointer;
+  user-select: none;
+}
+.group-header--clickable:hover {
+  background: color-mix(in srgb, var(--murasaki-primary) 6%, var(--murasaki-card));
+}
+.chevron-icon {
+  flex-shrink: 0;
+  color: var(--murasaki-muted-foreground);
+}
 .group-path {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: "Consolas", "Menlo", monospace;
+  flex: 1;
+  min-width: 0;
 }
 .group-count {
   flex-shrink: 0;

@@ -257,6 +257,7 @@ pub fn run() {
 
     builder
         .manage(WatcherState::default())
+        .manage(search::SearchState::default())
         .manage(RecentMenuState::default())
         .invoke_handler(tauri::generate_handler![
             files::list_tree,
@@ -272,6 +273,7 @@ pub fn run() {
             files::path_type,
             files::reveal_in_explorer,
             search::search_workspace,
+            search::cancel_search,
             outline::parse_outline,
             outline::invalidate_outline_cache,
             outline::clear_outline_cache,

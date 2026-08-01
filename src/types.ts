@@ -71,10 +71,34 @@ export interface SearchResult {
  * 搜索响应（与 Rust 端 SearchResponse 对齐）
  * - contentResults: 内容匹配结果
  * - filenameResults: 文件名匹配结果（仅路径字符串）
+ * - truncated: 是否因达到结果上限而被截断（前端用于提示「结果已截断，请细化查询」）
  */
 export interface SearchResponse {
   contentResults: SearchResult[];
   filenameResults: string[];
+  truncated: boolean;
+}
+
+/**
+ * 搜索进度事件 payload（与 Rust 端 SearchProgressEvent 对齐）
+ * 通过 `search-progress` Tauri 事件推送给前端
+ */
+export interface SearchProgressEvent {
+  scannedFiles: number;
+  totalFiles: number;
+  matchedFiles: number;
+  matchedCount: number;
+  cancelToken: string;
+}
+
+/**
+ * 搜索结果增量事件 payload（与 Rust 端 SearchResultChunkEvent 对齐）
+ * 通过 `search-result-chunk` Tauri 事件推送给前端，每命中一个文件发出一次
+ */
+export interface SearchResultChunkEvent {
+  cancelToken: string;
+  result: SearchResult | null;
+  filenameMatch: string | null;
 }
 
 /**
