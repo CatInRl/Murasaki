@@ -6,6 +6,7 @@ pub mod drafts;
 pub mod files;
 pub mod menu;
 pub mod outline;
+pub mod pdf;
 pub mod search;
 pub mod settings;
 pub mod watcher;

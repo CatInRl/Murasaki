@@ -29,6 +29,11 @@ export interface FileActionsDeps {
     alert: (opts: { message: string; variant?: "info" | "warning" | "error"; title?: string }) => void;
     confirm: (opts: { message: string; danger?: boolean }) => Promise<boolean>;
   };
+  /** toast 反馈（PDF 导出成功/失败提示） */
+  toast: {
+    success: (title: string) => void;
+    error: (title: string) => void;
+  };
   /** 当前激活 tab（computed 或 getter） */
   activeTab: { value: Tab | null };
   /** 当前主题（用于 HTML 导出） */
@@ -41,7 +46,7 @@ export interface FileActionsDeps {
  * 从 App.vue 提取，保持原有行为不变。
  */
 export function useFileActions(deps: FileActionsDeps) {
-  const { tabsStore, workspace, persistence, dialog, activeTab, currentTheme } = deps;
+  const { tabsStore, workspace, persistence, dialog, toast, activeTab, currentTheme } = deps;
 
   async function openFile(path: string): Promise<void> {
     try {
@@ -151,6 +156,36 @@ export function useFileActions(deps: FileActionsDeps) {
     }
   }
 
+  async function exportCurrentPdf(): Promise<void> {
+    if (!activeTab.value) {
+      dialog.alert({ message: "请先打开一个文件", variant: "warning" });
+      return;
+    }
+    const tab = activeTab.value;
+    const defaultName = tab.path
+      ? basename(tab.path).replace(/\.md$/i, "") + ".pdf"
+      : "untitled.pdf";
+    const selected = await saveDialog({
+      defaultPath: defaultName,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+      title: "导出 PDF",
+    });
+    if (typeof selected !== "string" || !selected) return;
+    try {
+      const html = await exportHtml({
+        source: tab.content,
+        theme: currentTheme.value,
+        workspacePath: workspace.workspacePath ?? null,
+        filePath: tab.path,
+      });
+      await fileSystem.exportPdf(html, selected);
+      toast.success("已导出 PDF");
+    } catch (err) {
+      console.error("导出 PDF 失败:", err);
+      toast.error(`导出 PDF 失败: ${err}`);
+    }
+  }
+
   function onNewTab(): void {
     tabsStore.newTab("");
   }
@@ -199,6 +234,7 @@ export function useFileActions(deps: FileActionsDeps) {
     saveAsCurrentFile,
     reloadCurrentFile,
     exportCurrentHtml,
+    exportCurrentPdf,
     onNewTab,
     onNewFile,
     onOpenFolder,

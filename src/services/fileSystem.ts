@@ -142,4 +142,14 @@ export const fileSystem = {
       () => null
     );
   },
+
+  // ===== PDF 导出 =====
+
+  /**
+   * 调用 Rust 端 export_pdf 命令，通过 WebView2 PrintToPdf 静默导出 PDF。
+   * 接收完整 HTML 字串（来自 exportHtml）+ 输出路径，返回 void。
+   */
+  async exportPdf(html: string, outputPath: string): Promise<void> {
+    await invoke("export_pdf", { html, outputPath });
+  },
 };

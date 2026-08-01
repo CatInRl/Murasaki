@@ -100,9 +100,9 @@ watch(currentFilePath, (path) => {
 // ===== 文件操作 composable（磁盘 IO 类入口）=====
 const {
   openFile, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
-  reloadCurrentFile, exportCurrentHtml, onNewTab, onNewFile,
+  reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, onNewTab, onNewFile,
   onOpenFolder, onOpenFile, onOpenRecent,
-} = useFileActions({ tabsStore, workspace, persistence, dialog, activeTab, currentTheme });
+} = useFileActions({ tabsStore, workspace, persistence, dialog, toast: toastStore, activeTab, currentTheme });
 
 // ===== 复制为富文本 composable（issue #108，复用 exportHtml 管线，走剪贴板而非文件）=====
 const { copyRichText } = useCopyRichText({
@@ -370,7 +370,7 @@ async function toggleFullscreen(): Promise<void> {
 // ===== 命令分发（菜单事件 + 全局快捷键）=====
 const { handleMenuEvent, onKeyDown } = useCommands({
   onNewTab, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
-  reloadCurrentFile, exportCurrentHtml, copyRichText,
+  reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, copyRichText,
   onCloseTabRequest,
   workspace, tabsStore, searchStore, fileOps, dialog,
   editorRef, currentTheme, sidebarView, statusBarVisible,

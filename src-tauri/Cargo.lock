@@ -2190,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "murasaki"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.22.1",
  "dirs 5.0.1",
@@ -2214,6 +2214,8 @@ dependencies = [
  "trash",
  "uuid",
  "walkdir",
+ "webview2-com",
+ "windows 0.61.3",
 ]
 
 [[package]]

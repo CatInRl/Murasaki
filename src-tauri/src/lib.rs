@@ -9,6 +9,7 @@ use commands::drafts;
 use commands::files;
 use commands::menu::{self, RecentMenuState};
 use commands::outline;
+use commands::pdf;
 use commands::search;
 use commands::settings;
 use commands::watcher::{self, WatcherState};
@@ -288,6 +289,7 @@ pub fn run() {
             menu::update_recent_menu,
             menu::set_theme_checked,
             settings::open_settings,
+            pdf::export_pdf,
             ai_providers::get_ai_providers,
             ai_providers::save_ai_provider,
             ai_providers::delete_ai_provider,
