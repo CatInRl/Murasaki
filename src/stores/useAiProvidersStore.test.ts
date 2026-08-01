@@ -644,14 +644,15 @@ describe("useAiProvidersStore", () => {
   });
 
   describe("getPresets", () => {
-    it("返回预设列表（含 DeepSeek / OpenAI / 自定义）", () => {
+    it("返回预设列表（含 DeepSeek / OpenAI / Anthropic / 自定义）", () => {
       const store = useAiProvidersStore();
       const presets = store.getPresets();
 
-      expect(presets).toHaveLength(3);
+      expect(presets).toHaveLength(4);
       expect(presets.map((p) => p.type)).toEqual([
         "deepseek",
         "openai",
+        "anthropic",
         "custom",
       ]);
     });

@@ -27,9 +27,9 @@ vi.mock("@tauri-apps/api/core", () => ({
   }),
 }));
 
-// Mock OpenAICompatibleProvider
-vi.mock("../agent/OpenAICompatibleProvider", () => ({
-  OpenAICompatibleProvider: vi.fn().mockImplementation(() => ({
+// Mock createProvider（ADR-0011: useAgentStore 改用 createProvider 工厂）
+vi.mock("../agent/Provider", () => ({
+  createProvider: vi.fn().mockImplementation(() => ({
     streamChat: vi.fn(),
     streamChatWithTools: vi.fn().mockResolvedValue({
       hasToolCalls: false,

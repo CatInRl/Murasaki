@@ -11,7 +11,7 @@
  * T8.2 范围：表单显示与编辑（保存即生效）。
  * T8.4：测试连接（testProvider + localStorage 状态指示器）、删除二次确认。
  * T8.5：高级参数可编辑（存 SettingsState，所有 provider 共用）。
- * 移除 Azure OpenAI 选项（spec 决策：统一使用 OpenAICompatibleProvider）。
+ * ADR-0011: 支持 OpenAI 兼容 + Anthropic 双协议（createProvider 工厂按 type 路由）。
  */
 import { ref, computed, watch } from "vue";
 import { Plus, Trash2, Plug, ChevronDown, Eye, EyeOff, Check, X } from "lucide-vue-next";
@@ -289,7 +289,7 @@ function typeLabel(type: AiProvider["type"]): string {
             <div class="setting-row provider-form-row">
               <div class="setting-label-column">
                 <label class="setting-label">类型</label>
-                <span class="setting-description">API 兼容格式（统一使用 OpenAI 兼容）</span>
+                <span class="setting-description">选择 API 协议（OpenAI 兼容或 Anthropic）</span>
               </div>
               <div class="setting-control-column">
                 <div class="select-wrapper">
@@ -308,7 +308,7 @@ function typeLabel(type: AiProvider["type"]): string {
             <div class="setting-row provider-form-row">
               <div class="setting-label-column">
                 <label class="setting-label">API URL</label>
-                <span class="setting-description">OpenAI 兼容端点的基础 URL</span>
+                <span class="setting-description">API 端点的基础 URL</span>
               </div>
               <div class="setting-control-column">
                 <input

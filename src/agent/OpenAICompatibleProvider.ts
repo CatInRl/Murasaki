@@ -5,44 +5,32 @@
  * 通过 baseURL / apiKey / model 配置任意 OpenAI 兼容端点。
  *
  * MVP 固定非思考模式（thinking 参数预留，后续 ticket 启用）。
+ *
+ * ADR-0011: 实现 Provider 接口，共享类型从 Provider.ts 导入并 re-export 保持兼容。
  */
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam, ChatCompletionTool } from "openai/resources/chat/completions";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import type {
+  Provider,
+  ProviderConfig,
+  ChatMessage,
+  ToolSpec,
+  StreamCallbacks,
+  StreamChatWithToolsResult,
+} from "./Provider";
 
-export interface ProviderConfig {
-  baseURL: string;
-  apiKey: string;
-  model: string;
-}
+// Re-export 共享类型（向后兼容：useAgentStore.test.ts 等仍可从此文件导入）
+export type {
+  ProviderConfig,
+  ChatMessage,
+  ToolSpec,
+  StreamCallbacks,
+  StreamChatWithToolsResult,
+  Provider,
+  ProviderType,
+} from "./Provider";
 
-export interface StreamCallbacks {
-  /** 收到 token 时调用 */
-  onToken: (token: string) => void;
-  /** 流式结束时调用 */
-  onDone: () => void;
-  /** 发生错误时调用 */
-  onError: (err: Error) => void;
-}
-
-/** 流式 + 工具调用的结果 */
-export interface StreamChatWithToolsResult {
-  /** 是否有工具调用需要执行 */
-  hasToolCalls: boolean;
-  /** 累积的工具调用列表 */
-  toolCalls: Array<{
-    id: string;
-    name: string;
-    arguments: string;
-  }>;
-  /** LLM 返回的 token 用量（stream_options.include_usage 启用后，最后一个 chunk 携带） */
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
-
-export class OpenAICompatibleProvider {
+export class OpenAICompatibleProvider implements Provider {
   private client: OpenAI;
   private model: string;
   private baseURL: string;
@@ -63,7 +51,7 @@ export class OpenAICompatibleProvider {
    * 流式聊天补全（无工具调用，Ticket #20 用）
    */
   async streamChat(
-    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+    messages: ChatMessage[],
     callbacks: StreamCallbacks,
     signal?: AbortSignal
   ): Promise<void> {
@@ -101,8 +89,8 @@ export class OpenAICompatibleProvider {
    * 因为 openai npm 包的 stream iterator 在 Tauri WebView 2 中会 hang。
    */
   async streamChatWithTools(
-    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
-    tools: ChatCompletionTool[],
+    messages: ChatMessage[],
+    tools: ToolSpec[],
     callbacks: StreamCallbacks,
     signal?: AbortSignal
   ): Promise<StreamChatWithToolsResult> {

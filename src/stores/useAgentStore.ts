@@ -13,7 +13,7 @@ import { useWorkspaceStore } from "./useWorkspaceStore";
 import { useAiProvidersStore } from "./useAiProvidersStore";
 import { usePersistenceStore } from "./usePersistenceStore";
 import { useEditorBridgeStore } from "./useEditorBridgeStore";
-import { OpenAICompatibleProvider } from "../agent/OpenAICompatibleProvider";
+import { createProvider } from "../agent/Provider";
 import { getToolMetadataList, executeTool } from "../agent/tools";
 import {
   compressContext,
@@ -375,7 +375,8 @@ ${content}
     }
 
     // 创建 provider
-    const provider = new OpenAICompatibleProvider({
+    const provider = createProvider({
+      type: activeProvider.type,
       baseURL: activeProvider.baseUrl,
       apiKey,
       model: activeProvider.model,

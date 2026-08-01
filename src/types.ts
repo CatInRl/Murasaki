@@ -170,7 +170,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
 export interface AiProvider {
   id: string;
   name: string;
-  type: "deepseek" | "openai" | "custom";
+  type: "deepseek" | "openai" | "anthropic" | "custom";
   baseUrl: string;
   model: string;
   /** 是否为活动 provider（仅一个可为 true） */
@@ -188,7 +188,7 @@ export interface AiProviderPreset {
 }
 
 /**
- * DeepSeek / OpenAI 默认预设
+ * DeepSeek / OpenAI / Anthropic 默认预设
  */
 export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
   {
@@ -202,6 +202,12 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     label: "OpenAI",
     baseUrl: "https://api.openai.com",
     model: "gpt-4o-mini",
+  },
+  {
+    type: "anthropic",
+    label: "Anthropic",
+    baseUrl: "https://api.anthropic.com",
+    model: "claude-sonnet-4-5-20250929",
   },
   {
     type: "custom",
