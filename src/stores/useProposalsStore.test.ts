@@ -11,12 +11,16 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 
-// Mock Tauri invoke（acceptNewFileProposal 会调用 agent_write_file）
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
+// Mock fileSystem（acceptNewFileProposal 会调用 writeAgentFile / writeText / resolveAgentPath）
+vi.mock("../services/fileSystem", () => ({
+  fileSystem: {
+    writeAgentFile: vi.fn(),
+    writeText: vi.fn().mockResolvedValue(undefined),
+    resolveAgentPath: vi.fn().mockResolvedValue(null),
+  },
 }));
 
-// Mock useWorkspaceStore（动态 import）
+// Mock useWorkspaceStore
 vi.mock("./useWorkspaceStore", () => ({
   useWorkspaceStore: () => ({
     workspacePath: "/workspace",
@@ -41,6 +45,7 @@ vi.mock("../agent/proposals", () => ({
 }));
 
 import { useProposalsStore } from "./useProposalsStore";
+import { fileSystem } from "../services/fileSystem";
 import type { NewFileProposal } from "../types";
 
 function makeNewFileProposal(overrides: Partial<NewFileProposal> = {}): NewFileProposal {
@@ -130,9 +135,8 @@ describe("useProposalsStore - 新文件提议", () => {
       });
       store.addNewFileProposal(proposal);
 
-      // Mock invoke 成功
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+      // Mock writeAgentFile 成功
+      vi.mocked(fileSystem.writeAgentFile).mockResolvedValue({
         docPath: "notes/new.md",
         absolutePath: "/workspace/notes/new.md",
         contentLength: 15,
@@ -187,8 +191,7 @@ describe("useProposalsStore - 新文件提议", () => {
         })
       );
 
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(fileSystem.writeAgentFile).mockResolvedValue({
         docPath: "notes/success.md",
         absolutePath: "/workspace/notes/success.md",
         contentLength: 9,
@@ -198,11 +201,11 @@ describe("useProposalsStore - 新文件提议", () => {
       expect(result).toBe(true);
       expect(store.newFileProposals[0].status).toBe("written");
       expect(store.newFileProposals[0].writtenPath).toBe("/workspace/notes/success.md");
-      expect(invoke).toHaveBeenCalledWith("agent_write_file", {
-        workspace: "/workspace",
-        path: "notes/success.md",
-        content: "# Success",
-      });
+      expect(fileSystem.writeAgentFile).toHaveBeenCalledWith(
+        "/workspace",
+        "notes/success.md",
+        "# Success"
+      );
     });
   });
 
@@ -213,9 +216,8 @@ describe("useProposalsStore - 新文件提议", () => {
         makeNewFileProposal({ id: "nf-conflict", path: "exists.md" })
       );
 
-      const { invoke } = await import("@tauri-apps/api/core");
       // 第一次调用报 file exists，第二次（rename 后）成功
-      (invoke as ReturnType<typeof vi.fn>)
+      vi.mocked(fileSystem.writeAgentFile)
         .mockRejectedValueOnce(new Error("file exists"))
         .mockResolvedValueOnce({
           docPath: "exists-renamed.md",
@@ -241,8 +243,7 @@ describe("useProposalsStore - 新文件提议", () => {
         makeNewFileProposal({ id: "nf-cancel", path: "exists.md" })
       );
 
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      vi.mocked(fileSystem.writeAgentFile).mockRejectedValueOnce(
         new Error("file exists")
       );
 
@@ -259,8 +260,7 @@ describe("useProposalsStore - 新文件提议", () => {
         makeNewFileProposal({ id: "nf-no-resolver", path: "exists.md" })
       );
 
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      vi.mocked(fileSystem.writeAgentFile).mockRejectedValueOnce(
         new Error("file exists")
       );
 
@@ -277,8 +277,7 @@ describe("useProposalsStore - 新文件提议", () => {
         makeNewFileProposal({ id: "nf-outside", path: "../outside.md" })
       );
 
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      vi.mocked(fileSystem.writeAgentFile).mockRejectedValueOnce(
         new Error("path outside workspace")
       );
 
@@ -311,8 +310,7 @@ describe("useProposalsStore - 新文件提议", () => {
         makeNewFileProposal({ id: "nf-test", path: "exists.md" })
       );
 
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      vi.mocked(fileSystem.writeAgentFile).mockRejectedValueOnce(
         new Error("file exists")
       );
 
@@ -322,7 +320,7 @@ describe("useProposalsStore - 新文件提议", () => {
       // 移除解决器
       store.setNewFileConflictResolver(null);
       vi.clearAllMocks();
-      (invoke as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      vi.mocked(fileSystem.writeAgentFile).mockRejectedValueOnce(
         new Error("file exists")
       );
 

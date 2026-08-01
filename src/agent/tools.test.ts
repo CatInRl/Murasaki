@@ -6,12 +6,23 @@
  * - Ticket #22: 3 个文件类工具
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
 import { getToolMetadataList, executeTool } from "./tools";
 import type { ToolContext } from "./tools";
 
 // Mock Tauri invoke（get_outline / 文件类工具用）
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
+}));
+
+// Mock useProposalsStore（propose_new_file / propose_insert / propose_replace 用）
+const addNewFileProposalMock = vi.fn();
+const addProposalMock = vi.fn();
+vi.mock("../stores/useProposalsStore", () => ({
+  useProposalsStore: () => ({
+    addNewFileProposal: addNewFileProposalMock,
+    addProposal: addProposalMock,
+  }),
 }));
 
 /** 构造一个最小可用的 EditorView mock */
@@ -255,8 +266,7 @@ describe("agent tools registry", () => {
     });
 
     it("成功返回大纲", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(invoke).mockResolvedValue([
         { level: 1, text: "Hello", line: 1 },
       ]);
       const ctx = makeCtx(makeEditorView(), "/test.md");
@@ -268,8 +278,7 @@ describe("agent tools registry", () => {
     });
 
     it("invoke 抛错时返回错误结果", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("network"));
+      vi.mocked(invoke).mockRejectedValue(new Error("network"));
       const ctx = makeCtx(makeEditorView(), "/test.md");
       const { result } = await executeTool("get_outline", "{}", ctx);
       expect(result.ok).toBe(false);
@@ -288,8 +297,7 @@ describe("agent tools registry", () => {
     });
 
     it("成功返回文件列表", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue([
+      vi.mocked(invoke).mockResolvedValue([
         "intro.md",
         "sub/deep.md",
       ]);
@@ -306,8 +314,7 @@ describe("agent tools registry", () => {
     });
 
     it("invoke 抛错时返回错误结果", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockRejectedValue(
+      vi.mocked(invoke).mockRejectedValue(
         new Error("workspace not exists")
       );
       const ctx = makeCtx(makeEditorView(), "/test.md", "/bad");
@@ -348,8 +355,7 @@ describe("agent tools registry", () => {
     });
 
     it("成功返回文件内容", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(invoke).mockResolvedValue({
         docPath: "intro.md",
         content: "# Intro",
         contentHash: "abc123",
@@ -374,8 +380,7 @@ describe("agent tools registry", () => {
     });
 
     it("截断文件标记 truncated", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(invoke).mockResolvedValue({
         docPath: "long.md",
         content: "x".repeat(100),
         contentHash: "abc",
@@ -393,8 +398,7 @@ describe("agent tools registry", () => {
     });
 
     it("越界路径由后端拒绝", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockRejectedValue(
+      vi.mocked(invoke).mockRejectedValue(
         new Error("path outside workspace")
       );
       const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
@@ -428,8 +432,7 @@ describe("agent tools registry", () => {
     });
 
     it("空 query 字符串返回空结果（不报错）", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(invoke).mockResolvedValue({
         hits: [],
         totalHits: 0,
         truncated: false,
@@ -446,8 +449,7 @@ describe("agent tools registry", () => {
     });
 
     it("成功返回搜索结果", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(invoke).mockResolvedValue({
         hits: [
           {
             filePath: "intro.md",
@@ -479,8 +481,7 @@ describe("agent tools registry", () => {
     });
 
     it("支持 is_regex 参数", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(invoke).mockResolvedValue({
         hits: [],
         totalHits: 0,
         truncated: false,
@@ -499,8 +500,7 @@ describe("agent tools registry", () => {
     });
 
     it("截断结果标记 truncated", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
-      (invoke as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(invoke).mockResolvedValue({
         hits: [],
         totalHits: 100,
         truncated: true,
@@ -575,30 +575,21 @@ describe("agent tools registry", () => {
     });
 
     it("接受 .md/.markdown/.mdown/.mkd 扩展名", async () => {
-      // Mock useProposalsStore 避免触发 Pinia 初始化
-      const addNewFileProposal = vi.fn();
-      vi.doMock("../stores/useProposalsStore", () => ({
-        useProposalsStore: () => ({ addNewFileProposal }),
-      }));
       const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
       for (const ext of ["new.md", "new.markdown", "new.mdown", "new.mkd"]) {
-        addNewFileProposal.mockClear();
+        addNewFileProposalMock.mockClear();
         const { result } = await executeTool(
           "propose_new_file",
           JSON.stringify({ path: ext, content: "# Hi", label: "Create" }),
           ctx
         );
         expect(result.ok).toBe(true);
-        expect(addNewFileProposal).toHaveBeenCalledTimes(1);
+        expect(addNewFileProposalMock).toHaveBeenCalledTimes(1);
       }
-      vi.doUnmock("../stores/useProposalsStore");
     });
 
     it("成功创建提议并调用 store.addNewFileProposal", async () => {
-      const addNewFileProposal = vi.fn();
-      vi.doMock("../stores/useProposalsStore", () => ({
-        useProposalsStore: () => ({ addNewFileProposal }),
-      }));
+      addNewFileProposalMock.mockClear();
       const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
       const { result, summary } = await executeTool(
         "propose_new_file",
@@ -617,19 +608,15 @@ describe("agent tools registry", () => {
       expect(data.status).toBe("awaiting_user");
       expect(summary).toContain("notes/today.md");
       expect(summary).toContain("3 行");
-      expect(addNewFileProposal).toHaveBeenCalledTimes(1);
-      const proposalArg = addNewFileProposal.mock.calls[0][0];
+      expect(addNewFileProposalMock).toHaveBeenCalledTimes(1);
+      const proposalArg = addNewFileProposalMock.mock.calls[0][0];
       expect(proposalArg.path).toBe("notes/today.md");
       expect(proposalArg.status).toBe("pending");
       expect(proposalArg.label).toBe("创建 today.md");
-      vi.doUnmock("../stores/useProposalsStore");
     });
 
     it("Windows 反斜杠路径转换为正斜杠", async () => {
-      const addNewFileProposal = vi.fn();
-      vi.doMock("../stores/useProposalsStore", () => ({
-        useProposalsStore: () => ({ addNewFileProposal }),
-      }));
+      addNewFileProposalMock.mockClear();
       const ctx = makeCtx(makeEditorView(), "/test.md", "/workspace");
       const { result } = await executeTool(
         "propose_new_file",
@@ -643,9 +630,8 @@ describe("agent tools registry", () => {
       expect(result.ok).toBe(true);
       const data = result.data as { path: string };
       expect(data.path).toBe("sub/deep/note.md");
-      const proposalArg = addNewFileProposal.mock.calls[0][0];
+      const proposalArg = addNewFileProposalMock.mock.calls[0][0];
       expect(proposalArg.path).toBe("sub/deep/note.md");
-      vi.doUnmock("../stores/useProposalsStore");
     });
   });
 });

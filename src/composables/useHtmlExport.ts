@@ -1,9 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
 import { getMarkdownRenderer, getFrontMatter, resolveShikiThemeOption } from "./useMarkdownRenderer";
 import { renderFrontMatterCard } from "./useFrontMatter";
 import { MARKDOWN_THEMES } from "./useTheme";
 import { codeToHtml, type ThemeRegistration } from "shiki";
 import { dirname, extname, joinPaths } from "../utils/path";
+import { fileSystem } from "../services/fileSystem";
 import markdownContentCss from "../styles/markdown-content.css?raw";
 
 /**
@@ -149,9 +149,7 @@ async function inlineImages(
 
     try {
       // 读取文件字节并转 Base64
-      const bytes = await invoke<number[]>("read_binary_file", { path: absPath }).catch(
-        () => null
-      );
+      const bytes = await fileSystem.readBinary(absPath).catch(() => null);
       if (!bytes) continue;
       const binary = String.fromCharCode(...bytes);
       const base64 = btoa(binary);

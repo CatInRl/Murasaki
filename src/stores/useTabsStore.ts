@@ -1,8 +1,8 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { invoke } from "@tauri-apps/api/core";
 import type { Tab, PersistedTab } from "../types";
 import { usePersistenceStore } from "./usePersistenceStore";
+import { fileSystem } from "../services/fileSystem";
 import { basename } from "../utils/path";
 
 /**
@@ -66,18 +66,18 @@ export const useTabsStore = defineStore("tabs", () => {
     }
 
     try {
-      const content = await invoke<string>("read_text_file", { path });
-      const mtime = await invoke<number>("get_file_mtime", { path }).catch(() => 0);
+      const content = await fileSystem.readText(path);
+      const mtime = await fileSystem.getMtime(path);
 
       // 检查是否有草稿（上次未保存的内容）
       let finalContent = content;
       let isDirty = false;
-      const hasDraft = await invoke<boolean>("draft_exists", { path }).catch(() => false);
+      const hasDraft = await fileSystem.draftExists(path);
       if (hasDraft) {
         // 读取草稿与保存时的 knownMtime
         // 注意：read_draft 返回 (String, DraftMeta)，DraftMeta 是对象 {path, draftPath, knownMtime, savedAt}
         // 不是数字，必须从对象中取 knownMtime 字段
-        const [draftContent, draftMeta] = await invoke<[string, { knownMtime: number }]>("read_draft", { path });
+        const [draftContent, draftMeta] = await fileSystem.readDraft(path);
         // 仅当草稿基于的 mtime 与当前文件 mtime 一致时才采用草稿内容
         // 否则磁盘已被外部修改，草稿过期，回退到磁盘内容
         if (draftMeta.knownMtime === mtime) {
@@ -85,7 +85,7 @@ export const useTabsStore = defineStore("tabs", () => {
           isDirty = true;
         } else {
           // 草稿过期，清理掉
-          await invoke("delete_draft", { path }).catch(() => {});
+          await fileSystem.deleteDraft(path);
         }
       }
 
@@ -167,11 +167,8 @@ export const useTabsStore = defineStore("tabs", () => {
     const tab = tabs.value[idx];
     if (tab.isDirty && tab.path) {
       // 写入草稿（保留未保存内容，供下次启动恢复）
-      await invoke("save_draft", {
-        path: tab.path,
-        content: tab.content,
-        knownMtime: tab.lastMtime ?? 0,
-      }).catch((err) => console.error("保存草稿失败:", err));
+      await fileSystem.saveDraft(tab.path, tab.content, tab.lastMtime ?? 0)
+        .catch((err) => console.error("保存草稿失败:", err));
     }
 
     tabs.value.splice(idx, 1);
@@ -212,7 +209,7 @@ export const useTabsStore = defineStore("tabs", () => {
       if (externalContent !== undefined) {
         tab.content = externalContent;
       }
-      const mtime = await invoke<number>("get_file_mtime", { path: filePath }).catch(() => 0);
+      const mtime = await fileSystem.getMtime(filePath);
       tab.lastMtime = mtime;
       // 选择"加载磁盘版本"后，磁盘内容即当前内容，更新快照
       tab.savedContent = tab.content;
@@ -221,7 +218,7 @@ export const useTabsStore = defineStore("tabs", () => {
     } else {
       // keep-local：将 lastMtime 对齐磁盘当前 mtime，保证草稿 knownMtime 与磁盘一致
       // 这样关闭未保存时草稿能被下次启动正确恢复
-      const mtime = await invoke<number>("get_file_mtime", { path: filePath }).catch(() => 0);
+      const mtime = await fileSystem.getMtime(filePath);
       tab.lastMtime = mtime;
       tab.isDirty = true;
       tab.hasExternalChange = true;
@@ -242,8 +239,8 @@ export const useTabsStore = defineStore("tabs", () => {
   async function reloadFromDisk(filePath: string): Promise<void> {
     const tab = getTabByPath(filePath);
     if (!tab) return;
-    const content = await invoke<string>("read_text_file", { path: filePath });
-    const mtime = await invoke<number>("get_file_mtime", { path: filePath }).catch(() => 0);
+    const content = await fileSystem.readText(filePath);
+    const mtime = await fileSystem.getMtime(filePath);
     tab.content = content;
     tab.lastMtime = mtime;
     // 从磁盘重载后，磁盘内容即当前内容，更新快照
@@ -256,8 +253,8 @@ export const useTabsStore = defineStore("tabs", () => {
    * 写入合并后的内容到磁盘并更新 tab（对比窗口保存时调用）
    */
   async function writeMergedContent(filePath: string, mergedContent: string): Promise<void> {
-    await invoke("write_text_file", { path: filePath, content: mergedContent });
-    const mtime = await invoke<number>("get_file_mtime", { path: filePath }).catch(() => 0);
+    await fileSystem.writeText(filePath, mergedContent);
+    const mtime = await fileSystem.getMtime(filePath);
     const tab = getTabByPath(filePath);
     if (tab) {
       tab.content = mergedContent;
@@ -337,16 +334,16 @@ export const useTabsStore = defineStore("tabs", () => {
     if (!tab || !tab.path) {
       throw new Error("无文件路径，请使用另存为");
     }
-    await invoke("write_text_file", { path: tab.path, content: tab.content });
+    await fileSystem.writeText(tab.path, tab.content);
     // 更新 mtime
-    const mtime = await invoke<number>("get_file_mtime", { path: tab.path }).catch(() => 0);
+    const mtime = await fileSystem.getMtime(tab.path);
     tab.lastMtime = mtime;
     // 保存后更新已保存内容快照，确保后续编辑能正确比较 dirty
     tab.savedContent = tab.content;
     tab.isDirty = false;
     tab.hasExternalChange = false;
     // 删除草稿（已保存到磁盘）
-    await invoke("delete_draft", { path: tab.path }).catch(() => {});
+    await fileSystem.deleteDraft(tab.path);
   }
 
   /**
@@ -355,8 +352,8 @@ export const useTabsStore = defineStore("tabs", () => {
   async function saveTabAs(tabId: string, newPath: string): Promise<void> {
     const tab = tabs.value.find((t) => t.id === tabId);
     if (!tab) return;
-    await invoke("write_text_file", { path: newPath, content: tab.content });
-    const mtime = await invoke<number>("get_file_mtime", { path: newPath }).catch(() => 0);
+    await fileSystem.writeText(newPath, tab.content);
+    const mtime = await fileSystem.getMtime(newPath);
     tab.path = newPath;
     tab.lastMtime = mtime;
     // 另存为后磁盘内容即当前内容，更新快照
@@ -372,11 +369,8 @@ export const useTabsStore = defineStore("tabs", () => {
   async function closeAll(): Promise<void> {
     for (const tab of tabs.value) {
       if (tab.isDirty && tab.path) {
-        await invoke("save_draft", {
-          path: tab.path,
-          content: tab.content,
-          knownMtime: tab.lastMtime ?? 0,
-        }).catch((err) => console.error("保存草稿失败:", err));
+        await fileSystem.saveDraft(tab.path, tab.content, tab.lastMtime ?? 0)
+          .catch((err) => console.error("保存草稿失败:", err));
       }
     }
   }

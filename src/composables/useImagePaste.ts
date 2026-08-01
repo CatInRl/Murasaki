@@ -45,12 +45,12 @@ export interface UseImagePaste {
 
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"];
 
-function isImageExt(ext: string): boolean {
+export function isImageExt(ext: string): boolean {
   return IMAGE_EXTENSIONS.includes(ext.toLowerCase());
 }
 
 /** 计算从 fromFile 到 toPath 的相对路径（如 ../assets/foo.png） */
-function relativePath(fromFile: string, toPath: string): string {
+export function relativePath(fromFile: string, toPath: string): string {
   return computeRelativePath(fromFile, toPath);
 }
 
@@ -210,6 +210,3 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
     insertExistingImage,
   };
 }
-
-// 暴露内部工具函数供测试
-export const __test__ = { relativePath, isImageExt };

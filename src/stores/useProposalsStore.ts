@@ -19,6 +19,8 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { EditorView } from "@codemirror/view";
 import { useEditorBridgeStore } from "./useEditorBridgeStore";
+import { useWorkspaceStore } from "./useWorkspaceStore";
+import { fileSystem } from "../services/fileSystem";
 import {
   type Proposal,
   type ProposalStatus,
@@ -283,7 +285,6 @@ export const useProposalsStore = defineStore("proposals", () => {
       proposal.error = undefined;
     }
 
-    const { useWorkspaceStore } = await import("./useWorkspaceStore");
     const workspace = useWorkspaceStore();
     if (!workspace.workspacePath) {
       proposal.status = "error";
@@ -298,16 +299,11 @@ export const useProposalsStore = defineStore("proposals", () => {
     // 限制 5 次以避免无限循环
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const result = await invoke<{
-          docPath: string;
-          absolutePath: string;
-          contentLength: number;
-        }>("agent_write_file", {
-          workspace: workspace.workspacePath,
-          path: pathToWrite,
-          content: contentToWrite,
-        });
+        const result = await fileSystem.writeAgentFile(
+          workspace.workspacePath,
+          pathToWrite,
+          contentToWrite
+        );
         proposal.status = "written";
         proposal.writtenPath = result.absolutePath;
         // 触发文件树刷新（新文件应出现在文件树中）
@@ -343,18 +339,16 @@ export const useProposalsStore = defineStore("proposals", () => {
           if (choice.action === "overwrite") {
             // 直接用 write_text_file 覆盖现有文件
             try {
-              const { invoke } = await import("@tauri-apps/api/core");
-              // resolve 到绝对路径
-              const absPath = await invoke<string>("agent_resolve_workspace_path", {
-                workspace: workspace.workspacePath,
-                path: pathToWrite,
-              }).catch(() => null);
+              const absPath = await fileSystem.resolveAgentPath(
+                workspace.workspacePath,
+                pathToWrite
+              );
               if (!absPath) {
                 proposal.status = "error";
                 proposal.error = "Cannot resolve path for overwrite";
                 return false;
               }
-              await invoke("write_text_file", { path: absPath, content: contentToWrite });
+              await fileSystem.writeText(absPath, contentToWrite);
               proposal.status = "written";
               proposal.writtenPath = absPath;
               try {

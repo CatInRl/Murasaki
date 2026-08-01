@@ -11,6 +11,10 @@
  * 前端中间件参数校验，结构化错误 {ok, data|error}
  */
 
+import { invoke } from "@tauri-apps/api/core";
+import { useProposalsStore } from "../stores/useProposalsStore";
+import type { Proposal } from "./proposals";
+
 /** 工具元数据（发送给 LLM 的 function 定义） */
 export interface ToolMetadata {
   type: "function";
@@ -244,7 +248,6 @@ const getOutline: ToolDef = {
       return { ok: false, error: "No file path (unsaved document)" };
     }
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const items = await invoke<unknown[]>("parse_outline", { path: docPath });
       return { ok: true, data: items };
     } catch (err) {
@@ -277,7 +280,6 @@ const listFiles: ToolDef = {
       return { ok: false, error: "No workspace open" };
     }
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const files = await invoke<string[]>("agent_list_files", { workspace });
       return { ok: true, data: { files } };
     } catch (err) {
@@ -320,7 +322,6 @@ const readFile: ToolDef = {
       return { ok: false, error: "missing required parameter: path" };
     }
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const result = await invoke<{
         docPath: string;
         content: string;
@@ -374,7 +375,6 @@ const searchAcrossFiles: ToolDef = {
       return { ok: false, error: "missing required parameter: query" };
     }
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const result = await invoke<{
         hits: Array<{
           filePath: string;
@@ -455,9 +455,6 @@ const proposeInsert: ToolDef = {
       return { ok: false, error: `from (${from}) exceeds document length (${view.state.doc.length})` };
     }
     try {
-      // Dynamically import to avoid circular dependency
-      type Proposal = import("./proposals").Proposal;
-      const { useProposalsStore } = await import("../stores/useProposalsStore");
       const proposalId = `prop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const lineCount = content.split("\n").length;
       const proposal: Proposal = {
@@ -544,8 +541,6 @@ const proposeReplace: ToolDef = {
       return { ok: false, error: `to (${to}) exceeds document length (${view.state.doc.length})` };
     }
     try {
-      type Proposal = import("./proposals").Proposal;
-      const { useProposalsStore } = await import("../stores/useProposalsStore");
       const proposalId = `prop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const lineCount = content.split("\n").length;
       const proposal: Proposal = {
@@ -646,7 +641,6 @@ const proposeNewFile: ToolDef = {
       return { ok: false, error: "path must end with .md, .markdown, .mdown, or .mkd" };
     }
     try {
-      const { useProposalsStore } = await import("../stores/useProposalsStore");
       const proposalsStore = useProposalsStore();
       const proposalId = `nf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const lineCount = content.split("\n").length;

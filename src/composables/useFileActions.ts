@@ -1,7 +1,7 @@
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
 import { basename } from "../utils/path";
 import { exportHtml } from "./useHtmlExport";
+import { fileSystem } from "../services/fileSystem";
 import type { Ref } from "vue";
 import type { Tab } from "../types";
 
@@ -50,7 +50,7 @@ export function useFileActions(deps: FileActionsDeps) {
       await persistence.addRecent(path, "file");
     } catch (err) {
       console.error("打开文件失败:", err);
-      const exists = await invoke<boolean>("path_exists", { path }).catch(() => false);
+      const exists = await fileSystem.exists(path);
       if (!exists) {
         const fileName = basename(path);
         const shouldRemove = await dialog.confirm({
@@ -144,7 +144,7 @@ export function useFileActions(deps: FileActionsDeps) {
         workspacePath: workspace.workspacePath ?? null,
         filePath: tab.path,
       });
-      await invoke("write_text_file", { path: selected, content: html });
+      await fileSystem.writeText(selected, html);
     } catch (err) {
       console.error("导出 HTML 失败:", err);
       dialog.alert({ message: `导出 HTML 失败: ${err}`, variant: "error" });
@@ -173,7 +173,7 @@ export function useFileActions(deps: FileActionsDeps) {
         await workspace.openWorkspace(path);
       } catch (err) {
         console.error("打开工作区失败:", err);
-        const exists = await invoke<boolean>("path_exists", { path }).catch(() => false);
+        const exists = await fileSystem.exists(path);
         if (!exists) {
           const folderName = basename(path);
           const shouldRemove = await dialog.confirm({

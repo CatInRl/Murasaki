@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
-import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore } from "./useWorkspaceStore";
+import { fileSystem } from "../services/fileSystem";
 import type { TreeNode } from "../types";
 
 /**
@@ -36,6 +36,35 @@ export const useFileOpsStore = defineStore("fileOps", () => {
   /** 注入冲突解决回调 */
   function setConflictResolver(resolver: ConflictResolver | null): void {
     conflictResolver = resolver;
+  }
+
+  /**
+   * 检查目标路径是否存在并解决冲突（消除 4 处重复的 exists+pathType+conflictResolver 模式）
+   *
+   * - 目标不存在：返回 null（无冲突，调用方直接执行操作）
+   * - 目标存在且是目录：抛出错误（spec 禁止覆盖目录）
+   * - 目标存在且是文件：调用 conflictResolver 让用户选择
+   *
+   * @returns 冲突解决结果，或 null 表示无冲突
+   */
+  async function checkAndResolveConflict(
+    targetPath: string,
+    operation: "rename" | "copy",
+    sourcePath: string
+  ): Promise<{ action: "overwrite" | "rename" | "cancel"; newName?: string } | null> {
+    const exists = await fileSystem.exists(targetPath);
+    if (!exists) return null;
+
+    const targetType = await fileSystem.pathType(targetPath);
+    if (targetType === "directory") {
+      throw new Error("无法覆盖目录，请使用不同的名称");
+    }
+
+    if (!conflictResolver) {
+      throw new Error("未配置冲突对话框");
+    }
+
+    return conflictResolver(targetPath, operation, sourcePath);
   }
 
   /** 规范化路径分隔符为 / */
@@ -77,7 +106,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
   async function createFile(dirPath: string, name: string): Promise<TreeNode | null> {
     const fullPath = joinPath(dirPath, name);
     try {
-      const node = await invoke<TreeNode>("create_file", { path: fullPath });
+      const node = await fileSystem.createFile(fullPath);
       await workspace.refreshTree();
       return node;
     } catch (err) {
@@ -92,7 +121,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
   async function createDirectory(dirPath: string, name: string): Promise<TreeNode | null> {
     const fullPath = joinPath(dirPath, name);
     try {
-      const node = await invoke<TreeNode>("create_directory", { path: fullPath });
+      const node = await fileSystem.createDirectory(fullPath);
       await workspace.refreshTree();
       return node;
     } catch (err) {
@@ -106,7 +135,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
    */
   async function deletePath(path: string): Promise<void> {
     try {
-      await invoke("delete_path", { path });
+      await fileSystem.deletePath(path);
       await workspace.refreshTree();
     } catch (err) {
       console.error("删除失败:", err);
@@ -134,41 +163,19 @@ export const useFileOpsStore = defineStore("fileOps", () => {
       return null;
     }
 
-    // 检查目标是否存在
-    const exists = await invoke<boolean>("path_exists", { path: newPath }).catch(
-      () => false
-    );
-
-    if (exists) {
-      // 目标是目录时禁止覆盖（spec：目录覆盖被禁止）
-      const targetType = await invoke<string>("path_type", { path: newPath }).catch(
-        () => "none"
-      );
-      if (targetType === "directory") {
-        throw new Error("无法覆盖目录，请使用不同的名称");
-      }
-
-      // 弹出冲突对话框
-      if (!conflictResolver) {
-        throw new Error("未配置冲突对话框");
-      }
-      const res = await conflictResolver(newPath, "rename", oldPath);
-      if (res.action === "cancel") {
-        return null;
-      }
-      if (res.action === "rename") {
-        if (!res.newName) return null;
-        return renamePath(oldPath, res.newName);
+    const conflict = await checkAndResolveConflict(newPath, "rename", oldPath);
+    if (conflict) {
+      if (conflict.action === "cancel") return null;
+      if (conflict.action === "rename") {
+        if (!conflict.newName) return null;
+        return renamePath(oldPath, conflict.newName);
       }
       // overwrite：先删除目标
-      await invoke("delete_path", { path: newPath });
+      await fileSystem.deletePath(newPath);
     }
 
     try {
-      const node = await invoke<TreeNode>("rename_path", {
-        from: oldPath,
-        to: newPath,
-      });
+      const node = await fileSystem.renamePath(oldPath, newPath);
       await workspace.refreshTree();
       return node;
     } catch (err) {
@@ -209,46 +216,35 @@ export const useFileOpsStore = defineStore("fileOps", () => {
       return;
     }
 
-    const exists = await invoke<boolean>("path_exists", { path: targetPath }).catch(
-      () => false
+    const conflict = await checkAndResolveConflict(
+      targetPath,
+      mode === "cut" ? "rename" : "copy",
+      src
     );
-
-    if (exists) {
-      const targetType = await invoke<string>("path_type", { path: targetPath }).catch(
-        () => "none"
-      );
-      if (targetType === "directory") {
-        throw new Error("无法覆盖目录，请使用不同的名称");
-      }
-      if (!conflictResolver) {
-        throw new Error("未配置冲突对话框");
-      }
-      const res = await conflictResolver(targetPath, mode === "cut" ? "rename" : "copy", src);
-      if (res.action === "cancel") {
-        return;
-      }
-      if (res.action === "rename") {
-        if (!res.newName) return;
-        const newTarget = joinPath(targetDir, res.newName);
+    if (conflict) {
+      if (conflict.action === "cancel") return;
+      if (conflict.action === "rename") {
+        if (!conflict.newName) return;
+        const newTarget = joinPath(targetDir, conflict.newName);
         if (mode === "cut") {
-          await invoke("rename_path", { from: src, to: newTarget });
+          await fileSystem.renamePath(src, newTarget);
         } else {
-          await invoke("copy_file", { from: src, to: newTarget });
+          await fileSystem.copyFile(src, newTarget);
         }
         await workspace.refreshTree();
         if (mode === "cut") clipboard = null;
         return;
       }
       // overwrite：先删除目标
-      await invoke("delete_path", { path: targetPath });
+      await fileSystem.deletePath(targetPath);
     }
 
     try {
       if (mode === "cut") {
-        await invoke("rename_path", { from: src, to: targetPath });
+        await fileSystem.renamePath(src, targetPath);
         clipboard = null;
       } else {
-        await invoke("copy_file", { from: src, to: targetPath });
+        await fileSystem.copyFile(src, targetPath);
       }
       await workspace.refreshTree();
     } catch (err) {
@@ -262,7 +258,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
    */
   async function revealInExplorer(path: string): Promise<void> {
     try {
-      await invoke("reveal_in_explorer", { path });
+      await fileSystem.revealInExplorer(path);
     } catch (err) {
       console.error("在资源管理器中显示失败:", err);
       throw err;
@@ -331,7 +327,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     if (normalize(src) === normalize(targetPath)) return;
 
     // 禁止目录覆盖
-    const srcType = await invoke<string>("path_type", { path: src }).catch(() => "none");
+    const srcType = await fileSystem.pathType(src);
     if (srcType === "directory") {
       // 检查目标是否是源目录的子目录（会导致递归移动）
       const targetIsInsideSource = normalize(targetPath).startsWith(normalize(src) + "/");
@@ -340,30 +336,22 @@ export const useFileOpsStore = defineStore("fileOps", () => {
       }
     }
 
-    const exists = await invoke<boolean>("path_exists", { path: targetPath }).catch(() => false);
-    if (exists) {
-      const targetType = await invoke<string>("path_type", { path: targetPath }).catch(() => "none");
-      if (targetType === "directory") {
-        throw new Error("无法覆盖目录，请使用不同的名称");
-      }
-      if (!conflictResolver) {
-        throw new Error("未配置冲突对话框");
-      }
-      const res = await conflictResolver(targetPath, "rename", src);
-      if (res.action === "cancel") return;
-      if (res.action === "rename") {
-        if (!res.newName) return;
-        const newTarget = joinPath(targetDir, res.newName);
-        await invoke("rename_path", { from: src, to: newTarget });
+    const conflict = await checkAndResolveConflict(targetPath, "rename", src);
+    if (conflict) {
+      if (conflict.action === "cancel") return;
+      if (conflict.action === "rename") {
+        if (!conflict.newName) return;
+        const newTarget = joinPath(targetDir, conflict.newName);
+        await fileSystem.renamePath(src, newTarget);
         await workspace.refreshTree();
         return;
       }
       // overwrite
-      await invoke("delete_path", { path: targetPath });
+      await fileSystem.deletePath(targetPath);
     }
 
     try {
-      await invoke("rename_path", { from: src, to: targetPath });
+      await fileSystem.renamePath(src, targetPath);
       await workspace.refreshTree();
     } catch (err) {
       console.error("工作区内移动失败:", err);
@@ -380,29 +368,21 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     const name = basename(src);
     const targetPath = joinPath(targetDir, name);
 
-    const exists = await invoke<boolean>("path_exists", { path: targetPath }).catch(() => false);
-    if (exists) {
-      const targetType = await invoke<string>("path_type", { path: targetPath }).catch(() => "none");
-      if (targetType === "directory") {
-        throw new Error("无法覆盖目录，请使用不同的名称");
-      }
-      if (!conflictResolver) {
-        throw new Error("未配置冲突对话框");
-      }
-      const res = await conflictResolver(targetPath, "copy", src);
-      if (res.action === "cancel") return;
-      if (res.action === "rename") {
-        if (!res.newName) return;
-        const newTarget = joinPath(targetDir, res.newName);
-        await invoke("copy_file", { from: src, to: newTarget });
+    const conflict = await checkAndResolveConflict(targetPath, "copy", src);
+    if (conflict) {
+      if (conflict.action === "cancel") return;
+      if (conflict.action === "rename") {
+        if (!conflict.newName) return;
+        const newTarget = joinPath(targetDir, conflict.newName);
+        await fileSystem.copyFile(src, newTarget);
         await workspace.refreshTree();
         return;
       }
-      await invoke("delete_path", { path: targetPath });
+      await fileSystem.deletePath(targetPath);
     }
 
     try {
-      await invoke("copy_file", { from: src, to: targetPath });
+      await fileSystem.copyFile(src, targetPath);
       await workspace.refreshTree();
     } catch (err) {
       console.error("外部拖入复制失败:", err);

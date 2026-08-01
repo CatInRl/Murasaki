@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { __test__ } from "./useImagePaste";
-
-const { relativePath, isImageExt } = __test__;
+import { relativePath, isImageExt } from "./useImagePaste";
 
 describe("useImagePaste utilities", () => {
   describe("isImageExt", () => {
