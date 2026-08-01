@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { EditorView } from "@codemirror/view";
 import { NPopover, NInput, NButton, NInputNumber, NSpace } from "naive-ui";
 import {
@@ -51,6 +52,8 @@ const props = withDefaults(defineProps<Props>(), {
   cursorKey: 0,
 });
 
+const { t } = useI18n();
+
 // ============ 激活态 ============
 const activeFormats = ref<Set<string>>(new Set());
 
@@ -79,30 +82,30 @@ interface FormatButton {
   blockquote?: boolean;
 }
 
-const textButtons: FormatButton[] = [
-  { id: "bold", icon: Bold, title: "加粗", marker: "**" },
-  { id: "italic", icon: Italic, title: "斜体", marker: "*" },
-  { id: "strikethrough", icon: Strikethrough, title: "删除线", marker: "~~" },
-  { id: "code", icon: Code, title: "行内代码", marker: "`" },
-];
+const textButtons = computed<FormatButton[]>(() => [
+  { id: "bold", icon: Bold, title: t("editor.toolbar.bold"), marker: "**" },
+  { id: "italic", icon: Italic, title: t("editor.toolbar.italic"), marker: "*" },
+  { id: "strikethrough", icon: Strikethrough, title: t("editor.toolbar.strikethrough"), marker: "~~" },
+  { id: "code", icon: Code, title: t("editor.toolbar.inlineCode"), marker: "`" },
+]);
 
-const headingButtons: FormatButton[] = [
-  { id: "h1", icon: Heading1, title: "标题 1", headingLevel: 1 },
-  { id: "h2", icon: Heading2, title: "标题 2", headingLevel: 2 },
-  { id: "h3", icon: Heading3, title: "标题 3", headingLevel: 3 },
-];
+const headingButtons = computed<FormatButton[]>(() => [
+  { id: "h1", icon: Heading1, title: t("editor.toolbar.heading1"), headingLevel: 1 },
+  { id: "h2", icon: Heading2, title: t("editor.toolbar.heading2"), headingLevel: 2 },
+  { id: "h3", icon: Heading3, title: t("editor.toolbar.heading3"), headingLevel: 3 },
+]);
 
-const listButtons: FormatButton[] = [
-  { id: "unordered-list", icon: List, title: "无序列表", listType: "unordered" },
-  { id: "ordered-list", icon: ListOrdered, title: "有序列表", listType: "ordered" },
-  { id: "task-list", icon: ListChecks, title: "任务列表", listType: "task" },
-  { id: "blockquote", icon: Quote, title: "引用", blockquote: true },
-];
+const listButtons = computed<FormatButton[]>(() => [
+  { id: "unordered-list", icon: List, title: t("editor.toolbar.unorderedList"), listType: "unordered" },
+  { id: "ordered-list", icon: ListOrdered, title: t("editor.toolbar.orderedList"), listType: "ordered" },
+  { id: "task-list", icon: ListChecks, title: t("editor.toolbar.taskList"), listType: "task" },
+  { id: "blockquote", icon: Quote, title: t("editor.toolbar.blockquote"), blockquote: true },
+]);
 
-const insertButtons: FormatButton[] = [
-  { id: "code-block", icon: Code2, title: "代码块", action: "code-block" },
-  { id: "hr", icon: Minus, title: "水平分隔线", action: "hr" },
-];
+const insertButtons = computed<FormatButton[]>(() => [
+  { id: "code-block", icon: Code2, title: t("editor.toolbar.codeBlock"), action: "code-block" },
+  { id: "hr", icon: Minus, title: t("editor.toolbar.horizontalRule"), action: "hr" },
+]);
 
 function onFormatClick(btn: FormatButton): void {
   const view = props.getView();
@@ -203,7 +206,7 @@ function confirmTable(): void {
 </script>
 
 <template>
-  <div class="editor-toolbar" role="toolbar" aria-label="格式化工具栏">
+  <div class="editor-toolbar" role="toolbar" :aria-label="$t('editor.toolbar.ariaLabel')">
     <!-- 文本格式 -->
     <button
       v-for="btn in textButtons"
@@ -261,28 +264,28 @@ function confirmTable(): void {
       @update:show="(s: boolean) => s && openLinkPopover()"
     >
       <template #trigger>
-        <button type="button" title="插入链接" class="tb-btn">
+        <button type="button" :title="$t('editor.toolbar.insertLink')" class="tb-btn">
           <LinkIcon class="tb-icon" />
         </button>
       </template>
       <div class="pop-form">
-        <label class="pop-label">链接地址</label>
+        <label class="pop-label">{{ $t('editor.toolbar.linkUrl') }}</label>
         <NInput
           v-model:value="linkUrl"
           size="small"
           placeholder="https://..."
           class="pop-input"
         />
-        <label class="pop-label">链接文字</label>
+        <label class="pop-label">{{ $t('editor.toolbar.linkText') }}</label>
         <NInput
           v-model:value="linkText"
           size="small"
-          placeholder="链接文字（可选）"
+          :placeholder="$t('editor.toolbar.linkTextPlaceholder')"
           class="pop-input"
         />
         <NSpace justify="end" class="pop-actions">
-          <NButton size="small" @click="linkPopoverShow = false">取消</NButton>
-          <NButton size="small" type="primary" @click="confirmLink">确认</NButton>
+          <NButton size="small" @click="linkPopoverShow = false">{{ $t('common.cancel') }}</NButton>
+          <NButton size="small" type="primary" @click="confirmLink">{{ $t('common.confirm') }}</NButton>
         </NSpace>
       </div>
     </NPopover>
@@ -295,28 +298,28 @@ function confirmTable(): void {
       @update:show="(s: boolean) => s && openImagePopover()"
     >
       <template #trigger>
-        <button type="button" title="插入图片" class="tb-btn">
+        <button type="button" :title="$t('editor.toolbar.insertImage')" class="tb-btn">
           <ImageIcon class="tb-icon" />
         </button>
       </template>
       <div class="pop-form">
-        <label class="pop-label">图片路径</label>
+        <label class="pop-label">{{ $t('editor.toolbar.imagePath') }}</label>
         <NInput
           v-model:value="imageUrl"
           size="small"
           placeholder="/assets/figure.png"
           class="pop-input"
         />
-        <label class="pop-label">替代文字</label>
+        <label class="pop-label">{{ $t('editor.toolbar.imageAlt') }}</label>
         <NInput
           v-model:value="imageAlt"
           size="small"
-          placeholder="替代文字（可选）"
+          :placeholder="$t('editor.toolbar.imageAltPlaceholder')"
           class="pop-input"
         />
         <NSpace justify="end" class="pop-actions">
-          <NButton size="small" @click="imagePopoverShow = false">取消</NButton>
-          <NButton size="small" type="primary" @click="confirmImage">插入</NButton>
+          <NButton size="small" @click="imagePopoverShow = false">{{ $t('common.cancel') }}</NButton>
+          <NButton size="small" type="primary" @click="confirmImage">{{ $t('editor.tableDialog.insert') }}</NButton>
         </NSpace>
       </div>
     </NPopover>
@@ -329,24 +332,24 @@ function confirmTable(): void {
       @update:show="(s: boolean) => s && openTablePopover()"
     >
       <template #trigger>
-        <button type="button" title="插入表格" class="tb-btn">
+        <button type="button" :title="$t('editor.toolbar.insertTable')" class="tb-btn">
           <TableIcon class="tb-icon" />
         </button>
       </template>
       <div class="pop-form">
         <div class="pop-row">
           <div class="pop-col">
-            <label class="pop-label">行数</label>
+            <label class="pop-label">{{ $t('editor.toolbar.rows') }}</label>
             <NInputNumber v-model:value="tableRows" :min="1" :max="50" size="small" />
           </div>
           <div class="pop-col">
-            <label class="pop-label">列数</label>
+            <label class="pop-label">{{ $t('editor.toolbar.cols') }}</label>
             <NInputNumber v-model:value="tableCols" :min="1" :max="20" size="small" />
           </div>
         </div>
         <NSpace justify="end" class="pop-actions">
-          <NButton size="small" @click="tablePopoverShow = false">取消</NButton>
-          <NButton size="small" type="primary" @click="confirmTable">插入</NButton>
+          <NButton size="small" @click="tablePopoverShow = false">{{ $t('common.cancel') }}</NButton>
+          <NButton size="small" type="primary" @click="confirmTable">{{ $t('editor.tableDialog.insert') }}</NButton>
         </NSpace>
       </div>
     </NPopover>

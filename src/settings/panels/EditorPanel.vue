@@ -30,23 +30,23 @@ function stepFontSize(delta: number): void {
 
 <template>
   <div>
-    <h1 class="settings-page-title">编辑器</h1>
+    <h1 class="settings-page-title">{{ $t('settings.editor.title') }}</h1>
 
     <!-- 编辑模式 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">编辑模式</h2>
+      <h2 class="settings-section-title">{{ $t('settings.editor.editorMode') }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">默认编辑模式</span>
-          <span class="setting-description">新建或打开文件时使用的默认视图</span>
+          <span class="setting-label">{{ $t('settings.editor.editorMode') }}</span>
+          <span class="setting-description">{{ $t('settings.editor.editorModeDesc') }}</span>
         </div>
         <div class="setting-control-column">
-          <div class="segmented-control" role="radiogroup" aria-label="默认编辑模式">
+          <div class="segmented-control" role="radiogroup" :aria-label="$t('settings.editor.editorMode')">
             <button
               v-for="opt in [
-                { v: 'source', l: '源码' },
-                { v: 'split', l: '分屏' },
-                { v: 'wysiwyg', l: '所见即所得' },
+                { v: 'source', l: $t('settings.editor.editorModeSource') },
+                { v: 'split', l: $t('settings.editor.editorModeSplit') },
+                { v: 'wysiwyg', l: $t('settings.editor.editorModeWysiwyg') },
               ]"
               :key="opt.v"
               type="button"
@@ -63,11 +63,11 @@ function stepFontSize(delta: number): void {
 
     <!-- 编辑器显示 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">编辑器显示</h2>
+      <h2 class="settings-section-title">{{ $t('settings.editor.editorMode') }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">显示行号</span>
-          <span class="setting-description">在源码编辑区左侧显示行号</span>
+          <span class="setting-label">{{ $t('settings.editor.showLineNumbers') }}</span>
+          <span class="setting-description">{{ $t('settings.editor.showLineNumbersDesc') }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">
@@ -83,8 +83,8 @@ function stepFontSize(delta: number): void {
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">软折行</span>
-          <span class="setting-description">超过编辑器宽度时自动换行显示</span>
+          <span class="setting-label">{{ $t('settings.editor.softWrap') }}</span>
+          <span class="setting-description">{{ $t('settings.editor.softWrapDesc') }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">
@@ -100,12 +100,12 @@ function stepFontSize(delta: number): void {
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">字体大小</span>
-          <span class="setting-description">编辑器字体大小，范围 12–20 px</span>
+          <span class="setting-label">{{ $t('settings.editor.fontSize') }}</span>
+          <span class="setting-description">{{ $t('settings.editor.fontSizeDesc') }}</span>
         </div>
         <div class="setting-control-column">
           <div class="number-stepper">
-            <button class="stepper-btn" type="button" aria-label="减小" @click="stepFontSize(-1)">−</button>
+            <button class="stepper-btn" type="button" aria-label="−" @click="stepFontSize(-1)">−</button>
             <input
               class="stepper-input"
               type="number"
@@ -114,15 +114,15 @@ function stepFontSize(delta: number): void {
               :value="draft.editorFontSize"
               @input="patch('editorFontSize', Number(($event.target as HTMLInputElement).value))"
             />
-            <button class="stepper-btn" type="button" aria-label="增大" @click="stepFontSize(1)">+</button>
+            <button class="stepper-btn" type="button" aria-label="+" @click="stepFontSize(1)">+</button>
           </div>
         </div>
       </div>
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">行高</span>
-          <span class="setting-description">编辑器文本行间距</span>
+          <span class="setting-label">{{ $t('settings.editor.lineHeight') }}</span>
+          <span class="setting-description">{{ $t('settings.editor.lineHeightDesc') }}</span>
         </div>
         <div class="setting-control-column">
           <div class="select-wrapper">
@@ -141,8 +141,8 @@ function stepFontSize(delta: number): void {
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">字体族</span>
-          <span class="setting-description">等宽字体用于源码编辑区</span>
+          <span class="setting-label">{{ $t('settings.editor.fontFamily') }}</span>
+          <span class="setting-description">{{ $t('settings.editor.fontFamilyDesc') }}</span>
         </div>
         <div class="setting-control-column">
           <div class="select-wrapper">

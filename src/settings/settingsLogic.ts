@@ -21,6 +21,7 @@ export const GENERAL_FIELDS: (keyof SettingsState)[] = [
   "showAgentPanel",
   "defaultImageDir",
   "checkUpdatesOnStartup",
+  "language",
 ];
 
 /** 编辑器分类下受 footer Save 管理的字段 */
@@ -87,6 +88,7 @@ export function restoreCategoryDefaults(
         showAgentPanel: DEFAULT_SETTINGS.showAgentPanel,
         defaultImageDir: DEFAULT_SETTINGS.defaultImageDir,
         checkUpdatesOnStartup: DEFAULT_SETTINGS.checkUpdatesOnStartup,
+        language: DEFAULT_SETTINGS.language,
       };
     case "editor":
       return {

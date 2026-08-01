@@ -15,6 +15,7 @@ import { usePersistenceStore } from "./usePersistenceStore";
 import { useEditorBridgeStore } from "./useEditorBridgeStore";
 import { createProvider } from "../agent/Provider";
 import { getToolMetadataList, executeTool } from "../agent/tools";
+import { i18n } from "../i18n";
 import {
   compressContext,
   CumulativeTokenTracker,
@@ -30,17 +31,13 @@ function genId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** 系统提示词 */
-const SYSTEM_PROMPT =
-  "你是 Murasaki 的 AI 助手，帮助用户编辑和管理 Markdown 文档。请简洁清晰地回答。";
-
 /** 8K 字符截断阈值 */
 const MAX_CONTENT_CHARS = 8192;
 
 /** 截断文本 */
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
-  return text.slice(0, max) + "\n... [truncated]";
+  return text.slice(0, max) + "\n" + i18n.global.t("agent.truncatedSuffix");
 }
 
 /** 简单 debounce 工具（含 flush 方法） */
@@ -289,19 +286,22 @@ export const useAgentStore = defineStore("agent", () => {
     const view = bridge.editorView;
     if (!view) return "";
 
-    const docPath = bridge.activeDocPath ?? "(未保存)";
+    const t = i18n.global.t.bind(i18n.global);
+    const docPath = bridge.activeDocPath ?? t("agent.context.unsaved");
     const content = truncate(view.state.doc.toString(), MAX_CONTENT_CHARS);
     const sel = view.state.selection.main;
     const cursorLine = view.state.doc.toString().slice(0, sel.from).split("\n").length;
-    const selectionText = sel.empty ? "" : `\n选区: ${view.state.doc.toString().slice(sel.from, sel.to)}`;
+    const selectionText = sel.empty
+      ? ""
+      : `\n${t("agent.context.selectionLabel")}: ${view.state.doc.toString().slice(sel.from, sel.to)}`;
 
-    const contextText = `--- 当前文档上下文 ---
-路径: ${docPath}
-光标: 行 ${cursorLine}
+    const contextText = `${t("agent.context.header")}
+${t("agent.context.path")}: ${docPath}
+${t("agent.context.cursor", { line: cursorLine })}
 ${selectionText}
---- 文档内容 ---
+${t("agent.context.contentHeader")}
 ${content}
---- 文档上下文结束 ---`;
+${t("agent.context.footer")}`;
 
     contextTokens.value = estimateTokens(contextText);
     return contextText;
@@ -317,7 +317,7 @@ ${content}
     const aiProviders = useAiProvidersStore();
     const activeProvider = aiProviders.activeProvider;
     if (!activeProvider) {
-      errorMessage.value = "未配置活动 AI provider";
+      errorMessage.value = i18n.global.t("agent.errors.noProvider");
       return;
     }
 
@@ -326,7 +326,7 @@ ${content}
     try {
       apiKey = await invoke<string>("get_api_key", { id: activeProvider.id });
     } catch (err) {
-      errorMessage.value = `获取 API key 失败: ${err}`;
+      errorMessage.value = i18n.global.t("agent.errors.apiKeyFailed", { error: String(err) });
       status.value = "error";
       return;
     }
@@ -336,7 +336,8 @@ ${content}
 
     // 构建带上下文的用户消息
     const contextText = buildContextText();
-    const fullText = contextText ? `${contextText}\n\n用户消息: ${text}` : text;
+    const userMsgLabel = i18n.global.t("agent.context.userMessageLabel");
+    const fullText = contextText ? `${contextText}\n\n${userMsgLabel}: ${text}` : text;
 
     const userMsg: ChatMessage = {
       id: genId(),
@@ -357,7 +358,7 @@ ${content}
 
     // 构建 LLM 消息历史
     const llmMessages: LLMMessage[] = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: i18n.global.t("agent.systemPrompt") },
     ];
     // 添加历史（用原文，不重复附带上下文）
     for (const m of messages.value) {
@@ -550,7 +551,7 @@ ${content}
         // 添加 assistant 消息到 LLM 历史（含 tool_calls）
         llmMessages.push({
           role: "assistant",
-          content: textBeforeTools || "(calling tools)",
+          content: textBeforeTools || i18n.global.t("agent.callingTools"),
         });
 
         // 逐个执行工具
@@ -580,7 +581,7 @@ ${content}
           // 添加工具结果到 LLM 历史
           llmMessages.push({
             role: "user" as const,
-            content: `${TOOL_RESULT_PREFIX}${tc.name} 的结果: ${JSON.stringify(toolResult)}`,
+            content: `${TOOL_RESULT_PREFIX}${i18n.global.t("agent.toolResultLabel", { name: tc.name })}: ${JSON.stringify(toolResult)}`,
           });
         }
 
@@ -594,7 +595,7 @@ ${content}
         messages.value.push({
           id: genId(),
           role: "assistant",
-          content: "(达到最大工具调用轮数限制)",
+          content: i18n.global.t("agent.maxRoundsReached"),
           createdAt: Date.now(),
         });
         status.value = "idle";

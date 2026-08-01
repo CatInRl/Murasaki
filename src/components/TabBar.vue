@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { X, Copy, FolderOpen } from "lucide-vue-next";
 import { useTabsStore } from "../stores/useTabsStore";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
@@ -12,6 +13,7 @@ const tabsStore = useTabsStore();
 const fileOps = useFileOpsStore();
 const contextMenu = useContextMenuStore();
 const dialog = useDialogStore();
+const { t } = useI18n();
 
 const emit = defineEmits<{
   (e: "new-tab"): void;
@@ -71,14 +73,14 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
 
   const hasPath = !!tab.path;
   const items: MenuItem[] = [
-    { label: "关闭", icon: X, shortcut: "Ctrl+W", action: () => emit("close-tab", tab.id) },
-    { label: "关闭其他", action: () => emit("close-others", tab.id) },
-    { label: "关闭右侧", action: () => emit("close-right", tab.id) },
-    { label: "关闭左侧", action: () => emit("close-left", tab.id) },
-    { label: "关闭所有", action: () => emit("close-all") },
+    { label: t("editor.tabBar.close"), icon: X, shortcut: "Ctrl+W", action: () => emit("close-tab", tab.id) },
+    { label: t("editor.tabBar.closeOthers"), action: () => emit("close-others", tab.id) },
+    { label: t("editor.tabBar.closeRight"), action: () => emit("close-right", tab.id) },
+    { label: t("editor.tabBar.closeLeft"), action: () => emit("close-left", tab.id) },
+    { label: t("editor.tabBar.closeAll"), action: () => emit("close-all") },
     { separator: true },
     {
-      label: "复制路径",
+      label: t("common.copyPath"),
       icon: Copy,
       disabled: !hasPath,
       action: async () => {
@@ -86,12 +88,12 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
         try {
           await fileOps.copyAbsolutePath(tab.path);
         } catch (err) {
-          void dialog.alert({ title: "错误", message: `复制路径失败: ${err}`, variant: "error" });
+          void dialog.alert({ title: t("common.dialog.errorTitle"), message: t("common.error.copyPathFailed", { error: String(err) }), variant: "error" });
         }
       },
     },
     {
-      label: "在文件资源管理器中显示",
+      label: t("common.revealInExplorer"),
       icon: FolderOpen,
       disabled: !hasPath,
       action: async () => {
@@ -99,7 +101,7 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
         try {
           await fileOps.revealInExplorer(tab.path);
         } catch (err) {
-          void dialog.alert({ title: "错误", message: `无法在资源管理器中显示: ${err}`, variant: "error" });
+          void dialog.alert({ title: t("common.dialog.errorTitle"), message: t("common.error.revealFailed", { error: String(err) }), variant: "error" });
         }
       },
     },
@@ -117,7 +119,7 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
         :key="tab.id"
         class="tab-item"
         :class="{ active: isActive(tab.id) }"
-        :title="tab.path ?? '未保存的文件'"
+        :title="tab.path ?? $t('common.status.unsavedFile')"
         @click="onClick(tab.id)"
         @mousedown="onMiddleClick($event, tab.id)"
         @contextmenu="onContextMenu($event, tab)"
@@ -140,8 +142,8 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
         <button
           class="close-btn"
           type="button"
-          title="关闭"
-          aria-label="关闭标签页"
+          :title="$t('editor.tabBar.close')"
+          :aria-label="$t('editor.tabBar.closeTabAria')"
           @click="onCloseTab($event, tab.id)"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -156,8 +158,8 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
     <button
       class="new-tab-btn"
       type="button"
-      title="新建文件"
-      aria-label="新建文件"
+      :title="$t('editor.tabBar.newTab')"
+      :aria-label="$t('editor.tabBar.newTab')"
       @click="onNewTab"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

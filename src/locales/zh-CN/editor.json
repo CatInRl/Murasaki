@@ -1,0 +1,136 @@
+{
+  "welcome": {
+    "tagline": "紫式部 · 轻量级本地 Markdown 编辑器",
+    "openFolder": "打开文件夹",
+    "openFolderDesc": "作为工作区管理 Markdown 文件",
+    "openFile": "打开文件",
+    "openFileDesc": "在新标签页中打开单个 Markdown",
+    "newFile": "新建文件",
+    "newFileDesc": "从空白开始撰写",
+    "recentFolders": "最近打开的文件夹",
+    "recentFiles": "最近打开的文件",
+    "noRecent": "暂无最近文件",
+    "shortcutOpen": "打开",
+    "shortcutNew": "新建",
+    "shortcutOpenFolder": "打开文件夹",
+    "shortcutHintsAria": "快捷键提示",
+    "settings": "设置"
+  },
+  "statusBar": {
+    "lineCol": "行 {line}, 列 {col}",
+    "charCount": "{count} 字符",
+    "agentRunning": "Agent 运行中",
+    "orphanCount": "{count} 个未归附会话",
+    "orphanTooltip": "点击清理 {count} 个未归附会话",
+    "providerTooltip": "当前 AI Provider：{name}"
+  },
+  "tabBar": {
+    "newTab": "新建文件",
+    "close": "关闭",
+    "closeOthers": "关闭其他",
+    "closeRight": "关闭右侧",
+    "closeLeft": "关闭左侧",
+    "closeAll": "关闭所有",
+    "closeTabAria": "关闭标签页"
+  },
+  "sidebar": {
+    "filesTab": "文件树",
+    "filesTabAria": "文件树",
+    "outlineTab": "大纲",
+    "outlineTabAria": "大纲"
+  },
+  "fileTree": {
+    "refresh": "刷新",
+    "noWorkspace": "未打开工作区",
+    "noWorkspaceDesc": "打开一个文件夹开始编辑",
+    "openFolder": "打开文件夹",
+    "newFilePlaceholder": "新文件名.md",
+    "newFolderPlaceholder": "新文件夹名",
+    "createFailed": "新建失败: {error}"
+  },
+  "outline": {
+    "title": "大纲",
+    "empty": "无标题",
+    "emptyDesc": "本文档暂无标题段落",
+    "lineTooltip": "第 {line} 行"
+  },
+  "search": {
+    "placeholder": "搜索工作区内容…",
+    "regex": "正则",
+    "caseSensitive": "大小写",
+    "wholeWord": "全词",
+    "cancelSearch": "取消搜索",
+    "close": "关闭",
+    "truncated": "结果已截断（超过 1000 处命中），请细化查询",
+    "noResults": "未找到匹配的文件",
+    "clearSearch": "清空搜索",
+    "filenameMatches": "文件名匹配",
+    "scanningProgress": "扫描中 {scanned}/{total} 文件，已找到 {matched} 处",
+    "scanning": "扫描中… 已找到 {matched} 处",
+    "resultSummary": "{files} 个文件 / {matches} 处匹配"
+  },
+  "toolbar": {
+    "ariaLabel": "格式化工具栏",
+    "bold": "加粗",
+    "italic": "斜体",
+    "strikethrough": "删除线",
+    "inlineCode": "行内代码",
+    "heading1": "标题 1",
+    "heading2": "标题 2",
+    "heading3": "标题 3",
+    "unorderedList": "无序列表",
+    "orderedList": "有序列表",
+    "taskList": "任务列表",
+    "blockquote": "引用",
+    "codeBlock": "代码块",
+    "horizontalRule": "水平分隔线",
+    "insertLink": "插入链接",
+    "insertImage": "插入图片",
+    "insertTable": "插入表格",
+    "linkUrl": "链接地址",
+    "linkText": "链接文字",
+    "linkTextPlaceholder": "链接文字（可选）",
+    "imagePath": "图片路径",
+    "imageAlt": "替代文字",
+    "imageAltPlaceholder": "替代文字（可选）",
+    "rows": "行数",
+    "cols": "列数"
+  },
+  "tableDialog": {
+    "title": "插入表格",
+    "rowsLabel": "行数（不含表头）",
+    "colsLabel": "列数",
+    "insert": "插入"
+  },
+  "compare": {
+    "title": "对比合并 — {filename}",
+    "diffLabel": "差异：",
+    "legendEqual": "相同",
+    "legendAdd": "仅本地",
+    "legendDel": "仅外部",
+    "legendMod": "修改",
+    "externalSide": "外部版本（磁盘）",
+    "externalHint": "只读",
+    "localSide": "本地版本（可编辑）",
+    "localHint": "编辑后点击\"保存\"写回磁盘",
+    "dirtyHint": "你已编辑本地版本（与初始内容不同）",
+    "cleanHint": "直接编辑右侧文本框，完成后点击\"保存合并结果\"",
+    "discardLocal": "放弃本地修改",
+    "saveMerge": "保存合并结果"
+  },
+  "update": {
+    "title": "发现新版本",
+    "currentVersion": "当前版本：",
+    "latestVersion": "最新版本：",
+    "releaseNotes": "发布说明",
+    "noNotes": "（无发布说明）",
+    "later": "稍后",
+    "updateNow": "立即更新"
+  },
+  "commands": {
+    "needWorkspace": "请先打开一个工作区",
+    "newFolderPrompt": "请输入文件夹名称：",
+    "newFolderPlaceholder": "文件夹名称",
+    "openFileFirst": "请先打开一个文件"
+  }
+}

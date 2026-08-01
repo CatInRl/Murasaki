@@ -1,0 +1,59 @@
+{
+  "fileMenu": "File",
+  "editMenu": "Edit",
+  "paragraphMenu": "Paragraph",
+  "themeMenu": "Theme",
+  "helpMenu": "Help",
+  "recentFolders": "Recent Folders",
+  "recentFiles": "Recent Files",
+  "noRecent": "(None)",
+  "file": {
+    "newFile": "New File…",
+    "newFolder": "New Folder…",
+    "openFile": "Open File…",
+    "openFolder": "Open Folder…",
+    "save": "Save",
+    "saveAs": "Save As…",
+    "exportHtml": "Export HTML…",
+    "exportPdf": "Export PDF…",
+    "copyRichText": "Copy as Rich Text",
+    "closeTab": "Close Tab",
+    "reloadFile": "Reload File",
+    "closeWorkspace": "Close Workspace",
+    "settings": "Settings…",
+    "quit": "Quit"
+  },
+  "edit": {
+    "undo": "Undo",
+    "redo": "Redo",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "selectAll": "Select All",
+    "find": "Find…",
+    "replace": "Replace…",
+    "findInFiles": "Find in Files…"
+  },
+  "paragraph": {
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "heading4": "Heading 4",
+    "heading5": "Heading 5",
+    "heading6": "Heading 6",
+    "normal": "Normal",
+    "codeBlock": "Code Block",
+    "blockquote": "Blockquote",
+    "unorderedList": "Bullet List",
+    "orderedList": "Numbered List",
+    "taskList": "Task List",
+    "horizontalRule": "Horizontal Rule",
+    "insertTable": "Insert Table…"
+  },
+  "help": {
+    "docs": "View Documentation",
+    "about": "About Murasaki",
+    "checkUpdates": "Check for Updates…"
+  },
+  "aboutText": "Murasaki v{version}\nA lightweight local Markdown file manager and editor\nBuilt with Tauri 2.x + Vue 3 + CodeMirror 6"
+}

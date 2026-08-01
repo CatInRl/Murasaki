@@ -1,0 +1,136 @@
+{
+  "welcome": {
+    "tagline": "Murasaki · A lightweight local Markdown editor",
+    "openFolder": "Open Folder",
+    "openFolderDesc": "Manage Markdown files as a workspace",
+    "openFile": "Open File",
+    "openFileDesc": "Open a single Markdown in a new tab",
+    "newFile": "New File",
+    "newFileDesc": "Start writing from scratch",
+    "recentFolders": "Recent Folders",
+    "recentFiles": "Recent Files",
+    "noRecent": "No recent files",
+    "shortcutOpen": "Open",
+    "shortcutNew": "New",
+    "shortcutOpenFolder": "Open Folder",
+    "shortcutHintsAria": "Shortcut hints",
+    "settings": "Settings"
+  },
+  "statusBar": {
+    "lineCol": "Ln {line}, Col {col}",
+    "charCount": "{count} chars",
+    "agentRunning": "Agent running",
+    "orphanCount": "{count} orphan chats",
+    "orphanTooltip": "Click to clean up {count} orphan chats",
+    "providerTooltip": "Current AI Provider: {name}"
+  },
+  "tabBar": {
+    "newTab": "New File",
+    "close": "Close",
+    "closeOthers": "Close Others",
+    "closeRight": "Close to the Right",
+    "closeLeft": "Close to the Left",
+    "closeAll": "Close All",
+    "closeTabAria": "Close tab"
+  },
+  "sidebar": {
+    "filesTab": "File Tree",
+    "filesTabAria": "File Tree",
+    "outlineTab": "Outline",
+    "outlineTabAria": "Outline"
+  },
+  "fileTree": {
+    "refresh": "Refresh",
+    "noWorkspace": "No workspace open",
+    "noWorkspaceDesc": "Open a folder to start editing",
+    "openFolder": "Open Folder",
+    "newFilePlaceholder": "new-file.md",
+    "newFolderPlaceholder": "new-folder",
+    "createFailed": "Failed to create: {error}"
+  },
+  "outline": {
+    "title": "Outline",
+    "empty": "No headings",
+    "emptyDesc": "This document has no heading sections yet",
+    "lineTooltip": "Line {line}"
+  },
+  "search": {
+    "placeholder": "Search workspace content…",
+    "regex": "Regex",
+    "caseSensitive": "Match Case",
+    "wholeWord": "Whole Word",
+    "cancelSearch": "Cancel search",
+    "close": "Close",
+    "truncated": "Results truncated (over 1000 matches). Please refine your query.",
+    "noResults": "No matching files found",
+    "clearSearch": "Clear search",
+    "filenameMatches": "Filename matches",
+    "scanningProgress": "Scanning {scanned}/{total} files, found {matched} matches",
+    "scanning": "Scanning… found {matched} matches",
+    "resultSummary": "{files} files / {matches} matches"
+  },
+  "toolbar": {
+    "ariaLabel": "Formatting toolbar",
+    "bold": "Bold",
+    "italic": "Italic",
+    "strikethrough": "Strikethrough",
+    "inlineCode": "Inline Code",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "unorderedList": "Bullet List",
+    "orderedList": "Numbered List",
+    "taskList": "Task List",
+    "blockquote": "Quote",
+    "codeBlock": "Code Block",
+    "horizontalRule": "Horizontal Rule",
+    "insertLink": "Insert Link",
+    "insertImage": "Insert Image",
+    "insertTable": "Insert Table",
+    "linkUrl": "Link URL",
+    "linkText": "Link Text",
+    "linkTextPlaceholder": "Link text (optional)",
+    "imagePath": "Image Path",
+    "imageAlt": "Alt Text",
+    "imageAltPlaceholder": "Alt text (optional)",
+    "rows": "Rows",
+    "cols": "Columns"
+  },
+  "tableDialog": {
+    "title": "Insert Table",
+    "rowsLabel": "Rows (excluding header)",
+    "colsLabel": "Columns",
+    "insert": "Insert"
+  },
+  "compare": {
+    "title": "Compare & Merge — {filename}",
+    "diffLabel": "Diff:",
+    "legendEqual": "Equal",
+    "legendAdd": "Local only",
+    "legendDel": "External only",
+    "legendMod": "Modified",
+    "externalSide": "External (disk)",
+    "externalHint": "Read-only",
+    "localSide": "Local (editable)",
+    "localHint": "Edit then click \"Save\" to write back to disk",
+    "dirtyHint": "You have edited the local version (differs from initial)",
+    "cleanHint": "Edit the right text box directly, then click \"Save merge result\"",
+    "discardLocal": "Discard Local",
+    "saveMerge": "Save Merge Result"
+  },
+  "update": {
+    "title": "Update Available",
+    "currentVersion": "Current version:",
+    "latestVersion": "Latest version:",
+    "releaseNotes": "Release Notes",
+    "noNotes": "(No release notes)",
+    "later": "Later",
+    "updateNow": "Update Now"
+  },
+  "commands": {
+    "needWorkspace": "Please open a workspace first",
+    "newFolderPrompt": "Enter a folder name:",
+    "newFolderPlaceholder": "Folder name",
+    "openFileFirst": "Please open a file first"
+  }
+}

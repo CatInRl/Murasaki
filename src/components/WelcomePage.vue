@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { BookOpen, FileText } from "lucide-vue-next";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
 import { basename, dirname } from "../utils/path";
 import EmptyState from "./EmptyState.vue";
 
 const persistence = usePersistenceStore();
+const { t } = useI18n();
 
 const emit = defineEmits<{
   (e: "open-folder"): void;
@@ -22,11 +24,11 @@ const recentFolders = computed(() => persistence.getRecentFolders(5));
 const recentFiles = computed(() => persistence.getRecentFiles(5));
 
 // 三个主操作按钮配置
-const primaryActions = [
-  { key: "open-folder", label: "打开文件夹", desc: "作为工作区管理 Markdown 文件", icon: "folder", primary: true },
-  { key: "open-file", label: "打开文件", desc: "在新标签页中打开单个 Markdown", icon: "file", primary: false },
-  { key: "new-file", label: "新建文件", desc: "从空白开始撰写", icon: "plus", primary: false },
-] as const;
+const primaryActions = computed(() => [
+  { key: "open-folder", label: t("editor.welcome.openFolder"), desc: t("editor.welcome.openFolderDesc"), icon: "folder", primary: true },
+  { key: "open-file", label: t("editor.welcome.openFile"), desc: t("editor.welcome.openFileDesc"), icon: "file", primary: false },
+  { key: "new-file", label: t("editor.welcome.newFile"), desc: t("editor.welcome.newFileDesc"), icon: "plus", primary: false },
+]);
 
 function onAction(key: string) {
   switch (key) {
@@ -37,11 +39,11 @@ function onAction(key: string) {
 }
 
 // 底部快捷键提示
-const shortcutHints = [
-  { keys: "Ctrl+O", label: "打开" },
-  { keys: "Ctrl+N", label: "新建" },
-  { keys: "Ctrl+Shift+O", label: "打开文件夹" },
-] as const;
+const shortcutHints = computed(() => [
+  { keys: "Ctrl+O", label: t("editor.welcome.shortcutOpen") },
+  { keys: "Ctrl+N", label: t("editor.welcome.shortcutNew") },
+  { keys: "Ctrl+Shift+O", label: t("editor.welcome.shortcutOpenFolder") },
+]);
 </script>
 
 <template>
@@ -60,7 +62,7 @@ const shortcutHints = [
           <BookOpen :size="36" />
         </div>
         <h1 class="brand-title">Murasaki</h1>
-        <p class="brand-tagline">紫式部 · 轻量级本地 Markdown 编辑器</p>
+        <p class="brand-tagline">{{ $t('editor.welcome.tagline') }}</p>
       </header>
 
       <!-- 主操作区：三张卡片 -->
@@ -98,7 +100,7 @@ const shortcutHints = [
         <div v-if="recentFolders.length > 0" class="recent-block">
           <h3 class="block-title">
             <span class="block-dot"></span>
-            最近打开的文件夹
+            {{ $t('editor.welcome.recentFolders') }}
           </h3>
           <ul class="recent-list">
             <li
@@ -125,7 +127,7 @@ const shortcutHints = [
         <div v-if="recentFiles.length > 0" class="recent-block">
           <h3 class="block-title">
             <span class="block-dot"></span>
-            最近打开的文件
+            {{ $t('editor.welcome.recentFiles') }}
           </h3>
           <ul class="recent-list">
             <li
@@ -150,12 +152,12 @@ const shortcutHints = [
         <EmptyState
           v-if="recentFolders.length === 0 && recentFiles.length === 0"
           :icon="FileText"
-          title="暂无最近文件"
+          :title="$t('editor.welcome.noRecent')"
         />
       </section>
 
       <!-- 底部快捷键提示 -->
-      <section class="shortcut-hints" aria-label="快捷键提示">
+      <section class="shortcut-hints" :aria-label="$t('editor.welcome.shortcutHintsAria')">
         <div v-for="hint in shortcutHints" :key="hint.keys" class="shortcut-hint">
           <kbd class="shortcut-key">{{ hint.keys }}</kbd>
           <span class="shortcut-label">{{ hint.label }}</span>
@@ -167,7 +169,7 @@ const shortcutHints = [
         <span class="version-text">v{{ APP_VERSION }}</span>
         <span class="footer-sep">·</span>
         <a class="settings-link" href="#" @click.prevent="emit('open-settings')">
-          设置
+          {{ $t('editor.welcome.settings') }}
         </a>
       </footer>
     </div>

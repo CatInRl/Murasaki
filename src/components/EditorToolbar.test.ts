@@ -4,6 +4,7 @@ import { nextTick } from "vue";
 import { EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import EditorToolbar from "./EditorToolbar.vue";
+import { i18n } from "../i18n";
 
 /**
  * 创建附加到 jsdom 的 EditorView，供工具栏操作。
@@ -41,7 +42,7 @@ const stubs = {
 function makeToolbar(view: EditorView) {
   return mount(EditorToolbar, {
     props: { getView: () => view },
-    global: { stubs },
+    global: { stubs, plugins: [i18n] },
   });
 }
 
@@ -252,7 +253,7 @@ describe("EditorToolbar", () => {
   it("getView 返回 null 时不抛错", () => {
     const wrapper = mount(EditorToolbar, {
       props: { getView: () => null },
-      global: { stubs },
+      global: { stubs, plugins: [i18n] },
     });
     expect(wrapper.find(".editor-toolbar").exists()).toBe(true);
   });

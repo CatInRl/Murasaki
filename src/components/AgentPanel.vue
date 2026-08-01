@@ -6,6 +6,7 @@
  * Ticket #69 (T4.1): 全量视觉对齐设计规范
  */
 import { ref, computed, watch, nextTick, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   AlertTriangle,
   Paperclip,
@@ -51,6 +52,7 @@ const proposals = useProposalsStore();
 const editorBridge = useEditorBridgeStore();
 const dialog = useDialogStore();
 const contextMenu = useContextMenuStore();
+const { t } = useI18n();
 
 // ===== 输入框 =====
 const inputText = ref("");
@@ -72,9 +74,9 @@ function toolCallsSummary(toolCalls: ToolCallEntry[]): string {
   const total = toolCalls.length;
   const calling = toolCalls.filter((t) => t.status === "calling").length;
   const error = toolCalls.filter((t) => t.status === "error").length;
-  if (calling > 0) return `${calling}/${total} 调用中`;
-  if (error > 0) return `${total} 个工具 · ${error} 失败`;
-  return `${total} 个工具`;
+  if (calling > 0) return t("agent.toolCallsSummaryCalling", { calling, total });
+  if (error > 0) return t("agent.toolCallsSummaryError", { total, error });
+  return t("agent.toolCallsSummaryDone", { total });
 }
 
 // ===== 提案行号范围 =====
@@ -173,7 +175,7 @@ function onCollapse(): void {
 // ===== 清空对话 =====
 async function onClearConversation(): Promise<void> {
   if (agent.messages.length === 0) return;
-  if (!(await dialog.confirm({ message: "确定要清空当前工作区的对话吗？此操作不可撤销。", danger: true }))) return;
+  if (!(await dialog.confirm({ message: t("agent.clearConfirm"), danger: true }))) return;
   await agent.clearConversation();
 }
 
@@ -195,22 +197,22 @@ function onOpenSettings(): void {
 function onMessageContextMenu(e: MouseEvent, msg: ChatMessage): void {
   const items: MenuItem[] = [
     {
-      label: "复制",
+      label: t("agent.contextMenu.copy"),
       icon: Copy,
       action: () => copyToClipboard(msg.content),
     },
     {
-      label: "复制 Markdown 源码",
+      label: t("agent.contextMenu.copyMarkdown"),
       icon: Code,
       action: () => copyToClipboard(msg.content),
     },
     {
-      label: "插入到编辑器",
+      label: t("agent.contextMenu.insertToEditor"),
       icon: CornerDownLeft,
       action: () => insertIntoEditor(msg.content),
     },
     {
-      label: "从当前消息重新生成",
+      label: t("agent.contextMenu.regenerate"),
       icon: RotateCw,
       disabled: agent.isThinking,
       action: () => regenerateFromMessage(msg),
@@ -228,7 +230,7 @@ function copyToClipboard(text: string): void {
 function insertIntoEditor(text: string): void {
   const view = editorBridge.editorView;
   if (!view) {
-    dialog.alert({ message: "请先打开一个文件", variant: "warning" });
+    dialog.alert({ message: t("editor.commands.openFileFirst"), variant: "warning" });
     return;
   }
   view.focus();
@@ -282,12 +284,12 @@ onMounted(() => {
         <button
           v-if="agent.messages.length > 0"
           class="agent-clear-btn"
-          title="清空当前工作区的对话"
+          :title="$t('agent.clearConversation')"
           @click="onClearConversation"
         >
           <Trash2 :size="14" />
         </button>
-        <button class="agent-collapse-btn" title="收起面板" @click="onCollapse">
+        <button class="agent-collapse-btn" :title="$t('agent.collapsePanel')" @click="onCollapse">
           <PanelRightClose :size="14" />
         </button>
       </div>
@@ -300,8 +302,8 @@ onMounted(() => {
     >
       <FileText :size="12" class="agent-context-icon" />
       <span class="agent-context-path">{{ agent.contextDocPath }}</span>
-      <span class="agent-context-tokens">≈ {{ agent.contextTokens }} tokens</span>
-      <button class="agent-context-remove" title="移除当前文档上下文" @click="agent.removeContext()">
+      <span class="agent-context-tokens">{{ $t('agent.contextTokens', { count: agent.contextTokens }) }}</span>
+      <button class="agent-context-remove" :title="$t('agent.removeContext')" @click="agent.removeContext()">
         <X :size="11" />
       </button>
     </div>
@@ -310,50 +312,50 @@ onMounted(() => {
     <div
       v-if="agent.isOverTokenLimit"
       class="agent-token-warning agent-token-danger"
-      title="累计 prompt token 已超过软限制，建议清空对话"
+      :title="$t('agent.tokenOverLimitTooltip')"
     >
       <AlertTriangle :size="12" class="token-warning-icon" />
       <span class="token-warning-text">
-        累计 {{ agent.cumulativeTokens }} / {{ agent.tokenLimit }} tokens，已超限
+        {{ $t('agent.tokenOverLimit', { used: agent.cumulativeTokens, limit: agent.tokenLimit }) }}
       </span>
     </div>
     <div
       v-else-if="agent.isApproachingTokenLimit"
       class="agent-token-warning agent-token-caution"
-      title="累计 prompt token 接近软限制"
+      :title="$t('agent.tokenApproachingTooltip')"
     >
       <span class="token-warning-icon">!</span>
       <span class="token-warning-text">
-        累计 {{ agent.cumulativeTokens }} / {{ agent.tokenLimit }} tokens
+        {{ $t('agent.tokenApproaching', { used: agent.cumulativeTokens, limit: agent.tokenLimit }) }}
       </span>
     </div>
     <!-- 压缩提示（仅在最近一次请求触发了压缩时显示） -->
     <div
       v-if="agent.lastCompression"
       class="agent-compression-badge"
-      title="已应用上下文压缩"
+      :title="$t('agent.compressionBadge')"
     >
       <Paperclip :size="12" />
       <span v-if="agent.lastCompression.layer1Applied">L1·</span>
       <span v-if="agent.lastCompression.layer2Applied">L2·</span>
-      <span v-if="agent.lastCompression.truncated">截断·</span>
+      <span v-if="agent.lastCompression.truncated">{{ $t('agent.truncated') }}·</span>
       <span>{{ agent.lastCompression.compressedTokens }}/{{ agent.lastCompression.originalTokens }} tok</span>
     </div>
 
     <!-- 空状态：无工作区 -->
     <div v-if="showNoWorkspace" class="agent-empty-state">
       <FolderOpen :size="40" class="empty-icon" />
-      <p class="empty-title">打开工作区后启用 Agent</p>
-      <p class="empty-desc">Agent 需要工作区上下文才能辅助编辑</p>
-      <button class="empty-action" @click="onOpenWorkspace">打开工作区</button>
+      <p class="empty-title">{{ $t('agent.noWorkspace.title') }}</p>
+      <p class="empty-desc">{{ $t('agent.noWorkspace.desc') }}</p>
+      <button class="empty-action" @click="onOpenWorkspace">{{ $t('agent.noWorkspace.action') }}</button>
     </div>
 
     <!-- 空状态：未配置 provider -->
     <div v-else-if="showNoProvider" class="agent-empty-state">
       <Sparkles :size="40" class="empty-icon empty-icon-dim" />
-      <p class="empty-title">未配置 AI 服务</p>
-      <p class="empty-desc">请在设置中配置 AI Provider</p>
-      <button class="empty-action" @click="onOpenSettings">打开设置</button>
+      <p class="empty-title">{{ $t('agent.noProvider.title') }}</p>
+      <p class="empty-desc">{{ $t('agent.noProvider.desc') }}</p>
+      <button class="empty-action" @click="onOpenSettings">{{ $t('agent.noProvider.action') }}</button>
     </div>
 
     <!-- 正常状态：对话区 + 输入区 -->
@@ -368,8 +370,8 @@ onMounted(() => {
         <EmptyState
           v-if="agent.messages.length === 0"
           :icon="MessageSquare"
-          title="向 Agent 发送消息开始对话"
-          description="Agent 可基于当前工作区辅助编辑与生成"
+          :title="$t('agent.emptyConversation.title')"
+          :description="$t('agent.emptyConversation.desc')"
         />
 
         <!-- 消息列表 -->
@@ -401,7 +403,7 @@ onMounted(() => {
               >
                 {{ msg.content }}
                 <span v-if="msg.interrupted" class="agent-interrupted-tag">
-                  <AlertTriangle :size="11" /> 已中断
+                  <AlertTriangle :size="11" /> {{ $t('agent.interrupted') }}
                 </span>
               </div>
 
@@ -416,7 +418,7 @@ onMounted(() => {
                   @click="toggleToolCallCard(msg.id)"
                 >
                   <Wrench :size="12" class="tool-call-card-icon" />
-                  <span class="tool-call-card-title">工具 · {{ toolCallsSummary(msg.toolCalls) }}</span>
+                  <span class="tool-call-card-title">{{ $t('agent.toolCardTitle', { summary: toolCallsSummary(msg.toolCalls) }) }}</span>
                   <ChevronDown
                     v-if="expandedToolCalls.has(msg.id)"
                     :size="12"
@@ -448,16 +450,16 @@ onMounted(() => {
                       <Wrench :size="10" class="tool-call-item-icon" />
                       <span class="tool-call-item-name">{{ tc.name }}</span>
                       <span class="tool-call-summary tool-call-item-summary">
-                        {{ tc.status === "calling" ? "调用中..." : tc.summary }}
+                        {{ tc.status === "calling" ? $t('agent.toolCallCalling') : tc.summary }}
                       </span>
                     </div>
                     <div class="tool-call-detail">
                       <div v-if="tc.parsedArgs" class="tool-call-section">
-                        <span class="tool-call-label">参数:</span>
+                        <span class="tool-call-label">{{ $t('agent.toolCallArgs') }}</span>
                         <pre class="tool-call-pre">{{ JSON.stringify(tc.parsedArgs, null, 2) }}</pre>
                       </div>
                       <div v-if="tc.result" class="tool-call-section">
-                        <span class="tool-call-label">结果:</span>
+                        <span class="tool-call-label">{{ $t('agent.toolCallResult') }}</span>
                         <pre class="tool-call-pre">{{ JSON.stringify(tc.result, null, 2).slice(0, 500) }}</pre>
                       </div>
                     </div>
@@ -493,7 +495,7 @@ onMounted(() => {
           </div>
           <div class="agent-message-content">
             <div class="agent-message-bubble agent-message-bubble-assistant">
-              <span class="agent-thinking-dots">思考中...</span>
+              <span class="agent-thinking-dots">{{ $t('agent.thinking') }}</span>
             </div>
           </div>
         </div>
@@ -511,7 +513,7 @@ onMounted(() => {
       >
         <div class="proposal-list-header">
           <ListChecks :size="12" class="proposal-list-icon" />
-          <span class="proposal-list-title">提议 ({{ proposals.pendingProposals.length }})</span>
+          <span class="proposal-list-title">{{ $t('agent.proposals.title', { count: proposals.pendingProposals.length }) }}</span>
         </div>
         <div
           v-for="p in proposals.proposals"
@@ -528,22 +530,22 @@ onMounted(() => {
         >
           <span class="proposal-item-icon"><Plus v-if="p.type === 'insert'" :size="11" /><RotateCw v-else :size="11" /></span>
           <span class="proposal-item-label">{{ p.label }}</span>
-          <span class="proposal-item-lines">{{ proposalLineRange(p.from, p.to) || `${p.lineCount} 行` }}</span>
+          <span class="proposal-item-lines">{{ proposalLineRange(p.from, p.to) || $t('agent.proposals.lines', { count: p.lineCount }) }}</span>
           <template v-if="p.status === 'pending'">
             <button
               class="proposal-item-btn proposal-item-accept"
-              title="接受"
+              :title="$t('agent.proposals.accept')"
               @click.stop="proposals.acceptProposal(p.id)"
             ><Check :size="11" /></button>
             <button
               class="proposal-item-btn proposal-item-reject"
-              title="拒绝"
+              :title="$t('agent.proposals.reject')"
               @click.stop="proposals.rejectProposal(p.id)"
             ><X :size="11" /></button>
           </template>
-          <span v-else-if="p.status === 'accepted'" class="proposal-item-status">已接受</span>
-          <span v-else-if="p.status === 'rejected'" class="proposal-item-status">已拒绝</span>
-          <span v-else-if="p.status === 'expired'" class="proposal-item-status"><AlertTriangle :size="10" /> 已过期</span>
+          <span v-else-if="p.status === 'accepted'" class="proposal-item-status">{{ $t('agent.proposals.accepted') }}</span>
+          <span v-else-if="p.status === 'rejected'" class="proposal-item-status">{{ $t('agent.proposals.rejected') }}</span>
+          <span v-else-if="p.status === 'expired'" class="proposal-item-status"><AlertTriangle :size="10" /> {{ $t('agent.proposals.expired') }}</span>
         </div>
       </div>
 
@@ -555,7 +557,7 @@ onMounted(() => {
         <div class="newfile-list-header">
           <FilePlus :size="12" class="newfile-list-icon" />
           <span class="newfile-list-title">
-            新文件提议 ({{ proposals.pendingNewFileProposals.length }})
+            {{ $t('agent.newFileProposals.title', { count: proposals.pendingNewFileProposals.length }) }}
           </span>
         </div>
         <div
@@ -572,7 +574,7 @@ onMounted(() => {
           <div class="newfile-card-header">
             <FilePlus :size="12" class="newfile-card-icon" />
             <span class="newfile-card-label" :title="nf.label">{{ nf.label }}</span>
-            <span class="newfile-card-meta">{{ nf.lineCount }} 行</span>
+            <span class="newfile-card-meta">{{ $t('agent.newFileProposals.lines', { count: nf.lineCount }) }}</span>
           </div>
           <div class="newfile-card-path" :title="nf.path">{{ nf.path }}</div>
 
@@ -581,20 +583,20 @@ onMounted(() => {
             <div class="newfile-card-actions">
               <button
                 class="newfile-btn newfile-btn-reject"
-                title="拒绝"
+                :title="$t('agent.newFileProposals.reject')"
                 @click="proposals.rejectNewFileProposal(nf.id)"
-              ><X :size="11" /> 拒绝</button>
+              ><X :size="11" /> {{ $t('agent.newFileProposals.reject') }}</button>
               <button
                 class="newfile-btn newfile-btn-accept"
-                title="接受并创建文件"
+                :title="$t('agent.newFileProposals.acceptTitle')"
                 @click="proposals.acceptNewFileProposal(nf.id)"
-              ><Check :size="11" /> 接受</button>
+              ><Check :size="11" /> {{ $t('agent.newFileProposals.accept') }}</button>
             </div>
           </template>
 
           <!-- written 状态：显示已写入路径 -->
           <div v-else-if="nf.status === 'written'" class="newfile-card-status newfile-status-written">
-            <Check :size="11" /> 已创建
+            <Check :size="11" /> {{ $t('agent.newFileProposals.created') }}
             <span v-if="nf.writtenPath" class="newfile-written-path" :title="nf.writtenPath">
               {{ nf.writtenPath }}
             </span>
@@ -602,7 +604,7 @@ onMounted(() => {
 
           <!-- rejected 状态 -->
           <div v-else-if="nf.status === 'rejected'" class="newfile-card-status newfile-status-rejected">
-            <X :size="11" /> 已拒绝
+            <X :size="11" /> {{ $t('agent.newFileProposals.rejected') }}
           </div>
 
           <!-- error 状态：显示错误信息 + 重试按钮 -->
@@ -613,9 +615,9 @@ onMounted(() => {
             <div class="newfile-card-actions">
               <button
                 class="newfile-btn newfile-btn-retry"
-                title="重试"
+                :title="$t('agent.newFileProposals.retry')"
                 @click="proposals.acceptNewFileProposal(nf.id)"
-              ><RotateCw :size="11" /> 重试</button>
+              ><RotateCw :size="11" /> {{ $t('agent.newFileProposals.retry') }}</button>
             </div>
           </template>
         </div>
@@ -627,17 +629,17 @@ onMounted(() => {
         class="proposal-confirmation-overlay"
       >
         <div class="proposal-confirmation-dialog">
-          <div class="confirmation-title">确认接受 {{ proposals.pendingConfirmation.lineCount }} 行替换？</div>
+          <div class="confirmation-title">{{ $t('agent.proposals.confirmTitle', { count: proposals.pendingConfirmation.lineCount }) }}</div>
           <div class="confirmation-label">{{ proposals.pendingConfirmation.label }}</div>
           <div class="confirmation-buttons">
             <button
               class="confirmation-btn confirmation-cancel"
-              title="取消"
+              :title="$t('common.cancel')"
               @click="proposals.cancelConfirmation()"
             ><X :size="14" /></button>
             <button
               class="confirmation-btn confirmation-confirm"
-              title="确认替换"
+              :title="$t('agent.proposals.confirmReplace')"
               @click="proposals.confirmLargeReplace()"
             ><Check :size="14" /></button>
           </div>
@@ -650,7 +652,7 @@ onMounted(() => {
         class="agent-new-content-btn"
         @click="onClickNewContent"
       >
-        ↓ 新内容
+        {{ $t('agent.newContent') }}
       </div>
 
       <!-- Provider chip (T4.1: bg-primary/10 text-primary + Sparkles 图标 + provider 名) -->
@@ -666,7 +668,7 @@ onMounted(() => {
             ref="inputRef"
             v-model="inputText"
             class="agent-input"
-            placeholder="向 Agent 发送消息..."
+            :placeholder="$t('agent.inputPlaceholder')"
             :disabled="agent.isThinking"
             rows="3"
             @keydown="onKeydown"
@@ -684,7 +686,7 @@ onMounted(() => {
           v-else
           class="agent-send-btn agent-send-btn-stop"
           @click="onStop"
-          title="停止"
+          :title="$t('agent.stop')"
         >
           <Square :size="14" />
         </button>

@@ -1,0 +1,58 @@
+{
+  "categories": {
+    "general": "General",
+    "editor": "Editor",
+    "ai": "AI"
+  },
+  "sidebarAriaLabel": "Settings categories",
+  "general": {
+    "title": "General",
+    "appearance": "Appearance",
+    "uiMode": "UI Mode",
+    "uiModeDesc": "Choose the display mode of Murasaki",
+    "uiModeLight": "Light",
+    "uiModeDark": "Dark",
+    "uiModeSystem": "Follow System",
+    "language": "Language",
+    "languageDesc": "Choose the interface language (applies immediately)",
+    "languageZhCN": "中文",
+    "languageEn": "English",
+    "fileHandling": "File Handling",
+    "showHiddenFiles": "Show Hidden Files",
+    "showHiddenFilesDesc": "Show files and directories starting with . in the file tree",
+    "defaultImageDir": "Default Image Directory",
+    "defaultImageDirDesc": "Relative directory where pasted or dropped images are saved by default",
+    "defaultImageDirPlaceholder": "e.g. assets/images",
+    "agent": "Agent",
+    "showAgentPanel": "Show Agent Panel",
+    "showAgentPanelDesc": "Show the AI Agent panel on the right of the editor (source/split mode only)",
+    "updates": "Updates",
+    "checkUpdatesOnStartup": "Check for updates on startup",
+    "checkUpdatesOnStartupDesc": "Silently check for new versions on app startup (notify only, no auto-install)"
+  },
+  "editor": {
+    "title": "Editor",
+    "editorMode": "Editor Mode",
+    "editorModeDesc": "Choose the editor display mode",
+    "editorModeSource": "Source",
+    "editorModeSplit": "Split",
+    "editorModeWysiwyg": "WYSIWYG",
+    "fontSize": "Font Size",
+    "fontSizeDesc": "Editor font size (px)",
+    "lineHeight": "Line Height",
+    "lineHeightDesc": "Editor line height multiplier",
+    "fontFamily": "Font Family",
+    "fontFamilyDesc": "Monospace font for the source editor",
+    "showLineNumbers": "Show Line Numbers",
+    "showLineNumbersDesc": "Show line numbers on the left of the source editor",
+    "softWrap": "Soft Wrap",
+    "softWrapDesc": "Wrap long lines to fit the editor width"
+  },
+  "footer": {
+    "restoreDefaults": "Restore Defaults",
+    "close": "Close",
+    "save": "Save",
+    "saving": "Saving…"
+  },
+  "unsavedMessage": "You have unsaved settings changes. Save them?"
+}

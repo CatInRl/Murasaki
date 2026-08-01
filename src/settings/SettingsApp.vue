@@ -12,6 +12,7 @@
  * - 副作用统一触发：一次 save 通过 Tauri event `settings://saved` 通知主窗口
  */
 import { ref, computed, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { Settings, Type, Bot } from "lucide-vue-next";
 import { emit } from "@tauri-apps/api/event";
 import "./settings.css";
@@ -34,6 +35,7 @@ import {
 const persistence = usePersistenceStore();
 const aiProviders = useAiProvidersStore();
 const dialog = useDialogStore();
+const { t } = useI18n();
 
 const emitClose = defineEmits<{ (e: "close"): void }>();
 
@@ -107,7 +109,7 @@ function handleRestoreDefault(): void {
 async function handleClose(): Promise<void> {
   if (isDirty(draft.value, snapshot.value)) {
     const choice = await dialog.unsavedChanges({
-      message: "设置有未保存的修改，是否保存？",
+      message: t("settings.unsavedMessage"),
     });
     if (choice === "cancel") return;
     if (choice === "save") {
@@ -121,7 +123,7 @@ async function handleClose(): Promise<void> {
 <template>
   <div class="settings-shell">
     <!-- Sidebar -->
-    <nav class="settings-sidebar" aria-label="设置分类">
+    <nav class="settings-sidebar" :aria-label="$t('settings.sidebarAriaLabel')">
       <div class="settings-category-list">
         <button
           type="button"
@@ -130,7 +132,7 @@ async function handleClose(): Promise<void> {
           @click="selectCategory('general')"
         >
           <Settings :size="16" />
-          <span>常规</span>
+          <span>{{ $t('settings.categories.general') }}</span>
         </button>
         <button
           type="button"
@@ -139,7 +141,7 @@ async function handleClose(): Promise<void> {
           @click="selectCategory('editor')"
         >
           <Type :size="16" />
-          <span>编辑器</span>
+          <span>{{ $t('settings.categories.editor') }}</span>
         </button>
         <button
           type="button"
@@ -148,7 +150,7 @@ async function handleClose(): Promise<void> {
           @click="selectCategory('ai')"
         >
           <Bot :size="16" />
-          <span>AI</span>
+          <span>{{ $t('settings.categories.ai') }}</span>
         </button>
       </div>
     </nav>
@@ -175,7 +177,7 @@ async function handleClose(): Promise<void> {
           :disabled="!currentCategoryDirty"
           @click="handleRestoreDefault"
         >
-          恢复默认
+          {{ $t('settings.footer.restoreDefaults') }}
         </button>
         <button
           class="secondary-button"
@@ -183,7 +185,7 @@ async function handleClose(): Promise<void> {
           style="margin-left: auto"
           @click="handleClose"
         >
-          关闭
+          {{ $t('settings.footer.close') }}
         </button>
         <button
           class="primary-button"
@@ -191,7 +193,7 @@ async function handleClose(): Promise<void> {
           :disabled="saving || !dirty"
           @click="handleSave"
         >
-          {{ saving ? "保存中…" : "保存" }}
+          {{ saving ? $t('settings.footer.saving') : $t('settings.footer.save') }}
         </button>
       </div>
     </div>

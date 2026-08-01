@@ -1,0 +1,58 @@
+{
+  "categories": {
+    "general": "常规",
+    "editor": "编辑器",
+    "ai": "AI"
+  },
+  "sidebarAriaLabel": "设置分类",
+  "general": {
+    "title": "常规",
+    "appearance": "外观",
+    "uiMode": "界面模式",
+    "uiModeDesc": "选择 Murasaki 的界面显示模式",
+    "uiModeLight": "浅色",
+    "uiModeDark": "深色",
+    "uiModeSystem": "跟随系统",
+    "language": "界面语言",
+    "languageDesc": "选择应用界面语言（切换即时生效）",
+    "languageZhCN": "中文",
+    "languageEn": "English",
+    "fileHandling": "文件处理",
+    "showHiddenFiles": "显示隐藏文件",
+    "showHiddenFilesDesc": "在文件树中显示以 . 开头的文件和目录",
+    "defaultImageDir": "默认图片目录",
+    "defaultImageDirDesc": "粘贴或拖入图片时默认保存到的相对目录",
+    "defaultImageDirPlaceholder": "例如：assets/images",
+    "agent": "Agent",
+    "showAgentPanel": "显示 Agent 面板",
+    "showAgentPanelDesc": "在编辑器右侧显示 AI Agent 面板（仅 source/split 模式可用）",
+    "updates": "更新",
+    "checkUpdatesOnStartup": "启动时检查更新",
+    "checkUpdatesOnStartupDesc": "应用启动时静默检查是否有新版本（仅提示，不自动安装）"
+  },
+  "editor": {
+    "title": "编辑器",
+    "editorMode": "编辑模式",
+    "editorModeDesc": "选择编辑器的显示模式",
+    "editorModeSource": "源码",
+    "editorModeSplit": "分屏",
+    "editorModeWysiwyg": "所见即所得",
+    "fontSize": "字体大小",
+    "fontSizeDesc": "编辑器字体大小（px）",
+    "lineHeight": "行高",
+    "lineHeightDesc": "编辑器行高倍数",
+    "fontFamily": "字体族",
+    "fontFamilyDesc": "编辑器等宽字体族",
+    "showLineNumbers": "显示行号",
+    "showLineNumbersDesc": "在编辑器左侧显示行号",
+    "softWrap": "自动换行",
+    "softWrapDesc": "长行自动折行显示"
+  },
+  "footer": {
+    "restoreDefaults": "恢复默认",
+    "close": "关闭",
+    "save": "保存",
+    "saving": "保存中…"
+  },
+  "unsavedMessage": "设置有未保存的修改，是否保存？"
+}

@@ -1,0 +1,86 @@
+{
+  "title": "Agent",
+  "clearConversation": "清空当前工作区的对话",
+  "collapsePanel": "收起面板",
+  "clearConfirm": "确定要清空当前工作区的对话吗？此操作不可撤销。",
+  "contextTokens": "≈ {count} tokens",
+  "removeContext": "移除当前文档上下文",
+  "tokenOverLimit": "累计 {used} / {limit} tokens，已超限",
+  "tokenOverLimitTooltip": "累计 prompt token 已超过软限制，建议清空对话",
+  "tokenApproaching": "累计 {used} / {limit} tokens",
+  "tokenApproachingTooltip": "累计 prompt token 接近软限制",
+  "compressionBadge": "已应用上下文压缩",
+  "truncated": "截断",
+  "systemPrompt": "你是 Murasaki 的 AI 助手，帮助用户编辑和管理 Markdown 文档。请简洁清晰地回答。",
+  "maxRoundsReached": "(达到最大工具调用轮数限制)",
+  "truncatedSuffix": "... [已截断]",
+  "callingTools": "(调用工具中)",
+  "toolResultLabel": "{name} 的结果",
+  "errors": {
+    "noProvider": "未配置活动 AI provider",
+    "apiKeyFailed": "获取 API key 失败: {error}"
+  },
+  "context": {
+    "unsaved": "(未保存)",
+    "selectionLabel": "选区",
+    "header": "--- 当前文档上下文 ---",
+    "path": "路径",
+    "cursor": "光标: 行 {line}",
+    "contentHeader": "--- 文档内容 ---",
+    "footer": "--- 文档上下文结束 ---",
+    "userMessageLabel": "用户消息"
+  },
+  "noWorkspace": {
+    "title": "打开工作区后启用 Agent",
+    "desc": "Agent 需要工作区上下文才能辅助编辑",
+    "action": "打开工作区"
+  },
+  "noProvider": {
+    "title": "未配置 AI 服务",
+    "desc": "请在设置中配置 AI Provider",
+    "action": "打开设置"
+  },
+  "emptyConversation": {
+    "title": "向 Agent 发送消息开始对话",
+    "desc": "Agent 可基于当前工作区辅助编辑与生成"
+  },
+  "inputPlaceholder": "向 Agent 发送消息...",
+  "stop": "停止",
+  "thinking": "思考中...",
+  "interrupted": "已中断",
+  "newContent": "↓ 新内容",
+  "toolCallCalling": "调用中...",
+  "toolCallsSummaryCalling": "{calling}/{total} 调用中",
+  "toolCallsSummaryError": "{total} 个工具 · {error} 失败",
+  "toolCallsSummaryDone": "{total} 个工具",
+  "toolCallArgs": "参数:",
+  "toolCallResult": "结果:",
+  "toolCardTitle": "工具 · {summary}",
+  "proposals": {
+    "title": "提议 ({count})",
+    "lines": "{count} 行",
+    "accept": "接受",
+    "reject": "拒绝",
+    "accepted": "已接受",
+    "rejected": "已拒绝",
+    "expired": "已过期",
+    "confirmTitle": "确认接受 {count} 行替换？",
+    "confirmReplace": "确认替换"
+  },
+  "newFileProposals": {
+    "title": "新文件提议 ({count})",
+    "lines": "{count} 行",
+    "accept": "接受",
+    "reject": "拒绝",
+    "retry": "重试",
+    "acceptTitle": "接受并创建文件",
+    "created": "已创建",
+    "rejected": "已拒绝"
+  },
+  "contextMenu": {
+    "copy": "复制",
+    "copyMarkdown": "复制 Markdown 源码",
+    "insertToEditor": "插入到编辑器",
+    "regenerate": "从当前消息重新生成"
+  }
+}

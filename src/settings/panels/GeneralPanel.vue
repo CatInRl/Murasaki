@@ -2,11 +2,11 @@
 /**
  * GeneralPanel — 常规设置面板
  *
- * 设置项：UI 模式、显示隐藏文件、显示 Agent 面板、默认图片目录
+ * 设置项：UI 模式、界面语言、显示隐藏文件、显示 Agent 面板、默认图片目录
  * Design ref: settings-general.html
  */
 import { computed } from "vue";
-import type { SettingsState } from "../../types";
+import type { SettingsState, AppLocale } from "../../types";
 
 const props = defineProps<{ modelValue: SettingsState }>();
 const emit = defineEmits<{ "update:modelValue": [SettingsState] }>();
@@ -20,23 +20,23 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
 <template>
   <div>
-    <h1 class="settings-page-title">常规</h1>
+    <h1 class="settings-page-title">{{ $t('settings.general.title') }}</h1>
 
     <!-- 外观 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">外观</h2>
+      <h2 class="settings-section-title">{{ $t('settings.general.appearance') }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">界面模式</span>
-          <span class="setting-description">选择 Murasaki 的界面显示模式</span>
+          <span class="setting-label">{{ $t('settings.general.uiMode') }}</span>
+          <span class="setting-description">{{ $t('settings.general.uiModeDesc') }}</span>
         </div>
         <div class="setting-control-column">
-          <div class="segmented-control" role="group" aria-label="界面模式">
+          <div class="segmented-control" role="group" :aria-label="$t('settings.general.uiMode')">
             <button
               v-for="opt in [
-                { v: 'light', l: '浅色' },
-                { v: 'dark', l: '深色' },
-                { v: 'system', l: '跟随系统' },
+                { v: 'light', l: $t('settings.general.uiModeLight') },
+                { v: 'dark', l: $t('settings.general.uiModeDark') },
+                { v: 'system', l: $t('settings.general.uiModeSystem') },
               ]"
               :key="opt.v"
               type="button"
@@ -49,15 +49,37 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
           </div>
         </div>
       </div>
+
+      <!-- 界面语言（ADR-0013） -->
+      <div class="setting-row">
+        <div class="setting-label-column">
+          <span class="setting-label">{{ $t('settings.general.language') }}</span>
+          <span class="setting-description">{{ $t('settings.general.languageDesc') }}</span>
+        </div>
+        <div class="setting-control-column">
+          <div class="select-wrapper">
+            <select
+              :value="draft.language"
+              @change="patch('language', ($event.target as HTMLSelectElement).value as AppLocale)"
+            >
+              <option value="zh-CN">{{ $t('settings.general.languageZhCN') }}</option>
+              <option value="en">{{ $t('settings.general.languageEn') }}</option>
+            </select>
+            <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- 文件处理 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">文件处理</h2>
+      <h2 class="settings-section-title">{{ $t('settings.general.fileHandling') }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">显示隐藏文件</span>
-          <span class="setting-description">在文件树中显示以 <code>.</code> 开头的文件和目录</span>
+          <span class="setting-label">{{ $t('settings.general.showHiddenFiles') }}</span>
+          <span class="setting-description">{{ $t('settings.general.showHiddenFilesDesc') }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">
@@ -73,15 +95,15 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">默认图片目录</span>
-          <span class="setting-description">粘贴或拖入图片时默认保存到的相对目录</span>
+          <span class="setting-label">{{ $t('settings.general.defaultImageDir') }}</span>
+          <span class="setting-description">{{ $t('settings.general.defaultImageDirDesc') }}</span>
         </div>
         <div class="setting-control-column">
           <input
             class="setting-input"
             type="text"
             :value="draft.defaultImageDir"
-            placeholder="例如：assets/images"
+            :placeholder="$t('settings.general.defaultImageDirPlaceholder')"
             @input="patch('defaultImageDir', ($event.target as HTMLInputElement).value)"
           />
         </div>
@@ -90,11 +112,11 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
     <!-- Agent -->
     <section class="settings-section">
-      <h2 class="settings-section-title">Agent</h2>
+      <h2 class="settings-section-title">{{ $t('settings.general.agent') }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">显示 Agent 面板</span>
-          <span class="setting-description">在编辑器右侧显示 AI Agent 面板（仅 source/split 模式可用）</span>
+          <span class="setting-label">{{ $t('settings.general.showAgentPanel') }}</span>
+          <span class="setting-description">{{ $t('settings.general.showAgentPanelDesc') }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">
@@ -111,11 +133,11 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
     <!-- 更新 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">更新</h2>
+      <h2 class="settings-section-title">{{ $t('settings.general.updates') }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">启动时检查更新</span>
-          <span class="setting-description">应用启动时静默检查是否有新版本（仅提示，不自动安装）</span>
+          <span class="setting-label">{{ $t('settings.general.checkUpdatesOnStartup') }}</span>
+          <span class="setting-description">{{ $t('settings.general.checkUpdatesOnStartupDesc') }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">

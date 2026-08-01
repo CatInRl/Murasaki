@@ -3,11 +3,13 @@ import { createPinia } from "pinia";
 import "katex/dist/katex.min.css";
 import "./styles/theme.css";
 import App from "./App.vue";
+import { i18n } from "./i18n";
 import { executeTool as agentExecuteTool } from "./agent/tools";
 
 const app = createApp(App);
 const pinia = createPinia();
 app.use(pinia);
+app.use(i18n);
 app.mount("#app");
 
 // E2E 测试辅助：暴露 Pinia 到 window

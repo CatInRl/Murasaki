@@ -45,7 +45,7 @@ function onConfirm(): void {
     :mask-closable="false"
     :close-on-esc="!downloading"
     preset="card"
-    title="发现新版本"
+    :title="$t('editor.update.title')"
     style="width: 520px"
     @esc="!downloading && onCancel()"
   >
@@ -53,9 +53,9 @@ function onConfirm(): void {
       <div v-if="update" class="update-content">
         <!-- 版本号 -->
         <div class="version-row">
-          <NText depth="2">当前版本：</NText>
+          <NText depth="2">{{ $t('editor.update.currentVersion') }}</NText>
           <NText>{{ update.currentVersion }}</NText>
-          <NText depth="2" style="margin-left: 16px">最新版本：</NText>
+          <NText depth="2" style="margin-left: 16px">{{ $t('editor.update.latestVersion') }}</NText>
           <NTag type="success" size="small" :bordered="false">
             v{{ update.version }}
           </NTag>
@@ -63,22 +63,22 @@ function onConfirm(): void {
 
         <!-- 发布说明 -->
         <div class="release-notes">
-          <NText depth="2" class="notes-title">发布说明</NText>
-          <div class="notes-body">{{ update.body || "（无发布说明）" }}</div>
+          <NText depth="2" class="notes-title">{{ $t('editor.update.releaseNotes') }}</NText>
+          <div class="notes-body">{{ update.body || $t('editor.update.noNotes') }}</div>
         </div>
       </div>
     </NCard>
 
     <template #footer>
       <NSpace justify="end">
-        <NButton :disabled="downloading" @click="onCancel">稍后</NButton>
+        <NButton :disabled="downloading" @click="onCancel">{{ $t('editor.update.later') }}</NButton>
         <NButton
           type="primary"
           :loading="downloading"
           :disabled="!update"
           @click="onConfirm"
         >
-          立即更新
+          {{ $t('editor.update.updateNow') }}
         </NButton>
       </NSpace>
     </template>

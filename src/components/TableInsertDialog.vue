@@ -46,14 +46,14 @@ function onCancel(): void {
     :mask-closable="false"
     :close-on-esc="true"
     preset="card"
-    title="插入表格"
+    :title="$t('editor.tableDialog.title')"
     style="width: 360px"
     @esc="onCancel"
   >
     <NCard :bordered="false" size="small">
       <div class="table-form">
         <div class="form-row">
-          <NText class="form-label">行数（不含表头）</NText>
+          <NText class="form-label">{{ $t('editor.tableDialog.rowsLabel') }}</NText>
           <NInputNumber
             v-model:value="rows"
             :min="1"
@@ -63,7 +63,7 @@ function onCancel(): void {
           />
         </div>
         <div class="form-row">
-          <NText class="form-label">列数</NText>
+          <NText class="form-label">{{ $t('editor.tableDialog.colsLabel') }}</NText>
           <NInputNumber
             v-model:value="cols"
             :min="1"
@@ -77,9 +77,9 @@ function onCancel(): void {
 
     <template #footer>
       <NSpace justify="end">
-        <NButton size="small" @click="onCancel">取消</NButton>
+        <NButton size="small" @click="onCancel">{{ $t('common.cancel') }}</NButton>
         <NButton size="small" type="primary" @click="onConfirm">
-          插入
+          {{ $t('editor.tableDialog.insert') }}
         </NButton>
       </NSpace>
     </template>

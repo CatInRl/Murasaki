@@ -1,6 +1,8 @@
 import { ref, watch, type Ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { setLocale } from "../i18n";
+import type { AppLocale } from "../types";
 
 /** useAppLifecycle 依赖的 store/状态切片 */
 export interface AppLifecycleDeps {
@@ -18,6 +20,7 @@ export interface AppLifecycleDeps {
       editorMode: string;
       sidebarView: "files" | "outline";
       lastWorkspacePath: string | null;
+      language: AppLocale;
     };
     updateSettings(patch: Record<string, unknown>): Promise<unknown>;
     loadSettings(): Promise<unknown>;
@@ -160,6 +163,10 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
             themeId: "theme-" + persistence.settings.markdownTheme,
           });
         }
+        // 同步界面语言：前端 i18n + Rust 原生菜单（ADR-0013）
+        // 始终调用，即使值未变也保证前端与 Rust 状态一致
+        setLocale(persistence.settings.language);
+        void invoke("reload_menu", { lang: persistence.settings.language });
       }
     );
 

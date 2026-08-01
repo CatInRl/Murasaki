@@ -64,7 +64,8 @@
     "openai": "^6.49.0",
     "pinia": "^2.1.0",
     "shiki": "^4.3.1",
-    "vue": "^3.5.0"
+    "vue": "^3.5.0",
+    "vue-i18n": "^9.14.4"
   },
   "devDependencies": {
     "@pinia/testing": "^0.1.7",

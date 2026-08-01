@@ -2,12 +2,15 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 use tauri::menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use crate::i18n;
 
 /// 最近打开菜单状态
 /// - folders/files: 前端推送的最近路径列表
 /// - id_to_path: 菜单项 ID → 完整路径的反查映射（每次重建菜单时刷新）
 /// - current_theme: 当前选中的主题菜单项 ID（如 "theme-murasaki"），
 ///   供 build_app_menu 在菜单重建时恢复正确的 checked 状态
+/// - current_language: 当前界面语言（"zh-CN" / "en"），供 build_app_menu
+///   在菜单重建时使用对应语言的文案
 ///
 /// 使用稳定的 ID（基于路径类型前缀 + 序号）配合 id_to_path 映射反查，
 /// 避免在菜单重建期间用户点击旧菜单项时因索引错位打开错误路径。
@@ -16,6 +19,7 @@ pub struct RecentMenuState {
     pub files: Mutex<Vec<String>>,
     pub id_to_path: Mutex<HashMap<String, String>>,
     pub current_theme: Mutex<String>,
+    pub current_language: Mutex<String>,
 }
 
 impl Default for RecentMenuState {
@@ -25,6 +29,7 @@ impl Default for RecentMenuState {
             files: Mutex::new(Vec::new()),
             id_to_path: Mutex::new(HashMap::new()),
             current_theme: Mutex::new("theme-murasaki".to_string()),
+            current_language: Mutex::new(i18n::DEFAULT_LANG.to_string()),
         }
     }
 }
@@ -35,74 +40,80 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
     let state = app.state::<RecentMenuState>();
     let folders = state.folders.lock().map_err(|e| e.to_string())?.clone();
     let files = state.files.lock().map_err(|e| e.to_string())?.clone();
+    let lang = state
+        .current_language
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
+    let t = i18n::menu_texts(&lang);
 
     // === File menu ===
-    let mut file_builder = SubmenuBuilder::new(app, "文件")
-        .text("new-file", "新建文件…\tCtrl+N")
-        .text("new-folder", "新建文件夹…")
+    let mut file_builder = SubmenuBuilder::new(app, t.file_menu)
+        .text("new-file", i18n::with_accel(t.file_new, "Ctrl+N"))
+        .text("new-folder", t.file_new_folder)
         .separator()
-        .text("open-file", "打开文件…\tCtrl+O")
-        .text("open-folder", "打开文件夹…\tCtrl+Shift+O")
+        .text("open-file", i18n::with_accel(t.file_open_file, "Ctrl+O"))
+        .text("open-folder", i18n::with_accel(t.file_open_folder, "Ctrl+Shift+O"))
         .separator();
 
     // "最近打开" 双子菜单：最近文件夹 + 最近文件
     // build_recent_submenu 会更新 id_to_path 映射
-    let recent_folders_submenu = build_recent_submenu(app, "最近文件夹", &folders, "recent-folder", &state.id_to_path)?;
-    let recent_files_submenu = build_recent_submenu(app, "最近文件", &files, "recent-file", &state.id_to_path)?;
+    let recent_folders_submenu = build_recent_submenu(app, t.recent_folders, t.no_recent, &folders, "recent-folder", &state.id_to_path)?;
+    let recent_files_submenu = build_recent_submenu(app, t.recent_files, t.no_recent, &files, "recent-file", &state.id_to_path)?;
     file_builder = file_builder
         .item(&recent_folders_submenu)
         .item(&recent_files_submenu)
         .separator()
-        .text("save", "保存\tCtrl+S")
-        .text("save-as", "另存为…\tCtrl+Shift+S")
+        .text("save", i18n::with_accel(t.file_save, "Ctrl+S"))
+        .text("save-as", i18n::with_accel(t.file_save_as, "Ctrl+Shift+S"))
         .separator()
-        .text("export-html", "导出 HTML…")
-        .text("export-pdf", "导出 PDF…")
-        .text("copy-rich-text", "复制为富文本")
+        .text("export-html", t.file_export_html)
+        .text("export-pdf", t.file_export_pdf)
+        .text("copy-rich-text", t.file_copy_rich_text)
         .separator()
-        .text("close-tab", "关闭标签页\tCtrl+W")
-        .text("reload-file", "重新加载文件\tCtrl+R")
-        .text("close-workspace", "关闭工作区")
+        .text("close-tab", i18n::with_accel(t.file_close_tab, "Ctrl+W"))
+        .text("reload-file", i18n::with_accel(t.file_reload_file, "Ctrl+R"))
+        .text("close-workspace", t.file_close_workspace)
         .separator()
-        .text("settings", "设置…")
+        .text("settings", t.file_settings)
         .separator()
-        .text("quit", "退出\tCtrl+Q");
+        .text("quit", i18n::with_accel(t.file_quit, "Ctrl+Q"));
 
     let file_menu = file_builder.build()?;
 
     // === Edit menu ===
-    let edit_menu = SubmenuBuilder::new(app, "编辑")
-        .text("undo", "撤销\tCtrl+Z")
-        .text("redo", "重做\tCtrl+Y")
+    let edit_menu = SubmenuBuilder::new(app, t.edit_menu)
+        .text("undo", i18n::with_accel(t.edit_undo, "Ctrl+Z"))
+        .text("redo", i18n::with_accel(t.edit_redo, "Ctrl+Y"))
         .separator()
-        .text("cut", "剪切\tCtrl+X")
-        .text("copy", "复制\tCtrl+C")
-        .text("paste", "粘贴\tCtrl+V")
-        .text("select-all", "全选\tCtrl+A")
+        .text("cut", i18n::with_accel(t.edit_cut, "Ctrl+X"))
+        .text("copy", i18n::with_accel(t.edit_copy, "Ctrl+C"))
+        .text("paste", i18n::with_accel(t.edit_paste, "Ctrl+V"))
+        .text("select-all", i18n::with_accel(t.edit_select_all, "Ctrl+A"))
         .separator()
-        .text("find", "查找…\tCtrl+F")
-        .text("replace", "替换…\tCtrl+H")
-        .text("find-in-files", "在文件中查找…\tCtrl+Shift+F")
+        .text("find", i18n::with_accel(t.edit_find, "Ctrl+F"))
+        .text("replace", i18n::with_accel(t.edit_replace, "Ctrl+H"))
+        .text("find-in-files", i18n::with_accel(t.edit_find_in_files, "Ctrl+Shift+F"))
         .build()?;
 
     // === Paragraph menu ===
-    let paragraph_menu = SubmenuBuilder::new(app, "段落")
-        .text("heading-1", "标题 1\tCtrl+1")
-        .text("heading-2", "标题 2\tCtrl+2")
-        .text("heading-3", "标题 3\tCtrl+3")
-        .text("heading-4", "标题 4\tCtrl+4")
-        .text("heading-5", "标题 5\tCtrl+5")
-        .text("heading-6", "标题 6\tCtrl+6")
-        .text("normal", "普通\tCtrl+0")
+    let paragraph_menu = SubmenuBuilder::new(app, t.paragraph_menu)
+        .text("heading-1", i18n::with_accel(t.para_heading1, "Ctrl+1"))
+        .text("heading-2", i18n::with_accel(t.para_heading2, "Ctrl+2"))
+        .text("heading-3", i18n::with_accel(t.para_heading3, "Ctrl+3"))
+        .text("heading-4", i18n::with_accel(t.para_heading4, "Ctrl+4"))
+        .text("heading-5", i18n::with_accel(t.para_heading5, "Ctrl+5"))
+        .text("heading-6", i18n::with_accel(t.para_heading6, "Ctrl+6"))
+        .text("normal", i18n::with_accel(t.para_normal, "Ctrl+0"))
         .separator()
-        .text("code-block", "代码块\tCtrl+Shift+K")
-        .text("blockquote", "引用块\tCtrl+Shift+Q")
-        .text("unordered-list", "无序列表\tCtrl+Shift+]")
-        .text("ordered-list", "有序列表\tCtrl+Shift+[")
-        .text("task-list", "任务列表\tCtrl+Shift+X")
+        .text("code-block", i18n::with_accel(t.para_code_block, "Ctrl+Shift+K"))
+        .text("blockquote", i18n::with_accel(t.para_blockquote, "Ctrl+Shift+Q"))
+        .text("unordered-list", i18n::with_accel(t.para_unordered_list, "Ctrl+Shift+]"))
+        .text("ordered-list", i18n::with_accel(t.para_ordered_list, "Ctrl+Shift+["))
+        .text("task-list", i18n::with_accel(t.para_task_list, "Ctrl+Shift+X"))
         .separator()
-        .text("horizontal-rule", "水平分隔线")
-        .text("insert-table", "插入表格…")
+        .text("horizontal-rule", t.para_horizontal_rule)
+        .text("insert-table", t.para_insert_table)
         .build()?;
 
     // === Theme menu ===
@@ -134,7 +145,7 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .checked(current_theme == "theme-academic")
         .build(app)?;
 
-    let theme_menu = SubmenuBuilder::new(app, "主题")
+    let theme_menu = SubmenuBuilder::new(app, t.theme_menu)
         .item(&theme_murasaki)
         .item(&theme_github)
         .item(&theme_newsprint)
@@ -143,10 +154,10 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .build()?;
 
     // === Help menu ===
-    let help_menu = SubmenuBuilder::new(app, "帮助")
-        .text("docs", "查看文档")
-        .text("about", "关于 Murasaki")
-        .text("check-updates", "检查更新…")
+    let help_menu = SubmenuBuilder::new(app, t.help_menu)
+        .text("docs", t.help_docs)
+        .text("about", t.help_about)
+        .text("check-updates", t.help_check_updates)
         .build()?;
 
     let menu = MenuBuilder::new(app)
@@ -166,6 +177,7 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
 fn build_recent_submenu(
     app: &AppHandle,
     title: &str,
+    no_recent_label: &str,
     entries: &[String],
     prefix: &str,
     id_to_path: &Mutex<HashMap<String, String>>,
@@ -174,7 +186,7 @@ fn build_recent_submenu(
 
     if entries.is_empty() {
         // 无条目时显示禁用的占位
-        let placeholder = MenuItemBuilder::new("（无）")
+        let placeholder = MenuItemBuilder::new(no_recent_label)
             .id(format!("{}:-1", prefix))
             .enabled(false)
             .build(app)?;
@@ -273,6 +285,23 @@ pub fn set_theme_checked(
             }
         }
     }
+    Ok(())
+}
+
+/// 前端调用：切换界面语言后重建原生菜单
+/// 更新 current_language 并重建菜单，使菜单文案即时跟随语言切换（ADR-0013）
+#[tauri::command]
+pub fn reload_menu(
+    app: AppHandle,
+    state: tauri::State<'_, RecentMenuState>,
+    lang: String,
+) -> Result<(), String> {
+    {
+        let mut current = state.current_language.lock().map_err(|e| e.to_string())?;
+        *current = lang;
+    }
+    let menu = build_app_menu(&app).map_err(|e| e.to_string())?;
+    app.set_menu(menu).map_err(|e| e.to_string())?;
     Ok(())
 }
 

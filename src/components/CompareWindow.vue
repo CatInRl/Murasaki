@@ -239,24 +239,24 @@ function onLocalInput(e: Event): void {
     :mask-closable="false"
     :close-on-esc="false"
     preset="card"
-    :title="`对比合并 — ${filePath.split(/[/\\\\]/).pop() ?? filePath}`"
+    :title="$t('editor.compare.title', { filename: filePath.split(/[/\\\\]/).pop() ?? filePath })"
     style="width: 92vw; max-width: 1400px; height: 88vh"
     @update:show="(v: boolean) => !v && onClose()"
   >
     <!-- 顶部工具栏 -->
     <div class="compare-toolbar">
       <NSpace align="center" :size="12">
-        <NText depth="3" class="toolbar-label">差异：</NText>
+        <NText depth="3" class="toolbar-label">{{ $t('editor.compare.diffLabel') }}</NText>
         <NTag size="small" type="success">+{{ stats.added }}</NTag>
         <NTag size="small" type="error">−{{ stats.removed }}</NTag>
         <NTag size="small" type="warning">~{{ stats.modified }}</NTag>
       </NSpace>
       <NSpace align="center" :size="8">
         <NText depth="3" class="legend-text">
-          <span class="legend-box legend-equal"></span> 相同
-          <span class="legend-box legend-add"></span> 仅本地
-          <span class="legend-box legend-del"></span> 仅外部
-          <span class="legend-box legend-mod"></span> 修改
+          <span class="legend-box legend-equal"></span> {{ $t('editor.compare.legendEqual') }}
+          <span class="legend-box legend-add"></span> {{ $t('editor.compare.legendAdd') }}
+          <span class="legend-box legend-del"></span> {{ $t('editor.compare.legendDel') }}
+          <span class="legend-box legend-mod"></span> {{ $t('editor.compare.legendMod') }}
         </NText>
       </NSpace>
     </div>
@@ -266,8 +266,8 @@ function onLocalInput(e: Event): void {
       <!-- 左侧：外部版本（只读） -->
       <div class="compare-side external-side">
         <div class="side-header">
-          <span class="side-title">外部版本（磁盘）</span>
-          <NText depth="3" class="side-hint">只读</NText>
+          <span class="side-title">{{ $t('editor.compare.externalSide') }}</span>
+          <NText depth="3" class="side-hint">{{ $t('editor.compare.externalHint') }}</NText>
         </div>
         <NScrollbar class="side-scroll">
           <div class="diff-content">
@@ -300,8 +300,8 @@ function onLocalInput(e: Event): void {
       <!-- 右侧：本地版本（可编辑） -->
       <div class="compare-side local-side">
         <div class="side-header">
-          <span class="side-title">本地版本（可编辑）</span>
-          <NText depth="3" class="side-hint">编辑后点击"保存"写回磁盘</NText>
+          <span class="side-title">{{ $t('editor.compare.localSide') }}</span>
+          <NText depth="3" class="side-hint">{{ $t('editor.compare.localHint') }}</NText>
         </div>
         <textarea
           class="local-editor"
@@ -316,16 +316,16 @@ function onLocalInput(e: Event): void {
     <template #footer>
       <NSpace justify="space-between" align="center">
         <NText v-if="hasEdits" type="warning" class="dirty-hint">
-          <AlertTriangle :size="14" /> 你已编辑本地版本（与初始内容不同）
+          <AlertTriangle :size="14" /> {{ $t('editor.compare.dirtyHint') }}
         </NText>
         <NText v-else depth="3" class="dirty-hint">
-          直接编辑右侧文本框，完成后点击"保存合并结果"
+          {{ $t('editor.compare.cleanHint') }}
         </NText>
         <NSpace>
-          <NButton @click="onClose">取消</NButton>
-          <NButton @click="onUseExternal">放弃本地修改</NButton>
+          <NButton @click="onClose">{{ $t('common.cancel') }}</NButton>
+          <NButton @click="onUseExternal">{{ $t('editor.compare.discardLocal') }}</NButton>
           <NButton type="primary" :disabled="!hasEdits" @click="onSave">
-            保存合并结果
+            {{ $t('editor.compare.saveMerge') }}
           </NButton>
         </NSpace>
       </NSpace>

@@ -1,0 +1,59 @@
+{
+  "fileMenu": "文件",
+  "editMenu": "编辑",
+  "paragraphMenu": "段落",
+  "themeMenu": "主题",
+  "helpMenu": "帮助",
+  "recentFolders": "最近文件夹",
+  "recentFiles": "最近文件",
+  "noRecent": "（无）",
+  "file": {
+    "newFile": "新建文件…",
+    "newFolder": "新建文件夹…",
+    "openFile": "打开文件…",
+    "openFolder": "打开文件夹…",
+    "save": "保存",
+    "saveAs": "另存为…",
+    "exportHtml": "导出 HTML…",
+    "exportPdf": "导出 PDF…",
+    "copyRichText": "复制为富文本",
+    "closeTab": "关闭标签页",
+    "reloadFile": "重新加载文件",
+    "closeWorkspace": "关闭工作区",
+    "settings": "设置…",
+    "quit": "退出"
+  },
+  "edit": {
+    "undo": "撤销",
+    "redo": "重做",
+    "cut": "剪切",
+    "copy": "复制",
+    "paste": "粘贴",
+    "selectAll": "全选",
+    "find": "查找…",
+    "replace": "替换…",
+    "findInFiles": "在文件中查找…"
+  },
+  "paragraph": {
+    "heading1": "标题 1",
+    "heading2": "标题 2",
+    "heading3": "标题 3",
+    "heading4": "标题 4",
+    "heading5": "标题 5",
+    "heading6": "标题 6",
+    "normal": "普通",
+    "codeBlock": "代码块",
+    "blockquote": "引用块",
+    "unorderedList": "无序列表",
+    "orderedList": "有序列表",
+    "taskList": "任务列表",
+    "horizontalRule": "水平分隔线",
+    "insertTable": "插入表格…"
+  },
+  "help": {
+    "docs": "查看文档",
+    "about": "关于 Murasaki",
+    "checkUpdates": "检查更新…"
+  },
+  "aboutText": "Murasaki v{version}\n轻量级本地 Markdown 文件管理编辑器\n基于 Tauri 2.x + Vue 3 + CodeMirror 6"
+}

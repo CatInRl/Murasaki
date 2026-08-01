@@ -43,6 +43,7 @@ import { useTabClose } from "./composables/useTabClose";
 import { useCommands } from "./composables/useCommands";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
 import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
+import { setLocale } from "./i18n";
 import {
   fieldsForCategory,
   isDirty,
@@ -242,6 +243,11 @@ onMounted(async () => {
   }
   // 应用保存的编辑模式（运行时切换，无需重启）
   editorBridge.setEditorMode(persistence.settings.editorMode);
+  // 应用保存的界面语言（ADR-0013，前端 i18n + Rust 菜单）
+  setLocale(persistence.settings.language);
+  void invoke("reload_menu", { lang: persistence.settings.language }).catch((err: unknown) =>
+    console.warn("初始化菜单语言失败:", err)
+  );
   // 恢复侧栏视图
   if (persistence.settings.sidebarView) {
     sidebarView.value = persistence.settings.sidebarView;

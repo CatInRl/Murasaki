@@ -1,0 +1,86 @@
+{
+  "title": "Agent",
+  "clearConversation": "Clear conversation for this workspace",
+  "collapsePanel": "Collapse panel",
+  "clearConfirm": "Clear the conversation for this workspace? This cannot be undone.",
+  "contextTokens": "≈ {count} tokens",
+  "removeContext": "Remove current document context",
+  "tokenOverLimit": "Cumulative {used} / {limit} tokens, over limit",
+  "tokenOverLimitTooltip": "Cumulative prompt tokens exceed the soft limit. Consider clearing the conversation.",
+  "tokenApproaching": "Cumulative {used} / {limit} tokens",
+  "tokenApproachingTooltip": "Cumulative prompt tokens are approaching the soft limit",
+  "compressionBadge": "Context compression applied",
+  "truncated": "Truncated",
+  "systemPrompt": "You are the Murasaki AI assistant, helping users edit and manage Markdown documents. Please answer concisely and clearly.",
+  "maxRoundsReached": "(Maximum tool call rounds reached)",
+  "truncatedSuffix": "... [truncated]",
+  "callingTools": "(calling tools)",
+  "toolResultLabel": "Result of {name}",
+  "errors": {
+    "noProvider": "No active AI provider configured",
+    "apiKeyFailed": "Failed to get API key: {error}"
+  },
+  "context": {
+    "unsaved": "(Unsaved)",
+    "selectionLabel": "Selection",
+    "header": "--- Current Document Context ---",
+    "path": "Path",
+    "cursor": "Cursor: Line {line}",
+    "contentHeader": "--- Document Content ---",
+    "footer": "--- End Document Context ---",
+    "userMessageLabel": "User message"
+  },
+  "noWorkspace": {
+    "title": "Open a workspace to enable Agent",
+    "desc": "Agent needs a workspace context to assist editing",
+    "action": "Open Workspace"
+  },
+  "noProvider": {
+    "title": "No AI service configured",
+    "desc": "Please configure an AI Provider in Settings",
+    "action": "Open Settings"
+  },
+  "emptyConversation": {
+    "title": "Send a message to start a conversation",
+    "desc": "Agent can help edit and generate based on the current workspace"
+  },
+  "inputPlaceholder": "Send a message to Agent...",
+  "stop": "Stop",
+  "thinking": "Thinking...",
+  "interrupted": "Interrupted",
+  "newContent": "↓ New content",
+  "toolCallCalling": "Calling...",
+  "toolCallsSummaryCalling": "{calling}/{total} calling",
+  "toolCallsSummaryError": "{total} tools · {error} failed",
+  "toolCallsSummaryDone": "{total} tools",
+  "toolCallArgs": "Args:",
+  "toolCallResult": "Result:",
+  "toolCardTitle": "Tools · {summary}",
+  "proposals": {
+    "title": "Proposals ({count})",
+    "lines": "{count} lines",
+    "accept": "Accept",
+    "reject": "Reject",
+    "accepted": "Accepted",
+    "rejected": "Rejected",
+    "expired": "Expired",
+    "confirmTitle": "Confirm accepting {count}-line replacement?",
+    "confirmReplace": "Confirm replace"
+  },
+  "newFileProposals": {
+    "title": "New file proposals ({count})",
+    "lines": "{count} lines",
+    "accept": "Accept",
+    "reject": "Reject",
+    "retry": "Retry",
+    "acceptTitle": "Accept and create file",
+    "created": "Created",
+    "rejected": "Rejected"
+  },
+  "contextMenu": {
+    "copy": "Copy",
+    "copyMarkdown": "Copy Markdown source",
+    "insertToEditor": "Insert into editor",
+    "regenerate": "Regenerate from this message"
+  }
+}

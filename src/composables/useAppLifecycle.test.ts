@@ -33,6 +33,7 @@ function makeDeps(overrides: Partial<AppLifecycleDeps> = {}): AppLifecycleDeps {
         editorMode: "split" as const,
         sidebarView: "files" as const,
         lastWorkspacePath: null,
+        language: "zh-CN" as const,
       }),
       updateSettings: vi.fn().mockResolvedValue(undefined),
       loadSettings: vi.fn().mockResolvedValue(undefined),

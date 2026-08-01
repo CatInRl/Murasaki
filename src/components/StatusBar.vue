@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   FileText,
   AlignLeft,
@@ -38,6 +39,7 @@ const workspace = useWorkspaceStore();
 const tabs = useTabsStore();
 const aiProviders = useAiProvidersStore();
 const agentStore = useAgentStore();
+const { t } = useI18n();
 
 /** 孤立会话数量（启动时检测，清理后刷新） */
 const orphanCount = ref(0);
@@ -48,7 +50,7 @@ const cleaningOrphans = ref(false);
  * 相对工作区根的文件路径；无文件时显示"未打开文件"
  */
 const displayPath = computed<string>(() => {
-  if (!props.filePath) return "未打开文件";
+  if (!props.filePath) return t("common.status.noFileOpen");
   const root = workspace.workspacePath;
   if (!root) return props.filePath;
   const normRoot = root.replace(/\\/g, "/").replace(/\/$/, "");
@@ -60,7 +62,7 @@ const displayPath = computed<string>(() => {
 });
 
 const fileName = computed(() =>
-  props.filePath ? basename(displayPath.value) : "未打开文件"
+  props.filePath ? basename(displayPath.value) : t("common.status.noFileOpen")
 );
 const fileDir = computed(() => {
   if (!props.filePath) return "";
@@ -125,37 +127,37 @@ onMounted(() => {
     <!-- 光标位置 -->
     <div class="status-group">
       <AlignLeft class="status-icon" :size="14" />
-      <span>行 {{ cursorLine }}, 列 {{ cursorCol }}</span>
+      <span>{{ $t('editor.statusBar.lineCol', { line: cursorLine, col: cursorCol }) }}</span>
     </div>
 
     <!-- 字符数 -->
     <div class="status-group">
       <Type class="status-icon" :size="14" />
-      <span>{{ charCount }} 字符</span>
+      <span>{{ $t('editor.statusBar.charCount', { count: charCount }) }}</span>
     </div>
 
     <!-- 已保存指示：check + text-state-success -->
     <div
       v-if="savedState === 'saved'"
       class="status-group status-saved"
-      title="文件已保存"
+      :title="$t('common.status.savedTooltip')"
     >
       <Check :size="14" />
-      <span>已保存</span>
+      <span>{{ $t('common.status.saved') }}</span>
     </div>
     <div
       v-else-if="savedState === 'unsaved'"
       class="status-group status-unsaved"
-      title="有未保存的修改"
+      :title="$t('common.status.unsavedTooltip')"
     >
       <PencilLine :size="14" />
-      <span>未保存</span>
+      <span>{{ $t('common.status.unsaved') }}</span>
     </div>
 
     <!-- Agent 运行中指示器 -->
     <div v-if="agentRunning" class="status-agent-indicator">
       <span class="status-agent-dot"></span>
-      Agent 运行中
+      {{ $t('editor.statusBar.agentRunning') }}
     </div>
 
     <!-- 右侧：孤立会话清理 + provider chip -->
@@ -165,17 +167,17 @@ onMounted(() => {
         type="button"
         class="status-orphan"
         :disabled="cleaningOrphans"
-        :title="`点击清理 ${orphanCount} 个未归附会话`"
+        :title="$t('editor.statusBar.orphanTooltip', { count: orphanCount })"
         @click="onCleanupOrphans"
       >
         <MessageSquare :size="14" />
-        <span>{{ orphanCount }} 个未归附会话</span>
+        <span>{{ $t('editor.statusBar.orphanCount', { count: orphanCount }) }}</span>
       </button>
 
       <div
         v-if="providerName"
         class="status-provider-chip"
-        :title="`当前 AI Provider：${providerName}`"
+        :title="$t('editor.statusBar.providerTooltip', { name: providerName })"
       >
         <Sparkles :size="14" />
         <span>{{ providerName }}</span>

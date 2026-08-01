@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   ChevronDown,
   ChevronRight,
@@ -18,6 +19,7 @@ import type { SearchResult } from "../types";
 
 const searchStore = useSearchStore();
 const workspace = useWorkspaceStore();
+const { t } = useI18n();
 
 const emit = defineEmits<{
   (e: "select-file", path: string, line: number): void;
@@ -179,12 +181,15 @@ const progressText = computed<string>(() => {
     const scanned = searchStore.scannedFiles;
     const matched = searchStore.matchedCount;
     if (total > 0) {
-      return `扫描中 ${scanned}/${total} 文件，已找到 ${matched} 处`;
+      return t("editor.search.scanningProgress", { scanned, total, matched });
     }
-    return `扫描中… 已找到 ${matched} 处`;
+    return t("editor.search.scanning", { matched });
   }
   if (hasResults.value) {
-    return `${searchStore.results.length + searchStore.filenameResults.length} 个文件 / ${totalMatches.value} 处匹配`;
+    return t("editor.search.resultSummary", {
+      files: searchStore.results.length + searchStore.filenameResults.length,
+      matches: totalMatches.value,
+    });
   }
   return "";
 });
@@ -300,7 +305,7 @@ watch(
       <NInput
         :value="searchStore.query"
         size="small"
-        placeholder="搜索工作区内容…"
+        :placeholder="$t('editor.search.placeholder')"
         clearable
         class="search-input"
         @update:value="onInput"
@@ -311,21 +316,21 @@ watch(
           size="small"
           @update:checked="onToggleRegex"
         >
-          正则
+          {{ $t('editor.search.regex') }}
         </NCheckbox>
         <NCheckbox
           :checked="searchStore.options.caseSensitive"
           size="small"
           @update:checked="onToggleCaseSensitive"
         >
-          大小写
+          {{ $t('editor.search.caseSensitive') }}
         </NCheckbox>
         <NCheckbox
           :checked="searchStore.options.wholeWord"
           size="small"
           @update:checked="onToggleWholeWord"
         >
-          全词
+          {{ $t('editor.search.wholeWord') }}
         </NCheckbox>
       </div>
       <span v-if="progressText" class="search-summary">
@@ -341,7 +346,7 @@ watch(
         v-if="searchStore.loading"
         size="tiny"
         quaternary
-        :title="'取消搜索'"
+        :title="$t('editor.search.cancelSearch')"
         class="cancel-btn"
         @click="onCancelSearch"
       >
@@ -351,7 +356,7 @@ watch(
         size="tiny"
         quaternary
         circle
-        title="关闭"
+        :title="$t('editor.search.close')"
         class="close-btn"
         @click="onClose"
       >
@@ -362,7 +367,7 @@ watch(
     <!-- 截断提示 -->
     <div v-if="searchStore.truncated" class="truncation-banner">
       <TriangleAlert :size="12" class="truncation-icon" aria-hidden="true" />
-      <span>结果已截断（超过 1000 处命中），请细化查询</span>
+      <span>{{ $t('editor.search.truncated') }}</span>
     </div>
 
     <!-- 结果区 -->
@@ -372,8 +377,8 @@ watch(
         <EmptyState
           v-else-if="showEmpty"
           :icon="SearchX"
-          title="未找到匹配的文件"
-          action-text="清空搜索"
+          :title="$t('editor.search.noResults')"
+          :action-text="$t('editor.search.clearSearch')"
           @action="onClearSearch"
         />
         <div v-else-if="hasAnyResults" class="results-content">
@@ -383,7 +388,7 @@ watch(
             class="result-group filename-group"
           >
             <div class="group-header filename-header">
-              <span class="group-path">文件名匹配</span>
+              <span class="group-path">{{ $t('editor.search.filenameMatches') }}</span>
               <span class="group-count">{{ groupedFilenameResults.length }}</span>
             </div>
             <div

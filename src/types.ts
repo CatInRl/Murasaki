@@ -32,6 +32,12 @@ export interface RecentEntry {
 export type SidebarView = "files" | "outline";
 
 /**
+ * 界面语言（ADR-0013）
+ * 在 types.ts 定义为规范类型来源，i18n.ts 与各模块从此处导入
+ */
+export type AppLocale = "zh-CN" | "en";
+
+/**
  * 标签页数据结构
  * - path: 文件绝对路径（null 表示未保存的新文件）
  * - content: 当前编辑器内容
@@ -164,6 +170,8 @@ export interface SettingsState {
   aiProposeReplaceConfirmThreshold: number;
   /** 启动时静默检查更新（默认开，ADR-0012） */
   checkUpdatesOnStartup: boolean;
+  /** 界面语言（默认 zh-CN，ADR-0013） */
+  language: AppLocale;
 }
 
 /**
@@ -188,6 +196,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   aiCumulativeTokenSoftLimit: 51200,
   aiProposeReplaceConfirmThreshold: 50,
   checkUpdatesOnStartup: true,
+  language: "zh-CN",
 };
 
 /**

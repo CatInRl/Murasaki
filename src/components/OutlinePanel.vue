@@ -36,7 +36,7 @@ function normLevel(level: number): number {
 <template>
   <div class="outline-panel">
     <div class="outline-toolbar">
-      <span class="toolbar-title">大纲</span>
+      <span class="toolbar-title">{{ $t('editor.outline.title') }}</span>
     </div>
 
     <NScrollbar class="outline-scroll">
@@ -44,8 +44,8 @@ function normLevel(level: number): number {
       <EmptyState
         v-else-if="items.length === 0"
         :icon="List"
-        title="无标题"
-        description="本文档暂无标题段落"
+        :title="$t('editor.outline.empty')"
+        :description="$t('editor.outline.emptyDesc')"
       />
       <div v-else class="outline-content">
         <div
@@ -54,7 +54,7 @@ function normLevel(level: number): number {
           class="outline-item"
           :class="[`level-${normLevel(item.level)}`]"
           :style="{ paddingLeft: (item.level - minLevel) * 14 + 12 + 'px' }"
-          :title="`第 ${item.line} 行`"
+          :title="$t('editor.outline.lineTooltip', { line: item.line })"
           @click="emit('jump-to-line', item.line)"
         >
           <span class="outline-dot" aria-hidden="true"></span>

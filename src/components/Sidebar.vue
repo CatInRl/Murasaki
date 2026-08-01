@@ -45,8 +45,8 @@ const { outline: outlineItems, loading: outlineLoading } = useOutline(filePathRe
         class="sidebar-tab"
         :class="{ active: activeView === 'files' }"
         type="button"
-        title="文件树 (Ctrl+Shift+E)"
-        aria-label="文件树"
+        :title="$t('editor.sidebar.filesTab') + ' (Ctrl+Shift+E)'"
+        :aria-label="$t('editor.sidebar.filesTabAria')"
         @click="setView('files')"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -58,8 +58,8 @@ const { outline: outlineItems, loading: outlineLoading } = useOutline(filePathRe
         class="sidebar-tab"
         :class="{ active: activeView === 'outline' }"
         type="button"
-        title="大纲 (Ctrl+Shift+M)"
-        aria-label="大纲"
+        :title="$t('editor.sidebar.outlineTab') + ' (Ctrl+Shift+M)'"
+        :aria-label="$t('editor.sidebar.outlineTabAria')"
         @click="setView('outline')"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

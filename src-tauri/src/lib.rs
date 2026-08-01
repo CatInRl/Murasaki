@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod i18n;
 
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
 use commands::agent_files;
@@ -292,6 +293,7 @@ pub fn run() {
             watcher::stop_all_watching,
             menu::update_recent_menu,
             menu::set_theme_checked,
+            menu::reload_menu,
             settings::open_settings,
             pdf::export_pdf,
             ai_providers::get_ai_providers,
