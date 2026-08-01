@@ -15,6 +15,7 @@ import StatusBar from "./components/StatusBar.vue";
 import TableInsertDialog from "./components/TableInsertDialog.vue";
 import CompareWindow from "./components/CompareWindow.vue";
 import ImagePreviewModal from "./components/ImagePreviewModal.vue";
+import UpdateDialog from "./components/UpdateDialog.vue";
 import AgentPanel from "./components/AgentPanel.vue";
 import ToastContainer from "./components/ToastContainer.vue";
 import DialogContainer from "./components/DialogContainer.vue";
@@ -41,6 +42,7 @@ import { useCompareWindow } from "./composables/useCompareWindow";
 import { useTabClose } from "./composables/useTabClose";
 import { useCommands } from "./composables/useCommands";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
+import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
 import {
   fieldsForCategory,
   isDirty,
@@ -201,6 +203,30 @@ async function openSettings(): Promise<void> {
   }
 }
 
+// ===== 更新检查（T1.1 / ADR-0012）=====
+const updateDialogVisible = ref(false);
+const updateDialogInfo = ref<UpdateInfo | null>(null);
+
+const {
+  check: checkForUpdate,
+  downloadAndInstall: downloadUpdateAndInstall,
+  downloading: updateDownloading,
+} = useUpdater({
+  toast: toastStore,
+  onUpdateAvailable: (info) => {
+    updateDialogInfo.value = info;
+    updateDialogVisible.value = true;
+  },
+});
+
+async function onUpdateConfirm(update: UpdateInfo): Promise<void> {
+  await downloadUpdateAndInstall(update);
+}
+
+function onUpdateCancel(): void {
+  updateDialogVisible.value = false;
+}
+
 // ===== 启动初始化 =====
 // 事件监听器 cleanup（由 setupEventListeners 在 onMounted 中赋值）
 let cleanupListeners: (() => void) | null = null;
@@ -268,6 +294,12 @@ onMounted(async () => {
   }
 
   initialized.value = true;
+
+  // 11. 启动时静默检查更新（可被设置关闭，ADR-0012）
+  //     silent=true：不弹 toast / 不弹对话框，仅填充 availableUpdate 状态
+  if (persistence.settings.checkUpdatesOnStartup) {
+    void checkForUpdate(true);
+  }
 
   // E2E 测试辅助：暴露 editorRef + test hooks 到 window
   // 桌面应用 WebView 内部仅应用代码可访问，无 XSS 风险
@@ -376,6 +408,7 @@ const { handleMenuEvent, onKeyDown } = useCommands({
   editorRef, currentTheme, sidebarView, statusBarVisible,
   tableDialogVisible,
   openSettings, toggleFullscreen,
+  updater: { check: checkForUpdate },
 });
 
 // ===== 应用生命周期（5 watcher + 5 事件监听器）=====
@@ -519,6 +552,15 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
       :visible="tableDialogVisible"
       @confirm="onTableInsertConfirm"
       @cancel="tableDialogVisible = false"
+    />
+
+    <!-- 更新提示对话框（T1.1 / ADR-0012）-->
+    <UpdateDialog
+      :visible="updateDialogVisible"
+      :update="updateDialogInfo"
+      :downloading="updateDownloading"
+      @cancel="onUpdateCancel"
+      @confirm="onUpdateConfirm"
     />
 
     <!-- 对比窗口（外部修改合并） -->

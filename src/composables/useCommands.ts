@@ -10,6 +10,7 @@ import {
 } from "./useEditorCommands";
 import type { AlertVariant } from "../stores/useDialogStore";
 import type { SidebarView } from "../types";
+import type { UpdateInfo } from "./useUpdater";
 
 // ===== 编辑器实例最小切片 =====
 
@@ -78,6 +79,11 @@ export interface CommandsDeps {
   statusBarVisible: Ref<boolean>;
   tableDialogVisible: Ref<boolean>;
 
+  // updater 切片（T1.1：检查更新）
+  updater: {
+    check(silent?: boolean): Promise<UpdateInfo | null>;
+  };
+
   // 其他函数
   openSettings: () => Promise<void>;
   toggleFullscreen: () => Promise<void>;
@@ -97,7 +103,7 @@ export function useCommands(deps: CommandsDeps) {
     workspace, tabsStore, searchStore, fileOps, dialog,
     editorRef, currentTheme, sidebarView, statusBarVisible,
     tableDialogVisible,
-    openSettings, toggleFullscreen,
+    openSettings, toggleFullscreen, updater,
   } = deps;
 
   /** 由原生菜单触发的命令分发 */
@@ -257,7 +263,8 @@ export function useCommands(deps: CommandsDeps) {
         break;
       }
       case "check-updates": {
-        dialog.alert({ message: "检查更新功能暂不支持（占位菜单项）" });
+        // T1.1（ADR-0012）：菜单触发检查更新（非静默，会弹 UpdateDialog 或 toast）
+        await updater.check(false);
         break;
       }
       default:

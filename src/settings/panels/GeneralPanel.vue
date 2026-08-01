@@ -108,5 +108,26 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
         </div>
       </div>
     </section>
+
+    <!-- 更新 -->
+    <section class="settings-section">
+      <h2 class="settings-section-title">更新</h2>
+      <div class="setting-row">
+        <div class="setting-label-column">
+          <span class="setting-label">启动时检查更新</span>
+          <span class="setting-description">应用启动时静默检查是否有新版本（仅提示，不自动安装）</span>
+        </div>
+        <div class="setting-control-column">
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              :checked="draft.checkUpdatesOnStartup"
+              @change="patch('checkUpdatesOnStartup', ($event.target as HTMLInputElement).checked)"
+            />
+            <span class="toggle-track" aria-hidden="true"></span>
+          </label>
+        </div>
+      </div>
+    </section>
   </div>
 </template>

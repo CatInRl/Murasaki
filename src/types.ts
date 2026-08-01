@@ -162,6 +162,8 @@ export interface SettingsState {
   aiCumulativeTokenSoftLimit: number;
   /** propose_replace 二次确认阈值（默认 50 行） */
   aiProposeReplaceConfirmThreshold: number;
+  /** 启动时静默检查更新（默认开，ADR-0012） */
+  checkUpdatesOnStartup: boolean;
 }
 
 /**
@@ -185,6 +187,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   aiSingleRequestTokenLimit: 16384,
   aiCumulativeTokenSoftLimit: 51200,
   aiProposeReplaceConfirmThreshold: 50,
+  checkUpdatesOnStartup: true,
 };
 
 /**

@@ -231,7 +231,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_shell::init());
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
 
     // 单实例锁定：生产环境启用，E2E 测试环境禁用
     // tauri-driver 通过 msedgedriver 启动 murasaki.exe 时会附加 --remote-debugging-port，
