@@ -15,6 +15,7 @@ import markdownItTexmath from "markdown-it-texmath";
 import katex from "katex";
 import { codeToHtml, type ThemeRegistration } from "shiki";
 import { getCurrentTheme } from "./useTheme";
+import { sanitizeInlineHtml } from "../editor/wysiwyg/htmlSanitizer";
 
 /**
  * 当前 Shiki 主题（与 Markdown 主题联动）。
@@ -173,6 +174,56 @@ export function getFrontMatter(): string {
 }
 
 /**
+ * T6.3 (#101)：配置脚注原位渲染。
+ *
+ * 默认 markdown-it-footnote 的 footnote_tail 核心规则会把所有脚注定义收集到文末
+ * 汇聚成 footnotes-list。本函数禁用该行为，改为在定义出现的原位渲染为脚注块。
+ *
+ * 实现：
+ * 1. 禁用 footnote_tail 核心规则 → 定义 token（footnote_reference_open/close）留在原位
+ * 2. 覆写 footnote_ref 渲染器 → href 使用 label（#fn-{label}），与定义 id 对应
+ * 3. 新增 footnote_reference_open 渲染器 → <div class="footnote-def" id="fn-{label}">
+ * 4. 新增 footnote_reference_close 渲染器 → </div>
+ *
+ * 点击引用 → 通过 href="#fn-{label}" 跳转到原位定义。
+ */
+function configureFootnoteInline(md: MarkdownIt): void {
+  // 1. 禁用 footnote_tail（文末汇聚）
+  md.core.ruler.disable("footnote_tail");
+
+  // 2. 覆写 footnote_ref 渲染器：使用 label 作为 id（与定义对应）
+  md.renderer.rules.footnote_ref = (tokens, idx) => {
+    const label = String(tokens[idx].meta.label);
+    const id = `fn-${label}`;
+    const refId = `fnref-${label}`;
+    const subId = tokens[idx].meta.subId;
+    const refIdFull = subId > 0 ? `${refId}:${subId}` : refId;
+    const n = Number(tokens[idx].meta.id + 1).toString();
+    return `<sup class="footnote-ref"><a href="#${id}" id="${refIdFull}">[${n}]</a></sup>`;
+  };
+
+  // 3. footnote_reference_open → 原位渲染为脚注定义容器
+  md.renderer.rules.footnote_reference_open = (tokens, idx) => {
+    const label = String(tokens[idx].meta.label);
+    return `<div class="footnote-def" id="fn-${label}">`;
+  };
+
+  // 4. footnote_reference_close → 关闭容器（含返回引用的 backref）
+  //    close token 无 meta.label，用闭包变量从对应 open token 传递
+  md.renderer.rules.footnote_reference_close = (tokens, idx) => {
+    // 向后查找对应的 footnote_reference_open 获取 label
+    let label = "";
+    for (let i = idx - 1; i >= 0; i--) {
+      if (tokens[i].type === "footnote_reference_open") {
+        label = String(tokens[i].meta.label);
+        break;
+      }
+    }
+    return ` <a href="#fnref-${label}" class="footnote-backref">\u21a9\ufe0e</a></div>`;
+  };
+}
+
+/**
  * 创建带完整插件链的 markdown-it 实例。
  */
 function createMarkdownIt(): MarkdownIt {
@@ -197,6 +248,8 @@ function createMarkdownIt(): MarkdownIt {
     labelAfter: true,
   });
   md.use(markdownItFootnote);
+  // T6.3 (#101)：脚注原位渲染 —— 禁用 footnote_tail（文末汇聚），改为在定义位置原位渲染
+  configureFootnoteInline(md);
   md.use(markdownItSub);
   md.use(markdownItSup);
   md.use(markdownItIns);
@@ -290,7 +343,11 @@ export function useMarkdownRenderer(): UseMarkdownRenderer {
   function render(source: string): string {
     // 重置 front-matter 缓存：若文档含 front-matter，回调会重新赋值
     lastFrontMatter = "";
-    return getMd().render(source);
+    // T6.4 (#103)：净化 HTML 输出 —— markdown-it 配置 html:true 会原样透传内联 HTML，
+    // 此处用 DOMPurify 清除 script/iframe/on*/javascript: 等 XSS 向量。
+    // 覆盖 PreviewPane 预览 + useHtmlExport 导出（均调用 render()）。
+    // data-source-line / data-lang 等 data-* 属性保留（DOMPurify 默认允许）。
+    return sanitizeInlineHtml(getMd().render(source));
   }
 
   async function highlight(container: HTMLElement) {

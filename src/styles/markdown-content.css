@@ -491,6 +491,40 @@
 }
 
 /* =========================================================================
+ *  脚注（T6.3 / #101）—— 原位渲染样式
+ *  脚注定义在文档原位渲染为缩进块，而非文末汇聚
+ * ========================================================================= */
+.markdown-body .footnote-ref {
+  font-size: 0.75em;
+  vertical-align: super;
+  line-height: 0;
+}
+.markdown-body .footnote-ref a {
+  color: var(--md-primary, var(--murasaki-primary, #9333ea));
+  text-decoration: none;
+}
+.markdown-body .footnote-ref a:hover {
+  text-decoration: underline;
+}
+.markdown-body .footnote-def {
+  margin: 12px 0;
+  padding: 8px 16px;
+  border-left: 3px solid var(--md-primary, var(--murasaki-primary, #9333ea));
+  background: var(--md-surface-2, var(--murasaki-surface-2, #f3f4f6));
+  border-radius: 0 var(--murasaki-radius-sm, 4px) var(--murasaki-radius-sm, 4px) 0;
+  font-size: 0.9em;
+  color: var(--md-text-color, var(--murasaki-ink-2, #525252));
+}
+.markdown-body .footnote-def .footnote-backref {
+  color: var(--md-primary, var(--murasaki-primary, #9333ea));
+  text-decoration: none;
+  margin-left: 4px;
+}
+.markdown-body .footnote-def .footnote-backref:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================================
  *  响应式适配
  * ========================================================================= */
 

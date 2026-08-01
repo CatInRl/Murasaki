@@ -35,9 +35,13 @@ import {
 import { currentShikiTheme, getMarkdownRenderer, resolveShikiThemeOption } from "../../composables/useMarkdownRenderer";
 import {
   computeDecorations,
+  getParagraphRange,
   ComputedDeco,
   BlockWidgetDeco,
 } from "./computeDecorations";
+import { findEmojiShortcodesInRange } from "./emojiReplacement";
+import { sanitizeInlineHtml } from "./htmlSanitizer";
+import { renderFrontMatterCard } from "../../composables/useFrontMatter";
 
 // ===== T7.1 Widgets =====
 
@@ -302,7 +306,9 @@ class TableWidget extends WidgetType {
     const wrapper = document.createElement("div");
     wrapper.className = "murasaki-wysiwyg-table";
     try {
-      wrapper.innerHTML = getMarkdownRenderer().md.render(this.source);
+      // T6.4 (#103)：表格单元格内可能含内联 HTML（markdown-it html:true 透传），
+      // 注入 innerHTML 前用 sanitizeInlineHtml 净化防 XSS
+      wrapper.innerHTML = sanitizeInlineHtml(getMarkdownRenderer().md.render(this.source));
     } catch {
       // 渲染失败：显示原始 markdown 源码
       wrapper.textContent = this.source;
@@ -388,6 +394,82 @@ class EmojiWidget extends WidgetType {
   }
 }
 
+/**
+ * Frontmatter 卡片 widget（T6.2 / #100）：替换文档起始的 `---\n...\n---` 为样式化卡片。
+ *
+ * 复用 useFrontMatter.renderFrontMatterCard 渲染卡片 HTML（与预览/导出视觉一致）。
+ * 点击卡片发出 `murasaki-focus-frontmatter` 自定义事件，SourceEditor 监听后：
+ *   - 切换编辑模式到 source（让用户直接编辑原始 YAML）
+ *   - 把光标定位到 frontmatter 起始位置（from）
+ *
+ * 仅在光标离开 frontmatter 范围时生成此 widget（光标进入时显示原始文本可编辑）。
+ */
+class FrontmatterCardWidget extends WidgetType {
+  constructor(private content: string, private from: number) {
+    super();
+  }
+  eq(other: FrontmatterCardWidget): boolean {
+    return other.content === this.content;
+  }
+  toDOM(): HTMLElement {
+    const wrapper = document.createElement("div");
+    wrapper.className = "murasaki-wysiwyg-frontmatter";
+    // 复用预览/导出的卡片渲染（含 title/date/tags 字段样式化）
+    wrapper.innerHTML = renderFrontMatterCard(this.content);
+    // 点击卡片：发出事件让 SourceEditor 切源码模式并定位光标
+    wrapper.addEventListener("click", () => {
+      wrapper.dispatchEvent(new CustomEvent("murasaki-focus-frontmatter", {
+        bubbles: true,
+        detail: { from: this.from },
+      }));
+    });
+    return wrapper;
+  }
+  // click 由 widget 自己处理（切模式 + 定位光标），其他事件交给 CM
+  ignoreEvent(event: Event): boolean {
+    return event.type === "click";
+  }
+}
+
+/**
+ * HTML 块 widget（T6.4 / #103）：替换 HTMLBlock/HTMLTag 节点为渲染后的 HTML。
+ *
+ * 行为：
+ * - 光标离开 HTML 段 → widget 替换原始 HTML 文本，渲染实际样式（所见即所得）
+ * - 光标进入 HTML 段 → 显示原始 HTML 文本可编辑（不渲染 widget）
+ *
+ * 安全：注入 innerHTML 前用 sanitizeInlineHtml 净化（DOMPurify），
+ * 清除 script / iframe / on* 事件属性 / javascript: 协议等 XSS 向量。
+ *
+ * 点击 widget：发出 murasaki-focus-block 事件定位光标到块起始位置（与其他块 widget 一致）。
+ */
+class HtmlWidget extends WidgetType {
+  constructor(private source: string, private from: number) {
+    super();
+  }
+  eq(other: HtmlWidget): boolean {
+    return other.source === this.source;
+  }
+  toDOM(): HTMLElement {
+    const wrapper = document.createElement("div");
+    wrapper.className = "murasaki-wysiwyg-html";
+    // T6.4 (#103)：净化后注入 innerHTML —— 防止用户输入的 HTML 包含 XSS payload
+    wrapper.innerHTML = sanitizeInlineHtml(this.source);
+    // 点击 widget：发出事件定位光标到块起始位置
+    wrapper.addEventListener("click", () => {
+      wrapper.dispatchEvent(new CustomEvent("murasaki-focus-block", {
+        bubbles: true,
+        detail: { from: this.from },
+      }));
+    });
+    return wrapper;
+  }
+  // click 由 widget 自己处理（定位光标），其他事件交给 CM
+  ignoreEvent(event: Event): boolean {
+    return event.type === "click";
+  }
+}
+
 /** 根据块级 widget 描述符构造对应 WidgetType 实例。 */
 function createBlockWidget(d: BlockWidgetDeco, nextMermaidId: () => string): WidgetType {
   switch (d.widget) {
@@ -405,6 +487,10 @@ function createBlockWidget(d: BlockWidgetDeco, nextMermaidId: () => string): Wid
       return new MathWidget(d.expr, d.displayMode, d.from);
     case "emoji":
       return new EmojiWidget(d.emoji, d.shortcode);
+    case "frontmatter":
+      return new FrontmatterCardWidget(d.content, d.from);
+    case "html":
+      return new HtmlWidget(d.source, d.from);
   }
 }
 
@@ -555,11 +641,108 @@ const wysiwygSyntaxWatcher = ViewPlugin.fromClass(
     update(u: ViewUpdate): void {
       // 语法树引用变化 = 异步解析完成（或文档变化触发重新解析）
       if (syntaxTree(u.startState) !== syntaxTree(u.state)) {
-        u.view.dispatch({ effects: recomputeWysiwygEffect.of() });
+        const view = u.view;
+        // CM6 禁止在 plugin update 内同步 dispatch（会抛错并停用 plugin），
+        // 用 microtask 延迟到 update 周期外。T6.1 的 emoji 替换会改变 doc
+        // 从而触发语法树重解析，此处必须异步以避免崩溃。
+        queueMicrotask(() => {
+          view.dispatch({ effects: recomputeWysiwygEffect.of() });
+        });
       }
     }
     destroy(): void {
       // nothing to clean up
+    }
+  }
+);
+
+// ===== T6.1：Emoji 短代码源码替换 =====
+
+/**
+ * 从语法树收集代码范围（FencedCode / CodeBlock / InlineCode），
+ * 用于排除这些范围内的 emoji shortcode 替换。
+ */
+function collectCodeRanges(state: EditorState): Array<{ from: number; to: number }> {
+  const ranges: Array<{ from: number; to: number }> = [];
+  syntaxTree(state).iterate({
+    enter(ref) {
+      if (ref.name === "FencedCode" || ref.name === "CodeBlock" || ref.name === "InlineCode") {
+        ranges.push({ from: ref.from, to: ref.to });
+      }
+    },
+  });
+  return ranges;
+}
+
+/**
+ * Emoji 源码替换 ViewPlugin（issue #99 / T6.1）。
+ *
+ * 行为：WYSIWYG 模式下，光标离开当前段时，把段内 `:shortcode:` 替换为实际 emoji
+ * 字符写入源码（非仅视觉隐藏）。源码/分屏模式不加载此 plugin（由 wysiwygComp 控制）。
+ *
+ * 触发时机：selectionSet 或 docChanged，且光标当前位置在 lastPara 范围之外。
+ * 替换后置空 lastPara，由下一个 update 重新计算，避免位置偏移导致的误触发。
+ *
+ * 实现注意：CM6 不允许在 plugin update 内同步调用 view.dispatch（会抛
+ * "Calls to EditorView.update are not allowed while an update is in progress"
+ * 并停用 plugin）。因此用 queueMicrotask 把 dispatch 延迟到 update 周期之外。
+ *
+ * 仅替换段范围内、非代码范围、且 shortcode 映射有效的 `:name:` 文本。
+ */
+const emojiSourceReplacer = ViewPlugin.fromClass(
+  class {
+    private lastPara: { from: number; to: number } | null = null;
+
+    constructor(view: EditorView) {
+      this.lastPara = getParagraphRange(
+        view.state.doc.toString(),
+        view.state.selection.main.head
+      );
+    }
+
+    update(u: ViewUpdate): void {
+      if (!u.selectionSet && !u.docChanged) return;
+      const doc = u.state.doc.toString();
+      const head = u.state.selection.main.head;
+      const currentPara = getParagraphRange(doc, head);
+
+      if (this.lastPara) {
+        const leftPara = head < this.lastPara.from || head > this.lastPara.to;
+        if (leftPara) {
+          const codeRanges = collectCodeRanges(u.state);
+          const replacements = findEmojiShortcodesInRange(
+            doc,
+            this.lastPara.from,
+            this.lastPara.to,
+            codeRanges
+          );
+          if (replacements.length > 0) {
+            const changes = replacements.map((r) => ({
+              from: r.from,
+              to: r.to,
+              insert: r.emoji,
+            }));
+            const view = u.view;
+            // 置空 lastPara：dispatch 触发的下一个 update 会重新计算，
+            // 避免使用本次（已偏移的）位置
+            this.lastPara = null;
+            // CM6 禁止在 plugin update 内同步 dispatch，用 microtask 延迟到周期外
+            queueMicrotask(() => {
+              view.dispatch({
+                changes,
+                userEvent: "input.replaceEmoji",
+              });
+            });
+            return;
+          }
+        }
+      }
+
+      this.lastPara = currentPara;
+    }
+
+    destroy(): void {
+      this.lastPara = null;
     }
   }
 );
@@ -700,14 +883,88 @@ export const wysiwygTheme = EditorView.theme({
     textAlign: "center",
     padding: "0.5rem 0",
   },
+  // Frontmatter 卡片（T6.2 / #100）：镜像预览 .front-matter-card 样式
+  // 点击切源码模式 → cursor:pointer 提示可交互
+  ".murasaki-wysiwyg-frontmatter": {
+    cursor: "pointer",
+    margin: "0 0 16px",
+  },
+  ".murasaki-wysiwyg-frontmatter .front-matter-card": {
+    background: "var(--md-fm-card-bg, var(--murasaki-surface-2, #f3f4f6))",
+    border: "1px solid var(--md-fm-card-border, var(--murasaki-border, #e5e5e5))",
+    borderRadius: "var(--murasaki-radius-md, 8px)",
+    padding: "14px 18px",
+    fontSize: "13px",
+    position: "relative",
+    overflow: "hidden",
+  },
+  ".murasaki-wysiwyg-frontmatter .front-matter-card::before": {
+    content: "''",
+    position: "absolute",
+    top: "0",
+    left: "0",
+    width: "3px",
+    height: "100%",
+    background: "var(--md-primary, var(--murasaki-primary, #9333ea))",
+  },
+  ".murasaki-wysiwyg-frontmatter .fm-title": {
+    fontSize: "18px",
+    fontWeight: "700",
+    color: "var(--md-fm-title-color, var(--murasaki-ink, #171717))",
+    marginBottom: "8px",
+    lineHeight: "1.4",
+  },
+  ".murasaki-wysiwyg-frontmatter .fm-row": {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "8px",
+    margin: "4px 0",
+    color: "var(--md-text-color, var(--murasaki-ink-2, #525252))",
+  },
+  ".murasaki-wysiwyg-frontmatter .fm-key": {
+    fontWeight: "600",
+    color: "var(--md-fm-key-color, var(--murasaki-purple-700, #7e22ce))",
+    minWidth: "60px",
+    textTransform: "capitalize",
+  },
+  ".murasaki-wysiwyg-frontmatter .fm-value": {
+    color: "var(--md-fm-value-color, var(--murasaki-ink-2, #525252))",
+  },
+  ".murasaki-wysiwyg-frontmatter .fm-tags": {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginTop: "8px",
+  },
+  ".murasaki-wysiwyg-frontmatter .fm-tag": {
+    display: "inline-block",
+    background: "var(--md-fm-tag-bg, var(--murasaki-primary, #9333ea))",
+    color: "#fff",
+    padding: "2px 10px",
+    borderRadius: "12px",
+    fontSize: "11px",
+    fontWeight: "500",
+  },
+  // HTML 块 widget（T6.4 / #103）：渲染后的内联 HTML —— 鼠标 cursor 提示可交互
+  // 不强制样式（让用户 HTML 自身的 style/class 决定视觉），仅提供 click 提示
+  ".murasaki-wysiwyg-html": {
+    cursor: "text",
+    margin: "8px 0",
+  },
 });
 
 /**
- * 一键启用 WYSIWYG：StateField（提供装饰）+ 语法树监视 ViewPlugin + 主题。
+ * 一键启用 WYSIWYG：StateField（提供装饰）+ 语法树监视 ViewPlugin + emoji 源码替换器 + 主题。
  *
  * 在 SourceEditor.vue 中通过 Compartment 按模式（source/split/wysiwyg）叠加/移除。
  * - wysiwygField：StateField，提供所有 WYSIWYG 装饰（含跨换行块级 widget）
  * - wysiwygSyntaxWatcher：ViewPlugin，监听语法树异步解析并触发重算（不提供装饰）
+ * - emojiSourceReplacer：ViewPlugin，光标离段时把 :shortcode: 替换为 emoji 写入源码（T6.1）
  * - wysiwygTheme：EditorView.theme，WYSIWYG 样式
  */
-export const wysiwygExtensions = [wysiwygField, wysiwygSyntaxWatcher, wysiwygTheme];
+export const wysiwygExtensions = [
+  wysiwygField,
+  wysiwygSyntaxWatcher,
+  emojiSourceReplacer,
+  wysiwygTheme,
+];

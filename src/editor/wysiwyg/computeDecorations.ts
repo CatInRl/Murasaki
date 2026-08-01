@@ -17,6 +17,7 @@
 import type { Tree, SyntaxNode } from "@lezer/common";
 // markdown-it-emoji 的完整 shortcode → unicode 映射（用于 WYSIWYG 模式渲染 emoji shortcode）
 import emojiData from "markdown-it-emoji/lib/data/full.mjs";
+import { findFrontmatterRange } from "./frontmatterDetection";
 
 /** 行级语法标记节点名。命中即应用 hide/dim。 */
 const INLINE_MARK_TYPES = new Set([
@@ -143,6 +144,26 @@ export interface EmojiWidgetDeco {
   shortcode: string;
 }
 
+/** Frontmatter 卡片 widget：替换文档起始的 `---\n...\n---` 为样式化卡片（T6.2 / #100）。 */
+export interface FrontmatterWidgetDeco {
+  type: "blockWidget";
+  widget: "frontmatter";
+  from: number;
+  to: number;
+  /** 去除首尾 `---`/`...` 包裹后的 YAML 文本，供卡片渲染。 */
+  content: string;
+}
+
+/** HTML 块 widget（T6.4 / #103）：替换 HTMLBlock/HTMLTag 节点为渲染后的 HTML（DOMPurify 净化后）。 */
+export interface HtmlWidgetDeco {
+  type: "blockWidget";
+  widget: "html";
+  from: number;
+  to: number;
+  /** 原始 HTML 文本（未经净化），由 wysiwygPlugin 在 toDOM 时调用 sanitizeInlineHtml 净化。 */
+  source: string;
+}
+
 export type BlockWidgetDeco =
   | CodeBlockWidgetDeco
   | MermaidWidgetDeco
@@ -150,7 +171,9 @@ export type BlockWidgetDeco =
   | ImageWidgetDeco
   | TableWidgetDeco
   | MathWidgetDeco
-  | EmojiWidgetDeco;
+  | EmojiWidgetDeco
+  | FrontmatterWidgetDeco
+  | HtmlWidgetDeco;
 
 export type ComputedDeco = MarkDeco | WidgetDeco | RenderDeco | BlockWidgetDeco;
 
@@ -402,6 +425,24 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
         return false; // 不进入子节点
       }
 
+      // T6.4 (#103)：HTML 块 —— 渲染为 widget（光标离开段时）
+      // 仅处理 HTMLBlock（块级 HTML，覆盖完整 <tag>...</tag> 文本）。
+      // 不处理 HTMLTag（行内 HTML 开标签）—— HTMLTag 节点只覆盖开标签 <span ...>，
+      // 不含内容与闭合标签，无法独立渲染为有意义的 widget。
+      // 行内 HTML 的渲染由预览/导出管线（sanitizeInlineHtml）保证安全与样式。
+      if (name === "HTMLBlock") {
+        if (!inViewport(from, to, viewport)) return false;
+        if (overlapsAnyProposal(from, to, proposalRanges)) return false;
+
+        // 块级：光标在节点范围内 → 显示源码可编辑
+        const cursorInRange = selectionHead >= from && selectionHead <= to;
+        if (cursorInRange) return true; // 继续遍历子节点（保持原始文本可见）
+
+        const source = doc.slice(from, to);
+        decos.push({ type: "blockWidget", widget: "html", from, to, source });
+        return false; // 不进入子节点
+      }
+
       // 行级标记：hide / dim
       if (INLINE_MARK_TYPES.has(name)) {
         if (!inViewport(from, to, viewport)) return;
@@ -516,6 +557,27 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       emoji: emojiChar,
       shortcode,
     });
+  }
+
+  // Frontmatter 卡片：检测文档起始的 YAML frontmatter（T6.2 / #100）
+  // 光标离开 frontmatter 范围 → 渲染为样式化卡片 widget；光标进入 → 显示原始文本可编辑
+  const fmRange = findFrontmatterRange(doc);
+  if (fmRange) {
+    if (inViewport(fmRange.from, fmRange.to, viewport)) {
+      if (!overlapsAnyProposal(fmRange.from, fmRange.to, proposalRanges)) {
+        const cursorInRange =
+          selectionHead >= fmRange.from && selectionHead <= fmRange.to;
+        if (!cursorInRange) {
+          decos.push({
+            type: "blockWidget",
+            widget: "frontmatter",
+            from: fmRange.from,
+            to: fmRange.to,
+            content: fmRange.content,
+          });
+        }
+      }
+    }
   }
 
   decos.sort((a, b) => a.from - b.from || a.to - b.to);

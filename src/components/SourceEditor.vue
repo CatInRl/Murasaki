@@ -413,6 +413,19 @@ onMounted(() => {
     });
     view.focus();
   }) as EventListener);
+  // 监听 frontmatter 卡片点击事件（T6.2 / #100）：
+  // 切换到源码模式（让用户直接编辑 YAML）+ 定位光标到 frontmatter 起始位置
+  // setEditorMode 触发 store 反应 → prop 更新 → watch → wysiwygComp.reconfigure 移除 WYSIWYG 扩展
+  // view.dispatch 立即设置选区，reconfigure 后选区保留，用户看到源码模式光标在 frontmatter 起始
+  hostRef.value.addEventListener("murasaki-focus-frontmatter", ((e: CustomEvent) => {
+    const { from } = e.detail as { from: number };
+    useEditorBridgeStore().setEditorMode("source");
+    view.dispatch({
+      selection: { anchor: from },
+      scrollIntoView: true,
+    });
+    view.focus();
+  }) as EventListener);
 });
 
 onBeforeUnmount(() => {
