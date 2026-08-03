@@ -4,6 +4,27 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-03
+
+本版本聚焦产品交付能力建设：自动更新管道打通、三种导出格式、国际化框架、搜索模块重构、AI Provider 抽象层、WYSIWYG 四项补全。
+
+### Added
+
+- **自动更新（#106）**：Tauri updater + Minisign ed25519 签名体系打通；GitHub Actions Release workflow 自动构建三平台产物（Windows / macOS / Linux）、签名、生成 `latest.json` 并发布到 GitHub Releases；客户端内置公钥，启动后自动检测并提示更新。
+- **PDF 导出（#107）**：基于 Tauri WebView2 `PrintToPdf` 原生 API 的 PDF 导出；支持自定义文件名、A4 纸张、自动分页；`src-tauri/src/commands/export.rs` 封装 Rust 命令；前端 `useExportStore` 统一调度 HTML/PDF/富文本三种导出。
+- **复制为富文本（#108）**：`useCopyRichText` composable 实现；将当前 Markdown 通过预览渲染为 HTML 后以 `text/html` MIME 类型写入系统剪贴板；支持粘贴到 Word / Notion / 微信等富文本目标。
+- **国际化框架（#95）**：vue-i18n 9.x 集成；zh-CN / en 双语言 locale 文件（common / menu / settings / editor / agent 五模块）；Rust 端菜单翻译表 `src-tauri/src/i18n.rs` + `reload_menu` 命令；设置面板语言下拉切换；已完成 useAgentStore / ImagePreviewModal / App.vue / 菜单 文案提取，其余组件逐步迁移。
+- **AI Provider 抽象（#98）**：Provider 接口层 `src/agent/provider.ts` 统一定义；已实现 Claude（官方 SDK）与兼容 REST API 双后端；24 测试覆盖接口契约、错误处理、重试逻辑；Provider 选择与 API Key 通过设置面板管理。
+- **WYSIWYG 四项补全（#99 / #100 / #101 / #103）**：emoji 插入面板（40+ 常用 emoji 分类）、frontmatter 可视化编辑（YAML 键值对表格）、Markdown 脚注语法（`[^ref]` 定义与引用自动同步编号）、HTML 预览净化（DOMPurify 白名单过滤 XSS）。
+
+### Changed
+
+- **搜索模块重构（#104）**：`src/composables/useSearch.ts` 重写为异步可取消架构（`AbortController` 支持新查询自动终止旧任务）；搜索结果增量返回（streaming-like UI 更新）；新增 `SearchResultHit` 类型统一标题/路径/匹配位置；搜索导航支持 Tab 打开 / Ctrl+Enter 后台打开。
+
+### Fixed
+
+- **Tauri 签名公钥 baked in**：`tauri.conf.json` updater pubkey 已从占位符替换为实际 ed25519 公钥；私钥与密码已录入 GitHub Secrets，CI/CD 自动签名更新包。
+
 ## [0.3.1] - 2026-08-01
 
 本版本为架构改进与测试稳定性修复版本，无用户可见功能变更。聚焦深化模块边界、消除循环依赖、清理死代码、重塑测试接口，提升代码可维护性与可测试性。
