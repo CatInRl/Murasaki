@@ -55,6 +55,17 @@ export function useFileActions(deps: FileActionsDeps) {
       await tabsStore.openFile(path);
       workspace.selectFile(path);
       await persistence.addRecent(path, "file");
+      // 打开文件时若尚无工作区，自动以文件所在目录为工作区（issue #96/#113）
+      // 这样左侧文件树能显示该文件，且启动时能恢复 lastWorkspacePath
+      if (!workspace.hasWorkspace) {
+        const dir = path.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
+        if (dir) {
+          // 后台打开，不阻塞文件打开（失败仅告警，不影响打开文件）
+          void workspace.openWorkspace(dir).catch((err: unknown) => {
+            console.warn("自动打开文件所在目录为工作区失败:", err);
+          });
+        }
+      }
     } catch (err) {
       console.error("打开文件失败:", err);
       const exists = await fileSystem.exists(path);

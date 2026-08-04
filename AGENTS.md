@@ -132,18 +132,25 @@ murasaki/
 
 完整 changelog 详见 [CHANGELOG.md](CHANGELOG.md)。版本发布时必须同步更新该文件。
 
-### 当前版本：0.3.1（2026-08-01）
+### 当前版本：0.5.0（2026-08-04）
 
-**架构改进与测试稳定性修复**：无用户可见功能变更，聚焦代码可维护性与可测试性。
+**所见即所得模式可用性**：修复 WYSIWYG 核心问题，移除低 ROI 功能，打通自动更新端到端链路。
 
-- 模块边界：新建 `src/services/fileSystem.ts` 集中 Tauri 文件操作；`useFileOpsStore` 提取 `checkAndResolveConflict` 消除 4 处重复冲突解析
-- 循环依赖：`useProposalsStore` 和 `agent/tools.ts` 用静态 import 替换动态 `await import()`
-- 死代码清理：删除未使用的 `usePromiseModal`；测试工具从 `useEditorCommands` 迁移到独立 `src/test/editorTestUtils.ts`
-- 测试接口：移除 `useImagePaste` 的 `__test__` 导出改为命名导出；`tools.test.ts` 规范化 mock 模式（静态 import + `vi.mocked`）
-- E2E 修复：F11 全屏测试与弱断言声明一致化（移除错误的 `.cm-editor.waitForExist` 强断言）
+- 样式统一：source/split/wysiwyg 三种编辑模式统一使用预览同款阅读字体（`--murasaki-font-reading`），字号/行高/字体族通过 CodeMirror Compartment 动态切换（#111/#116）
+- 模式切换：`wysiwygComp` Compartment 运行时叠加/移除 WYSIWYG ViewPlugin，不销毁编辑器实例，内容/光标/undo 栈保持不变（#115）
+- 本地图片：Tauri `convertFileSrc` 解析，兼容相对/绝对/URL/Base64，切 tab 时重新渲染（#118）
+- 大纲跳转：`scrollToLine` 同时移动光标 + scrollIntoView + focus，WYSIWYG 下正确定位（#120）
+- 有序列表光标：`toggleList` 添加前缀后光标定位到 `1. ` 之后（#123）
+- 任务列表：checkbox 精确切换 `[ ]` ↔ `[x]`，不破坏列表结构（#119/#122）
+- Tab 栏：标题 flex 收缩 + 省略号；激活 tab 变化/窗口缩放（ResizeObserver）自动滚入可视区（#117）
+- 工作区：启动自动恢复上次工作区；打开文件无工作区时自动以文件所在目录为工作区（#96）
+- 文件关联：tauri.conf.json 配置 fileAssociations，安装包注册到系统"打开方式"（#113）
+- 移除深色模式（#114）；隐藏 Agent（#112，AGENT_ENABLED=false）
+- 自动更新：release.yml 升级 tauri-action 至 @v1，补传 tagName + updaterJsonPreferNsis，确保生成 latest.json 与 .sig（#124）
 
 ### 历史版本
 
+- 0.4.0（2026-08-03）：产品交付能力（自动更新管道 + 三种导出格式 + 国际化框架 + 搜索重构 + AI Provider 抽象 + WYSIWYG 四项补全）
 - 0.3.0（2026-07-30）：整体 UX 对齐 + WYSIWYG 模式（设计系统 + 反馈系统 + 状态展示三兄弟 + WYSIWYG + 设置窗口 + Markdown 样式统一 + Agent 面板对齐）
 - 0.2.0（2026-07-29）：Agent 能力（OpenAI 兼容端点 BYOK 助手 + 流式输出 + 提案 + 对话持久化 + 三层上下文压缩）
 - 0.1.0（2026-07-23）：首个正式版本（工作区 + 文件树 + 多 tab + CM6 编辑 + 实时预览 + 跨文件搜索 + HTML 导出）

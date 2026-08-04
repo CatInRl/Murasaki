@@ -25,30 +25,6 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
     <!-- 外观 -->
     <section class="settings-section">
       <h2 class="settings-section-title">{{ $t('settings.general.appearance') }}</h2>
-      <div class="setting-row">
-        <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.general.uiMode') }}</span>
-          <span class="setting-description">{{ $t('settings.general.uiModeDesc') }}</span>
-        </div>
-        <div class="setting-control-column">
-          <div class="segmented-control" role="group" :aria-label="$t('settings.general.uiMode')">
-            <button
-              v-for="opt in [
-                { v: 'light', l: $t('settings.general.uiModeLight') },
-                { v: 'dark', l: $t('settings.general.uiModeDark') },
-                { v: 'system', l: $t('settings.general.uiModeSystem') },
-              ]"
-              :key="opt.v"
-              type="button"
-              class="segmented-item"
-              :class="{ active: draft.uiMode === opt.v }"
-              @click="patch('uiMode', opt.v as SettingsState['uiMode'])"
-            >
-              {{ opt.l }}
-            </button>
-          </div>
-        </div>
-      </div>
 
       <!-- 界面语言（ADR-0013） -->
       <div class="setting-row">

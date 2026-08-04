@@ -16,6 +16,7 @@ import katex from "katex";
 import { codeToHtml, type ThemeRegistration } from "shiki";
 import { getCurrentTheme } from "./useTheme";
 import { sanitizeInlineHtml } from "../editor/wysiwyg/htmlSanitizer";
+import { resolveImageSrc } from "../utils/imagePath";
 
 /**
  * 当前 Shiki 主题（与 Markdown 主题联动）。
@@ -164,6 +165,30 @@ function attachSourceLinePlugin(md: MarkdownIt) {
 }
 
 /**
+ * 图片 src 解析插件（ADR-0015 / issue #118）。
+ *
+ * 覆盖 markdown-it 默认 image renderer，在渲染 <img> 前用 resolveImageSrc 转换 src：
+ * - 相对/绝对本地路径 → tauri://localhost/... 协议 URL（Tauri WebView 可加载）
+ * - URL / Base64 → 原样保留
+ *
+ * 通过模块级 currentFilePath 状态获取当前文件路径（由 setCurrentFilePath 设置）。
+ */
+function imageSrcPlugin(md: MarkdownIt) {
+  md.renderer.rules.image = (tokens, idx, options, _env, self) => {
+    const token = tokens[idx];
+    const src = token.attrGet("src") ?? "";
+    const resolved = resolveImageSrc(src, currentFilePath);
+    if (resolved !== src) {
+      token.attrSet("src", resolved);
+    }
+    // alt 属性必须设置（即使为空），复用默认行为
+    // token.children 可能为 null（无 alt 文本），传入空数组以保持类型安全
+    token.attrSet("alt", self.renderInlineAsText(token.children ?? [], options, _env));
+    return self.renderToken(tokens, idx, options);
+  };
+}
+
+/**
  * 最近一次解析的 YAML front-matter 原文。
  * 供前端渲染为卡片使用（见 spec：YAML frontmatter 必须解析并渲染为样式化卡片）。
  */
@@ -171,6 +196,23 @@ let lastFrontMatter = "";
 
 export function getFrontMatter(): string {
   return lastFrontMatter;
+}
+
+/**
+ * 当前文件路径（模块级状态）。
+ * 供 image renderer 与 WYSIWYG ImageWidget 解析相对图片路径使用（ADR-0015）。
+ *
+ * 由 PreviewPane / SourceEditor 在切换文件时通过 setCurrentFilePath() 设置。
+ * 单例 renderer 在 render() 时读取此状态解析图片 src。
+ */
+let currentFilePath: string | null = null;
+
+export function setCurrentFilePath(path: string | null): void {
+  currentFilePath = path;
+}
+
+export function getCurrentFilePath(): string | null {
+  return currentFilePath;
 }
 
 /**
@@ -273,6 +315,8 @@ function createMarkdownIt(): MarkdownIt {
   md.use(codeBlockPlugin);
   // 为块级元素注入 data-source-line，供滚动同步使用
   attachSourceLinePlugin(md);
+  // ADR-0015：图片 src 转换（本地路径 → tauri://localhost 协议）
+  imageSrcPlugin(md);
 
   return md;
 }

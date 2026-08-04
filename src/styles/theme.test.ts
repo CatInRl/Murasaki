@@ -7,7 +7,6 @@ import { resolve } from "node:path";
  *
  * 这些测试断言 theme.css 中存在 ticket 要求的 CSS 变量定义，覆盖验收标准：
  *   - theme.css 包含上述 token 定义
- *   - 浅色/深色模式 token 都有对应值（shadow-2 在两种模式下都有定义）
  *
  * 实现细节不测（不解析 CSS AST、不断言具体颜色值），只断言变量名存在，
  * 这样后续调整数值时测试不会频繁失败（符合 spec.md 的测试哲学）。
@@ -18,7 +17,7 @@ const themeCss = readFileSync(
 );
 
 describe("styles/theme.css tokens — Ticket #60", () => {
-  describe("字号 token（:root 全局，不分模式）", () => {
+  describe("字号 token（:root 全局）", () => {
     it.each<[string, string]>([
       ["--murasaki-text-xs", "12px"],
       ["--murasaki-text-sm", "13px"],
@@ -42,26 +41,17 @@ describe("styles/theme.css tokens — Ticket #60", () => {
     });
 
     it("--murasaki-shadow-2 在浅色模式（:root）中定义", () => {
-      // :root 块内应出现 shadow-2 定义（取第一个 :root 块，即浅色模式默认值）
       const rootBlock = themeCss.match(/:root\s*\{[\s\S]*?\}/);
       expect(rootBlock).not.toBeNull();
       expect(rootBlock![0]).toContain("--murasaki-shadow-2:");
     });
 
-    it("--murasaki-shadow-2 在 prefers-color-scheme: dark 媒体查询中覆盖", () => {
-      const darkMedia = themeCss.match(
-        /@media\s*\(prefers-color-scheme:\s*dark\)\s*\{[\s\S]*?\}\s*\}/,
-      );
-      expect(darkMedia).not.toBeNull();
-      expect(darkMedia![0]).toContain("--murasaki-shadow-2:");
+    it("不含 prefers-color-scheme: dark 媒体查询（issue #114 移除深色模式）", () => {
+      expect(themeCss).not.toMatch(/@media\s*\(prefers-color-scheme:\s*dark\)/);
     });
 
-    it("--murasaki-shadow-2 在 [data-theme=\"dark\"] 中覆盖", () => {
-      const darkAttr = themeCss.match(
-        /:root\[data-theme="dark"\]\s*\{[\s\S]*?\}/,
-      );
-      expect(darkAttr).not.toBeNull();
-      expect(darkAttr![0]).toContain("--murasaki-shadow-2:");
+    it("不含 [data-theme=\"dark\"] 选择器（issue #114 移除深色模式）", () => {
+      expect(themeCss).not.toMatch(/\[data-theme="dark"\]/);
     });
   });
 

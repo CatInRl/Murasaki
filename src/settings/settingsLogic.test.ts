@@ -22,10 +22,12 @@ function clone(s: SettingsState): SettingsState {
 describe("settingsLogic - fieldsForCategory", () => {
   it("general 返回常规分类字段", () => {
     expect(fieldsForCategory("general")).toEqual(GENERAL_FIELDS);
-    expect(GENERAL_FIELDS).toContain("uiMode");
     expect(GENERAL_FIELDS).toContain("showHiddenFiles");
     expect(GENERAL_FIELDS).toContain("showAgentPanel");
     expect(GENERAL_FIELDS).toContain("defaultImageDir");
+    expect(GENERAL_FIELDS).toContain("language");
+    // uiMode 已从字段列表中移除（issue #114）
+    expect(GENERAL_FIELDS).not.toContain("uiMode");
   });
 
   it("editor 返回编辑器分类字段", () => {
@@ -53,14 +55,14 @@ describe("settingsLogic - isCategoryDirty", () => {
   it("修改 general 字段后 general 变 dirty", () => {
     const draft = clone(DEFAULT_SETTINGS);
     const snapshot = clone(DEFAULT_SETTINGS);
-    draft.uiMode = "dark";
+    draft.showHiddenFiles = true;
     expect(isCategoryDirty(draft, snapshot, "general")).toBe(true);
   });
 
   it("修改 general 字段不影响 editor 的 dirty 状态", () => {
     const draft = clone(DEFAULT_SETTINGS);
     const snapshot = clone(DEFAULT_SETTINGS);
-    draft.uiMode = "dark";
+    draft.showHiddenFiles = true;
     expect(isCategoryDirty(draft, snapshot, "editor")).toBe(false);
   });
 
@@ -81,7 +83,7 @@ describe("settingsLogic - isCategoryDirty", () => {
   it("ai 分类永远不 dirty（不参与 draft 模型）", () => {
     const draft = clone(DEFAULT_SETTINGS);
     const snapshot = clone(DEFAULT_SETTINGS);
-    draft.uiMode = "dark";
+    draft.showHiddenFiles = true;
     draft.editorFontSize = 20;
     expect(isCategoryDirty(draft, snapshot, "ai")).toBe(false);
   });
@@ -120,7 +122,6 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
   it("恢复 general 分类：仅 general 字段回到默认，其他分类不变", () => {
     const draft: SettingsState = {
       ...DEFAULT_SETTINGS,
-      uiMode: "dark",
       showHiddenFiles: true,
       defaultImageDir: "custom/dir",
       editorFontSize: 20,
@@ -128,7 +129,6 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
       markdownTheme: "custom-theme",
     };
     const result = restoreCategoryDefaults(draft, "general");
-    expect(result.uiMode).toBe(DEFAULT_SETTINGS.uiMode);
     expect(result.showHiddenFiles).toBe(DEFAULT_SETTINGS.showHiddenFiles);
     expect(result.defaultImageDir).toBe(DEFAULT_SETTINGS.defaultImageDir);
     expect(result.showAgentPanel).toBe(DEFAULT_SETTINGS.showAgentPanel);
@@ -142,7 +142,7 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
   it("恢复 editor 分类：仅 editor 字段回到默认，其他分类不变", () => {
     const draft: SettingsState = {
       ...DEFAULT_SETTINGS,
-      uiMode: "dark",
+      showHiddenFiles: true,
       editorFontSize: 20,
       editorMode: "source",
       editorFontFamily: "Consolas",
@@ -156,13 +156,13 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
     expect(result.editorLineHeight).toBe(DEFAULT_SETTINGS.editorLineHeight);
     expect(result.softWrap).toBe(DEFAULT_SETTINGS.softWrap);
     // general 字段保持改动
-    expect(result.uiMode).toBe("dark");
+    expect(result.showHiddenFiles).toBe(true);
   });
 
   it("恢复 ai 分类：无字段变化（ai 不参与 draft 模型）", () => {
     const draft: SettingsState = {
       ...DEFAULT_SETTINGS,
-      uiMode: "dark",
+      showHiddenFiles: true,
       editorFontSize: 20,
     };
     const result = restoreCategoryDefaults(draft, "ai");
@@ -172,7 +172,7 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
   it("不 mutate 输入 draft", () => {
     const draft: SettingsState = {
       ...DEFAULT_SETTINGS,
-      uiMode: "dark",
+      showHiddenFiles: true,
     };
     const draftCopy = clone(draft);
     restoreCategoryDefaults(draft, "general");

@@ -208,10 +208,10 @@ describe("computeDecorations — 列表", () => {
     expect(replaces(compute(doc, 6)).some((r) => r.widget === "bullet")).toBe(true);
   });
 
-  it("1. 有序列表不替换为 bullet（编号保持可见）", () => {
+  it("1. 有序列表离开段落 → 替换为 orderedList widget（避免光标定位到序号前）", () => {
     const doc = "1. item\n\nbody";
     const d = compute(doc, 9);
-    expect(replaces(d).some((r) => r.widget === "bullet")).toBe(false);
+    expect(replaces(d).some((r) => r.widget === "orderedList")).toBe(true);
   });
 
   it("1. 有序列表光标在段内 → ListMark dim", () => {

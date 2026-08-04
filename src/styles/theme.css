@@ -72,6 +72,8 @@
   /* Typography */
   --murasaki-font-ui: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --murasaki-font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+  /* 阅读 font（预览/WYSIWYG）：霞鹜文楷优先，回退 Noto Sans SC（issue #111） */
+  --murasaki-font-reading: "LXGW WenKai", "Noto Sans SC", -apple-system, "Segoe UI", sans-serif;
 
   /* Font Size Tokens — visual hierarchy for secondary/base/heading text (Ticket #60) */
   --murasaki-text-xs: 12px;
@@ -96,59 +98,8 @@
   --murasaki-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
   --murasaki-shadow-purple: 0 8px 24px rgba(147, 51, 234, 0.18);
   /* Floating-layer shadow for popovers / dialogs / context menus (Ticket #60).
-     Two-layer shadow mirrors the design-spec `.shadow-2` utility and adapts to
-     the active theme via the overrides in the dark-mode blocks below. */
+     Two-layer shadow mirrors the design-spec `.shadow-2` utility. */
   --murasaki-shadow-2: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
-}
-
-/* Dark mode tokens (auto-applied when system is dark OR [data-theme="dark"]) */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --murasaki-background: #0f0f14;
-    --murasaki-foreground: #e5e7eb;
-    --murasaki-card: #18181f;
-    --murasaki-card-foreground: #e5e7eb;
-    --murasaki-popover: #1c1c24;
-    --murasaki-popover-foreground: #e5e7eb;
-    --murasaki-muted: #1f1f28;
-    --murasaki-muted-foreground: #9ca3af;
-    --murasaki-border: #2a2a35;
-    --murasaki-input: #2a2a35;
-
-    --murasaki-surface: #16161d;
-    --murasaki-surface-2: #1c1c24;
-    --murasaki-ink: #e5e7eb;
-    --murasaki-ink-2: #b3b3c0;
-    --murasaki-ink-3: #6b6b7c;
-    --murasaki-line: #2a2a35;
-
-    /* Dark-mode floating-layer shadow — soft light glow on dark surfaces
-       (mirrors design-spec `rgb(from var(--murasaki-foreground) r g b / 0.08)`). */
-    --murasaki-shadow-2: 0 20px 25px -5px rgba(229, 231, 235, 0.08), 0 8px 10px -6px rgba(229, 231, 235, 0.08);
-  }
-}
-
-:root[data-theme="dark"] {
-  --murasaki-background: #0f0f14;
-  --murasaki-foreground: #e5e7eb;
-  --murasaki-card: #18181f;
-  --murasaki-card-foreground: #e5e7eb;
-  --murasaki-popover: #1c1c24;
-  --murasaki-popover-foreground: #e5e7eb;
-  --murasaki-muted: #1f1f28;
-  --murasaki-muted-foreground: #9ca3af;
-  --murasaki-border: #2a2a35;
-  --murasaki-input: #2a2a35;
-
-  --murasaki-surface: #16161d;
-  --murasaki-surface-2: #1c1c24;
-  --murasaki-ink: #e5e7eb;
-  --murasaki-ink-2: #b3b3c0;
-  --murasaki-ink-3: #6b6b7c;
-  --murasaki-line: #2a2a35;
-
-  /* Dark-mode floating-layer shadow — soft light glow on dark surfaces. */
-  --murasaki-shadow-2: 0 20px 25px -5px rgba(229, 231, 235, 0.08), 0 8px 10px -6px rgba(229, 231, 235, 0.08);
 }
 
 /* Global reset & base */

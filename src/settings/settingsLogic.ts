@@ -5,20 +5,20 @@
  * 便于单元测试（参考项目测试哲学：优先测纯逻辑，不测组件实现细节）。
  *
  * 分类与字段映射来自 spec 议题簇 8：
- * - 常规：uiMode / showHiddenFiles / showAgentPanel / defaultImageDir / checkUpdatesOnStartup
+ * - 常规：showHiddenFiles / showAgentPanel / defaultImageDir / checkUpdatesOnStartup / language
  * - 编辑器：editorMode / editorFontSize / editorLineHeight / editorFontFamily / showLineNumbers / softWrap
  * - AI：Provider 有独立持久化（useAiProvidersStore），不参与 footer Save 的 draft 模型
  */
 import type { SettingsState } from "../types";
 import { DEFAULT_SETTINGS } from "../types";
 
-export type SettingsCategory = "general" | "editor" | "ai";
+export type SettingsCategory = "general" | "editor" | "ai" | "shortcuts";
 
 /** 常规分类下受 footer Save 管理的字段 */
 export const GENERAL_FIELDS: (keyof SettingsState)[] = [
-  "uiMode",
   "showHiddenFiles",
   "showAgentPanel",
+  "reopenLastWorkspace",
   "defaultImageDir",
   "checkUpdatesOnStartup",
   "language",
@@ -83,9 +83,9 @@ export function restoreCategoryDefaults(
     case "general":
       return {
         ...draft,
-        uiMode: DEFAULT_SETTINGS.uiMode,
         showHiddenFiles: DEFAULT_SETTINGS.showHiddenFiles,
         showAgentPanel: DEFAULT_SETTINGS.showAgentPanel,
+        reopenLastWorkspace: DEFAULT_SETTINGS.reopenLastWorkspace,
         defaultImageDir: DEFAULT_SETTINGS.defaultImageDir,
         checkUpdatesOnStartup: DEFAULT_SETTINGS.checkUpdatesOnStartup,
         language: DEFAULT_SETTINGS.language,

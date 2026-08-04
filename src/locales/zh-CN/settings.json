@@ -8,11 +8,6 @@
   "general": {
     "title": "常规",
     "appearance": "外观",
-    "uiMode": "界面模式",
-    "uiModeDesc": "选择 Murasaki 的界面显示模式",
-    "uiModeLight": "浅色",
-    "uiModeDark": "深色",
-    "uiModeSystem": "跟随系统",
     "language": "界面语言",
     "languageDesc": "选择应用界面语言（切换即时生效）",
     "languageZhCN": "中文",

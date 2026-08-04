@@ -42,6 +42,7 @@ export interface AppLifecycleDeps {
   settingsVisible: Ref<boolean>;
   handleMenuEvent(menuId: string): Promise<void>;
   onOpenRecent(path: string, type: "file" | "folder"): Promise<void>;
+  onOpenPath(path: string, type: "file" | "folder"): Promise<void>;
 }
 
 /**
@@ -66,6 +67,7 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
     settingsVisible,
     handleMenuEvent,
     onOpenRecent,
+    onOpenPath,
   } = deps;
 
   const initialized = ref(false);
@@ -150,6 +152,17 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
       }
     );
 
+    // 打开文件/文件夹路径（issue #92 / #113）
+    const unlistenOpenFromArgv = await listen<{
+      path: string;
+      type: "file" | "folder";
+    }>("open-from-argv", (event) => {
+      const { path, type } = event.payload;
+      if (path) {
+        void onOpenPath(path, type === "folder" ? "folder" : "file");
+      }
+    });
+
     const unlistenSettingsSaved = await listen<unknown>(
       "settings://saved",
       async () => {
@@ -178,6 +191,7 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
       unlistenMenu();
       unlistenRecentOpen();
       unlistenSingleInstance();
+      unlistenOpenFromArgv();
       unlistenSettingsSaved();
       unlistenNavigate();
     };

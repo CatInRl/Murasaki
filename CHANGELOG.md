@@ -4,6 +4,32 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-04
+
+本版本聚焦 **WYSIWYG 模式可用性**：修复样式不一致、模式切换、图片加载、任务列表、大纲跳转等核心问题；移除低 ROI 的深色模式，隐藏不成熟的 Agent 功能并补全日常体验；同时打通自动更新端到端链路。
+
+### Added
+
+- **WYSIWYG 样式与预览统一（#111 / #116）**：source / split / wysiwyg 三种编辑模式统一使用预览同款阅读字体（`--murasaki-font-reading`），字号/行高/字体族通过 CodeMirror Compartment 动态切换；WYSIWYG widget 对齐 markdown-it class，与预览/导出视觉一致。
+- **本地图片加载（#118）**：基于 Tauri `convertFileSrc` 解析图片，兼容相对路径 / 绝对路径 / URL / Base64，`ImageWidget.eq()` 比较解析后的 src，切 tab 时重新渲染。
+- **Tab 栏滚动与关闭按钮（#117）**：tab 标题 flex 收缩 + 省略号；激活 tab 变化、数量变化及窗口缩放（ResizeObserver）时自动滚入可视区，最右侧 tab 始终可选中/关闭。
+- **启动时打开上次工作区（#96）**：设置项开启后，启动自动恢复上次工作区；打开文件无工作区时自动以文件所在目录为工作区，左侧文件树即时显示。
+- **文件关联（#113）**：`tauri.conf.json` 配置 `fileAssociations`（md/markdown/mdown/mkd），安装包注册到系统"打开方式"。
+
+### Changed
+
+- **WYSIWYG 模式切换不刷新（#115）**：通过 `wysiwygComp` Compartment 运行时叠加/移除 WYSIWYG ViewPlugin，不销毁编辑器实例，内容/光标/undo 栈保持不变。
+- **移除深色模式（#114）**：仅移除 UI 层 dark 选项，保留 night 预览主题。
+- **隐藏 Agent（#112）**：`AGENT_ENABLED` 开关置 false，隐藏所有 Agent 入口与弹窗，恢复时仅需置 true。
+
+### Fixed
+
+- **大纲点击未跳转（#120）**：`scrollToLine` 同时移动光标 + `scrollIntoView` + focus，WYSIWYG 模式下块级 widget 替换后也能正确定位。
+- **WYSIWYG 插入列表后光标位置异常（#123）**：`toggleList` 添加列表前缀后把光标定位到 `1. ` 之后，不再落在序号前。
+- **WYSIWYG 任务列表展示（#119）**：任务 checkbox 渲染为可交互 widget，点击精确切换 `[ ]` ↔ `[x]`，不影响行内其他文本、不破坏列表结构。
+- **点击元素修改范围控制（#122）**：checkbox 点击精确替换 `[from,to]` 范围；链接点击仅导航不修改文本；块级元素点击定位到块起始。
+- **自动更新失败（#124）**：`release.yml` 升级 tauri-action 至 `@v1`，build job 补传 `tagName` 并开启 `updaterJsonPreferNsis`，确保 Release 生成并上传 `latest.json` 与 `.sig` 签名文件。
+
 ## [0.4.0] - 2026-08-03
 
 本版本聚焦产品交付能力建设：自动更新管道打通、三种导出格式、国际化框架、搜索模块重构、AI Provider 抽象层、WYSIWYG 四项补全。

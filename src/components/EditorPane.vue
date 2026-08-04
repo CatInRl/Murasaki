@@ -242,6 +242,7 @@ defineExpose({
         :line-height="lineHeight"
         :font-family="fontFamily"
         :markdown-theme="previewTheme"
+        :current-file-path="currentFilePath"
         @update:model-value="onInput"
         @cursor-change="onCursorChange"
         @context-action="(a) => emit('context-action', a)"

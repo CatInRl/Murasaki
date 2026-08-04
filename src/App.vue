@@ -33,6 +33,7 @@ import { useDialogStore } from "./stores/useDialogStore";
 import { useToastStore } from "./stores/useToastStore";
 import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
+import { isImageExt } from "./composables/useImagePaste";
 import { useRecentMenuSync } from "./composables/useRecentMenuSync";
 import { useFileActions } from "./composables/useFileActions";
 import { useCopyRichText } from "./composables/useCopyRichText";
@@ -54,6 +55,7 @@ import {
 import { basename } from "./utils/path";
 import { DEFAULT_THEME } from "./composables/useTheme";
 import { useNaiveTheme } from "./composables/useNaiveTheme";
+import { AGENT_ENABLED } from "./features";
 import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import type { SidebarView, SettingsState } from "./types";
 
@@ -73,10 +75,7 @@ const { t } = useI18n();
 const currentTheme = ref(DEFAULT_THEME);
 
 // ===== naive-ui 主题对齐 --murasaki-* token（ADR-0005）=====
-// 浅色/深色切换时 naive-ui 组件颜色/圆角/字体跟随 --murasaki-* token 变化
-const { theme: naiveTheme, themeOverrides: naiveThemeOverrides } = useNaiveTheme(
-  computed(() => persistence.settings.uiMode)
-);
+const { theme: naiveTheme, themeOverrides: naiveThemeOverrides } = useNaiveTheme();
 
 // ===== 编辑器引用 =====
 const editorRef = ref<InstanceType<typeof EditorPane> | null>(null);
@@ -254,12 +253,14 @@ onMounted(async () => {
   if (persistence.settings.sidebarView) {
     sidebarView.value = persistence.settings.sidebarView;
   }
-  // 恢复上次打开的工作区
-  if (persistence.settings.lastWorkspacePath) {
+  // 恢复上次打开的工作区（仅当开启"启动时打开上次工作区"，issue #96）
+  if (persistence.settings.reopenLastWorkspace && persistence.settings.lastWorkspacePath) {
     try {
+      console.log("[Murasaki] 恢复工作区:", persistence.settings.lastWorkspacePath);
       await workspace.openWorkspace(persistence.settings.lastWorkspacePath);
+      console.log("[Murasaki] 恢复工作区成功, workspacePath:", workspace.workspacePath);
     } catch (err) {
-      console.warn("恢复工作区失败:", err);
+      console.warn("[Murasaki] 恢复工作区失败:", err);
     }
   }
 
@@ -419,6 +420,21 @@ const { handleMenuEvent, onKeyDown } = useCommands({
   updater: { check: checkForUpdate },
 });
 
+// ===== 拖拽/命令行打开文件或文件夹（issue #92 / #113）=====
+// 分类处理：图片 → 复制到 assets 并插入编辑器；文件夹 → 设为工作区；其他 → 打开为 tab
+function onOpenPath(path: string, type: "file" | "folder"): Promise<void> {
+  if (type === "folder") {
+    return workspace.openWorkspace(path);
+  }
+  const ext = path.split(".").pop() ?? "";
+  if (isImageExt(ext)) {
+    imagePaste.insertExistingImage(path);
+    return Promise.resolve();
+  }
+  // 打开文件（若尚无工作区，openFile 内部会自动以文件所在目录为工作区，issue #96/#113）
+  return openFile(path);
+}
+
 // ===== 应用生命周期（5 watcher + 5 事件监听器）=====
 const { initialized, setupEventListeners } = useAppLifecycle({
   tabsStore,
@@ -431,6 +447,7 @@ const { initialized, setupEventListeners } = useAppLifecycle({
   settingsVisible,
   handleMenuEvent,
   onOpenRecent,
+  onOpenPath,
 });
 
 // ===== 最近打开菜单同步（debounce + in-flight 锁，watcher 自启动）=====
@@ -538,8 +555,9 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
       </div>
 
       <!-- Agent 面板 -->
+      <!-- Agent 面板（AGENT_ENABLED 关闭时隐藏整个入口，issue #112） -->
       <AgentPanel
-        v-if="persistence.settings.showAgentPanel"
+        v-if="AGENT_ENABLED && persistence.settings.showAgentPanel"
         @collapse="onCollapseAgentPanel"
         @open-folder-dialog="onOpenFolder"
         @open-settings="openSettings"

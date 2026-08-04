@@ -8,11 +8,6 @@
   "general": {
     "title": "General",
     "appearance": "Appearance",
-    "uiMode": "UI Mode",
-    "uiModeDesc": "Choose the display mode of Murasaki",
-    "uiModeLight": "Light",
-    "uiModeDark": "Dark",
-    "uiModeSystem": "Follow System",
     "language": "Language",
     "languageDesc": "Choose the interface language (applies immediately)",
     "languageZhCN": "中文",

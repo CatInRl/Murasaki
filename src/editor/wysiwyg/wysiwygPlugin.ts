@@ -21,7 +21,7 @@
  */
 import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, WidgetType } from "@codemirror/view";
 import { EditorState, StateField, StateEffect } from "@codemirror/state";
-import { syntaxTree, ensureSyntaxTree } from "@codemirror/language";
+import { syntaxTree, syntaxTreeAvailable } from "@codemirror/language";
 import { codeToHtml } from "shiki";
 import katex from "katex";
 import mermaid from "mermaid";
@@ -32,7 +32,7 @@ import {
   expireAllProposalsEffect,
   proposalActionEffect,
 } from "../../agent/proposals";
-import { currentShikiTheme, getMarkdownRenderer, resolveShikiThemeOption } from "../../composables/useMarkdownRenderer";
+import { currentShikiTheme, getMarkdownRenderer, resolveShikiThemeOption, getCurrentFilePath } from "../../composables/useMarkdownRenderer";
 import {
   computeDecorations,
   getParagraphRange,
@@ -42,6 +42,7 @@ import {
 import { findEmojiShortcodesInRange } from "./emojiReplacement";
 import { sanitizeInlineHtml } from "./htmlSanitizer";
 import { renderFrontMatterCard } from "../../composables/useFrontMatter";
+import { resolveImageSrc } from "../../utils/imagePath";
 
 // ===== T7.1 Widgets =====
 
@@ -61,15 +62,34 @@ class BulletWidget extends WidgetType {
   }
 }
 
+/** 有序列表编号 widget（替换 `1.`/`a.` 标记）。离开段落时替换，避免光标定位到序号前。 */
+class OrderedListWidget extends WidgetType {
+  constructor(private label: string) {
+    super();
+  }
+  eq(other: OrderedListWidget): boolean {
+    return other.label === this.label;
+  }
+  toDOM(): HTMLElement {
+    const span = document.createElement("span");
+    span.className = "murasaki-wysiwyg-bullet murasaki-wysiwyg-ordered";
+    span.textContent = this.label;
+    return span;
+  }
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
 /** 分隔线（替换 `---`/`***`/`___`）。 */
 class HrWidget extends WidgetType {
   eq(): boolean {
     return true;
   }
   toDOM(): HTMLElement {
-    const div = document.createElement("div");
-    div.className = "murasaki-wysiwyg-hr";
-    return div;
+    const hr = document.createElement("hr");
+    hr.className = "murasaki-wysiwyg-hr";
+    return hr;
   }
   ignoreEvent(): boolean {
     return true;
@@ -92,7 +112,7 @@ class TaskCheckboxWidget extends WidgetType {
   toDOM(): HTMLElement {
     const input = document.createElement("input");
     input.type = "checkbox";
-    input.className = "murasaki-wysiwyg-task-checkbox";
+    input.className = "murasaki-wysiwyg-task-checkbox"; // markdown-content.css: input[type="checkbox"] 提供视觉样式
     input.checked = this.checked;
     // 点击切换：发出自定义事件，SourceEditor 监听后 dispatch changes 修改 markdown
     input.addEventListener("click", (e: MouseEvent) => {
@@ -129,12 +149,12 @@ class CodeBlockWidget extends WidgetType {
   }
   toDOM(): HTMLElement {
     const wrapper = document.createElement("div");
-    wrapper.className = "murasaki-wysiwyg-codeblock-wrapper";
+    wrapper.className = "murasaki-wysiwyg-codeblock-wrapper code-block-wrapper";
 
     // 语言标签栏（issue #85 / T2）：有语言时显示，空语言不显示
     if (this.lang) {
       const label = document.createElement("div");
-      label.className = "murasaki-wysiwyg-code-lang-label";
+      label.className = "murasaki-wysiwyg-code-lang-label code-lang-label";
       label.textContent = this.lang;
       wrapper.appendChild(label);
     }
@@ -188,7 +208,7 @@ class MermaidWidget extends WidgetType {
   }
   toDOM(): HTMLElement {
     const container = document.createElement("div");
-    container.className = "murasaki-wysiwyg-mermaid";
+    container.className = "murasaki-wysiwyg-mermaid mermaid";
     // 占位：出错时显示源码，便于排错
     container.textContent = this.code;
     void mermaid
@@ -271,17 +291,24 @@ class LinkWidget extends WidgetType {
 
 /** 图片 widget：替换 ![alt](url)，渲染为实际 <img>。 */
 class ImageWidget extends WidgetType {
-  constructor(private alt: string, private url: string) {
+  /** 构造时解析好的 src（基于当前文件路径）。eq 比较此值，路径变化时触发重渲染。 */
+  private resolvedSrc: string;
+
+  constructor(private alt: string, url: string) {
     super();
+    // ADR-0015：在构造时解析 src（而非 toDOM 时），这样 eq 比较解析后的值，
+    // 当 currentFilePath 变化时（切 tab），新 widget 的 resolvedSrc 不同，
+    // eq 返回 false，CM6 会调用 toDOM 重新渲染图片。
+    this.resolvedSrc = resolveImageSrc(url, getCurrentFilePath());
   }
   eq(other: ImageWidget): boolean {
-    return other.alt === this.alt && other.url === this.url;
+    return other.alt === this.alt && other.resolvedSrc === this.resolvedSrc;
   }
   toDOM(): HTMLElement {
     const img = document.createElement("img");
     img.className = "murasaki-wysiwyg-image";
     img.alt = this.alt;
-    img.src = this.url;
+    img.src = this.resolvedSrc;
     img.title = this.alt;
     return img;
   }
@@ -343,8 +370,8 @@ class MathWidget extends WidgetType {
     const el = document.createElement(this.displayMode ? "div" : "span");
     // 块级公式追加 modifier class，便于在 wysiwygTheme 中区分块级居中样式（T6）
     el.className = this.displayMode
-      ? "murasaki-wysiwyg-math murasaki-wysiwyg-math-block"
-      : "murasaki-wysiwyg-math";
+      ? "murasaki-wysiwyg-math murasaki-wysiwyg-math-block katex katex-display"
+      : "murasaki-wysiwyg-math katex";
     try {
       el.innerHTML = katex.renderToString(this.expr, {
         displayMode: this.displayMode,
@@ -413,6 +440,7 @@ class FrontmatterCardWidget extends WidgetType {
   }
   toDOM(): HTMLElement {
     const wrapper = document.createElement("div");
+    // markdown-body class on editor container makes .front-matter-card selectors match
     wrapper.className = "murasaki-wysiwyg-frontmatter";
     // 复用预览/导出的卡片渲染（含 title/date/tags 字段样式化）
     wrapper.innerHTML = renderFrontMatterCard(this.content);
@@ -509,6 +537,8 @@ function toDecorationSet(decos: ComputedDeco[], nextMermaidId: () => string): De
         widget = new BulletWidget();
       } else if (d.widget === "hr") {
         widget = new HrWidget();
+      } else if (d.widget === "orderedList") {
+        widget = new OrderedListWidget(d.label ?? "");
       } else {
         // taskCheckbox：携带 checked 状态 + 范围（用于点击切换时定位）
         widget = new TaskCheckboxWidget(!!d.checked, d.from, d.to);
@@ -555,15 +585,18 @@ export const recomputeWysiwygEffect = StateEffect.define<void>();
 /**
  * 从 EditorState 计算 WYSIWYG DecorationSet（纯函数，无副作用）。
  *
- * 强制完整解析语法树（小文档同步完成；大文档 5s 超时回退到部分解析），
- * 避免 FencedCode/Table 等节点未识别导致 widget 不渲染。
+ * 注意：此处不主动调用 ensureSyntaxTree 强制解析语法树。
+ * 原因：在 StateField.create/update 内推进 ParseContext 会让语法树引用变化，
+ * 又会触发 wysiwygSyntaxWatcher 的 dispatch，形成无限循环（曾导致 OOM）。
+ * 语法树的异步解析由 CM6 内置的 parseWorker 在后台 requestIdleCallback 中完成，
+ * 解析完成时 wysiwygSyntaxWatcher 会 dispatch recomputeWysiwygEffect 触发重算。
+ * 因此本函数只读取当前已解析的语法树（可能不完整），不主动推进解析。
  *
  * 注意：StateField 无法访问 view.viewport，因此不做视口增量计算。
  * 大文档（>10000 行）场景下性能可接受（CM6 RangeSet 增量构建），
  * 如需优化可再引入 ViewPlugin 监听 viewport 并 dispatch effect。
  */
 function computeDecorationsForState(state: EditorState): DecorationSet {
-  ensureSyntaxTree(state, state.doc.length + 1, 5000);
   const decos = computeDecorations({
     doc: state.doc.toString(),
     selectionHead: state.selection.main.head,
@@ -623,7 +656,7 @@ export const wysiwygField = StateField.define<DecorationSet>({
 // ===== 轻量 ViewPlugin：监听语法树异步解析变化 =====
 
 /**
- * 语法树监视器：当语法树引用变化（异步解析完成）时，dispatch recomputeWysiwygEffect
+ * 语法树监视器：当语法树异步解析从未完成变为完成时，dispatch recomputeWysiwygEffect
  * 通知 wysiwygField 重算装饰。
  *
  * 为什么需要这个？
@@ -631,24 +664,47 @@ export const wysiwygField = StateField.define<DecorationSet>({
  * - 初次创建编辑器时，语法树可能未完整解析，FencedCode/Table/Link 等节点未被识别，
  *   导致 widget 不渲染。语法树解析完成后，需要触发重算。
  * - 此 ViewPlugin 不提供任何装饰（decorations 不返回），仅用于副作用 dispatch。
+ *
+ * 防循环策略（曾因循环导致 OOM）：
+ *  - 不在 constructor 主动 ensureSyntaxTree（让 parseWorker 在后台自然解析）
+ *  - 只在解析状态从「未完成 → 完成」时 dispatch 一次（wasDone=false && isDone=true）
+ *    解析进行中的增量推进不再触发 dispatch，避免「解析→重算→推进解析→再触发」循环
+ *  - 额外保留 16ms 防抖 + pending 标志作为兜底保护
  */
 const wysiwygSyntaxWatcher = ViewPlugin.fromClass(
   class {
-    constructor(view: EditorView) {
-      // 初次构造时强制解析语法树（小文档同步完成）
-      ensureSyntaxTree(view.state, view.state.doc.length + 1, 5000);
+    /** 上次 dispatch recomputeWysiwygEffect 的时间戳（防抖，避免循环） */
+    private lastDispatch = 0;
+    /** 是否已有 pending microtask dispatch（避免重复调度） */
+    private pending = false;
+
+    constructor(_view: EditorView) {
+      // 不主动 ensureSyntaxTree —— parseWorker 会在后台解析，完成后通过 update 通知。
     }
     update(u: ViewUpdate): void {
-      // 语法树引用变化 = 异步解析完成（或文档变化触发重新解析）
-      if (syntaxTree(u.startState) !== syntaxTree(u.state)) {
-        const view = u.view;
-        // CM6 禁止在 plugin update 内同步 dispatch（会抛错并停用 plugin），
-        // 用 microtask 延迟到 update 周期外。T6.1 的 emoji 替换会改变 doc
-        // 从而触发语法树重解析，此处必须异步以避免崩溃。
-        queueMicrotask(() => {
-          view.dispatch({ effects: recomputeWysiwygEffect.of() });
-        });
-      }
+      // 语法树引用未变化 → 无需处理
+      if (syntaxTree(u.startState) === syntaxTree(u.state)) return;
+      // 只在解析状态从「未完成 → 完成」时 dispatch 一次。
+      // 解析进行中的增量推进（wasDone=false && isDone=false）不触发，
+      // 避免每次语法树变化都重算装饰导致循环累积内存。
+      const wasDone = syntaxTreeAvailable(u.startState, u.startState.doc.length);
+      const isDone = syntaxTreeAvailable(u.state, u.state.doc.length);
+      if (!(!wasDone && isDone)) return;
+
+      // 防抖兜底：同一 microtask 周期内只调度一次，且最少间隔 16ms
+      const now = performance.now();
+      if (this.pending || now - this.lastDispatch < 16) return;
+      this.pending = true;
+      this.lastDispatch = now;
+
+      const view = u.view;
+      // CM6 禁止在 plugin update 内同步 dispatch（会抛错并停用 plugin），
+      // 用 microtask 延迟到 update 周期外。T6.1 的 emoji 替换会改变 doc
+      // 从而触发语法树重解析，此处必须异步以避免崩溃。
+      queueMicrotask(() => {
+        this.pending = false;
+        view.dispatch({ effects: recomputeWysiwygEffect.of() });
+      });
     }
     destroy(): void {
       // nothing to clean up
@@ -747,7 +803,13 @@ const emojiSourceReplacer = ViewPlugin.fromClass(
   }
 );
 
-/** WYSIWYG 所需样式（标记隐藏/dim、bullet、分隔线、引用块左边框、T7.2 块级 widget）。 */
+/**
+ * WYSIWYG 行为样式（仅 CM6 特有行为，视觉样式由 markdown-content.css 统一提供）。
+ *
+ * 0.5.0（issue #116）：移除了所有与 markdown-content.css 重复的视觉样式规则。
+ * WYSIWYG 模式下编辑器容器带 .markdown-body class，markdown-content.css 的选择器
+ * 直接匹配 widget 内的原生 HTML 标签和工具类。
+ */
 export const wysiwygTheme = EditorView.theme({
   ".murasaki-wysiwyg-mark-hide": {
     display: "none",
@@ -756,200 +818,40 @@ export const wysiwygTheme = EditorView.theme({
     opacity: "0.4",
     fontSize: "80%",
   },
-  // 引用块：跟随 markdown 主题（--md-quote-*），与预览 .markdown-body blockquote 一致
+  // 引用块：CM6 mark decoration 样式（无法用 <blockquote> 标签，需独立样式）
+  // 引用 --md-* 变量与 markdown-content.css 保持视觉一致
   ".murasaki-wysiwyg-blockquote": {
     borderLeft: "3px solid var(--md-quote-border, var(--murasaki-purple-300, #d8b4fe))",
     background: "var(--md-quote-bg, var(--murasaki-purple-50, #faf5ff))",
     color: "var(--md-quote-color, var(--murasaki-muted-foreground, #737373))",
     fontStyle: "var(--md-quote-style, italic)",
     padding: "10px 16px",
-    borderRadius:
-      "0 var(--murasaki-radius-sm, 4px) var(--murasaki-radius-sm, 4px) 0",
+    borderRadius: "0 var(--murasaki-radius-sm, 4px) var(--murasaki-radius-sm, 4px) 0",
   },
   ".murasaki-wysiwyg-bullet": {
     color: "var(--md-list-marker-color, var(--murasaki-primary, #9333ea))",
     paddingRight: "6px",
     userSelect: "none",
   },
-  // 任务列表复选框：跟随 --md-checkbox-accent
+  // 行为样式：cursor / userSelect 等（视觉由 markdown-content.css 提供）
   ".murasaki-wysiwyg-task-checkbox": {
-    accentColor: "var(--md-checkbox-accent, var(--murasaki-primary, #9333ea))",
-    marginRight: "6px",
     cursor: "pointer",
     userSelect: "none",
   },
-  ".murasaki-wysiwyg-hr": {
-    display: "block",
-    borderBottom: "var(--md-hr-border-width, 2px) solid var(--murasaki-border, #e5e5e5)",
-    margin: "var(--md-hr-margin, 6px) 0",
-    height: "0",
-  },
-  // T7.2 块级 widget 样式
-  // 代码块：跟随 --md-codeblock-*，与预览 .markdown-body pre 一致
-  ".murasaki-wysiwyg-codeblock": {
-    backgroundColor: "var(--md-codeblock-bg, #171717)",
-    color: "var(--md-codeblock-color, #e5e7eb)",
-    borderRadius: "var(--murasaki-radius-md, 8px)",
-    padding: "14px 18px",
-    fontFamily: "var(--murasaki-font-mono, ui-monospace, monospace)",
-    fontSize: "13px",
-    lineHeight: "1.6",
-    overflow: "auto",
-    margin: "12px 0 16px",
-    boxShadow: "var(--murasaki-shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.04))",
-  },
-  // 代码块 wrapper + 语言标签栏（issue #85 / T2）：与预览 .code-block-wrapper 视觉一致
-  ".murasaki-wysiwyg-codeblock-wrapper": {
-    overflow: "hidden",
-    borderRadius: "var(--murasaki-radius-md, 8px)",
-    margin: "12px 0 16px",
-    boxShadow: "var(--murasaki-shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.04))",
-  },
-  ".murasaki-wysiwyg-codeblock-wrapper .murasaki-wysiwyg-codeblock": {
-    margin: "0",
-    borderRadius: "0",
-    boxShadow: "none",
-  },
-  ".murasaki-wysiwyg-codeblock-wrapper .murasaki-wysiwyg-code-lang-label": {
-    backgroundColor: "var(--murasaki-neutral-800, #262626)",
-    color: "var(--murasaki-neutral-400, #a3a3a3)",
-    fontSize: "11px",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    padding: "4px 12px",
-    borderBottom: "1px solid var(--murasaki-neutral-700, #404040)",
-  },
-  // Mermaid：卡片包裹，跟随主题背景
-  ".murasaki-wysiwyg-mermaid": {
-    background: "var(--md-bg, white)",
-    border: "1px solid var(--murasaki-border, #e5e5e5)",
-    borderRadius: "var(--murasaki-radius-md, 8px)",
-    padding: "0.75rem",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    margin: "12px 0",
-    minHeight: "20px",
-    color: "var(--murasaki-ink-3, #a3a3a3)",
-    fontSize: "12px",
-  },
-  ".murasaki-wysiwyg-mermaid svg": {
-    maxWidth: "100%",
-    height: "auto",
-  },
-  // 链接：跟随 --md-link-*
   ".murasaki-wysiwyg-link": {
-    color: "var(--md-link-color, var(--murasaki-primary, #9333ea))",
-    textDecoration: "var(--md-link-decoration, underline)",
     cursor: "text",
   },
-  ".murasaki-wysiwyg-link:hover": {
-    color: "var(--md-link-color, var(--murasaki-purple-700, #7e22ce))",
-  },
-  // 图片：圆角 + 阴影，对齐预览 .markdown-body img
-  ".murasaki-wysiwyg-image": {
-    maxWidth: "100%",
-    borderRadius: "var(--murasaki-radius-sm, 4px)",
-    boxShadow: "var(--murasaki-shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.04))",
-    display: "inline-block",
-    verticalAlign: "middle",
-  },
-  // 表格：跟随 --md-table-*，对齐预览 .markdown-body table
-  ".murasaki-wysiwyg-table": {
-    margin: "8px 0",
-    overflow: "auto",
-    fontSize: "13px",
-  },
-  ".murasaki-wysiwyg-table table": {
-    borderCollapse: "collapse",
-    width: "100%",
-  },
-  ".murasaki-wysiwyg-table th, .murasaki-wysiwyg-table td": {
-    border: "1px solid var(--md-table-border, var(--murasaki-line, #e5e5e5))",
-    padding: "8px 14px",
-  },
-  ".murasaki-wysiwyg-table th": {
-    backgroundColor: "var(--md-table-th-bg, var(--murasaki-surface-2, #f3f4f6))",
-    fontWeight: "600",
-  },
-  // 数学公式：蓝色斜体，对齐预览 KaTeX 样式（T5 / T6）
-  ".murasaki-wysiwyg-math": {
-    color: "var(--murasaki-state-info, #2563eb)",
-    fontStyle: "italic",
-    display: "inline-block",
-  },
-  ".murasaki-wysiwyg-math-block": {
-    display: "block",
-    textAlign: "center",
-    padding: "0.5rem 0",
-  },
-  // Frontmatter 卡片（T6.2 / #100）：镜像预览 .front-matter-card 样式
-  // 点击切源码模式 → cursor:pointer 提示可交互
   ".murasaki-wysiwyg-frontmatter": {
     cursor: "pointer",
     margin: "0 0 16px",
   },
-  ".murasaki-wysiwyg-frontmatter .front-matter-card": {
-    background: "var(--md-fm-card-bg, var(--murasaki-surface-2, #f3f4f6))",
-    border: "1px solid var(--md-fm-card-border, var(--murasaki-border, #e5e5e5))",
-    borderRadius: "var(--murasaki-radius-md, 8px)",
-    padding: "14px 18px",
-    fontSize: "13px",
-    position: "relative",
-    overflow: "hidden",
-  },
-  ".murasaki-wysiwyg-frontmatter .front-matter-card::before": {
-    content: "''",
-    position: "absolute",
-    top: "0",
-    left: "0",
-    width: "3px",
-    height: "100%",
-    background: "var(--md-primary, var(--murasaki-primary, #9333ea))",
-  },
-  ".murasaki-wysiwyg-frontmatter .fm-title": {
-    fontSize: "18px",
-    fontWeight: "700",
-    color: "var(--md-fm-title-color, var(--murasaki-ink, #171717))",
-    marginBottom: "8px",
-    lineHeight: "1.4",
-  },
-  ".murasaki-wysiwyg-frontmatter .fm-row": {
-    display: "flex",
-    alignItems: "baseline",
-    gap: "8px",
-    margin: "4px 0",
-    color: "var(--md-text-color, var(--murasaki-ink-2, #525252))",
-  },
-  ".murasaki-wysiwyg-frontmatter .fm-key": {
-    fontWeight: "600",
-    color: "var(--md-fm-key-color, var(--murasaki-purple-700, #7e22ce))",
-    minWidth: "60px",
-    textTransform: "capitalize",
-  },
-  ".murasaki-wysiwyg-frontmatter .fm-value": {
-    color: "var(--md-fm-value-color, var(--murasaki-ink-2, #525252))",
-  },
-  ".murasaki-wysiwyg-frontmatter .fm-tags": {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "6px",
-    marginTop: "8px",
-  },
-  ".murasaki-wysiwyg-frontmatter .fm-tag": {
-    display: "inline-block",
-    background: "var(--md-fm-tag-bg, var(--murasaki-primary, #9333ea))",
-    color: "#fff",
-    padding: "2px 10px",
-    borderRadius: "12px",
-    fontSize: "11px",
-    fontWeight: "500",
-  },
-  // HTML 块 widget（T6.4 / #103）：渲染后的内联 HTML —— 鼠标 cursor 提示可交互
-  // 不强制样式（让用户 HTML 自身的 style/class 决定视觉），仅提供 click 提示
   ".murasaki-wysiwyg-html": {
     cursor: "text",
     margin: "8px 0",
+  },
+  ".murasaki-wysiwyg-mermaid svg": {
+    maxWidth: "100%",
+    height: "auto",
   },
 });
 

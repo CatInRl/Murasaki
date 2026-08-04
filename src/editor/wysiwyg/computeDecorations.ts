@@ -58,9 +58,11 @@ export interface WidgetDeco {
   type: "replace";
   from: number;
   to: number;
-  widget: "bullet" | "hr" | "taskCheckbox";
+  widget: "bullet" | "hr" | "taskCheckbox" | "orderedList";
   /** 仅 taskCheckbox 使用：是否已勾选 */
   checked?: boolean;
+  /** 仅 orderedList 使用：有序列表编号文本（如 `1.`） */
+  label?: string;
 }
 
 /** 渲染 decoration：对 [from,to] 内容 span 应用渲染样式类（引用块左边框等）。 */
@@ -477,9 +479,12 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
             }
             return;
           }
-          // 有序列表（1. a.）：段内 dim，离开保持可见（编号是功能性内容）
+          // 有序列表（1. a.）：段内 dim，离开段落替换为编号 widget
+          // （替换后光标无法定位到序号前，避免输入时破坏列表结构）
           if (inParagraph) {
             decos.push({ type: "mark", from, to, kind: "dim", markType: name });
+          } else {
+            decos.push({ type: "replace", from, to, widget: "orderedList", label: text });
           }
           return;
         }

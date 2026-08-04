@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { getMarkdownRenderer, getFrontMatter } from "../composables/useMarkdownRenderer";
+import { getMarkdownRenderer, getFrontMatter, setCurrentFilePath } from "../composables/useMarkdownRenderer";
 import { renderFrontMatterCard } from "../composables/useFrontMatter";
 import { MARKDOWN_THEMES } from "../composables/useTheme";
 // 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
@@ -99,6 +99,8 @@ async function renderMermaid(container: HTMLElement) {
 async function update() {
   const container = containerRef.value;
   if (!container) return;
+  // ADR-0015：设置当前文件路径，供 image renderer 解析相对图片路径
+  setCurrentFilePath(props.currentFilePath);
   // 同步渲染 HTML
   const bodyHtml = renderer.render(props.source);
   // 渲染 front-matter 卡片（spec：YAML frontmatter 必须解析并渲染为样式化卡片）
@@ -118,6 +120,14 @@ watch(
     void nextTick(update);
   },
   { immediate: true }
+);
+
+// 当前文件路径变更 → 重新渲染（图片相对路径解析依赖此值）
+watch(
+  () => props.currentFilePath,
+  () => {
+    void nextTick(update);
+  }
 );
 
 // 主题变更 → 切换 Shiki 主题并重新渲染（代码块高亮跟随主题）
@@ -307,7 +317,7 @@ defineExpose({
   padding: 28px 36px;
   background: var(--md-bg, var(--murasaki-background));
   color: var(--md-fg, var(--murasaki-ink));
-  font-family: var(--murasaki-font-ui);
+  font-family: var(--murasaki-font-reading, var(--murasaki-font-ui));
   font-size: 14px;
   line-height: 1.75;
   transition: padding var(--murasaki-duration-base) var(--murasaki-ease);

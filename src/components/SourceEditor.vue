@@ -33,7 +33,8 @@ import {
   expireAllProposalsEffect,
 } from "../agent/proposals";
 import { useProposalsStore } from "../stores/useProposalsStore";
-import { wysiwygExtensions } from "../editor/wysiwyg/wysiwygPlugin";
+import { wysiwygExtensions, recomputeWysiwygEffect } from "../editor/wysiwyg/wysiwygPlugin";
+import { setCurrentFilePath } from "../composables/useMarkdownRenderer";
 
 /**
  * Murasaki syntax theme — purple-tinted, writing-first (ADR-0006).
@@ -113,9 +114,7 @@ const murasakiTheme = EditorView.theme({
     fontWeight: "500",
   },
   ".cm-content": {
-    fontFamily: "var(--murasaki-font-mono)",
-    fontSize: "13px",
-    lineHeight: "1.65",
+    // 字体/字号/行高由 fontComp 动态应用（buildFontTheme），统一各编辑模式使用阅读字体
     padding: "12px 0",
     caretColor: "var(--murasaki-primary)",
   },
@@ -155,7 +154,7 @@ const murasakiTheme = EditorView.theme({
   },
   ".cm-scroller": {
     overflow: "auto",
-    fontFamily: "var(--murasaki-font-mono)",
+    // 字体由 fontComp 动态应用（buildFontTheme），统一各编辑模式使用阅读字体
   },
   ".cm-searchMatch": {
     backgroundColor: "rgba(192, 132, 252, 0.25)",
@@ -230,6 +229,8 @@ interface Props {
   fontFamily?: string;
   /** Markdown 主题（驱动 WYSIWYG 模式下的 --md-* 变量，与预览/导出一致） */
   markdownTheme?: string;
+  /** 当前文件路径（用于 WYSIWYG 模式解析相对图片路径，ADR-0015） */
+  currentFilePath?: string | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -242,6 +243,7 @@ const props = withDefaults(defineProps<Props>(), {
   lineHeight: 1.6,
   fontFamily: "JetBrains Mono",
   markdownTheme: "murasaki",
+  currentFilePath: null,
 });
 
 const emit = defineEmits<{
@@ -353,9 +355,13 @@ function buildExtensions() {
  * 构建字体主题（EditorView.theme）。
  * 把 fontSize/lineHeight/fontFamily props 转换为 .cm-content / .cm-scroller 的 CSS。
  * 通过 fontComp 在设置变更时重新应用，无需销毁编辑器实例。
+ *
+ * 所有编辑模式（source/split/wysiwyg）统一使用阅读字体（与预览一致）。
+ * 用户配置的等宽字体作为 fallback（阅读字体缺失时兜底）。
  */
 function buildFontTheme() {
-  const fontCss = `${props.fontFamily}, ui-monospace, monospace`;
+  const fontFamily = `var(--murasaki-font-reading, ${props.fontFamily})`;
+  const fontCss = `${fontFamily}, ui-monospace, monospace`;
   const sizePx = `${props.fontSize}px`;
   return EditorView.theme({
     ".cm-content": {
@@ -475,6 +481,14 @@ watch(
           isApplyingExternalValue = false;
         }
       }
+      // 确保 wysiwygComp + fontComp 与当前 editorMode 一致（issue #115）
+      // cached state 可能在不同编辑模式下缓存，setState 恢复后需重新应用当前模式
+      view.dispatch({
+        effects: [
+          wysiwygComp.reconfigure(props.editorMode === "wysiwyg" ? wysiwygExtensions : []),
+          fontComp.reconfigure(buildFontTheme()),
+        ],
+      });
     } else {
       // 首次进入此 tab：创建新 state
       const newState = EditorState.create({
@@ -538,12 +552,16 @@ watch(
 );
 
 // 编辑模式切换：仅 wysiwyg 叠加 WYSIWYG ViewPlugin，其他模式移除
+// 同时重新应用字体主题（WYSIWYG 用阅读字体，source/split 用等宽字体）
 // 通过 Compartment.reconfigure 动态切换，不销毁编辑器实例，内容/光标/undo 栈保持不变
 watch(
   () => props.editorMode,
   (v) => {
     viewRef.value?.dispatch({
-      effects: wysiwygComp.reconfigure(v === "wysiwyg" ? wysiwygExtensions : []),
+      effects: [
+        wysiwygComp.reconfigure(v === "wysiwyg" ? wysiwygExtensions : []),
+        fontComp.reconfigure(buildFontTheme()),
+      ],
     });
   }
 );
@@ -557,6 +575,18 @@ watch(
       effects: fontComp.reconfigure(buildFontTheme()),
     });
   }
+);
+
+// 当前文件路径变更（切 tab / 重命名）→ 更新模块级状态并触发 WYSIWYG 重算
+// ImageWidget 在 toDOM 时读取 currentFilePath 解析相对图片路径（ADR-0015）
+watch(
+  () => props.currentFilePath,
+  (path) => {
+    setCurrentFilePath(path);
+    // 触发 wysiwygField 重算，让 ImageWidget 用新路径重新渲染
+    viewRef.value?.dispatch({ effects: recomputeWysiwygEffect.of() });
+  },
+  { immediate: true }
 );
 
 // ===== 右键菜单 =====
@@ -641,9 +671,13 @@ defineExpose({
     const total = view.state.doc.lines;
     const n = Math.max(1, Math.min(line, total));
     const linePos = view.state.doc.line(n).from;
+    // 同时移动光标到目标行：WYSIWYG 模式下块级 widget 替换可能导致 scrollIntoView
+    // 定位不准，光标定位可强制编辑器滚动到正确位置（大纲跳转 #120）
     view.dispatch({
+      selection: { anchor: linePos },
       effects: EditorView.scrollIntoView(linePos, { y: "start" }),
     });
+    view.focus();
   },
 });
 </script>
@@ -651,7 +685,7 @@ defineExpose({
 <template>
   <div
     class="source-editor"
-    :class="{ 'mode-wysiwyg': editorMode === 'wysiwyg' }"
+    :class="{ 'mode-wysiwyg': editorMode === 'wysiwyg', 'markdown-body': editorMode === 'wysiwyg' }"
     :data-md-theme="markdownTheme"
     @contextmenu="onContextMenu"
   >
@@ -670,6 +704,9 @@ defineExpose({
 .source-editor.mode-wysiwyg {
   background: var(--md-bg, var(--murasaki-background));
   color: var(--md-fg, var(--murasaki-ink));
+  font-family: var(--murasaki-font-reading, var(--murasaki-font-ui));
+  font-size: 14px;
+  line-height: 1.75;
 }
 .cm-host {
   height: 100%;

@@ -111,7 +111,38 @@ export function toggleList(view: EditorView, type: ListType): void {
     // 添加/替换为指定类型前缀
     return indent + newPrefix[type] + stripped;
   });
-  replaceLines(view, fromLine, toLine, newLines);
+
+  const doc = view.state.doc;
+  const from = doc.line(fromLine).from;
+  const toLineEnd = doc.line(toLine).to;
+  const insert = newLines.join("\n");
+
+  // 目标行 = 光标所在行（相对被处理行的第一个，用于计算光标落点）
+  const headLineNum = doc.lineAt(view.state.selection.main.head).number;
+  const targetIdx = Math.max(0, Math.min(headLineNum, toLine) - fromLine);
+  const targetNewLine = newLines[targetIdx];
+
+  // 计算目标行前缀长度（含缩进）。添加时把光标定位到新前缀之后，
+  // 避免光标落在编号/标记前（插入有序列表时光标跑到序号前的问题）。
+  let prefixLen = 0;
+  const m = targetNewLine.match(listRegex);
+  if (m) {
+    prefixLen = m[0].length;
+  } else if (!allAlready) {
+    prefixLen = newPrefix[type].length;
+  }
+
+  // 计算目标行在新文档中的起始位置
+  let targetLineStart = from;
+  for (let i = 0; i < targetIdx; i++) {
+    targetLineStart += newLines[i].length + 1; // +1 为换行符
+  }
+
+  view.dispatch({
+    changes: { from, to: toLineEnd, insert },
+    selection: { anchor: targetLineStart + prefixLen },
+    userEvent: "input.toggleList",
+  });
 }
 
 /**

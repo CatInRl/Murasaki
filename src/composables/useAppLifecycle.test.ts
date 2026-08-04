@@ -53,6 +53,7 @@ function makeDeps(overrides: Partial<AppLifecycleDeps> = {}): AppLifecycleDeps {
     settingsVisible: ref(false),
     handleMenuEvent: vi.fn().mockResolvedValue(undefined),
     onOpenRecent: vi.fn().mockResolvedValue(undefined),
+    onOpenPath: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -149,20 +150,21 @@ describe("useAppLifecycle", () => {
   });
 
   describe("setupEventListeners", () => {
-    it("注册 5 个事件监听器并返回 cleanup 函数", async () => {
+    it("注册 6 个事件监听器并返回 cleanup 函数", async () => {
       const deps = makeDeps();
       const scope = effectScope();
       const { setupEventListeners } = scope.run(() => useAppLifecycle(deps))!;
 
       const cleanup = await setupEventListeners();
 
-      expect(mockedListen).toHaveBeenCalledTimes(5);
+      expect(mockedListen).toHaveBeenCalledTimes(6);
       expect(mockedListen).toHaveBeenCalledWith("menu-event", expect.any(Function));
       expect(mockedListen).toHaveBeenCalledWith("recent-open", expect.any(Function));
       expect(mockedListen).toHaveBeenCalledWith(
         "single-instance-open-workspace",
         expect.any(Function)
       );
+      expect(mockedListen).toHaveBeenCalledWith("open-from-argv", expect.any(Function));
       expect(mockedListen).toHaveBeenCalledWith("settings://saved", expect.any(Function));
       expect(mockedListen).toHaveBeenCalledWith("navigate", expect.any(Function));
 

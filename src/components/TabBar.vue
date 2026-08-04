@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { X, Copy, FolderOpen } from "lucide-vue-next";
 import { useTabsStore } from "../stores/useTabsStore";
@@ -14,6 +14,8 @@ const fileOps = useFileOpsStore();
 const contextMenu = useContextMenuStore();
 const dialog = useDialogStore();
 const { t } = useI18n();
+
+const tabsListRef = ref<HTMLElement | null>(null);
 
 const emit = defineEmits<{
   (e: "new-tab"): void;
@@ -31,6 +33,52 @@ const emit = defineEmits<{
 
 const tabs = computed(() => tabsStore.tabs);
 const activeTabId = computed(() => tabsStore.activeTabId);
+
+/**
+ * 把激活 tab 滚动到可见区域。
+ * 窗口缩小时 tab 会横向溢出，若激活 tab 落在可视区外将无法选中/关闭，需自动滚动。
+ */
+function scrollActiveTabIntoView(): void {
+  const list = tabsListRef.value;
+  if (!list) return;
+  const active = list.querySelector<HTMLElement>(".tab-item.active");
+  if (!active) return;
+  const left = active.offsetLeft;
+  const right = left + active.offsetWidth;
+  const viewLeft = list.scrollLeft;
+  const viewRight = viewLeft + list.clientWidth;
+  if (left < viewLeft) {
+    list.scrollLeft = left;
+  } else if (right > viewRight) {
+    list.scrollLeft = right - list.clientWidth;
+  }
+}
+
+// 激活 tab 变化 / tab 数量变化时，把激活 tab 滚动到可见区域
+watch(
+  [activeTabId, () => tabs.value.length],
+  () => {
+    void nextTick(scrollActiveTabIntoView);
+  }
+);
+
+// 窗口缩放（/ tab 栏宽度变化）时，tab 可能横向溢出，激活 tab 可能被推出可视区。
+// 用 ResizeObserver 监听容器宽度变化，确保激活 tab 始终可见、可选中与关闭。
+let resizeObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+  const list = tabsListRef.value;
+  if (!list || typeof ResizeObserver === "undefined") return;
+  resizeObserver = new ResizeObserver(() => {
+    void nextTick(scrollActiveTabIntoView);
+  });
+  resizeObserver.observe(list);
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
 
 function isActive(tabId: string): boolean {
   return activeTabId.value === tabId;
@@ -113,7 +161,7 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
 <template>
   <div class="tab-bar-container">
     <!-- Tab 列表 -->
-    <div class="tabs-list">
+    <div ref="tabsListRef" class="tabs-list">
       <div
         v-for="tab in tabs"
         :key="tab.id"
@@ -237,6 +285,8 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
 }
 
 .tab-title {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

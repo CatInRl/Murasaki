@@ -70,11 +70,12 @@ describe("useEditorCommands", () => {
   });
 
   describe("toggleList", () => {
-    it("无序列表：添加 - 前缀", () => {
+    it("无序列表：添加 - 前缀，光标定位到前缀之后", () => {
       const v = makeView("item");
       setSelection(v, 0);
       toggleList(v, "unordered");
       expect(getDoc(v)).toBe("- item");
+      expect(v.state.selection.main.anchor).toBe(2);
     });
 
     it("无序列表：已是 - 前缀则取消", () => {
@@ -84,11 +85,12 @@ describe("useEditorCommands", () => {
       expect(getDoc(v)).toBe("item");
     });
 
-    it("有序列表：添加 1. 前缀", () => {
+    it("有序列表：添加 1. 前缀，光标定位到序号之后（不在序号前）", () => {
       const v = makeView("first");
       setSelection(v, 0);
       toggleList(v, "ordered");
       expect(getDoc(v)).toBe("1. first");
+      expect(v.state.selection.main.anchor).toBe(3);
     });
 
     it("任务列表：添加 - [ ] 前缀", () => {

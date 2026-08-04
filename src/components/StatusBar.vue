@@ -15,6 +15,7 @@ import { useTabsStore } from "../stores/useTabsStore";
 import { useAiProvidersStore } from "../stores/useAiProvidersStore";
 import { useAgentStore } from "../stores/useAgentStore";
 import { basename, dirname } from "../utils/path";
+import { AGENT_ENABLED } from "../features";
 
 interface Props {
   filePath: string | null;
@@ -155,7 +156,7 @@ onMounted(() => {
     </div>
 
     <!-- Agent 运行中指示器 -->
-    <div v-if="agentRunning" class="status-agent-indicator">
+    <div v-if="AGENT_ENABLED && agentRunning" class="status-agent-indicator">
       <span class="status-agent-dot"></span>
       {{ $t('editor.statusBar.agentRunning') }}
     </div>
@@ -163,7 +164,7 @@ onMounted(() => {
     <!-- 右侧：孤立会话清理 + provider chip -->
     <div class="status-right">
       <button
-        v-if="orphanCount > 0"
+        v-if="AGENT_ENABLED && orphanCount > 0"
         type="button"
         class="status-orphan"
         :disabled="cleaningOrphans"
@@ -175,7 +176,7 @@ onMounted(() => {
       </button>
 
       <div
-        v-if="providerName"
+        v-if="AGENT_ENABLED && providerName"
         class="status-provider-chip"
         :title="$t('editor.statusBar.providerTooltip', { name: providerName })"
       >

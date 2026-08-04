@@ -140,7 +140,8 @@ export interface TabsState {
  * settings.json 文件结构
  */
 export interface SettingsState {
-  uiMode: "light" | "dark" | "system";
+  /** UI 模式已固定为浅色（0.5.0 移除深色模式，issue #114） */
+  uiMode: "light";
   editorMode: "source" | "split" | "wysiwyg";
   showLineNumbers: boolean;
   softWrap: boolean;
@@ -150,6 +151,8 @@ export interface SettingsState {
   sidebarView: SidebarView;
   /** 上次打开的工作区路径（启动时恢复） */
   lastWorkspacePath: string | null;
+  /** 启动时自动打开上次工作区（默认关，issue #96） */
+  reopenLastWorkspace: boolean;
   /** 是否显示 Agent 面板（默认开） */
   showAgentPanel: boolean;
   /** 编辑器字体大小（px，12-20） */
@@ -186,6 +189,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   markdownTheme: "github",
   sidebarView: "files",
   lastWorkspacePath: null,
+  reopenLastWorkspace: false,
   showAgentPanel: true,
   editorFontSize: 14,
   editorLineHeight: 1.6,

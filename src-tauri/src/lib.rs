@@ -21,6 +21,35 @@ fn is_e2e_mode() -> bool {
     std::env::args().any(|a| a.starts_with("--remote-debugging-port="))
 }
 
+/// 判断路径是文件还是目录（用于拖拽打开 / 命令行参数打开文件关联，issue #92 / #113）
+fn classify_path(p: &std::path::Path) -> &'static str {
+    if p.is_dir() {
+        "folder"
+    } else {
+        "file"
+    }
+}
+
+/// 返回首个非 `--flag` 的命令行参数（文件/文件夹路径）。
+/// 用于首次启动时文件关联（双击 .md 文件）与命令行拖入打开。
+fn first_non_flag_arg() -> Option<String> {
+    std::env::args().skip(1).find(|a| !a.starts_with("--") && !a.is_empty())
+}
+
+/// 通知前端打开命令行传入的文件/文件夹路径（issue #92 / #113）。
+/// - 文件：在 tab 中打开
+/// - 文件夹：设为工作区
+/// 通过 `open-from-argv` 事件透传给前端 useAppLifecycle 处理。
+fn emit_open_path(app: &tauri::AppHandle, path: &str) {
+    if let Some(window) = app.get_webview_window("main") {
+        let payload = serde_json::json!({
+            "path": path,
+            "type": classify_path(std::path::Path::new(path)),
+        });
+        let _ = window.emit("open-from-argv", payload);
+    }
+}
+
 /// 解析 `--user-data-dir=PATH` 参数（msedgedriver 会传给 murasaki）
 fn parse_user_data_dir() -> Option<std::path::PathBuf> {
     for arg in std::env::args().skip(1) {
@@ -246,13 +275,12 @@ pub fn run() {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
-            // 若 argv 携带工作区路径（非 --flag 参数），通知前端打开该工作区
-            // argv[0] 是 exe 路径，argv[1] 可能是用户拖入或命令行传入的工作区路径
+            // 若 argv 携带文件/文件夹路径（非 --flag 参数），通知前端打开
+            // argv[0] 是 exe 路径，argv[1] 可能是用户拖入、命令行传入、或双击 .md 文件关联传入的路径
+            // 文件 → 打开为 tab；文件夹 → 设为工作区（issue #92 / #113）
             if let Some(arg) = argv.get(1) {
                 if !arg.starts_with("--") && !arg.is_empty() {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.emit("single-instance-open-workspace", arg.clone());
-                    }
+                    emit_open_path(app, &arg);
                 }
             }
         }));
@@ -354,6 +382,16 @@ pub fn run() {
                 e.to_string()
             })?;
             app.set_menu(menu)?;
+
+            // 首次启动时处理命令行传入的文件/文件夹路径（文件关联 / 命令行拖入打开，issue #92 / #113）
+            // 前端事件监听器在 onMounted 注册，可能尚未就绪，延迟 800ms 发射避免竞态
+            if let Some(path) = first_non_flag_arg() {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(800));
+                    emit_open_path(&handle, &path);
+                });
+            }
 
             Ok(())
         })
