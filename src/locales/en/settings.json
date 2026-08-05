@@ -18,6 +18,8 @@
     "defaultImageDir": "Default Image Directory",
     "defaultImageDirDesc": "Relative directory where pasted or dropped images are saved by default",
     "defaultImageDirPlaceholder": "e.g. assets/images",
+    "reopenLastWorkspace": "Reopen last workspace on startup",
+    "reopenLastWorkspaceDesc": "Automatically open the last used workspace on app startup",
     "agent": "Agent",
     "showAgentPanel": "Show Agent Panel",
     "showAgentPanelDesc": "Show the AI Agent panel on the right of the editor (source/split mode only)",

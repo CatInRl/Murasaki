@@ -18,6 +18,8 @@
     "defaultImageDir": "默认图片目录",
     "defaultImageDirDesc": "粘贴或拖入图片时默认保存到的相对目录",
     "defaultImageDirPlaceholder": "例如：assets/images",
+    "reopenLastWorkspace": "启动时打开上次工作区",
+    "reopenLastWorkspaceDesc": "应用启动时自动打开上次使用的工作区",
     "agent": "Agent",
     "showAgentPanel": "显示 Agent 面板",
     "showAgentPanelDesc": "在编辑器右侧显示 AI Agent 面板（仅 source/split 模式可用）",

@@ -141,6 +141,29 @@ describe("computeDecorations — 标题标记", () => {
     expect(hm.length).toBeGreaterThanOrEqual(1);
     expect(hm.every((m) => m.kind === "hide")).toBe(true);
   });
+
+  it("ATXHeading 生成对应级别的渲染装饰（h1-h6）", () => {
+    const cases: Array<[string, string]> = [
+      ["# H", "murasaki-wysiwyg-h1"],
+      ["## H", "murasaki-wysiwyg-h2"],
+      ["###### H", "murasaki-wysiwyg-h6"],
+    ];
+    for (const [doc, cls] of cases) {
+      const d = compute(doc, doc.length + 1);
+      const r = renders(d).filter((x) => x.cssClass.startsWith("murasaki-wysiwyg-h"));
+      expect(r.length).toBeGreaterThanOrEqual(1);
+      expect(r[0].cssClass).toBe(cls);
+      // 文本范围应排除 `#` 标记与末尾换行
+      expect(doc.slice(r[0].from, r[0].to)).toBe(" H");
+    }
+  });
+
+  it("SetextHeading（=== → h1，--- → h2）生成渲染装饰", () => {
+    const d = compute("Title\n=====", 20);
+    const r = renders(d).filter((x) => x.cssClass.startsWith("murasaki-wysiwyg-h"));
+    expect(r.length).toBeGreaterThanOrEqual(1);
+    expect(r[0].cssClass).toBe("murasaki-wysiwyg-h1");
+  });
 });
 
 // ===== 行内代码 =====

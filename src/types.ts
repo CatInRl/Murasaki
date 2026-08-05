@@ -189,7 +189,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   markdownTheme: "github",
   sidebarView: "files",
   lastWorkspacePath: null,
-  reopenLastWorkspace: false,
+  reopenLastWorkspace: true,
   showAgentPanel: true,
   editorFontSize: 14,
   editorLineHeight: 1.6,

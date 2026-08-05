@@ -517,6 +517,36 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
         decos.push({ type: "render", from, to, cssClass: "murasaki-wysiwyg-blockquote" });
         return;
       }
+
+      // 标题：应用与预览（markdown-content.css .markdown-body h1-h6）一致的排版样式。
+      // 语法标记（HeaderMark）仍由子节点 hide/dim 处理，这里只样式化正文文本。
+      // @codemirror/lang-markdown 的节点名带级别后缀：ATXHeading1..6 / SetextHeading1..2。
+      const atxMatch = /^ATXHeading([1-6])$/.exec(name);
+      const setextMatch = /^SetextHeading([1-2])$/.exec(name);
+      if (atxMatch || setextMatch) {
+        if (!inViewport(from, to, viewport)) return false;
+        const level = Number(atxMatch ? atxMatch[1] : setextMatch![1]);
+        // 正文文本范围：ATX 从 HeaderMark（# 前缀）之后开始；Setext 到 HeaderMark（下划线）之前结束。
+        let textFrom = from;
+        let textTo = to;
+        const mark = ref.node.getChild("HeaderMark");
+        if (atxMatch) {
+          textFrom = mark ? mark.to : from;
+        } else {
+          textTo = mark ? mark.from : to;
+        }
+        // 去掉末尾换行符，避免 decoration 覆盖行尾空白
+        while (textTo > textFrom && (doc.charCodeAt(textTo - 1) === 10 || doc.charCodeAt(textTo - 1) === 13)) textTo--;
+        if (textTo > textFrom) {
+          decos.push({
+            type: "render",
+            from: textFrom,
+            to: textTo,
+            cssClass: `murasaki-wysiwyg-h${Math.min(6, Math.max(1, level))}`,
+          });
+        }
+        return true; // 继续遍历子节点（HeaderMark 等仍需 hide/dim）
+      }
     },
   });
 

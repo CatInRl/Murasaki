@@ -84,6 +84,23 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
           />
         </div>
       </div>
+
+      <div class="setting-row">
+        <div class="setting-label-column">
+          <span class="setting-label">{{ $t('settings.general.reopenLastWorkspace') }}</span>
+          <span class="setting-description">{{ $t('settings.general.reopenLastWorkspaceDesc') }}</span>
+        </div>
+        <div class="setting-control-column">
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              :checked="draft.reopenLastWorkspace"
+              @change="patch('reopenLastWorkspace', ($event.target as HTMLInputElement).checked)"
+            />
+            <span class="toggle-track" aria-hidden="true"></span>
+          </label>
+        </div>
+      </div>
     </section>
 
     <!-- Agent -->

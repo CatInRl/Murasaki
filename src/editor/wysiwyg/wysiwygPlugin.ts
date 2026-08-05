@@ -833,6 +833,26 @@ export const wysiwygTheme = EditorView.theme({
     paddingRight: "6px",
     userSelect: "none",
   },
+  // 标题排版：与 markdown-content.css 的 .markdown-body h1-h6 保持一致（issue：WYSIWYG 与预览视觉统一）
+  ".murasaki-wysiwyg-h1": {
+    fontSize: "22px", fontWeight: "700", letterSpacing: "-0.02em", lineHeight: "1.3", color: "var(--md-heading-color)",
+  },
+  ".murasaki-wysiwyg-h2": {
+    fontSize: "18px", fontWeight: "700", letterSpacing: "-0.01em", lineHeight: "1.35", color: "var(--md-heading-color)",
+  },
+  ".murasaki-wysiwyg-h3": {
+    fontSize: "15px", fontWeight: "600", lineHeight: "1.4", color: "var(--md-heading-color)",
+  },
+  ".murasaki-wysiwyg-h4": {
+    fontSize: "14px", fontWeight: "600", lineHeight: "1.4", color: "var(--md-heading-color)",
+  },
+  ".murasaki-wysiwyg-h5": {
+    fontSize: "13px", fontWeight: "600", lineHeight: "1.4", color: "var(--md-heading-color-2)",
+  },
+  ".murasaki-wysiwyg-h6": {
+    fontSize: "12px", fontWeight: "600", lineHeight: "1.4", color: "var(--md-heading-color-3)",
+    textTransform: "uppercase", letterSpacing: "0.05em",
+  },
   // 行为样式：cursor / userSelect 等（视觉由 markdown-content.css 提供）
   ".murasaki-wysiwyg-task-checkbox": {
     cursor: "pointer",
