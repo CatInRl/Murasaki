@@ -412,6 +412,25 @@
   text-align: center;
 }
 
+/* === PlantUML diagrams（官方 TeaVM 纯浏览器产物，本地渲染） ===
+ * 与 .mermaid 同款卡片包裹，SVG 居中展示。 */
+.markdown-body .plantuml-block {
+  background: var(--murasaki-background, #ffffff);
+  border: 1px solid var(--murasaki-border);
+  border-radius: var(--murasaki-radius-md);
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 0;
+  text-align: center;
+  overflow-x: auto;
+}
+.markdown-body .plantuml-block svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* === KaTeX math (issue #88 / T5: 蓝色斜体 + 块级居中) === */
 .markdown-body .katex {
   color: var(--murasaki-state-info, #2563eb);

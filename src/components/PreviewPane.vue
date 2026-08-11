@@ -96,6 +96,76 @@ async function renderMermaid(container: HTMLElement) {
   }
 }
 
+// ===== PlantUML（官方 TeaVM 纯浏览器产物，无需服务器）=====
+interface PlantUmlApi {
+  /** 把 PlantUML 源码行渲染为 SVG 并写入 targetId 元素的 innerHTML */
+  render(lines: string[], targetId: string, opts?: { dark?: boolean }): void;
+}
+
+let plantUmlReady: Promise<PlantUmlApi> | null = null;
+
+/**
+ * 加载 viz-global.js（官方 Viz.js 3.x 全局产物），定义全局 `Viz`，
+ * 供 plantuml.js 的 Graphviz/Dot 布局使用。普通 script 一次性注入 + 缓存。
+ */
+function ensureVizLoaded(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const base = import.meta.env.BASE_URL ?? "/";
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-murasaki-plantuml-viz]'
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("加载 viz-global.js 失败")),
+        { once: true }
+      );
+      if ((existing as HTMLScriptElement & { _loaded?: boolean })._loaded) resolve();
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = `${base}plantuml/viz-global.js`;
+    s.dataset.murasakiPlantumlViz = "1";
+    s.onload = () => {
+      (s as HTMLScriptElement & { _loaded?: boolean })._loaded = true;
+      resolve();
+    };
+    s.onerror = () => reject(new Error("加载 viz-global.js 失败"));
+    document.head.appendChild(s);
+  });
+}
+
+/** 确保 plantuml.js 已加载（先加载依赖 viz-global.js），返回其模块接口 */
+async function ensurePlantUml(): Promise<PlantUmlApi> {
+  if (!plantUmlReady) {
+    plantUmlReady = (async () => {
+      await ensureVizLoaded();
+      const base = import.meta.env.BASE_URL ?? "/";
+      // 官方产物是独立 ES module，不参与 Vite bundle，运行时动态 import
+      const mod = await import(/* @vite-ignore */ `${base}plantuml/plantuml.js`);
+      return mod as unknown as PlantUmlApi;
+    })();
+  }
+  return plantUmlReady;
+}
+
+async function renderPlantUML(container: HTMLElement) {
+  const blocks = container.querySelectorAll<HTMLElement>(".plantuml-block");
+  if (blocks.length === 0) return;
+  const plantuml = await ensurePlantUml();
+  for (const block of Array.from(blocks)) {
+    const code = block.textContent || "";
+    const id = `plantuml-${Math.random().toString(36).slice(2, 10)}`;
+    try {
+      block.id = id;
+      plantuml.render([code], id, { dark: false });
+    } catch (err) {
+      block.innerHTML = `<pre style="color:#c00">${(err as Error).message}</pre>`;
+    }
+  }
+}
+
 async function update() {
   const container = containerRef.value;
   if (!container) return;
@@ -111,6 +181,8 @@ async function update() {
   await renderer.highlight(container);
   // 异步渲染 Mermaid
   await renderMermaid(container);
+  // 异步渲染 PlantUML
+  await renderPlantUML(container);
 }
 
 // 源码变更 → 重新渲染

@@ -119,6 +119,12 @@ function codeBlockPlugin(md: MarkdownIt) {
       return `<div class="mermaid"${lineAttr}>${md.utils.escapeHtml(code)}</div>`;
     }
 
+    if (lang === "plantuml") {
+      // 占位：由前端动态加载官方 plantuml.js（TeaVM 纯浏览器产物）异步渲染 SVG。
+      // 源码以转义文本存于 div 内，渲染时读取 textContent。
+      return `<div class="plantuml-block"${lineAttr}>${md.utils.escapeHtml(code)}</div>`;
+    }
+
     // 同步占位：返回原始 <pre><code>，后续由 highlightCodeBlocks 异步替换
     const escapedCode = md.utils.escapeHtml(code);
     const langAttr = lang ? ` data-lang="${md.utils.escapeHtml(lang)}"` : ' data-lang=""';

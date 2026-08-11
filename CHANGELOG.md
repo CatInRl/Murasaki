@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-11
+
+本版本新增 **PlantUML 图渲染支持**：采用官方纯浏览器方案（TeaVM 编译产物），在浏览器本地渲染 SVG，无需任何服务器。
+
+### Added
+
+- **PlantUML 图渲染（浏览器本地）**：预览与分栏预览中识别 `plantuml` 代码块，动态加载官方 `plantuml.js`（TeaVM WASM 产物）+ `viz-global.js`（Graphviz 布局引擎）渲染为 SVG，样式与 Mermaid 卡片保持一致。两个大体积产物（约 5.4MB）走 `public/` 目录 + 运行时动态 `import(/* @vite-ignore */)` 懒加载，仅在文档包含 PlantUML 时才加载，不影响启动性能。
+
+### Changed
+
+- **构建产物**：新增 `dist/plantuml/`（plantuml.js + viz-global.js）作为静态资源随包分发。
+
 ## [0.5.0] - 2026-08-04
 
 本版本聚焦 **WYSIWYG 模式可用性**：修复样式不一致、模式切换、图片加载、任务列表、大纲跳转等核心问题；移除低 ROI 的深色模式，隐藏不成熟的 Agent 功能并补全日常体验；同时打通自动更新端到端链路。

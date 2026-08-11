@@ -1,7 +1,7 @@
 {
   "name": "murasaki",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A local Markdown file manager and editor built with Tauri + Vue 3",
   "license": "MIT",
   "author": "CatInRl",
