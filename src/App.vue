@@ -179,6 +179,9 @@ function expandSidebar(view: SidebarView): void {
 function startResize(e: PointerEvent): void {
   if (sidebarCollapsed.value) return;
   e.preventDefault();
+  // 指针捕获：指针移入主区域（如 HTML 预览 iframe）时 pointermove/up 会被 iframe 吞掉，
+  // 导致缩小侧栏后无法拖回右侧。捕获后事件始终派发到本元素，拖拽双向可靠。
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   const startX = e.clientX;
   const startWidth = sidebarWidth.value;
   sidebarDragging.value = true;
@@ -192,9 +195,11 @@ function startResize(e: PointerEvent): void {
     document.body.style.userSelect = "";
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
+    window.removeEventListener("pointercancel", onUp);
   };
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
 }
 
 // ===== 状态栏 / 全屏 =====

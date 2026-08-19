@@ -70,17 +70,22 @@ const isHtml = computed(() =>
 );
 
 // 分隔条拖拽
+// 用 pointer 事件 + setPointerCapture：指针拖入右侧 HtmlPreview(iframe) 时，
+// 鼠标事件会被 iframe 吞掉不再送达父文档，导致缩小后无法拖回右侧。
+// 指针捕获后事件始终派发给本元素（含越过 iframe / 窗口外），拖拽双向可靠。
 const dragging = ref(false);
 const leftWidthPct = ref(props.splitRatio * 100);
 
-function onMouseDown(e: MouseEvent) {
+function onPointerDown(e: PointerEvent) {
   e.preventDefault();
   dragging.value = true;
-  window.addEventListener("mousemove", onMouseMove);
-  window.addEventListener("mouseup", onMouseUp);
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+  window.addEventListener("pointercancel", onPointerUp);
 }
 
-function onMouseMove(e: MouseEvent) {
+function onPointerMove(e: PointerEvent) {
   if (!dragging.value) return;
   const container = document.querySelector(".editor-pane") as HTMLElement | null;
   if (!container) return;
@@ -91,10 +96,11 @@ function onMouseMove(e: MouseEvent) {
   leftWidthPct.value = clamped * 100;
 }
 
-function onMouseUp() {
+function onPointerUp() {
   dragging.value = false;
-  window.removeEventListener("mousemove", onMouseMove);
-  window.removeEventListener("mouseup", onMouseUp);
+  window.removeEventListener("pointermove", onPointerMove);
+  window.removeEventListener("pointerup", onPointerUp);
+  window.removeEventListener("pointercancel", onPointerUp);
 }
 
 function onInput(value: string) {
@@ -252,7 +258,6 @@ defineExpose({
         :font-family="fontFamily"
         :markdown-theme="previewTheme"
         :current-file-path="currentFilePath"
-        :read-only="isHtml"
         @update:model-value="onInput"
         @cursor-change="onCursorChange"
         @context-action="(a) => emit('context-action', a)"
@@ -263,7 +268,7 @@ defineExpose({
       v-if="editorMode === 'split'"
       class="splitter"
       :class="{ dragging }"
-      @mousedown="onMouseDown"
+      @pointerdown="onPointerDown"
     >
       <div class="splitter-handle"></div>
     </div>
