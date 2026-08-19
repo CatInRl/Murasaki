@@ -94,6 +94,30 @@ export interface MermaidWidgetDeco {
   code: string;
 }
 
+/** 可实时预览的图表围栏代码块语言（光标在内时，代码块下方显示实时预览卡）。 */
+const DIAGRAM_FENCES = new Set(["mermaid", "plantuml", "katex", "math"]);
+
+/** 判断围栏语言是否可实时预览（mermaid / plantuml / katex / math）。 */
+export function isDiagramFence(lang: string): boolean {
+  return DIAGRAM_FENCES.has(lang.trim().toLowerCase());
+}
+
+/**
+ * 实时预览卡 widget（问题2）：光标进入 mermaid/plantuml/katex 围栏代码块时，
+ * 替换代码块结尾的换行符，在其下方渲染一张实时预览卡。
+ * 源码仍可编辑（围栏 CodeMark dim），预览随键入实时更新。
+ */
+export interface DiagramPreviewDeco {
+  type: "blockWidget";
+  widget: "diagramPreview";
+  /** 代码块结束位置（替换其后紧邻的换行符）。 */
+  from: number;
+  /** from + 1（换行符之后），用于 replace 该换行符并渲染为块级预览卡。 */
+  to: number;
+  lang: string;
+  code: string;
+}
+
 /** 链接 widget：替换 [text](url)，渲染为蓝色下划线锚文本。 */
 export interface LinkWidgetDeco {
   type: "blockWidget";
@@ -169,6 +193,7 @@ export interface HtmlWidgetDeco {
 export type BlockWidgetDeco =
   | CodeBlockWidgetDeco
   | MermaidWidgetDeco
+  | DiagramPreviewDeco
   | LinkWidgetDeco
   | ImageWidgetDeco
   | TableWidgetDeco
@@ -339,9 +364,19 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
     enter(ref) {
       const { name, from, to } = ref;
 
-      // 行内代码：仅记录范围（用于排除数学公式）
+      // 行内代码：记录范围（排除数学公式）+ 应用与预览（.markdown-body code）一致的样式。
+      // 覆盖整段（含反引号）：反引号由 CodeMark 的 hide/dim 处理，这里只负责视觉样式，
+      // 背景/圆角与预览一致，避免 WYSIWYG 仍使用高亮样式（固定紫色背景）导致差异。
       if (name === "InlineCode") {
         codeRanges.push({ from, to });
+        if (!inViewport(from, to, viewport)) return;
+        if (overlapsAnyProposal(from, to, proposalRanges)) return;
+        decos.push({
+          type: "render",
+          from,
+          to,
+          cssClass: "murasaki-wysiwyg-inline-code",
+        });
         return;
       }
 
@@ -356,6 +391,21 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
 
         if (cursorInRange) {
           // 光标在代码块内：围栏 CodeMark 走默认 dim（继续遍历子节点）
+          // 若为可实时预览的图表（mermaid/plantuml/katex/math），
+          // 在代码块下方追加实时预览卡（替换块尾换行符为块级 widget）
+          if (name === "FencedCode") {
+            const { lang, code } = extractFencedCode(ref.node, doc);
+            if (isDiagramFence(lang) && to < doc.length) {
+              decos.push({
+                type: "blockWidget",
+                widget: "diagramPreview",
+                from: to,
+                to: Math.min(to + 1, doc.length),
+                lang,
+                code,
+              });
+            }
+          }
           return true;
         }
         // 光标离开：整体替换为 widget

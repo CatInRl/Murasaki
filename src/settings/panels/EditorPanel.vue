@@ -8,7 +8,8 @@
  * Mermaid/KaTeX/任务列表渲染默认开启，不暴露设置项（spec 决策）。
  */
 import { computed } from "vue";
-import type { SettingsState } from "../../types";
+import type { SettingsState, ReadingFontPreset } from "../../types";
+import { READING_FONT_PRESETS, READING_FONT_PRESET_LABELS } from "../../types";
 
 const props = defineProps<{ modelValue: SettingsState }>();
 const emit = defineEmits<{ "update:modelValue": [SettingsState] }>();
@@ -21,6 +22,15 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
 const FONT_FAMILIES = ["JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas"];
 const LINE_HEIGHTS = [1.4, 1.6, 1.8, 2.0];
+
+/** 4 档阅读字体预设（A/B/C/D），值来自 types.ts 统一常量 */
+const FONT_PRESET_OPTIONS: { value: ReadingFontPreset; label: string; stack: string }[] = (
+  ["a", "b", "c", "d"] as ReadingFontPreset[]
+).map((v) => ({
+  value: v,
+  label: READING_FONT_PRESET_LABELS[v],
+  stack: READING_FONT_PRESETS[v],
+}));
 
 function stepFontSize(delta: number): void {
   const next = Math.min(20, Math.max(12, draft.value.editorFontSize + delta));
@@ -135,6 +145,31 @@ function stepFontSize(delta: number): void {
             <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="9 18 15 12 9 6" />
             </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label-column">
+          <span class="setting-label">{{ $t('settings.editor.fontPreset') }}</span>
+          <span class="setting-description">{{ $t('settings.editor.fontPresetDesc') }}</span>
+        </div>
+        <div class="setting-control-column">
+          <div class="font-preset-grid" role="radiogroup" :aria-label="$t('settings.editor.fontPreset')">
+            <button
+              v-for="p in FONT_PRESET_OPTIONS"
+              :key="p.value"
+              type="button"
+              class="font-preset-card"
+              :class="{ active: draft.editorFontPreset === p.value }"
+              :style="{ fontFamily: p.stack }"
+              role="radio"
+              :aria-checked="draft.editorFontPreset === p.value"
+              @click="patch('editorFontPreset', p.value)"
+            >
+              <span class="font-preset-name">{{ $t(p.label) }}</span>
+              <span class="font-preset-sample">Aa 中文 123</span>
+            </button>
           </div>
         </div>
       </div>

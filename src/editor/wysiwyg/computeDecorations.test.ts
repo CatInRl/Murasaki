@@ -184,6 +184,20 @@ describe("computeDecorations — 行内代码", () => {
     expect(cm.every((m) => m.kind === "dim")).toBe(true);
   });
 
+  it("`code` 生成预览同款样式渲染装饰（覆盖整段含反引号）", () => {
+    const d = compute("`inline code` here", 20);
+    const r = renders(d).filter((x) => x.cssClass === "murasaki-wysiwyg-inline-code");
+    expect(r).toHaveLength(1);
+    // 覆盖整段（含反引号）：反引号由 CodeMark hide/dim 处理，样式统一由 render 装饰提供
+    expect("`inline code`".slice(r[0].from, r[0].to)).toBe("`inline code`");
+  });
+
+  it("`code` 与提案范围重叠时不生成样式装饰", () => {
+    const d = compute("`code`", 20, [{ from: 0, to: 7 }]);
+    const r = renders(d).filter((x) => x.cssClass === "murasaki-wysiwyg-inline-code");
+    expect(r).toHaveLength(0);
+  });
+
   it("代码块（FencedCode）的 ``` 反引号不单独隐藏（整体替换为 widget）", () => {
     const doc = "```js\nconsole.log(1)\n```\n\nbody";
     const d = compute(doc, 30); // 光标在 body
@@ -347,6 +361,49 @@ describe("computeDecorations — 代码块 widget (T7.2)", () => {
     expect(mw[0].code).toContain("graph LR");
     // 不应同时生成 codeBlock
     expect(blockWidgets(d).filter((w) => w.widget === "codeBlock")).toHaveLength(0);
+  });
+
+  it("光标进入 mermaid 围栏代码块 → 生成 diagramPreview（替换块尾换行符）", () => {
+    const doc = "```mermaid\ngraph LR\nA-->B\n```\n\nbody";
+    // 光标在代码块内容中间
+    const d = compute(doc, 24);
+    const pv = blockWidgets(d).filter((w) => w.widget === "diagramPreview");
+    expect(pv).toHaveLength(1);
+    expect(pv[0].lang).toBe("mermaid");
+    expect(pv[0].code).toContain("graph LR");
+    // 范围 = 块尾结束位置 → +1（替换紧跟的新换行符）
+    expect(pv[0].from).toBe(29);
+    expect(pv[0].to).toBe(30);
+    // 仍保留围栏 CodeMark dim，不生成 codeBlock
+    expect(blockWidgets(d).filter((w) => w.widget === "codeBlock")).toHaveLength(0);
+    const cm = marks(d).filter((m) => m.markType === "CodeMark");
+    expect(cm.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("光标进入 plantuml/katex 围栏 → 生成 diagramPreview；普通语言不生成", () => {
+    const d1 = compute("```plantuml\nA->B\n```\n\nbody", 12);
+    expect(
+      blockWidgets(d1).filter((w) => w.widget === "diagramPreview")
+    ).toHaveLength(1);
+
+    const d2 = compute("```katex\nx^2\n```\n\nbody", 9);
+    expect(
+      blockWidgets(d2).filter((w) => w.widget === "diagramPreview")
+    ).toHaveLength(1);
+
+    // 普通 js 代码块：光标在内 → 无 preview
+    const d3 = compute("```js\nconst x=1\n```\n\nbody", 13);
+    expect(
+      blockWidgets(d3).filter((w) => w.widget === "diagramPreview")
+    ).toHaveLength(0);
+  });
+
+  it("光标离开 mermaid 围栏 → 不生成 diagramPreview", () => {
+    const doc = "```mermaid\ngraph LR\nA-->B\n```\n\nbody";
+    const d = compute(doc, 40); // 光标在 body
+    expect(
+      blockWidgets(d).filter((w) => w.widget === "diagramPreview")
+    ).toHaveLength(0);
   });
 
   it("无语言围栏代码块 → codeBlock widget lang 为空", () => {

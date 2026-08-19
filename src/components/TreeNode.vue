@@ -21,6 +21,12 @@ import { useDialogStore } from "../stores/useDialogStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
 import type { MenuItem } from "../stores/useContextMenuStore";
 import type { TreeNode } from "../types";
+import {
+  isMarkdownFile,
+  isHtmlFile,
+  isImageFile,
+  isEditableTextFile,
+} from "../utils/fileKind";
 
 interface Props {
   node: TreeNode;
@@ -71,19 +77,22 @@ function onClick(): void {
     } else if (isImageFile(props.node.name)) {
       // 图片文件点击 → 弹预览窗
       emit("preview-image", props.node.path);
+    } else if (isEditableTextFile(props.node.name, props.node.size)) {
+      // 文本/代码文件（含 html、含 <1MB 无后缀）→ 按文本打开编辑
+      emit("select-file", props.node.path);
     }
   } else {
     toggle();
   }
 }
 
-function isMarkdownFile(name: string): boolean {
-  return /\.(md|markdown|mdown|mkd)$/i.test(name);
-}
-
-/** 判断是否为图片文件（用于拖入编辑器插入相对路径引用） */
-function isImageFile(name: string): boolean {
-  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+/** 文本/代码文件类（排除 markdown 与 html，用于图标分类） */
+function isTextFile(name: string): boolean {
+  return (
+    !isMarkdownFile(name) &&
+    !isHtmlFile(name) &&
+    isEditableTextFile(name, props.node.size)
+  );
 }
 
 /**
@@ -176,7 +185,7 @@ function buildMenuItems(): MenuItem[] {
 
   // 文件类型专属：打开 / 预览
   if (isFile) {
-    if (isMarkdownFile(props.node.name)) {
+    if (isMarkdownFile(props.node.name) || isEditableTextFile(props.node.name, props.node.size)) {
       items.push({
         label: t("common.open"),
         icon: FileText,
@@ -394,9 +403,31 @@ function cancelCreating(): void {
       >
         <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
       </svg>
-      <!-- 文件：Markdown 用 M 徽标，图片用图片图标，其他用 · -->
+      <!-- 文件：按类型分级图标（markdown=M 徽标 / html=角码 / 文本=文本文件 / 图片=图片 / 其他=通用文件） -->
       <template v-else>
         <span v-if="isMarkdownFile(node.name)" class="md-badge">M</span>
+        <svg
+          v-else-if="isHtmlFile(node.name)"
+          class="node-file-icon is-html"
+          width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        >
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <polyline points="10 12 8 14 10 16"/>
+          <polyline points="14 12 16 14 14 16"/>
+        </svg>
+        <svg
+          v-else-if="isTextFile(node.name)"
+          class="node-file-icon is-text"
+          width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        >
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
         <svg
           v-else-if="isImageFile(node.name)"
           class="node-file-icon"
@@ -583,6 +614,11 @@ export default { name: "TreeNode" };
 .node-file-icon {
   flex-shrink: 0;
   color: var(--murasaki-ink-3);
+}
+
+/* HTML 文件：紫色（与 markdown 徽标同色系，但用角码图标区分） */
+.node-file-icon.is-html {
+  color: var(--murasaki-purple-500);
 }
 
 /* Markdown 文件徽标：紫色圆角矩形里的 M */

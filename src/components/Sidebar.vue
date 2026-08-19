@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { toRef } from "vue";
+import { toRef, computed } from "vue";
 import FileTree from "./FileTree.vue";
 import OutlinePanel from "./OutlinePanel.vue";
 import { useOutline } from "../composables/useOutline";
+import { isMarkdownFile } from "../utils/fileKind";
 import type { SidebarView } from "../types";
 
 interface Props {
@@ -34,6 +35,15 @@ function setView(view: SidebarView): void {
 // 大纲：监听当前文件路径，自动拉取
 const filePathRef = toRef(props, "currentFilePath");
 const { outline: outlineItems, loading: outlineLoading } = useOutline(filePathRef);
+
+// 大纲仅对 markdown 文件有意义：非 md 时隐藏大纲 tab，强制文件树视图
+const isCurrentMarkdown = computed(() =>
+  props.currentFilePath ? isMarkdownFile(props.currentFilePath) : true
+);
+/** 有效活动视图：非 md 文件始终强制文件树 */
+function effectiveView(view: SidebarView): SidebarView {
+  return view === "outline" && !isCurrentMarkdown.value ? "files" : view;
+}
 </script>
 
 <template>
@@ -43,7 +53,7 @@ const { outline: outlineItems, loading: outlineLoading } = useOutline(filePathRe
       <button
         v-if="hasWorkspace"
         class="sidebar-tab"
-        :class="{ active: activeView === 'files' }"
+        :class="{ active: effectiveView(activeView) === 'files' }"
         type="button"
         :title="$t('editor.sidebar.filesTab') + ' (Ctrl+Shift+E)'"
         :aria-label="$t('editor.sidebar.filesTabAria')"
@@ -55,8 +65,9 @@ const { outline: outlineItems, loading: outlineLoading } = useOutline(filePathRe
         </svg>
       </button>
       <button
+        v-if="isCurrentMarkdown"
         class="sidebar-tab"
-        :class="{ active: activeView === 'outline' }"
+        :class="{ active: effectiveView(activeView) === 'outline' }"
         type="button"
         :title="$t('editor.sidebar.outlineTab') + ' (Ctrl+Shift+M)'"
         :aria-label="$t('editor.sidebar.outlineTabAria')"
@@ -78,7 +89,7 @@ const { outline: outlineItems, loading: outlineLoading } = useOutline(filePathRe
     <div class="sidebar-content">
       <transition name="panel-fade" mode="out-in">
         <FileTree
-          v-if="activeView === 'files'"
+          v-if="effectiveView(activeView) === 'files'"
           key="files"
           @select-file="(p) => emit('select-file', p)"
           @preview-image="(p) => emit('preview-image', p)"

@@ -48,29 +48,26 @@ function closeEmptyMenu(): void {
   emptyMenuVisible.value = false;
 }
 
-// ===== 根目录新建输入框 =====
-const rootCreating = ref(false);
-const rootCreatingType = ref<"file" | "directory">("file");
+// ===== 根目录新建输入框（状态存于 fileOps，供菜单/Ctrl+N 共享触发）=====
 const rootCreatingName = ref("");
 
 async function onEmptyMenuSelect(key: string): Promise<void> {
   closeEmptyMenu();
   if (!workspace.workspacePath) return;
   if (key === "new-file" || key === "new-folder") {
-    rootCreatingType.value = key === "new-file" ? "file" : "directory";
+    fileOps.beginRootCreate(key === "new-file" ? "file" : "directory");
     rootCreatingName.value = "";
-    rootCreating.value = true;
   }
 }
 
 async function submitRootCreating(): Promise<void> {
   const name = rootCreatingName.value.trim();
   if (!name || !workspace.workspacePath) {
-    rootCreating.value = false;
+    fileOps.endRootCreate();
     return;
   }
   try {
-    if (rootCreatingType.value === "file") {
+    if (fileOps.rootCreatingType === "file") {
       await fileOps.createFile(workspace.workspacePath, name);
     } else {
       await fileOps.createDirectory(workspace.workspacePath, name);
@@ -78,13 +75,13 @@ async function submitRootCreating(): Promise<void> {
   } catch (err) {
     dialog.alert({ message: t("common.error.createFailed", { error: err }), variant: "error" });
   } finally {
-    rootCreating.value = false;
+    fileOps.endRootCreate();
     rootCreatingName.value = "";
   }
 }
 
 function cancelRootCreating(): void {
-  rootCreating.value = false;
+  fileOps.endRootCreate();
   rootCreatingName.value = "";
 }
 
@@ -128,9 +125,9 @@ async function onOpenWorkspace(): Promise<void> {
       />
       <div v-else class="tree-content">
         <!-- 根目录新建输入框 -->
-        <div v-if="rootCreating" class="root-creating-row">
+        <div v-if="fileOps.rootCreating" class="root-creating-row">
           <svg
-            v-if="rootCreatingType === 'directory'"
+            v-if="fileOps.rootCreatingType === 'directory'"
             class="root-creating-icon"
             width="14" height="14" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -150,7 +147,7 @@ async function onOpenWorkspace(): Promise<void> {
             v-model:value="rootCreatingName"
             size="tiny"
             autofocus
-            :placeholder="rootCreatingType === 'file' ? t('editor.fileTree.newFilePlaceholder') : t('editor.fileTree.newFolderPlaceholder')"
+            :placeholder="fileOps.rootCreatingType === 'file' ? t('editor.fileTree.newFilePlaceholder') : t('editor.fileTree.newFolderPlaceholder')"
             @keyup.enter="submitRootCreating"
             @keyup.escape="cancelRootCreating"
             @blur="submitRootCreating"

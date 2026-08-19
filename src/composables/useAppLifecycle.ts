@@ -2,7 +2,7 @@ import { ref, watch, type Ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { setLocale } from "../i18n";
-import type { AppLocale } from "../types";
+import { READING_FONT_PRESETS, type ReadingFontPreset, type AppLocale } from "../types";
 
 /** useAppLifecycle 依赖的 store/状态切片 */
 export interface AppLifecycleDeps {
@@ -18,6 +18,7 @@ export interface AppLifecycleDeps {
     settings: {
       markdownTheme: string;
       editorMode: string;
+      editorFontPreset: ReadingFontPreset;
       sidebarView: "files" | "outline";
       lastWorkspacePath: string | null;
       language: AppLocale;
@@ -71,6 +72,14 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
   } = deps;
 
   const initialized = ref(false);
+
+  // 点亮 --murasaki-font-reading 变量：预览/WYSIWYG 统一使用当前阅读字体预设
+  function applyReadingFontPreset(preset: ReadingFontPreset): void {
+    document.documentElement.style.setProperty(
+      "--murasaki-font-reading",
+      READING_FONT_PRESETS[preset] ?? READING_FONT_PRESETS.d
+    );
+  }
 
   // ===== 5 个 watcher =====
 
@@ -167,6 +176,8 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
       "settings://saved",
       async () => {
         await persistence.loadSettings();
+        // 同步阅读字体预设（--murasaki-font-reading）
+        applyReadingFontPreset(persistence.settings.editorFontPreset);
         // 同步主题（currentTheme 不在 watch 监听内，需手动同步）
         if (persistence.settings.markdownTheme) {
           currentTheme.value = persistence.settings.markdownTheme;

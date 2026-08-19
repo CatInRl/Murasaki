@@ -30,6 +30,7 @@ export const EDITOR_FIELDS: (keyof SettingsState)[] = [
   "editorFontSize",
   "editorLineHeight",
   "editorFontFamily",
+  "editorFontPreset",
   "showLineNumbers",
   "softWrap",
 ];
@@ -97,6 +98,7 @@ export function restoreCategoryDefaults(
         editorFontSize: DEFAULT_SETTINGS.editorFontSize,
         editorLineHeight: DEFAULT_SETTINGS.editorLineHeight,
         editorFontFamily: DEFAULT_SETTINGS.editorFontFamily,
+        editorFontPreset: DEFAULT_SETTINGS.editorFontPreset,
         showLineNumbers: DEFAULT_SETTINGS.showLineNumbers,
         softWrap: DEFAULT_SETTINGS.softWrap,
       };

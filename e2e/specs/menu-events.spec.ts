@@ -76,21 +76,18 @@ describe("菜单事件链", () => {
   });
 
   describe("文件菜单", () => {
-    it("menu-event 'new-file' 创建未命名 Tab", async () => {
+    it("menu-event 'new-file' 有工作区时落文件树内联命名（不新建未命名 Tab）", async () => {
       const ws = resetWorkspace(defaultFixtureFiles());
       await openFileInTab(browser, `${ws}/intro.md`);
       const initial = (await getTabsState(browser)).tabs.length;
 
       await emitMenuEvent(browser, "new-file");
 
-      await browser.waitUntil(
-        async () => (await getTabsState(browser)).tabs.length === initial + 1,
-        { timeout: 3000 }
-      );
-      const after = await getTabsState(browser);
-      const newTab = after.tabs[after.tabs.length - 1];
-      expect(newTab.path).toBeNull();
-      expect(newTab.title).toBe("未命名");
+      // 文件树根目录出现内联命名输入框
+      const input = await browser.$(".root-creating-row input");
+      await input.waitForExist({ timeout: 3000 });
+      // 不新建未命名 Tab
+      expect((await getTabsState(browser)).tabs.length).toBe(initial);
     });
 
     it("menu-event 'close-tab' 关闭当前 Tab", async () => {

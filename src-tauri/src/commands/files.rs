@@ -14,6 +14,9 @@ pub struct TreeNode {
     pub node_type: String, // "file" | "directory"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<TreeNode>>,
+    /// 文件大小（字节）；目录为 None。用于"无后缀文本"阈值判断与图标分类
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
 }
 
 /// spec：文件树默认隐藏以下已知噪音
@@ -129,13 +132,16 @@ fn build_tree_inner(dir: &Path, show_hidden: bool) -> Vec<TreeNode> {
                 path: path.to_string_lossy().to_string(),
                 node_type: "directory".to_string(),
                 children: Some(children),
+                size: None,
             });
         } else {
+            let size = entry.metadata().ok().map(|m| m.len());
             nodes.push(TreeNode {
                 name,
                 path: path.to_string_lossy().to_string(),
                 node_type: "file".to_string(),
                 children: None,
+                size,
             });
         }
     }
@@ -179,6 +185,7 @@ pub fn create_file(path: String) -> Result<TreeNode, String> {
         path: p.to_string_lossy().to_string(),
         node_type: "file".to_string(),
         children: None,
+        size: Some(0),
     })
 }
 
@@ -199,6 +206,7 @@ pub fn create_directory(path: String) -> Result<TreeNode, String> {
         path: p.to_string_lossy().to_string(),
         node_type: "directory".to_string(),
         children: Some(Vec::new()),
+        size: None,
     })
 }
 
@@ -242,6 +250,7 @@ pub fn rename_path(from: String, to: String) -> Result<TreeNode, String> {
         path: dst.to_string_lossy().to_string(),
         node_type: node_type.to_string(),
         children: None,
+        size: None,
     })
 }
 
@@ -267,11 +276,13 @@ pub fn copy_file(from: String, to: String) -> Result<TreeNode, String> {
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
+    let size = fs::metadata(&dst).ok().map(|m| m.len());
     Ok(TreeNode {
         name,
         path: dst.to_string_lossy().to_string(),
         node_type: "file".to_string(),
         children: None,
+        size,
     })
 }
 

@@ -6,6 +6,8 @@ export interface TreeNode {
   path: string;
   type: "file" | "directory";
   children?: TreeNode[];
+  /** 文件大小（字节）；目录或未知时为 undefined */
+  size?: number;
 }
 
 /**
@@ -139,6 +141,27 @@ export interface TabsState {
 /**
  * settings.json 文件结构
  */
+export type ReadingFontPreset = "a" | "b" | "c" | "d";
+
+/**
+ * 阅读字体 4 档预设的 font-family 栈。
+ * 用于替换 --murasaki-font-reading 变量的取值，保证预览与 WYSIWYG 一致。
+ */
+export const READING_FONT_PRESETS: Record<ReadingFontPreset, string> = {
+  a: `"LXGW WenKai", "Noto Serif SC", "SimSun", serif`,
+  b: `"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif`,
+  c: `"Source Han Serif SC", "SimSun", "Noto Serif SC", serif`,
+  d: `"JetBrains Mono", "Cascadia Code", "Consolas", ui-monospace, monospace`,
+};
+
+/** 阅读字体预设文案键（与 i18n settings.editor.fontPreset* 对应） */
+export const READING_FONT_PRESET_LABELS: Record<ReadingFontPreset, string> = {
+  a: "settings.editor.fontPresetA",
+  b: "settings.editor.fontPresetB",
+  c: "settings.editor.fontPresetC",
+  d: "settings.editor.fontPresetD",
+};
+
 export interface SettingsState {
   /** UI 模式已固定为浅色（0.5.0 移除深色模式，issue #114） */
   uiMode: "light";
@@ -149,6 +172,10 @@ export interface SettingsState {
   showHiddenFiles: boolean;
   markdownTheme: string;
   sidebarView: SidebarView;
+  /** 侧栏宽度（px，可拖拽调整，持久化，默认 260） */
+  sidebarWidth: number;
+  /** 侧栏是否折叠为细条（持久化） */
+  sidebarCollapsed: boolean;
   /** 上次打开的工作区路径（启动时恢复） */
   lastWorkspacePath: string | null;
   /** 启动时自动打开上次工作区（默认关，issue #96） */
@@ -161,6 +188,8 @@ export interface SettingsState {
   editorLineHeight: number;
   /** 编辑器等宽字体族 */
   editorFontFamily: string;
+  /** 阅读字体 4 档预设（默认 d：等宽，issue 0.x） */
+  editorFontPreset: ReadingFontPreset;
   /** 粘贴图片时默认保存的相对目录 */
   defaultImageDir: string;
   /** Agent 循环轮数上限（默认 15） */
@@ -188,12 +217,15 @@ export const DEFAULT_SETTINGS: SettingsState = {
   showHiddenFiles: false,
   markdownTheme: "github",
   sidebarView: "files",
+  sidebarWidth: 260,
+  sidebarCollapsed: false,
   lastWorkspacePath: null,
   reopenLastWorkspace: true,
   showAgentPanel: true,
   editorFontSize: 14,
   editorLineHeight: 1.6,
   editorFontFamily: "JetBrains Mono",
+  editorFontPreset: "d",
   defaultImageDir: "assets/images",
   aiAgentMaxRounds: 15,
   aiSingleRequestTokenLimit: 16384,

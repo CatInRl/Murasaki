@@ -37,7 +37,9 @@
     "filesTab": "文件树",
     "filesTabAria": "文件树",
     "outlineTab": "大纲",
-    "outlineTabAria": "大纲"
+    "outlineTabAria": "大纲",
+    "collapseSidebar": "收起侧栏",
+    "expandSidebar": "展开侧栏"
   },
   "fileTree": {
     "refresh": "刷新",

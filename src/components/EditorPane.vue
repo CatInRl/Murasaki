@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, computed, ref, watch } from "vue";
 import SourceEditor from "./SourceEditor.vue";
 import EditorToolbar from "./EditorToolbar.vue";
 import PreviewPane from "./PreviewPane.vue";
+import HtmlPreview from "./HtmlPreview.vue";
 import { useScrollSync } from "../composables/useScrollSync";
+import { isHtmlFile } from "../utils/fileKind";
 
 interface Props {
   modelValue: string;
@@ -57,8 +59,15 @@ const emit = defineEmits<{
 }>();
 
 const editorRef = ref<InstanceType<typeof SourceEditor> | null>(null);
-const previewRef = ref<InstanceType<typeof PreviewPane> | null>(null);
+const previewRef = ref<
+  InstanceType<typeof PreviewPane> | InstanceType<typeof HtmlPreview> | null
+>(null);
 const cursorKey = ref(0);
+
+/** 当前文件是否为 html（决定右侧预览用 HtmlPreview 渲染原始 HTML） */
+const isHtml = computed(() =>
+  props.currentFilePath ? isHtmlFile(props.currentFilePath) : false
+);
 
 // 分隔条拖拽
 const dragging = ref(false);
@@ -116,7 +125,7 @@ function detachScrollSyncIfAny(): void {
 
 function attachScrollSyncForSplit(): void {
   detachScrollSyncIfAny();
-  if (props.editorMode !== "split") return;
+  if (props.editorMode !== "split" || isHtml.value) return;
   const editorScrollDom = editorRef.value?.getScrollDom() ?? null;
   const previewScrollDom = previewRef.value?.getScrollDom() ?? null;
   detachScrollSync = scrollSync.attach(editorScrollDom, previewScrollDom);
@@ -243,6 +252,7 @@ defineExpose({
         :font-family="fontFamily"
         :markdown-theme="previewTheme"
         :current-file-path="currentFilePath"
+        :read-only="isHtml"
         @update:model-value="onInput"
         @cursor-change="onCursorChange"
         @context-action="(a) => emit('context-action', a)"
@@ -263,6 +273,7 @@ defineExpose({
       :style="{ width: `calc(${100 - leftWidthPct}% - 6px)` }"
     >
       <PreviewPane
+        v-if="!isHtml"
         ref="previewRef"
         :source="modelValue"
         :theme="previewTheme"
@@ -270,6 +281,11 @@ defineExpose({
         :workspace-path="workspacePath"
         @task-toggle="onTaskToggle"
         @open-internal="(p) => emit('open-internal', p)"
+      />
+      <HtmlPreview
+        v-else
+        ref="previewRef"
+        :source="modelValue"
       />
     </div>
     </div>

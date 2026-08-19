@@ -43,6 +43,7 @@ import { findEmojiShortcodesInRange } from "./emojiReplacement";
 import { sanitizeInlineHtml } from "./htmlSanitizer";
 import { renderFrontMatterCard } from "../../composables/useFrontMatter";
 import { resolveImageSrc } from "../../utils/imagePath";
+import { renderPlantUmlCode } from "../../utils/plantuml";
 
 // ===== T7.1 Widgets =====
 
@@ -231,6 +232,67 @@ class MermaidWidget extends WidgetType {
   // click 由 widget 自己处理（定位光标），其他事件交给 CM
   ignoreEvent(event: Event): boolean {
     return event.type === "click";
+  }
+}
+
+/**
+ * 实时预览卡 widget（问题2）：光标进入 mermaid/plantuml/katex 围栏代码块时，
+ * 渲染在其代码块下方的实时预览卡。替换的是代码块结尾的换行符（见 computeDecorations）。
+ * 源码仍保持可编辑（围栏 CodeMark dim），预览随键入实时更新。
+ */
+class DiagramPreviewWidget extends WidgetType {
+  constructor(private lang: string, private code: string) {
+    super();
+  }
+  eq(other: DiagramPreviewWidget): boolean {
+    return other.lang === this.lang && other.code === this.code;
+  }
+  toDOM(): HTMLElement {
+    const card = document.createElement("div");
+    card.className = "murasaki-wysiwyg-diagram-preview";
+
+    const head = document.createElement("div");
+    head.className = "murasaki-wysiwyg-diagram-preview-head";
+    head.textContent = `${this.lang} 预览`;
+    card.appendChild(head);
+
+    const body = document.createElement("div");
+    body.className = "murasaki-wysiwyg-diagram-preview-body";
+    card.appendChild(body);
+
+    const lang = this.lang.trim().toLowerCase();
+    if (lang === "mermaid") {
+      const id = `murasaki-preview-mermaid-${Math.random().toString(36).slice(2, 10)}`;
+      body.classList.add("mermaid");
+      body.textContent = this.code; // 占位：出错时保留源码便于排错
+      void mermaid
+        .render(id, this.code)
+        .then(({ svg }) => {
+          if (body.isConnected) body.innerHTML = svg;
+        })
+        .catch(() => {
+          // 渲染失败：保留源码占位
+        });
+    } else if (lang === "katex" || lang === "math") {
+      body.classList.add("katex", "katex-display");
+      try {
+        body.innerHTML = katex.renderToString(this.code, {
+          displayMode: true,
+          throwOnError: false,
+          strict: false,
+        });
+      } catch {
+        body.textContent = this.code;
+      }
+    } else if (lang === "plantuml") {
+      body.textContent = this.code; // 占位
+      void renderPlantUmlCode(this.code, body, "murasaki-preview-plantuml");
+    }
+    return card;
+  }
+  // 预览卡不可交互，事件全部交给 CM（避免点击时移动光标）
+  ignoreEvent(): boolean {
+    return true;
   }
 }
 
@@ -505,6 +567,8 @@ function createBlockWidget(d: BlockWidgetDeco, nextMermaidId: () => string): Wid
       return new CodeBlockWidget(d.lang, d.code, d.from);
     case "mermaid":
       return new MermaidWidget(d.code, nextMermaidId(), d.from);
+    case "diagramPreview":
+      return new DiagramPreviewWidget(d.lang, d.code);
     case "link":
       return new LinkWidget(d.text, d.url);
     case "image":
@@ -818,6 +882,32 @@ export const wysiwygTheme = EditorView.theme({
     opacity: "0.4",
     fontSize: "80%",
   },
+  // 行内代码：与预览 .markdown-body code 一致的视觉样式（背景/圆角/等宽字体）。
+  // 覆盖整段（含反引号）；内层高亮 token span 会被后代选择器重置，
+  // 避免高亮样式（固定紫色背景/紫 800 文字）盖住 --md-code-* 主题变量。
+  ".murasaki-wysiwyg-inline-code": {
+    fontFamily: "var(--murasaki-font-mono)",
+    fontSize: "13px",
+    background: "var(--md-code-bg, var(--murasaki-surface-2))",
+    color: "var(--md-code-color, var(--murasaki-primary))",
+    padding: "0.125rem 0.375rem",
+    borderRadius: "var(--murasaki-radius-sm, 4px)",
+  },
+  // 中性化 CM 高亮 token span（class 以 ͼ 前缀开头）对 render 装饰内部文本的干扰：
+  // 标题/引用/行内代码的视觉由 --md-* 变量统一提供，否则高亮样式（紫色、em 字号）
+  // 会盖住 render 装饰，导致 WYSIWYG 与预览不一致（与行内代码同一根因）。
+  ".murasaki-wysiwyg-inline-code [class^=\"ͼ\"]": {
+    background: "transparent",
+    color: "inherit",
+  },
+  ".murasaki-wysiwyg-h1 [class^=\"ͼ\"], .murasaki-wysiwyg-h2 [class^=\"ͼ\"], .murasaki-wysiwyg-h3 [class^=\"ͼ\"], .murasaki-wysiwyg-h4 [class^=\"ͼ\"], .murasaki-wysiwyg-h5 [class^=\"ͼ\"], .murasaki-wysiwyg-h6 [class^=\"ͼ\"]": {
+    color: "inherit",
+    fontSize: "inherit",
+    fontWeight: "inherit",
+  },
+  ".murasaki-wysiwyg-blockquote [class^=\"ͼ\"]": {
+    color: "inherit",
+  },
   // 引用块：CM6 mark decoration 样式（无法用 <blockquote> 标签，需独立样式）
   // 引用 --md-* 变量与 markdown-content.css 保持视觉一致
   ".murasaki-wysiwyg-blockquote": {
@@ -869,7 +959,40 @@ export const wysiwygTheme = EditorView.theme({
     cursor: "text",
     margin: "8px 0",
   },
+  // 问题1：重置 CM6 .cm-content 的 white-space:pre-wrap 继承。
+  // pre-wrap 会保留 thead/tbody 之间的空白文本节点，把它们拆成两个匿名 table 框，
+  // 导致表头与表体列宽各自计算而错位；恢复 normal 可保证表头/表体逐列对齐。
+  ".murasaki-wysiwyg-table": {
+    whiteSpace: "normal",
+  },
   ".murasaki-wysiwyg-mermaid svg": {
+    maxWidth: "100%",
+    height: "auto",
+  },
+  // 实时预览卡（问题2）：代码块下方，边框 + 内边距，与代码块视觉区分
+  ".murasaki-wysiwyg-diagram-preview": {
+    margin: "4px 0 12px",
+    border: "1px solid var(--md-pre-border, var(--murasaki-line, rgba(0,0,0,0.1)))",
+    borderRadius: "var(--murasaki-radius-sm, 6px)",
+    overflow: "hidden",
+    background: "var(--murasaki-surface, var(--md-pre-bg, #fafafa))",
+  },
+  ".murasaki-wysiwyg-diagram-preview-head": {
+    fontSize: "11px",
+    fontWeight: "600",
+    color: "var(--md-code-lang-color, var(--murasaki-ink-3, #a1a1aa))",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    padding: "4px 10px",
+    borderBottom: "1px solid var(--md-pre-border, var(--murasaki-line, rgba(0,0,0,0.1)))",
+    background: "var(--murasaki-surface-2, transparent)",
+  },
+  ".murasaki-wysiwyg-diagram-preview-body": {
+    padding: "10px",
+    maxWidth: "100%",
+    overflowX: "auto",
+  },
+  ".murasaki-wysiwyg-diagram-preview-body svg": {
     maxWidth: "100%",
     height: "auto",
   },

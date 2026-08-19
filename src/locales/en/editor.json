@@ -37,7 +37,9 @@
     "filesTab": "File Tree",
     "filesTabAria": "File Tree",
     "outlineTab": "Outline",
-    "outlineTabAria": "Outline"
+    "outlineTabAria": "Outline",
+    "collapseSidebar": "Collapse Sidebar",
+    "expandSidebar": "Expand Sidebar"
   },
   "fileTree": {
     "refresh": "Refresh",

@@ -53,11 +53,13 @@ import {
   restoreCategoryDefaults,
 } from "./settings/settingsLogic";
 import { basename } from "./utils/path";
+import { isMarkdownFile, isSourceOnlyFile } from "./utils/fileKind";
 import { DEFAULT_THEME } from "./composables/useTheme";
 import { useNaiveTheme } from "./composables/useNaiveTheme";
 import { AGENT_ENABLED } from "./features";
 import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import type { SidebarView, SettingsState } from "./types";
+import { READING_FONT_PRESETS } from "./types";
 
 const workspace = useWorkspaceStore();
 const tabsStore = useTabsStore();
@@ -93,6 +95,23 @@ const activeContent = computed({
 
 const currentFilePath = computed(() => activeTab.value?.path ?? null);
 
+// ===== 当前文件类型（issue 0.x：非 md 文件强制源码模式）=====
+// 无路径（未命名新文件）默认按 markdown 处理
+const currentIsMarkdown = computed(() =>
+  currentFilePath.value ? isMarkdownFile(currentFilePath.value) : true
+);
+/** 非 markdown 的非文档文件（yaml/xml/txt 等）→ 强制源码-only */
+const currentIsSourceOnly = computed(() =>
+  currentFilePath.value ? isSourceOnlyFile(currentFilePath.value) : false
+);
+/** 传给编辑器的有效模式：源码-only 强制 source；html 禁用所见即所得（降到 split）；其余遵循用户设置 */
+const effectiveEditorMode = computed<"source" | "split" | "wysiwyg">(() => {
+  if (currentIsSourceOnly.value) return "source";
+  // html 不走 WYSIWYG markdown 渲染 → 若有 wysiwyg 请求则退化为分屏（源码+预览）
+  if (editorBridge.editorMode === "wysiwyg" && !currentIsMarkdown.value) return "split";
+  return editorBridge.editorMode;
+});
+
 // 切 tab 时更新 editor bridge 的文档路径（供 agent 工具使用）
 // 用 flush: 'post' 确保在 SourceEditor.onMounted（registerView(view, null)）之后触发，
 // 否则首次打开 tab 时 EditorPane 挂载会重置 activeDocPath 为 null，
@@ -106,7 +125,7 @@ const {
   openFile, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
   reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, onNewTab, onNewFile,
   onOpenFolder, onOpenFile, onOpenRecent,
-} = useFileActions({ tabsStore, workspace, persistence, dialog, toast: toastStore, activeTab, currentTheme });
+} = useFileActions({ tabsStore, workspace, fileOps, persistence, dialog, toast: toastStore, activeTab, currentTheme });
 
 // ===== 复制为富文本 composable（issue #108，复用 exportHtml 管线，走剪贴板而非文件）=====
 const { copyRichText } = useCopyRichText({
@@ -130,6 +149,53 @@ const {
 
 // ===== 侧栏视图（受控） =====
 const sidebarView = ref<SidebarView>("files");
+
+// ===== 侧栏宽度（可拖拽调整 + 折叠成细条，均持久化） =====
+const SIDEBAR_MIN_WIDTH = 140;
+const SIDEBAR_MAX_WIDTH = 600;
+const SIDEBAR_COLLAPSED_WIDTH = 36;
+const sidebarWidth = ref(260);
+const sidebarCollapsed = ref(false);
+/** 拖拽调宽进行中：关闭宽度过渡动画 + 禁用文本选择 */
+const sidebarDragging = ref(false);
+
+/** 侧栏实际宽度：折叠时固定细条宽度，否则用用户调整后的宽度 */
+const sidebarStyle = computed(() => ({
+  width: sidebarCollapsed.value ? `${SIDEBAR_COLLAPSED_WIDTH}px` : `${sidebarWidth.value}px`,
+}));
+
+/** 大纲视图可用性（与 Sidebar 一致：仅 markdown 文件） */
+const canShowOutline = computed(() =>
+  currentFilePath.value ? isMarkdownFile(currentFilePath.value) : true
+);
+
+/** 折叠状态下点击图标 → 展开侧栏并切换视图 */
+function expandSidebar(view: SidebarView): void {
+  sidebarCollapsed.value = false;
+  sidebarView.value = view;
+}
+
+/** 侧栏右缘拖拽调宽（pointer events，Drag 期间禁止过渡与文本选择） */
+function startResize(e: PointerEvent): void {
+  if (sidebarCollapsed.value) return;
+  e.preventDefault();
+  const startX = e.clientX;
+  const startWidth = sidebarWidth.value;
+  sidebarDragging.value = true;
+  document.body.style.userSelect = "none";
+  const onMove = (ev: PointerEvent) => {
+    const w = startWidth + ev.clientX - startX;
+    sidebarWidth.value = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(w)));
+  };
+  const onUp = () => {
+    sidebarDragging.value = false;
+    document.body.style.userSelect = "";
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+  };
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
 
 // ===== 状态栏 / 全屏 =====
 const statusBarVisible = ref(true);
@@ -242,6 +308,11 @@ onMounted(async () => {
   if (persistence.settings.markdownTheme) {
     currentTheme.value = persistence.settings.markdownTheme;
   }
+  // 应用阅读字体预设（--murasaki-font-reading）
+  document.documentElement.style.setProperty(
+    "--murasaki-font-reading",
+    READING_FONT_PRESETS[persistence.settings.editorFontPreset] ?? READING_FONT_PRESETS.d
+  );
   // 应用保存的编辑模式（运行时切换，无需重启）
   editorBridge.setEditorMode(persistence.settings.editorMode);
   // 应用保存的界面语言（ADR-0013，前端 i18n + Rust 菜单）
@@ -253,6 +324,14 @@ onMounted(async () => {
   if (persistence.settings.sidebarView) {
     sidebarView.value = persistence.settings.sidebarView;
   }
+  // 恢复侧栏宽度与折叠状态（布局状态持久化）
+  if (persistence.settings.sidebarWidth) {
+    sidebarWidth.value = Math.min(
+      SIDEBAR_MAX_WIDTH,
+      Math.max(SIDEBAR_MIN_WIDTH, persistence.settings.sidebarWidth)
+    );
+  }
+  sidebarCollapsed.value = persistence.settings.sidebarCollapsed;
   // 恢复上次打开的工作区（仅当开启"启动时打开上次工作区"，issue #96）
   if (persistence.settings.reopenLastWorkspace && persistence.settings.lastWorkspacePath) {
     try {
@@ -450,6 +529,14 @@ const { initialized, setupEventListeners } = useAppLifecycle({
   onOpenPath,
 });
 
+// ===== 侧栏布局状态持久化（gated：初始化完成后才落盘） =====
+watch(sidebarWidth, (v) => {
+  if (initialized.value) void persistence.updateSettings({ sidebarWidth: v });
+});
+watch(sidebarCollapsed, (v) => {
+  if (initialized.value) void persistence.updateSettings({ sidebarCollapsed: v });
+});
+
 // ===== 最近打开菜单同步（debounce + in-flight 锁，watcher 自启动）=====
 const { recentEntries: recentEntriesRef } = storeToRefs(persistence);
 const { syncNow: syncRecentMenu } = useRecentMenuSync({
@@ -470,16 +557,78 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
       <aside
         v-if="workspace.hasWorkspace || tabsStore.hasTabs"
         class="murasaki-sidebar"
+        :class="{ collapsed: sidebarCollapsed, dragging: sidebarDragging }"
+        :style="sidebarStyle"
       >
-        <Sidebar
-          :current-file-path="currentFilePath"
-          :active-view="sidebarView"
-          :has-workspace="workspace.hasWorkspace"
-          @select-file="openFile"
-          @jump-to-line="onJumpToLine"
-          @preview-image="onPreviewImage"
-          @update:active-view="(v) => (sidebarView = v)"
-        />
+        <!-- 折叠态：细条图标栏（点击图标展开对应视图） -->
+        <div v-if="sidebarCollapsed" class="sidebar-collapsed-rail">
+          <button
+            v-if="workspace.hasWorkspace"
+            class="sidebar-rail-btn"
+            type="button"
+            :title="$t('editor.sidebar.filesTab') + ' (Ctrl+Shift+E)'"
+            :aria-label="$t('editor.sidebar.filesTabAria')"
+            @click="expandSidebar('files')"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+            </svg>
+          </button>
+          <button
+            v-if="canShowOutline"
+            class="sidebar-rail-btn"
+            type="button"
+            :title="$t('editor.sidebar.outlineTab') + ' (Ctrl+Shift+M)'"
+            :aria-label="$t('editor.sidebar.outlineTabAria')"
+            @click="expandSidebar('outline')"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"/>
+              <line x1="8" y1="12" x2="21" y2="12"/>
+              <line x1="8" y1="18" x2="21" y2="18"/>
+              <line x1="3" y1="6" x2="3.01" y2="6"/>
+              <line x1="3" y1="12" x2="3.01" y2="12"/>
+              <line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+          </button>
+          <div class="sidebar-rail-spacer"></div>
+          <button
+            class="sidebar-rail-btn"
+            type="button"
+            :title="$t('editor.sidebar.expandSidebar')"
+            :aria-label="$t('editor.sidebar.expandSidebar')"
+            @click="sidebarCollapsed = false"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+        </div>
+        <!-- 展开态：完整侧栏 + 收起按钮 -->
+        <template v-else>
+          <Sidebar
+            :current-file-path="currentFilePath"
+            :active-view="sidebarView"
+            :has-workspace="workspace.hasWorkspace"
+            @select-file="openFile"
+            @jump-to-line="onJumpToLine"
+            @preview-image="onPreviewImage"
+            @update:active-view="(v) => (sidebarView = v)"
+          />
+          <button
+            class="murasaki-sidebar-collapse"
+            type="button"
+            :title="$t('editor.sidebar.collapseSidebar')"
+            :aria-label="$t('editor.sidebar.collapseSidebar')"
+            @click="sidebarCollapsed = true"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+          <!-- 右缘拖拽调宽把手 -->
+          <div class="murasaki-sidebar-resizer" @pointerdown="startResize" />
+        </template>
       </aside>
 
       <!-- 主区域 -->
@@ -523,7 +672,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :preview-theme="currentTheme"
             :current-file-path="currentFilePath"
             :workspace-path="workspace.workspacePath"
-            :editor-mode="editorBridge.editorMode"
+            :editor-mode="effectiveEditorMode"
             :font-size="persistence.settings.editorFontSize"
             :line-height="persistence.settings.editorLineHeight"
             :font-family="persistence.settings.editorFontFamily"
@@ -554,10 +703,9 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
         />
       </div>
 
-      <!-- Agent 面板 -->
-      <!-- Agent 面板（AGENT_ENABLED 关闭时隐藏整个入口，issue #112） -->
+      <!-- Agent 面板（AGENT_ENABLED 关闭时隐藏整个入口，issue #112；非 markdown 文件隐藏，issue 0.x） -->
       <AgentPanel
-        v-if="AGENT_ENABLED && persistence.settings.showAgentPanel"
+        v-if="AGENT_ENABLED && persistence.settings.showAgentPanel && currentIsMarkdown"
         @collapse="onCollapseAgentPanel"
         @open-folder-dialog="onOpenFolder"
         @open-settings="openSettings"
@@ -623,12 +771,92 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
 }
 
 .murasaki-shell.has-sidebar .murasaki-sidebar {
-  width: var(--murasaki-sidebar-width);
+  /* width 由 inline style 控制（sidebarStyle：用户可拖拽调整 / 折叠为细条） */
+  position: relative;
   flex-shrink: 0;
   border-right: 1px solid var(--murasaki-line);
   background: var(--murasaki-surface);
   overflow: hidden;
   transition: width var(--murasaki-duration-base) var(--murasaki-ease);
+}
+
+/* 拖拽调宽期间：关闭过渡动画，避免拖拽滞后 */
+.murasaki-sidebar.dragging {
+  transition: none;
+  cursor: col-resize;
+}
+
+/* === 侧栏右缘拖拽调宽把手 === */
+.murasaki-sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 5px;
+  z-index: 20;
+  cursor: col-resize;
+}
+.murasaki-sidebar-resizer:hover,
+.murasaki-sidebar.dragging .murasaki-sidebar-resizer {
+  background: var(--murasaki-primary);
+  opacity: 0.25;
+}
+
+/* === 收起侧栏按钮（展开态，侧栏头部右上角） === */
+.murasaki-sidebar-collapse {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 21;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--murasaki-ink-3);
+  border-radius: var(--murasaki-radius-sm);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
+              color var(--murasaki-duration-fast) var(--murasaki-ease);
+}
+.murasaki-sidebar-collapse:hover {
+  background: var(--murasaki-neutral-200);
+  color: var(--murasaki-ink-2);
+}
+
+/* === 折叠态：细条图标栏 === */
+.sidebar-collapsed-rail {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+}
+.sidebar-rail-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--murasaki-ink-3);
+  border-radius: var(--murasaki-radius-sm);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
+              color var(--murasaki-duration-fast) var(--murasaki-ease);
+}
+.sidebar-rail-btn:hover {
+  background: var(--murasaki-neutral-200);
+  color: var(--murasaki-primary);
+}
+.sidebar-rail-spacer {
+  flex: 1;
 }
 
 .main-area {

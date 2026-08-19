@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { EditorState, Compartment, Transaction } from "@codemirror/state";
+import { EditorState, Compartment, Transaction, Extension } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab, selectAll } from "@codemirror/commands";
 import { indentOnInput, bracketMatching, foldGutter, foldKeymap, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
+import { languageForFile } from "../editor/language";
+import { isMarkdownFile } from "../utils/fileKind";
+import { basename } from "../utils/path";
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from "@codemirror/search";
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { tags } from "@lezer/highlight";
@@ -56,10 +59,10 @@ const murasakiHighlightStyle = HighlightStyle.define([
   { tag: [tags.heading4, tags.heading5, tags.heading6], color: "var(--murasaki-purple-600)", fontWeight: "600" },
   // ATX heading markers (#, ##): purple-400
   { tag: tags.heading, color: "var(--murasaki-purple-400)" },
-  // Emphasis — 语义 token，随主题切换
+  // Emphasis — 语义 token，随主题切换（颜色与预览 .markdown-body em/strong/del 一致）
   { tag: tags.strong, color: "var(--murasaki-ink)", fontWeight: "700" },
-  { tag: tags.emphasis, color: "var(--murasaki-ink-2)", fontStyle: "italic" },
-  { tag: tags.strikethrough, color: "var(--murasaki-ink-3)", textDecoration: "line-through" },
+  { tag: tags.emphasis, color: "var(--murasaki-ink)", fontStyle: "italic" },
+  { tag: tags.strikethrough, color: "var(--murasaki-muted-foreground)", textDecoration: "line-through" },
   // Links
   { tag: tags.link, color: "var(--murasaki-purple-700)", textDecoration: "underline" },
   { tag: tags.url, color: "var(--murasaki-state-info)" },
@@ -279,6 +282,8 @@ const readOnlyComp = new Compartment();
 const wysiwygComp = new Compartment();
 // 字体配置（大小/行高/字体族）通过此 Compartment 运行时切换
 const fontComp = new Compartment();
+// 语言高亮：非 markdown 文件通过此 Compartment 运行时切换 CodeMirror 语言
+const languageComp = new Compartment();
 
 function buildExtensions() {
   return [
@@ -306,11 +311,8 @@ function buildExtensions() {
     ]),
     // 段落格式化快捷键（高优先级，避免被 defaultKeymap 拦截）
     paragraphKeymap(),
-    markdown({
-      base: markdownLanguage, // 使用带 GFM 的 base（含删除线/任务列表/表格等扩展）
-      defaultCodeLanguage: markdownLanguage,
-      codeLanguages: languages,
-    }),
+    // 语言高亮：markdown 走 GFM，其他文本/代码文件走解析出的 CodeMirror 语言
+    languageComp.of(buildLanguageExtension()),
     lineNumbersComp.of(props.showLineNumbers ? lineNumbers() : []),
     wrapComp.of(props.softWrap ? EditorView.lineWrapping : []),
     readOnlyComp.of(EditorState.readOnly.of(props.readOnly)),
@@ -349,6 +351,27 @@ function buildExtensions() {
       }
     }),
   ];
+}
+
+/**
+ * 构建语言扩展（通过 languageComp 运行时切换）。
+ * - 空文件名（未命名新文件）或 markdown 文件 → 走 GFM markdown（含代码块语言支持）
+ * - 其他文本/代码文件 → 用 languageForFile 解析出的 CodeMirror 语言；无匹配回退纯文本
+ */
+function buildLanguageExtension(): Extension {
+  const filename = props.currentFilePath ? basename(props.currentFilePath) : "";
+  if (filename && !isMarkdownFile(filename)) {
+    const desc = languageForFile(filename);
+    if (desc && desc.support) {
+      return desc.support.language;
+    }
+    return [];
+  }
+  return markdown({
+    base: markdownLanguage, // 使用带 GFM 的 base（含删除线/任务列表/表格等扩展）
+    defaultCodeLanguage: markdownLanguage,
+    codeLanguages: languages,
+  });
 }
 
 /**
@@ -577,12 +600,14 @@ watch(
   }
 );
 
-// 当前文件路径变更（切 tab / 重命名）→ 更新模块级状态并触发 WYSIWYG 重算
+// 当前文件路径变更（切 tab / 重命名）→ 更新模块级状态并触发 WYSIWYG 重算 + 语言重配
 // ImageWidget 在 toDOM 时读取 currentFilePath 解析相对图片路径（ADR-0015）
 watch(
   () => props.currentFilePath,
   (path) => {
     setCurrentFilePath(path);
+    // 非 markdown 文件切换 CodeMirror 语言高亮；markdown 保持 GFM
+    viewRef.value?.dispatch({ effects: languageComp.reconfigure(buildLanguageExtension()) });
     // 触发 wysiwygField 重算，让 ImageWidget 用新路径重新渲染
     viewRef.value?.dispatch({ effects: recomputeWysiwygEffect.of() });
   },

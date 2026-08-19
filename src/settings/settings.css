@@ -443,3 +443,44 @@ body {
   background: var(--murasaki-surface);
   border-top: 1px solid var(--murasaki-line);
 }
+
+/* === Font preset cards（阅读字体 4 档预设）=== */
+.font-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+.font-preset-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--murasaki-background);
+  border: 1px solid var(--murasaki-border);
+  border-radius: var(--murasaki-radius-md);
+  cursor: pointer;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.font-preset-card:hover {
+  border-color: var(--murasaki-ring);
+}
+.font-preset-card.active {
+  border-color: var(--murasaki-primary);
+  box-shadow: 0 0 0 1px var(--murasaki-primary);
+}
+.font-preset-card:focus-visible {
+  outline: 2px solid var(--murasaki-ring);
+  outline-offset: 1px;
+}
+.font-preset-name {
+  font-size: var(--murasaki-text-xs);
+  font-family: var(--murasaki-font-ui);
+  color: var(--murasaki-ink-2);
+}
+.font-preset-sample {
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--murasaki-ink);
+}

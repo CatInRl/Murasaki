@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { ref } from "vue";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { fileSystem } from "../services/fileSystem";
 import type { TreeNode } from "../types";
@@ -29,6 +30,21 @@ export const useFileOpsStore = defineStore("fileOps", () => {
 
   /** 剪贴板：存放已剪切/复制的路径 */
   let clipboard: { path: string; mode: "cut" | "copy" } | null = null;
+
+  /** 文件树根目录"正在内联命名新建"状态（供文件树右键 + 菜单/Ctrl+N 共享触发） */
+  const rootCreating = ref(false);
+  const rootCreatingType = ref<"file" | "directory">("file");
+
+  /** 开始根目录内联命名新建（type: 新建文件 / 新建文件夹） */
+  function beginRootCreate(type: "file" | "directory"): void {
+    rootCreatingType.value = type;
+    rootCreating.value = true;
+  }
+
+  /** 结束根目录内联命名新建 */
+  function endRootCreate(): void {
+    rootCreating.value = false;
+  }
 
   /** 冲突解决回调（由 App.vue 注入） */
   let conflictResolver: ConflictResolver | null = null;
@@ -410,5 +426,9 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     moveInto,
     copyInto,
     hasClipboard,
+    rootCreating,
+    rootCreatingType,
+    beginRootCreate,
+    endRootCreate,
   };
 });

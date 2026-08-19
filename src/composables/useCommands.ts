@@ -58,6 +58,7 @@ export interface CommandsDeps {
   // file ops store 切片
   fileOps: {
     createDirectory: (parent: string, name: string) => Promise<unknown>;
+    beginRootCreate: (type: "file" | "directory") => void;
   };
 
   // dialog store 切片
@@ -111,7 +112,12 @@ export function useCommands(deps: CommandsDeps) {
   async function handleMenuEvent(menuId: string): Promise<void> {
     switch (menuId) {
       case "new-file":
-        onNewTab();
+        // 有工作区 → 落文件树根目录内联命名；无工作区 → 新建未命名 tab
+        if (workspace.hasWorkspace) {
+          fileOps.beginRootCreate("file");
+        } else {
+          onNewTab();
+        }
         break;
       case "open-file":
         await openFileViaDialog();

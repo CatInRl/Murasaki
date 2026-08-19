@@ -22,6 +22,10 @@ export interface FileActionsDeps {
     openWorkspace: (path: string) => Promise<unknown>;
     hasWorkspace: boolean;
   };
+  /** 文件操作 store 切片（含文件树根目录内联新建状态） */
+  fileOps: {
+    beginRootCreate: (type: "file" | "directory") => void;
+  };
   persistence: {
     addRecent: (path: string, type: "file" | "folder") => Promise<void>;
     removeRecent: (path: string) => Promise<void>;
@@ -47,7 +51,7 @@ export interface FileActionsDeps {
  * 从 App.vue 提取，保持原有行为不变。
  */
 export function useFileActions(deps: FileActionsDeps) {
-  const { tabsStore, workspace, persistence, dialog, toast, activeTab, currentTheme } = deps;
+  const { tabsStore, workspace, fileOps, persistence, dialog, toast, activeTab, currentTheme } = deps;
   const t = i18n.global.t.bind(i18n.global);
 
   async function openFile(path: string): Promise<void> {
@@ -204,7 +208,12 @@ export function useFileActions(deps: FileActionsDeps) {
   }
 
   function onNewFile(): void {
-    onNewTab();
+    // 有工作区 → 落文件树根目录内联命名；无工作区 → 新建未命名 tab
+    if (workspace.hasWorkspace) {
+      fileOps.beginRootCreate("file");
+    } else {
+      onNewTab();
+    }
   }
 
   function onOpenFolder(): void {

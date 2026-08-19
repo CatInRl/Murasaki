@@ -72,8 +72,9 @@
   /* Typography */
   --murasaki-font-ui: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --murasaki-font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
-  /* 阅读 font（预览/WYSIWYG）：霞鹜文楷优先，回退 Noto Sans SC（issue #111） */
-  --murasaki-font-reading: "LXGW WenKai", "Noto Sans SC", -apple-system, "Segoe UI", sans-serif;
+  /* 阅读 font（预览/WYSIWYG）：运行时由 editorFontPreset 设置动态改写；
+     此处静态默认 = 预设 D（等宽），issue #111 */
+  --murasaki-font-reading: "JetBrains Mono", "Cascadia Code", "Consolas", ui-monospace, monospace;
 
   /* Font Size Tokens — visual hierarchy for secondary/base/heading text (Ticket #60) */
   --murasaki-text-xs: 12px;

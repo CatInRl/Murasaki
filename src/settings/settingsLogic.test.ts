@@ -36,6 +36,7 @@ describe("settingsLogic - fieldsForCategory", () => {
     expect(EDITOR_FIELDS).toContain("editorFontSize");
     expect(EDITOR_FIELDS).toContain("editorLineHeight");
     expect(EDITOR_FIELDS).toContain("editorFontFamily");
+    expect(EDITOR_FIELDS).toContain("editorFontPreset");
     expect(EDITOR_FIELDS).toContain("showLineNumbers");
     expect(EDITOR_FIELDS).toContain("softWrap");
   });
