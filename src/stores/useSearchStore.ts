@@ -51,6 +51,8 @@ export const useSearchStore = defineStore("search", () => {
   const query = ref("");
   /** 内容命中结果（仅 .md，来自 Rust search_workspace） */
   const results = ref<SearchResult[]>([]);
+  /** 产生 results 的查询串（trim 后）；与当前 query 不一致时 buildGroups 视为陈旧结果并跳过内容组 */
+  const resultsQuery = ref("");
   /** 加载中标志 */
   const loading = ref(false);
   /** 搜索选项（仅作用于内容命中） */
@@ -92,6 +94,12 @@ export const useSearchStore = defineStore("search", () => {
     }
   }
 
+  /** 清空内容结果及其所属查询（使 buildGroups 的陈旧守卫失效，防抖窗口不展示旧结果） */
+  function resetResults(): void {
+    results.value = [];
+    resultsQuery.value = "";
+  }
+
   /** 重置增量搜索状态（不清理 results） */
   function resetProgressState(): void {
     scannedFiles.value = 0;
@@ -131,7 +139,7 @@ export const useSearchStore = defineStore("search", () => {
     void cancelSearch();
     clearListeners();
     query.value = "";
-    results.value = [];
+    resetResults();
     resetProgressState();
     cancelToken.value = null;
   }
@@ -172,7 +180,7 @@ export const useSearchStore = defineStore("search", () => {
       // 取消进行中的搜索
       void cancelSearch();
       clearListeners();
-      results.value = [];
+      resetResults();
       resetProgressState();
       cancelToken.value = null;
       return { contentResults: [], filenameResults: [], truncated: false };
@@ -227,6 +235,7 @@ export const useSearchStore = defineStore("search", () => {
       });
       // 用权威结果覆盖（保证与 Rust 端最终状态一致，避免增量事件丢失/乱序）
       results.value = resp.contentResults;
+      resultsQuery.value = currentQuery;
       truncated.value = resp.truncated;
       // 同步 matchedCount（若 Rust 端最终与增量累计不一致，以权威为准）
       const totalAuthoritative = resp.contentResults.reduce(
@@ -238,7 +247,7 @@ export const useSearchStore = defineStore("search", () => {
       return resp;
     } catch (err) {
       console.error("内容搜索失败:", err);
-      results.value = [];
+      resetResults();
       truncated.value = false;
       return { contentResults: [], filenameResults: [], truncated: false };
     } finally {
@@ -258,6 +267,7 @@ export const useSearchStore = defineStore("search", () => {
     // state
     query,
     results,
+    resultsQuery,
     loading,
     options,
     visible,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { matchText, buildGroups, SEARCH_LIMITS } from "./searchLogic";
-import type { BuildGroupsContext, SearchTabSource } from "./searchLogic";
+import type { BuildGroupsContext, SearchContentFileSource, SearchTabSource } from "./searchLogic";
 
 // ===== 测试数据工厂 =====
 
@@ -16,6 +16,7 @@ function makeCtx(overrides: Partial<BuildGroupsContext> = {}): BuildGroupsContex
     recents: [],
     files: [],
     content: [],
+    contentQuery: "",
     ...overrides,
   };
 }
@@ -70,7 +71,9 @@ describe("buildGroups", () => {
       tabs: [tab("t1", "/ws/a.md", "a.md")],
       recents: [{ path: "/ws/r.md", title: "r.md" }],
       files: [{ path: "/ws/f.md", title: "f.md" }],
-      content: [{ path: "/ws/c.md", title: "c.md", hits: [{ lineNumber: 1, snippet: "x" }] }],
+      content: [
+        { path: "/ws/c.md", title: "c.md", hits: [{ lineNumber: 1, snippet: "x", ranges: [] }] },
+      ],
     });
     const groups = buildGroups(ctx);
     expect(groups.map((g) => g.kind)).toEqual(["tabs", "recent"]);
@@ -79,10 +82,13 @@ describe("buildGroups", () => {
   it("有查询时按 tabs > recent > files > content 分组", () => {
     const ctx = makeCtx({
       query: "md",
+      contentQuery: "md",
       tabs: [tab("t1", "/ws/a.md", "a.md")],
       recents: [{ path: "/ws/r.md", title: "r.md" }],
       files: [{ path: "/ws/f.md", title: "f.md" }],
-      content: [{ path: "/ws/c.md", title: "c.md", hits: [{ lineNumber: 1, snippet: "md" }] }],
+      content: [
+        { path: "/ws/c.md", title: "c.md", hits: [{ lineNumber: 1, snippet: "md", ranges: [] }] },
+      ],
     });
     const groups = buildGroups(ctx);
     expect(groups.map((g) => g.kind)).toEqual(["tabs", "recent", "files", "content"]);
@@ -95,7 +101,9 @@ describe("buildGroups", () => {
       tabs: [tab("t1", "/ws/a.md", "a.md")],
       recents: [{ path: "/ws/r.md", title: "r.md" }],
       files: [{ path: "/ws/f.md", title: "f.md" }],
-      content: [{ path: "/ws/c.md", title: "c.md", hits: [{ lineNumber: 1, snippet: "md" }] }],
+      content: [
+        { path: "/ws/c.md", title: "c.md", hits: [{ lineNumber: 1, snippet: "md", ranges: [] }] },
+      ],
     });
     const groups = buildGroups(ctx);
     expect(groups.map((g) => g.kind)).toEqual(["tabs", "recent"]);
@@ -155,13 +163,13 @@ describe("buildGroups", () => {
         path: "/ws/a.md",
         title: "a.md",
         hits: [
-          { lineNumber: 1, snippet: "one" },
-          { lineNumber: 3, snippet: "three" },
-          { lineNumber: 5, snippet: "five" },
+          { lineNumber: 1, snippet: "one", ranges: [] },
+          { lineNumber: 3, snippet: "three", ranges: [] },
+          { lineNumber: 5, snippet: "five", ranges: [] },
         ],
       },
     ];
-    const groups = buildGroups(makeCtx({ query: "e", content }));
+    const groups = buildGroups(makeCtx({ query: "e", contentQuery: "e", content }));
     const g = groups.find((x) => x.kind === "content")!;
     expect(g.items.length).toBe(SEARCH_LIMITS.contentPerFile);
     expect(g.items.map((i) => i.lineNumber)).toEqual([1, 3]);
@@ -171,16 +179,44 @@ describe("buildGroups", () => {
     const content = Array.from({ length: 6 }, (_, i) => ({
       path: `/ws/c${i}.md`,
       title: `c${i}.md`,
-      hits: [{ lineNumber: 1, snippet: "x" }],
+      hits: [{ lineNumber: 1, snippet: "x", ranges: [] }],
     }));
-    const groups = buildGroups(makeCtx({ query: "x", content }));
+    const groups = buildGroups(makeCtx({ query: "x", contentQuery: "x", content }));
     const g = groups.find((x) => x.kind === "content")!;
     expect(g.items.length).toBe(SEARCH_LIMITS.contentFiles);
+  });
+
+  it("内容命中：片段高亮使用 Rust 端权威 ranges", () => {
+    const content: SearchContentFileSource[] = [
+      {
+        path: "/ws/a.md",
+        title: "a.md",
+        hits: [
+          { lineNumber: 1, snippet: "Mura.*editor 命中", ranges: [[0, 13]] },
+        ],
+      },
+    ];
+    const groups = buildGroups(makeCtx({ query: "Mura.*editor", contentQuery: "Mura.*editor", content }));
+    const g = groups.find((x) => x.kind === "content")!;
+    expect(g.items[0].snippetRanges).toEqual([[0, 13]]);
+  });
+
+  it("内容命中：contentQuery 与当前查询不一致时跳过（防陈旧）", () => {
+    const ctx = makeCtx({
+      query: "md",
+      contentQuery: "other",
+      content: [
+        { path: "/ws/c.md", title: "c.md", hits: [{ lineNumber: 1, snippet: "md", ranges: [] }] },
+      ],
+    });
+    const groups = buildGroups(ctx);
+    expect(groups.find((x) => x.kind === "content")).toBeUndefined();
   });
 
   it("同一路径不跨组重复（去重）", () => {
     const ctx = makeCtx({
       query: "a",
+      contentQuery: "a",
       tabs: [tab("t1", "/ws/a.md", "a.md")],
       recents: [
         { path: "/ws/a.md", title: "a.md" },
@@ -190,7 +226,9 @@ describe("buildGroups", () => {
         { path: "/ws/a.md", title: "a.md" },
         { path: "/ws/aaa.md", title: "aaa.md" },
       ],
-      content: [{ path: "/ws/a.md", title: "a.md", hits: [{ lineNumber: 1, snippet: "a" }] }],
+      content: [
+        { path: "/ws/a.md", title: "a.md", hits: [{ lineNumber: 1, snippet: "a", ranges: [] }] },
+      ],
     });
     const groups = buildGroups(ctx);
     const allPaths = groups.flatMap((g) => g.items.map((i) => i.path)).filter(Boolean);

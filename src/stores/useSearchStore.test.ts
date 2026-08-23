@@ -54,6 +54,7 @@ describe("useSearchStore", () => {
       const store = useSearchStore();
       expect(store.query).toBe("");
       expect(store.results).toEqual([]);
+      expect(store.resultsQuery).toBe("");
       expect(store.loading).toBe(false);
       expect(store.visible).toBe(false);
       expect(store.options).toEqual({
@@ -102,7 +103,7 @@ describe("useSearchStore", () => {
       const store = useSearchStore();
       store.setQuery("hello");
       store.results = [
-        { filePath: "/a.md", matches: [{ lineNumber: 1, lineContent: "x", contextBefore: [], contextAfter: [] }] },
+        { filePath: "/a.md", matches: [{ lineNumber: 1, lineContent: "x", contextBefore: [], contextAfter: [], ranges: [] }] },
       ];
       store.truncated = true;
       store.cancelToken = "old-token";
@@ -157,7 +158,7 @@ describe("useSearchStore", () => {
           {
             filePath: "/test/workspace/a.md",
             matches: [
-              { lineNumber: 3, lineContent: "hello world", contextBefore: [], contextAfter: [] },
+              { lineNumber: 3, lineContent: "hello world", contextBefore: [], contextAfter: [], ranges: [] },
             ],
           },
         ],
@@ -201,6 +202,44 @@ describe("useSearchStore", () => {
       expect(store.results).toEqual([]);
       expect(store.truncated).toBe(false);
       expect(store.loading).toBe(false);
+    });
+
+    it("search 成功后 resultsQuery 记录产生结果的查询", async () => {
+      mockedInvoke.mockResolvedValueOnce({
+        contentResults: [],
+        filenameResults: [],
+        truncated: false,
+      } as SearchResponse);
+      const store = useSearchStore();
+      store.setQuery("  hello  ");
+
+      await store.search();
+
+      expect(store.resultsQuery).toBe("hello");
+    });
+
+    it("空查询 / 失败时 resultsQuery 被清空", async () => {
+      const store = useSearchStore();
+      // 先产生一次结果
+      mockedInvoke.mockResolvedValueOnce({
+        contentResults: [],
+        filenameResults: [],
+        truncated: false,
+      } as SearchResponse);
+      store.setQuery("hello");
+      await store.search();
+      expect(store.resultsQuery).toBe("hello");
+
+      // 清空为空白查询 → resultsQuery 复位
+      store.setQuery("   ");
+      await store.search();
+      expect(store.resultsQuery).toBe("");
+
+      // 再次搜索后 invoke 失败 → resultsQuery 复位
+      store.setQuery("hello");
+      mockedInvoke.mockRejectedValueOnce(new Error("boom"));
+      await store.search();
+      expect(store.resultsQuery).toBe("");
     });
   });
 
@@ -309,7 +348,7 @@ describe("useSearchStore", () => {
         result: {
           filePath: "/test/workspace/c.md",
           matches: [
-            { lineNumber: 1, lineContent: "hello", contextBefore: [], contextAfter: [] },
+            { lineNumber: 1, lineContent: "hello", contextBefore: [], contextAfter: [], ranges: [] },
           ],
         },
         filenameMatch: null,
@@ -358,7 +397,7 @@ describe("useSearchStore", () => {
           result: {
             filePath: "/stale.md",
             matches: [
-              { lineNumber: 1, lineContent: "x", contextBefore: [], contextAfter: [] },
+              { lineNumber: 1, lineContent: "x", contextBefore: [], contextAfter: [], ranges: [] },
             ],
           },
           filenameMatch: null,
@@ -381,7 +420,7 @@ describe("useSearchStore", () => {
           {
             filePath: "/test/workspace/final.md",
             matches: [
-              { lineNumber: 10, lineContent: "final", contextBefore: [], contextAfter: [] },
+              { lineNumber: 10, lineContent: "final", contextBefore: [], contextAfter: [], ranges: [] },
             ],
           },
         ],
@@ -398,7 +437,7 @@ describe("useSearchStore", () => {
             result: {
               filePath: "/test/workspace/incremental.md",
               matches: [
-                { lineNumber: 1, lineContent: "inc", contextBefore: [], contextAfter: [] },
+                { lineNumber: 1, lineContent: "inc", contextBefore: [], contextAfter: [], ranges: [] },
               ],
             },
             filenameMatch: null,

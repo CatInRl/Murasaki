@@ -71,6 +71,8 @@ export interface SearchResult {
     lineContent: string;
     contextBefore: string[];
     contextAfter: string[];
+    /** 命中段（在 lineContent 内的 [start, end)，Rust 端按字符偏移给出，供片段高亮） */
+    ranges: [number, number][];
   }>;
 }
 

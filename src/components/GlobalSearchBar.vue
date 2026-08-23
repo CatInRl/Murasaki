@@ -101,7 +101,7 @@ const contentSource = computed<SearchContentFileSource[]>(() =>
     path: r.filePath,
     title: basename(r.filePath),
     hits: r.matches
-      .map((m) => ({ lineNumber: m.lineNumber, snippet: m.lineContent }))
+      .map((m) => ({ lineNumber: m.lineNumber, snippet: m.lineContent, ranges: m.ranges }))
       .sort((a, b) => a.lineNumber - b.lineNumber),
   }))
 );
@@ -116,6 +116,8 @@ const groups = computed<SearchGroup[]>(() =>
     recents: recentsSource.value,
     files: filesSource.value,
     content: contentSource.value,
+    // 内容结果仅在其所属查询与当前查询一致时展示（防抖窗口期视为陈旧）
+    contentQuery: searchStore.resultsQuery,
   })
 );
 
@@ -139,6 +141,8 @@ const showEmpty = computed(
 
 const inputRef = ref<HTMLInputElement | null>(null);
 const optRegexRef = ref<HTMLInputElement | null>(null);
+const optCaseRef = ref<HTMLInputElement | null>(null);
+const optWordRef = ref<HTMLInputElement | null>(null);
 const itemEls = ref<Record<string, HTMLElement>>({});
 
 const activeIndex = ref(-1);
@@ -152,6 +156,44 @@ watch(flatEntries, (entries) => {
     activeIndex.value = 0;
   }
 });
+
+/** 高级选项输入（仅展开时参与 Tab 循环） */
+const optionInputs = computed<HTMLInputElement[]>(() =>
+  optionsOpen.value
+    ? [optRegexRef.value, optCaseRef.value, optWordRef.value].filter(
+        (el): el is HTMLInputElement => el !== null
+      )
+    : []
+);
+
+/** Tab 焦点环：输入框 → 高级选项（展开时）→ 结果项（扁平顺序） */
+function focusableList(): HTMLElement[] {
+  const list: HTMLElement[] = [];
+  if (inputRef.value) list.push(inputRef.value);
+  list.push(...optionInputs.value);
+  for (const e of flatEntries.value) {
+    const el = itemEls.value[e.id];
+    if (el) list.push(el);
+  }
+  return list;
+}
+
+/** Tab / Shift+Tab 在焦点环内循环；聚焦到结果项时同步选中态并滚入视区 */
+function focusCycle(delta: 1 | -1): void {
+  const list = focusableList();
+  if (list.length === 0) return;
+  const current = document.activeElement as HTMLElement | null;
+  let idx = list.indexOf(current as HTMLElement);
+  if (idx === -1) idx = delta > 0 ? -1 : 0;
+  const next = (idx + delta + list.length) % list.length;
+  const target = list[next];
+  target?.focus();
+  const itemIdx = flatEntries.value.findIndex((e) => itemEls.value[e.id] === target);
+  if (itemIdx !== -1) {
+    activeIndex.value = itemIdx;
+    itemEls.value[flatEntries.value[itemIdx].id]?.scrollIntoView({ block: "nearest" });
+  }
+}
 
 function move(delta: number): void {
   const len = flatEntries.value.length;
@@ -184,16 +226,20 @@ function isActiveItem(item: SearchEntry): boolean {
   return flatEntries.value[activeIndex.value]?.id === item.id;
 }
 
-function focusInput(): void {
-  inputRef.value?.focus();
+/** 结果项获得焦点（鼠标点击 / Tab 循环）时同步选中态 */
+function onItemFocus(item: SearchEntry): void {
+  const idx = flatEntries.value.findIndex((e) => e.id === item.id);
+  if (idx !== -1) activeIndex.value = idx;
 }
 
-function focusFirstOption(): void {
-  optionsOpen.value = true;
-  nextTick(() => optRegexRef.value?.focus());
-}
-
-function onInputKeydown(e: KeyboardEvent): void {
+/**
+ * 根键盘处理：↑/↓ 选择、⏎ 打开、Esc 关闭、Tab 焦点循环。
+ * 焦点在选项 checkbox 或按钮上时，⏎/空格交给原生行为（切换选项 / 触发按钮），不打开结果。
+ */
+function onRootKeydown(e: KeyboardEvent): void {
+  const active = document.activeElement as HTMLElement | null;
+  const isCheckbox = active?.matches('input[type="checkbox"]') ?? false;
+  const isButton = active?.matches("button") ?? false;
   switch (e.key) {
     case "ArrowDown":
       e.preventDefault();
@@ -204,12 +250,13 @@ function onInputKeydown(e: KeyboardEvent): void {
       move(-1);
       break;
     case "Enter":
+      if (isCheckbox || isButton) break;
       e.preventDefault();
       selectActive();
       break;
     case "Tab":
       e.preventDefault();
-      focusFirstOption();
+      focusCycle(e.shiftKey ? -1 : 1);
       break;
     case "Escape":
       e.preventDefault();
@@ -337,7 +384,7 @@ watch(
 
 <template>
   <div class="gsb-overlay" @click.self="onClose">
-    <div class="gsb" role="dialog" :aria-label="t('editor.searchBar.aria')">
+    <div class="gsb" role="dialog" :aria-label="t('editor.searchBar.aria')" @keydown="onRootKeydown">
       <!-- 输入行 -->
       <div class="gsb__input">
         <span class="gsb__searchicon">
@@ -351,7 +398,6 @@ watch(
           autocomplete="off"
           spellcheck="false"
           @input="onInput(($event.target as HTMLInputElement).value)"
-          @keydown="onInputKeydown"
         />
         <button
           class="gsb__optbtn"
@@ -383,7 +429,6 @@ watch(
               type="checkbox"
               :checked="searchStore.options.regex"
               @change="toggleOption('regex')"
-              @keydown.tab.prevent="focusInput"
             />
             <span class="gsb-switch__thumb"></span>
           </span>
@@ -392,10 +437,10 @@ watch(
         <label class="gsb-opt">
           <span class="gsb-switch">
             <input
+              ref="optCaseRef"
               type="checkbox"
               :checked="searchStore.options.caseSensitive"
               @change="toggleOption('caseSensitive')"
-              @keydown.tab.prevent="focusInput"
             />
             <span class="gsb-switch__thumb"></span>
           </span>
@@ -404,10 +449,10 @@ watch(
         <label class="gsb-opt">
           <span class="gsb-switch">
             <input
+              ref="optWordRef"
               type="checkbox"
               :checked="searchStore.options.wholeWord"
               @change="toggleOption('wholeWord')"
-              @keydown.tab.prevent="focusInput"
             />
             <span class="gsb-switch__thumb"></span>
           </span>
@@ -439,7 +484,11 @@ watch(
               class="gsb__item"
               :class="{ 'is-active': isActiveItem(item) }"
               :title="item.path ?? item.title"
+              role="option"
+              tabindex="0"
+              :aria-selected="isActiveItem(item)"
               @click="selectEntry(item)"
+              @focus="onItemFocus(item)"
             >
               <span class="gsb__item__icon" :class="`gsb__item__icon--${g.kind}`">
                 <component :is="groupIcon(g.kind)" :size="14" aria-hidden="true" />

@@ -16,6 +16,8 @@ pub struct SearchMatch {
     pub line_content: String,
     pub context_before: Vec<String>,
     pub context_after: Vec<String>,
+    /// 命中段在 line_content 内的字符偏移 [start, end)，供前端精确高亮
+    pub ranges: Vec<(u32, u32)>,
 }
 
 /// 单个文件的搜索结果
@@ -109,6 +111,11 @@ fn filename_matches(file_path: &Path, regex: &Regex) -> bool {
     regex.is_match(&name)
 }
 
+/// 将字节偏移转换为 UTF-16 码元偏移（regex 返回字节偏移；前端 JS 按 UTF-16 码元索引切片高亮）
+fn byte_to_utf16_offset(line: &str, byte: usize) -> u32 {
+    line.get(..byte).map(|s| s.encode_utf16().count()).unwrap_or(0) as u32
+}
+
 /// 在单个文件内容中搜索匹配行
 fn search_in_content(content: &str, regex: &Regex) -> Vec<SearchMatch> {
     let lines: Vec<&str> = content.lines().collect();
@@ -116,6 +123,11 @@ fn search_in_content(content: &str, regex: &Regex) -> Vec<SearchMatch> {
     for (i, line) in lines.iter().enumerate() {
         if regex.is_match(line) {
             let line_number = (i + 1) as u32;
+            // 命中段：按当前正则（含大小写/全词选项）精确计算 UTF-16 码元偏移
+            let ranges: Vec<(u32, u32)> = regex
+                .find_iter(line)
+                .map(|m| (byte_to_utf16_offset(line, m.start()), byte_to_utf16_offset(line, m.end())))
+                .collect();
             // 上下文：前 2 行 + 后 2 行
             let before_start = i.saturating_sub(2);
             let context_before: Vec<String> = lines[before_start..i]
@@ -132,6 +144,7 @@ fn search_in_content(content: &str, regex: &Regex) -> Vec<SearchMatch> {
                 line_content: line.to_string(),
                 context_before,
                 context_after,
+                ranges,
             });
         }
     }
@@ -632,6 +645,64 @@ mod tests {
         assert_eq!(m.context_after.len(), 2);
         assert_eq!(m.context_after[0], "It supports search and more.");
         assert_eq!(m.context_after[1], "Additional context line.");
+    }
+
+    #[test]
+    fn test_search_ranges() {
+        let dir = create_test_workspace();
+        let resp = run_search(
+            dir.path().to_string_lossy().to_string(),
+            "Murasaki".to_string(),
+            None,
+            None,
+            None,
+        );
+        // intro.md 第 3 行 "Welcome to Murasaki, a markdown editor."
+        let result = resp
+            .content_results
+            .iter()
+            .find(|r| r.file_path.ends_with("intro.md"))
+            .unwrap();
+        let m = &result.matches[0];
+        assert_eq!(m.line_number, 3);
+        // "Welcome to " 为 11 个字符，"Murasaki" 占 [11, 19)
+        assert_eq!(m.ranges, vec![(11, 19)]);
+    }
+
+    #[test]
+    fn test_search_ranges_multiple_hits_in_line() {
+        let dir = create_test_workspace();
+        // notes.md 第 3 行 "Murasaki is lightweight." 同时命中 "Mura" 与 "light" → 一行两处
+        let opts = SearchOptions {
+            regex: true,
+            case_sensitive: false,
+            whole_word: false,
+        };
+        let resp = run_search(
+            dir.path().to_string_lossy().to_string(),
+            "Mura|light".to_string(),
+            Some(opts),
+            None,
+            None,
+        );
+        let result = resp
+            .content_results
+            .iter()
+            .find(|r| r.file_path.ends_with("notes.md"))
+            .unwrap();
+        let m = &result.matches[0];
+        assert_eq!(m.line_number, 3);
+        // "Mura" 占 [0, 4)；"light" 占 [12, 17)（UTF-16 码元偏移，与前端 slice 一致）
+        assert_eq!(m.ranges, vec![(0, 4), (12, 17)]);
+    }
+
+    #[test]
+    fn test_byte_to_utf16_offset() {
+        // 😀 是 1 个标量值但占 2 个 UTF-16 码元；"Mura" 从码元偏移 3 开始（😀=2 + x=1）
+        let line = "😀xMura";
+        let byte_start = line.find("Mura").unwrap();
+        assert_eq!(byte_to_utf16_offset(line, byte_start), 3);
+        assert_eq!(byte_to_utf16_offset(line, byte_start + "Mura".len()), 7);
     }
 
     #[test]

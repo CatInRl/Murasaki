@@ -3,7 +3,7 @@
  *
  * - matchText：前端模糊匹配（文件名 / 标签 / 最近），字符跳序 + 大小写不敏感 + 多词 AND。
  *   内容命中由 Rust `search_workspace` 负责（支持正则 / 大小写 / 全词），不经过本函数过滤；
- *   本函数仅为其 snippet 提供最佳努力的高亮 ranges。
+ *   其 snippet 高亮使用 Rust 端返回的权威 ranges（UTF-16 码元偏移）。
  * - buildGroups：按「打开的标签 > 最近文件 > 文件名 > 内容命中」分组，实现数量上限、
  *   去重（标签 > 最近 > 文件名 > 内容）、前缀优先排序、无工作区降级与空查询默认态。
  *
@@ -80,7 +80,7 @@ export interface SearchEntry {
   lineNumber?: number;
   /** 内容命中行片段（content 组） */
   snippet?: string;
-  /** 片段内匹配高亮段（content 组，最佳努力） */
+  /** 片段内匹配高亮段（content 组，Rust 端权威 ranges） */
   snippetRanges?: [number, number][];
 }
 
@@ -112,6 +112,8 @@ export interface SearchFileSource {
 export interface SearchContentHit {
   lineNumber: number;
   snippet: string;
+  /** 命中段（Rust 端字符偏移，权威高亮） */
+  ranges: [number, number][];
 }
 
 export interface SearchContentFileSource {
@@ -134,6 +136,8 @@ export interface BuildGroupsContext {
   files: SearchFileSource[];
   /** 内容命中（Rust search_workspace 结果，已按文件聚合、行号升序） */
   content: SearchContentFileSource[];
+  /** 产生 ctx.content 的查询（trim 后）；与当前 query 不一致视为陈旧结果，跳过内容组 */
+  contentQuery: string;
 }
 
 /** 各分组数量上限（W2 决策） */
@@ -231,7 +235,8 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
   }
 
   // —— 内容命中（仅 .md；≤5 文件 × 每文件 ≤2 条；行号升序；排除已显示路径）——
-  if (!empty && ctx.content.length) {
+  // 仅当内容结果确为当前查询所产生（contentQuery 一致），避免防抖窗口期展示陈旧结果
+  if (!empty && ctx.content.length && ctx.contentQuery === query) {
     const contentItems: SearchEntry[] = [];
     let filesUsed = 0;
     for (const c of ctx.content) {
@@ -252,7 +257,8 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
           isOpen: false,
           lineNumber: h.lineNumber,
           snippet: h.snippet,
-          snippetRanges: matchText(h.snippet, query).ranges,
+          // 权威高亮（Rust 端按当前选项精确计算），不再用前端模糊匹配近似
+          snippetRanges: h.ranges,
         });
       }
     }
