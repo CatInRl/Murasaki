@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { X, Copy, FolderOpen } from "lucide-vue-next";
+import { X, Copy, FolderOpen, ArrowUpRight } from "lucide-vue-next";
 import { useTabsStore } from "../stores/useTabsStore";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
 import { useDialogStore } from "../stores/useDialogStore";
+import { useWorkspaceStore } from "../stores/useWorkspaceStore";
+import { isPathUnder } from "../utils/path";
 import type { MenuItem } from "../stores/useContextMenuStore";
 import type { Tab } from "../types";
 
@@ -13,6 +15,7 @@ const tabsStore = useTabsStore();
 const fileOps = useFileOpsStore();
 const contextMenu = useContextMenuStore();
 const dialog = useDialogStore();
+const workspace = useWorkspaceStore();
 const { t } = useI18n();
 
 const tabsListRef = ref<HTMLElement | null>(null);
@@ -82,6 +85,23 @@ onBeforeUnmount(() => {
 
 function isActive(tabId: string): boolean {
   return activeTabId.value === tabId;
+}
+
+/**
+ * 工作区归属：tab 是否位于当前工作区之外。
+ * 派生布尔属性：由 workspacePath 与 tab.path 实时计算（前缀 + 目录边界 + 大小写不敏感）。
+ * 未保存 tab（path=null）与无工作区时均视为工作区内（不加角标）。
+ */
+function isOutOfWorkspace(tab: Tab): boolean {
+  const ws = workspace.workspacePath;
+  if (!ws || !tab.path) return false;
+  return !isPathUnder(ws, tab.path);
+}
+
+/** tab 的 hover 提示：工作区外 tab 加前缀 */
+function tabTooltip(tab: Tab): string {
+  const base = tab.path ?? t("common.status.unsavedFile");
+  return isOutOfWorkspace(tab) ? t("editor.tabBar.outOfWorkspacePrefix") + base : base;
 }
 
 function onClick(tabId: string): void {
@@ -167,13 +187,14 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
         :key="tab.id"
         class="tab-item"
         :class="{ active: isActive(tab.id) }"
-        :title="tab.path ?? $t('common.status.unsavedFile')"
+        :title="tabTooltip(tab)"
         @click="onClick(tab.id)"
         @mousedown="onMiddleClick($event, tab.id)"
         @contextmenu="onContextMenu($event, tab)"
       >
-        <!-- 文件图标 -->
+        <!-- 文件图标：工作区外 tab 用 ↗ 角标替换 -->
         <svg
+          v-if="!isOutOfWorkspace(tab)"
           class="tab-icon"
           width="13" height="13" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -183,6 +204,7 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
           <line x1="8" y1="13" x2="16" y2="13"/>
           <line x1="8" y1="17" x2="14" y2="17"/>
         </svg>
+        <ArrowUpRight v-else class="tab-icon" :size="13" :stroke-width="2" aria-hidden="true" />
         <span class="tab-title">{{ tabsStore.getTabTitle(tab) }}</span>
         <!-- dirty 状态：紫色圆点 -->
         <span v-if="tab.isDirty" class="dirty-dot" aria-hidden="true"></span>

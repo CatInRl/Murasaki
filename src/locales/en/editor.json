@@ -31,7 +31,8 @@
     "closeRight": "Close to the Right",
     "closeLeft": "Close to the Left",
     "closeAll": "Close All",
-    "closeTabAria": "Close tab"
+    "closeTabAria": "Close tab",
+    "outOfWorkspacePrefix": "Outside workspace: "
   },
   "sidebar": {
     "filesTab": "File Tree",

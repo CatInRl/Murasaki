@@ -99,6 +99,25 @@ export function resolveRelative(base: string, relative: string): string {
 }
 
 /**
+ * 判断 target 路径是否位于 base 目录之下（工作区归属判定）
+ * - 前缀匹配 + 目录边界：target 必须是 base 下某个子文件/子目录，兄弟前缀目录不算
+ * - Windows 大小写不敏感（盘符与目录均不区分大小写）
+ *
+ * 例如：isPathUnder("C:/docs", "C:/docs/sub/a.md") → true
+ *      isPathUnder("C:/docs", "C:/docs2/a.md") → false（目录边界）
+ *      isPathUnder("C:/docs", "C:/DOCS/a.md") → true（大小写不敏感）
+ *      isPathUnder("C:/docs", "D:/docs/a.md") → false（不同盘符）
+ */
+export function isPathUnder(base: string, target: string): boolean {
+  if (!base || !target) return false;
+  const baseNorm = stripTrailingSep(normalizePath(base)).toLowerCase();
+  const targetNorm = normalizePath(target).toLowerCase();
+  if (baseNorm === targetNorm) return true;
+  const prefix = baseNorm.endsWith("/") ? baseNorm : baseNorm + "/";
+  return targetNorm.startsWith(prefix);
+}
+
+/**
  * 计算从 fromFile 所在目录到 toPath 的相对路径
  * `from` 被视为文件路径，先取其目录作为基准
  *

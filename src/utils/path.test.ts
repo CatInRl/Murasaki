@@ -8,6 +8,7 @@ import {
   extname,
   resolveRelative,
   relativePath,
+  isPathUnder,
 } from "./path";
 
 describe("utils/path", () => {
@@ -119,6 +120,43 @@ describe("utils/path", () => {
     });
     it("Windows 反斜杠路径", () => {
       expect(relativePath("C:\\docs\\sub\\a.md", "C:\\docs\\b.md")).toBe("../b.md");
+    });
+  });
+
+  describe("isPathUnder", () => {
+    it("直接子文件在 base 下", () => {
+      expect(isPathUnder("C:/docs", "C:/docs/a.md")).toBe(true);
+    });
+    it("嵌套子文件在 base 下", () => {
+      expect(isPathUnder("C:/docs", "C:/docs/sub/a.md")).toBe(true);
+    });
+    it("兄弟前缀目录不算（目录边界）", () => {
+      expect(isPathUnder("C:/docs", "C:/docs2/a.md")).toBe(false);
+    });
+    it("Windows 大小写不敏感", () => {
+      expect(isPathUnder("C:/Docs", "c:/docs/a.md")).toBe(true);
+    });
+    it("Windows 反斜杠路径", () => {
+      expect(isPathUnder("C:\\docs", "C:\\docs\\sub\\a.md")).toBe(true);
+    });
+    it("不同盘符返回 false", () => {
+      expect(isPathUnder("C:/docs", "D:/docs/a.md")).toBe(false);
+    });
+    it("base 带末尾分隔符", () => {
+      expect(isPathUnder("C:/docs/", "C:/docs/a.md")).toBe(true);
+    });
+    it("target 等于 base 返回 true", () => {
+      expect(isPathUnder("C:/docs", "C:/docs")).toBe(true);
+    });
+    it("Unix 路径", () => {
+      expect(isPathUnder("/home/user", "/home/user/sub/a.md")).toBe(true);
+    });
+    it("Unix 兄弟前缀目录不算", () => {
+      expect(isPathUnder("/home/user", "/home/user2/a.md")).toBe(false);
+    });
+    it("空 base 或空 target 返回 false", () => {
+      expect(isPathUnder("", "C:/docs/a.md")).toBe(false);
+      expect(isPathUnder("C:/docs", "")).toBe(false);
     });
   });
 });

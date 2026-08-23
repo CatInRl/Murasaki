@@ -31,7 +31,8 @@
     "closeRight": "关闭右侧",
     "closeLeft": "关闭左侧",
     "closeAll": "关闭所有",
-    "closeTabAria": "关闭标签页"
+    "closeTabAria": "关闭标签页",
+    "outOfWorkspacePrefix": "工作区外："
   },
   "sidebar": {
     "filesTab": "文件树",
