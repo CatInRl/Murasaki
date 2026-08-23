@@ -1,14 +1,14 @@
 /**
- * 文件树选中态 & 搜索高亮 E2E 测试（议题簇 4 / Ticket #69, #70）
+ * 文件树选中态 & 统一搜索条 E2E 测试（议题簇 4 / Ticket #69, #70）
  *
  * 验证：
  * - 点击文件后 .node-row.is-selected 样式应用
  * - 选中态背景色为 primary/10 (rgba(147, 51, 234, 0.1))
- * - 搜索匹配的高亮颜色为紫色 (rgba(147, 51, 234, 0.2))
- * - 搜索结果渲染 match-highlight <mark> 元素
- * - 文件名匹配渲染
+ * - 内容命中高亮颜色为紫色 (rgba(147, 51, 234, 0.2))
+ * - 搜索结果渲染 gsb-hl <mark> 元素
+ * - 文件名匹配（前端模糊匹配）渲染
  *
- * 通过 Pinia store 操作 workspace/search，验证 UI 渲染。
+ * 通过 Pinia store 操作 workspace/search，验证统一搜索条（.gsb）UI 渲染。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
@@ -98,27 +98,32 @@ describe("文件树选中态 & 搜索高亮", () => {
     });
     console.log("[diag_invoke] " + JSON.stringify(diagInvoke));
 
-    // 通过 store 触发搜索
+    // 打开统一搜索条（挂载会 clear 旧查询），再通过 store 触发内容搜索
+    await browser.execute(() => {
+      // @ts-ignore
+      const search = window.__pinia__._s.get("search");
+      search.visible = true;
+    });
+    await browser.pause(200);
     const searchResult = await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setOptions({ regex: false, caseSensitive: false, wholeWord: false });
       search.setQuery("keyword");
-      search.visible = true;
       Promise.resolve(search.search())
-        .then((resp: any) => done({ ok: true, results: search.results.length, filenameResults: search.filenameResults.length, resp: resp ? JSON.stringify(resp).substring(0, 500) : null }))
+        .then((resp: any) => done({ ok: true, results: search.results.length, resp: resp ? JSON.stringify(resp).substring(0, 500) : null }))
         .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
     });
     console.log("[diag_search] " + JSON.stringify(searchResult));
 
     // 等待搜索结果渲染
-    const highlight = await browser.$(".match-highlight");
+    const highlight = await browser.$(".gsb-hl");
     await highlight.waitForExist({ timeout: 10000 });
 
     // 检查高亮颜色
     const bgColor = await browser.execute(() => {
-      const mark = document.querySelector(".match-highlight") as HTMLElement | null;
+      const mark = document.querySelector(".gsb-hl") as HTMLElement | null;
       if (!mark) return "NOT_FOUND";
       return window.getComputedStyle(mark).backgroundColor;
     });
@@ -128,24 +133,30 @@ describe("文件树选中态 & 搜索高亮", () => {
     expect(bgColor).toContain("234");
   });
 
-  it("搜索结果渲染 match-highlight mark 元素", async () => {
+  it("搜索结果渲染 gsb-hl mark 元素", async () => {
     const wsPath = resetWorkspace([
       { path: "highlight.md", content: "# 文档\n\n包含特殊关键词的内容。\n" },
     ]);
     await openWorkspace(browser, wsPath);
 
+    // 打开统一搜索条，再触发搜索
+    await browser.execute(() => {
+      // @ts-ignore
+      const search = window.__pinia__._s.get("search");
+      search.visible = true;
+    });
+    await browser.pause(200);
     await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setQuery("特殊关键词");
-      search.visible = true;
       Promise.resolve(search.search())
         .then(() => done(null))
         .catch((err: unknown) => done(err ? String(err) : null));
     });
 
-    const marks = await browser.$$(".match-highlight");
+    const marks = await browser.$$(".gsb-hl");
     expect(marks.length).toBeGreaterThan(0);
 
     // mark 元素的文字应包含搜索关键词
@@ -160,28 +171,28 @@ describe("文件树选中态 & 搜索高亮", () => {
     ]);
     await openWorkspace(browser, wsPath);
 
-    await browser.executeAsync((done: (res: unknown) => void) => {
+    // 打开统一搜索条，输入文件名（前端模糊匹配）
+    await browser.execute(() => {
       // @ts-ignore
-      const pinia = window.__pinia__;
-      const search = pinia._s.get("search");
-      search.setQuery("match-filename");
+      const search = window.__pinia__._s.get("search");
       search.visible = true;
-      Promise.resolve(search.search())
-        .then(() => done(null))
-        .catch((err: unknown) => done(err ? String(err) : null));
     });
+    await browser.pause(200);
+    const input = await browser.$(".gsb__input input");
+    await input.setValue("match-filename");
+    await browser.pause(300);
 
-    // 文件名匹配分组应存在
-    const filenameGroup = await browser.$(".filename-group");
-    await filenameGroup.waitForExist({ timeout: 10000 });
-    expect(await filenameGroup.isDisplayed()).toBe(true);
+    // 文件名分组应出现含 match-filename 的条目
+    const items = await browser.$$(".gsb__item");
+    const texts = await Promise.all(items.map((i) => i.getText()));
+    expect(texts.some((t) => t.includes("match-filename"))).toBe(true);
   });
 
-  it("搜索面板可见性切换", async () => {
+  it("统一搜索条可见性切换", async () => {
     const wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
 
-    // 通过 store 打开搜索面板
+    // 通过 store 打开统一搜索条
     await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
@@ -189,10 +200,10 @@ describe("文件树选中态 & 搜索高亮", () => {
     });
     await browser.pause(300);
 
-    const panel = await browser.$(".search-panel");
-    expect(await panel.isDisplayed()).toBe(true);
+    const gsb = await browser.$(".gsb");
+    expect(await gsb.isDisplayed()).toBe(true);
 
-    // 关闭搜索面板
+    // 关闭统一搜索条
     await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
@@ -200,6 +211,6 @@ describe("文件树选中态 & 搜索高亮", () => {
     });
     await browser.pause(300);
 
-    expect(await panel.isExisting()).toBe(false);
+    expect(await gsb.isExisting()).toBe(false);
   });
 });

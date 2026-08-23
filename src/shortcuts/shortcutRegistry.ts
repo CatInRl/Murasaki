@@ -45,6 +45,7 @@ export const SHORTCUT_COMMANDS: ShortcutCommand[] = [
   { id: "close-tab", labelKey: "settings.shortcuts.closeTab", category: "file", defaultShortcut: "Ctrl+W", scope: "global" },
   { id: "reload-file", labelKey: "settings.shortcuts.reloadFile", category: "file", defaultShortcut: "Ctrl+R", scope: "global" },
   { id: "close-workspace", labelKey: "settings.shortcuts.closeWorkspace", category: "file", defaultShortcut: null, scope: "global" },
+  { id: "global-search", labelKey: "settings.shortcuts.globalSearch", category: "file", defaultShortcut: "Ctrl+P", scope: "global" },
   { id: "settings", labelKey: "settings.shortcuts.settings", category: "file", defaultShortcut: null, scope: "global" },
   { id: "quit", labelKey: "settings.shortcuts.quit", category: "file", defaultShortcut: "Ctrl+Q", scope: "global" },
 

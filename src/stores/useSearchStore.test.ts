@@ -54,7 +54,6 @@ describe("useSearchStore", () => {
       const store = useSearchStore();
       expect(store.query).toBe("");
       expect(store.results).toEqual([]);
-      expect(store.filenameResults).toEqual([]);
       expect(store.loading).toBe(false);
       expect(store.visible).toBe(false);
       expect(store.options).toEqual({
@@ -113,7 +112,6 @@ describe("useSearchStore", () => {
 
       expect(store.query).toBe("");
       expect(store.results).toEqual([]);
-      expect(store.filenameResults).toEqual([]);
       expect(store.truncated).toBe(false);
       expect(store.cancelToken).toBeNull();
       // clear 触发 cancelSearch（fire-and-forget，需 await microtask）
@@ -184,7 +182,6 @@ describe("useSearchStore", () => {
       });
       // 验证 state 更新
       expect(store.results).toEqual(fakeResponse.contentResults);
-      expect(store.filenameResults).toEqual(fakeResponse.filenameResults);
       expect(store.truncated).toBe(false);
       expect(store.loading).toBe(false);
       expect(store.matchedCount).toBe(1);
@@ -202,7 +199,6 @@ describe("useSearchStore", () => {
 
       expect(resp).toEqual({ contentResults: [], filenameResults: [], truncated: false });
       expect(store.results).toEqual([]);
-      expect(store.filenameResults).toEqual([]);
       expect(store.truncated).toBe(false);
       expect(store.loading).toBe(false);
     });
@@ -326,44 +322,6 @@ describe("useSearchStore", () => {
       await searchPromise;
     });
 
-    it("search-result-chunk 事件增量追加文件名命中（去重）", async () => {
-      const store = useSearchStore();
-      store.setQuery("hello");
-
-      let capturedToken: string | null = null;
-      mockedInvoke.mockImplementationOnce((cmd: string, args: unknown) => {
-        if (cmd === "search_workspace") {
-          capturedToken = (args as { cancelToken: string }).cancelToken;
-          return Promise.resolve({
-            contentResults: [],
-            filenameResults: [],
-            truncated: false,
-          } as SearchResponse);
-        }
-        return Promise.resolve(undefined);
-      });
-
-      const searchPromise = store.search();
-      await vi.waitFor(() => expect(capturedToken).not.toBeNull());
-
-      const chunk1: SearchResultChunkEvent = {
-        cancelToken: capturedToken!,
-        result: null,
-        filenameMatch: "/test/workspace/d.md",
-      };
-      const chunk2: SearchResultChunkEvent = {
-        cancelToken: capturedToken!,
-        result: null,
-        filenameMatch: "/test/workspace/d.md", // 重复
-      };
-      listeners.get("search-result-chunk")!({ payload: chunk1 });
-      listeners.get("search-result-chunk")!({ payload: chunk2 });
-
-      expect(store.filenameResults).toEqual(["/test/workspace/d.md"]);
-
-      await searchPromise;
-    });
-
     it("过期 token 的事件被忽略", async () => {
       const store = useSearchStore();
       store.setQuery("hello");
@@ -410,7 +368,6 @@ describe("useSearchStore", () => {
       expect(store.scannedFiles).toBe(0);
       expect(store.matchedCount).toBe(0);
       expect(store.results).toEqual([]);
-      expect(store.filenameResults).toEqual([]);
 
       await searchPromise;
     });
@@ -453,7 +410,6 @@ describe("useSearchStore", () => {
       // 注：上面的 chunk 用了错误 token，所以不会被追加；但即便用正确 token，
       // 最终 invoke 结果也会覆盖。这里主要验证最终覆盖语义。
       expect(store.results).toEqual(finalResponse.contentResults);
-      expect(store.filenameResults).toEqual(finalResponse.filenameResults);
       expect(store.truncated).toBe(true);
     });
   });

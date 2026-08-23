@@ -86,6 +86,10 @@ describe("shortcutRegistry - 完整性", () => {
     expect(commandById("task-list")?.defaultShortcut).toBe("Ctrl+Shift+X");
     expect(commandById("fullscreen")?.defaultShortcut).toBe("F11");
     expect(commandById("toggle-statusbar")?.defaultShortcut).toBe("Alt+Shift+S");
+    // 统一全局搜索条：Ctrl+P 主入口 + Ctrl+Shift+F（find-in-files 重指向）
+    expect(commandById("global-search")?.defaultShortcut).toBe("Ctrl+P");
+    expect(commandById("global-search")?.scope).toBe("global");
+    expect(commandById("find-in-files")?.defaultShortcut).toBe("Ctrl+Shift+F");
     // 段落命令作用域必须是 editor
     expect(commandById("code-block")?.scope).toBe("editor");
     // 文件命令作用域必须是 global

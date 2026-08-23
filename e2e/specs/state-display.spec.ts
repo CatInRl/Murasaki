@@ -90,32 +90,35 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     expect(titleText.length).toBeGreaterThan(0);
   });
 
-  it("SearchPanel 搜索无结果显示 EmptyState", async () => {
+  it("统一搜索条搜索无结果显示 EmptyState", async () => {
     // 准备一个不含目标关键词的工作区
     await openWorkspace(browser, wsPath);
     await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
     await ensureSplitMode(browser);
 
     // 触发搜索：查询一个不存在的内容
-    // 必须先设置 search.visible = true，否则 SearchPanel 不会挂载（App.vue: v-if="searchStore.visible"）
-    await browser.executeAsync((done: (res: unknown) => void) => {
+    // 先 visible=true 挂载统一搜索条（挂载会 clear 旧查询），再设置关键词
+    await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
       search.visible = true;
+    });
+    await browser.pause(200);
+    await browser.executeAsync((done: (res: unknown) => void) => {
+      // @ts-ignore
+      const search = window.__pinia__._s.get("search");
       search.setQuery("zzz_no_match_keyword_xyz_12345");
       Promise.resolve(search.search())
         .then(() => done(null))
         .catch((err: unknown) => done(err ? String(err) : null));
     });
 
-    // 等待搜索完成 + EmptyState 渲染
-    const empty = await browser.$(".search-panel .empty-state, [class*='search'] .empty-state");
+    // 等待搜索完成 + 空态渲染
+    const empty = await browser.$(".gsb__empty");
     await empty.waitForExist({ timeout: 10000 });
 
-    const title = await empty.$(".empty-title");
-    expect(await title.isExisting()).toBe(true);
-    const titleText = (await title.getText()).trim();
-    // SearchPanel.vue 的 EmptyState title="未找到匹配的文件"
+    const titleText = (await empty.getText()).trim();
+    // GlobalSearchBar.vue 空态标题 = "未找到匹配项"
     expect(titleText).toContain("未找到");
   });
 
@@ -200,34 +203,32 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     });
   });
 
-  it("SearchPanel 搜索中显示 Skeleton", async () => {
+  it("统一搜索条搜索中显示 Loading", async () => {
     await openWorkspace(browser, wsPath);
     await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
     await ensureSplitMode(browser);
 
-    // 触发搜索并立即检查 Skeleton（在 search 完成前）
-    // search() 内部会设 loading=true，Rust 命令返回后置 false
-    // 由于搜索很快，我们手动设置 loading=true 模拟加载中状态
-    // 必须先设置 search.visible = true，否则 SearchPanel 不会挂载（App.vue: v-if="searchStore.visible"）
+    // 先 visible=true 挂载统一搜索条（挂载会 clear 旧查询），再模拟加载中
     await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
       search.visible = true;
+    });
+    await browser.pause(200);
+    await browser.execute(() => {
+      // @ts-ignore
+      const search = window.__pinia__._s.get("search");
       search.query = "简介";
       search.loading = true;
     });
     await browser.pause(300);
 
-    // SearchPanel.vue 第 270 行 <Skeleton :lines="4" :icon="FileText" />
-    const skeleton = await browser.$(
-      ".search-panel .skeleton, [class*='search'] .skeleton"
-    );
-    expect(await skeleton.isExisting()).toBe(true);
+    // GlobalSearchBar.vue 加载态 .gsb__loading（含 .gsb__spinner）
+    const loading = await browser.$(".gsb__loading");
+    expect(await loading.isExisting()).toBe(true);
 
-    const bars = await browser.$$(
-      ".search-panel .skeleton-bar, [class*='search'] .skeleton-bar"
-    );
-    expect(bars.length).toBeGreaterThan(0);
+    const spinner = await browser.$(".gsb__spinner");
+    expect(await spinner.isExisting()).toBe(true);
 
     // 清理
     await browser.execute(() => {
@@ -294,8 +295,8 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     expect(await empty.getAttribute("aria-live")).toBe("polite");
   });
 
-  it("Skeleton 根容器有 role=status 和 aria-busy=true", async () => {
-    // 通过 SearchPanel 触发 Skeleton
+  it("统一搜索条加载态有 role=status 和 aria-busy=true", async () => {
+    // 通过统一搜索条触发加载态
     await openWorkspace(browser, wsPath);
     await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
     await ensureSplitMode(browser);
@@ -304,17 +305,20 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
       search.visible = true;
+    });
+    await browser.pause(200);
+    await browser.execute(() => {
+      // @ts-ignore
+      const search = window.__pinia__._s.get("search");
       search.query = "测试";
       search.loading = true;
     });
     await browser.pause(300);
 
-    const skeleton = await browser.$(
-      ".search-panel .skeleton, [class*='search'] .skeleton"
-    );
-    if (await skeleton.isExisting()) {
-      expect(await skeleton.getAttribute("role")).toBe("status");
-      expect(await skeleton.getAttribute("aria-busy")).toBe("true");
+    const loading = await browser.$(".gsb__loading");
+    if (await loading.isExisting()) {
+      expect(await loading.getAttribute("role")).toBe("status");
+      expect(await loading.getAttribute("aria-busy")).toBe("true");
     }
 
     // 清理

@@ -409,10 +409,10 @@ describe("快捷键", () => {
     // （Sidebar.vue 通过 activeView prop 控制显示）
   });
 
-  // ============ M10: Ctrl+Shift+F 打开跨文件搜索面板 ============
+  // ============ M10: Ctrl+Shift+F 打开统一搜索条 ============
 
-  it("Ctrl+Shift+F 打开跨文件搜索面板", async () => {
-    // 初始搜索面板应不可见
+  it("Ctrl+Shift+F 打开统一搜索条", async () => {
+    // 初始搜索条应不可见
     let searchVisible = await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
@@ -439,9 +439,9 @@ describe("快捷键", () => {
     });
     expect(searchVisible).toBe(true);
 
-    // 搜索面板 DOM 应存在
-    const searchPanel = await browser.$(".search-panel, [class*='search-panel']");
-    expect(await searchPanel.isExisting()).toBe(true);
+    // 统一搜索条 DOM 应存在
+    const gsb = await browser.$(".gsb");
+    expect(await gsb.isExisting()).toBe(true);
   });
 
   // ============ M11: F11 全屏切换（弱断言） ============

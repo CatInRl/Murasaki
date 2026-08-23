@@ -10,7 +10,7 @@ import EditorPane from "./components/EditorPane.vue";
 import Sidebar from "./components/Sidebar.vue";
 import TabBar from "./components/TabBar.vue";
 import WelcomePage from "./components/WelcomePage.vue";
-import SearchPanel from "./components/SearchPanel.vue";
+import GlobalSearchBar from "./components/GlobalSearchBar.vue";
 import StatusBar from "./components/StatusBar.vue";
 import TableInsertDialog from "./components/TableInsertDialog.vue";
 import CompareWindow from "./components/CompareWindow.vue";
@@ -60,6 +60,7 @@ import { useNaiveTheme } from "./composables/useNaiveTheme";
 import { AGENT_ENABLED } from "./features";
 import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import type { SidebarView, SettingsState } from "./types";
+import type { SearchEntry } from "./search/searchLogic";
 import { READING_FONT_PRESETS } from "./types";
 
 const workspace = useWorkspaceStore();
@@ -474,9 +475,9 @@ const imagePaste = useImagePaste({
 
 // ===== 编辑器导航/插入 composable =====
 const {
-  onJumpToLine, onSearchSelectFile, onDropImagePath,
+  onJumpToLine, onDropImagePath,
   onEditorContextAction, onTableInsertConfirm,
-} = useEditorNavigation({ editorRef, openFile, imagePaste, tableDialogVisible, dialog });
+} = useEditorNavigation({ editorRef, imagePaste, tableDialogVisible, dialog });
 
 // ===== 全屏切换 =====
 async function toggleFullscreen(): Promise<void> {
@@ -527,6 +528,33 @@ function onOpenPath(path: string, type: "file" | "folder"): Promise<void> {
   }
   // 打开文件（若尚无工作区，openFile 内部会自动以文件所在目录为工作区，issue #96/#113）
   return openFile(path);
+}
+
+// ===== 统一搜索条选择处理（T2.1：标签切换 / openFile + 行跳转）=====
+async function onSearchEntrySelect(entry: SearchEntry): Promise<void> {
+  searchStore.visible = false;
+  // 已打开的标签 → 直接切换（不重新加载，保留编辑状态）
+  if (entry.isOpen && entry.tabId) {
+    tabsStore.switchTo(entry.tabId);
+    return;
+  }
+  // 未保存标签（path=null）无法打开
+  if (!entry.path) return;
+  await openFile(entry.path);
+  // 内容命中 → 打开后跳转到命中行
+  const line = entry.lineNumber;
+  if (line !== undefined) {
+    requestAnimationFrame(() => {
+      editorRef.value?.scrollToLine(line);
+      editorRef.value?.focus();
+    });
+  }
+}
+
+/** 搜索条关闭（Esc / 遮罩 / 清空未选择）：还原编辑器焦点 */
+function onSearchClose(): void {
+  searchStore.visible = false;
+  requestAnimationFrame(() => editorRef.value?.focus());
 }
 
 // ===== 应用生命周期（5 watcher + 5 事件监听器）=====
@@ -698,12 +726,11 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             @context-action="onEditorContextAction"
           />
 
-          <!-- 底部：跨文件搜索面板 -->
-          <SearchPanel
+          <!-- 统一搜索条：Ctrl+P / Ctrl+Shift+F（取代旧 find-in-files 底部面板） -->
+          <GlobalSearchBar
             v-if="searchStore.visible"
-            class="search-panel-slot"
-            @select-file="onSearchSelectFile"
-            @close="searchStore.visible = false"
+            @select="onSearchEntrySelect"
+            @close="onSearchClose"
           />
         </div>
 
@@ -893,18 +920,6 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   flex-direction: column;
   overflow: hidden;
   position: relative;
-}
-
-.search-panel-slot {
-  height: 240px;
-  flex-shrink: 0;
-  border-top: 1px solid var(--murasaki-line);
-  animation: murasaki-slide-up var(--murasaki-duration-base) var(--murasaki-ease-out);
-}
-
-@keyframes murasaki-slide-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .top-bar {

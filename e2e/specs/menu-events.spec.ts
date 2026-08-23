@@ -133,7 +133,7 @@ describe("菜单事件链", () => {
   });
 
   describe("视图/工具菜单", () => {
-    it("menu-event 'find-in-files' 显示搜索面板", async () => {
+    it("menu-event 'find-in-files' 打开统一搜索条", async () => {
       // 通过 store 检查 searchStore.visible
       await emitMenuEvent(browser, "find-in-files");
       const visible = await browser.execute(() => {

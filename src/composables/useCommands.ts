@@ -155,7 +155,9 @@ export function useCommands(deps: CommandsDeps) {
       case "copy-rich-text":
         await copyRichText();
         break;
+      // 统一全局搜索条：Ctrl+P 主入口 + 原 find-in-files（Ctrl+Shift+F）重指向
       case "find-in-files":
+      case "global-search":
         searchStore.visible = true;
         break;
       case "settings":

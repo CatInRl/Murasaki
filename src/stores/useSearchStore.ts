@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
@@ -11,7 +11,7 @@ import type {
 import { useWorkspaceStore } from "./useWorkspaceStore";
 
 /**
- * 搜索选项
+ * 搜索选项（仅作用于内容命中）
  */
 export interface SearchOptions {
   /** 启用正则表达式匹配 */
@@ -37,30 +37,29 @@ function generateCancelToken(): string {
 }
 
 /**
- * 跨文件搜索 Store
- * - 管理搜索查询、结果、选项与面板可见性
- * - 调用 Rust 端 `search_workspace` 命令执行搜索
- * - 通过 cancel_token + `cancel_search` 命令实现异步可取消
- * - 通过 `search-progress` / `search-result-chunk` 事件实现进度指示与增量返回
- * - 分别存储内容匹配与文件名匹配
+ * 统一搜索条 Store（0.8.0 改造）
+ *
+ * - `visible` 控制「统一搜索条」开关（取代 find-in-files 底部面板）。
+ * - `search_workspace` 仅承担「内容命中」（仅 .md，支持正则 / 大小写 / 全词）；
+ *   文件名 / 标签 / 最近文件不再走 Rust，由前端模糊匹配（searchLogic.ts）负责。
+ * - 通过 cancel_token + `cancel_search` 命令实现异步可取消；
+ * - 通过 `search-progress` / `search-result-chunk` 事件实现进度指示与增量返回。
  */
 export const useSearchStore = defineStore("search", () => {
   // ===== State =====
   /** 搜索关键词 */
   const query = ref("");
-  /** 内容匹配结果 */
+  /** 内容命中结果（仅 .md，来自 Rust search_workspace） */
   const results = ref<SearchResult[]>([]);
-  /** 文件名匹配结果（仅路径字符串） */
-  const filenameResults = ref<string[]>([]);
   /** 加载中标志 */
   const loading = ref(false);
-  /** 搜索选项 */
+  /** 搜索选项（仅作用于内容命中） */
   const options = ref<SearchOptions>({
     regex: false,
     caseSensitive: false,
     wholeWord: false,
   });
-  /** 面板可见性 */
+  /** 统一搜索条可见性 */
   const visible = ref(false);
 
   // ===== 0.4.0 增量搜索状态 =====
@@ -93,7 +92,7 @@ export const useSearchStore = defineStore("search", () => {
     }
   }
 
-  /** 重置增量搜索状态（不清理 results/filenameResults） */
+  /** 重置增量搜索状态（不清理 results） */
   function resetProgressState(): void {
     scannedFiles.value = 0;
     totalFiles.value = 0;
@@ -118,7 +117,7 @@ export const useSearchStore = defineStore("search", () => {
   }
 
   /**
-   * 切换面板显隐
+   * 切换统一搜索条显隐
    */
   function toggleVisible(): void {
     visible.value = !visible.value;
@@ -133,7 +132,6 @@ export const useSearchStore = defineStore("search", () => {
     clearListeners();
     query.value = "";
     results.value = [];
-    filenameResults.value = [];
     resetProgressState();
     cancelToken.value = null;
   }
@@ -154,7 +152,7 @@ export const useSearchStore = defineStore("search", () => {
   }
 
   /**
-   * 执行跨文件搜索
+   * 执行内容搜索（仅 .md；工作区内）
    *
    * 流程（0.4.0 重构）：
    * 1. 若已有进行中的搜索：调用 `cancel_search` 中断（fire-and-forget）
@@ -175,7 +173,6 @@ export const useSearchStore = defineStore("search", () => {
       void cancelSearch();
       clearListeners();
       results.value = [];
-      filenameResults.value = [];
       resetProgressState();
       cancelToken.value = null;
       return { contentResults: [], filenameResults: [], truncated: false };
@@ -188,7 +185,6 @@ export const useSearchStore = defineStore("search", () => {
     // 重置增量状态 + 准备新 token
     resetProgressState();
     results.value = [];
-    filenameResults.value = [];
     const token = generateCancelToken();
     cancelToken.value = token;
 
@@ -214,15 +210,6 @@ export const useSearchStore = defineStore("search", () => {
             // 增量追加内容命中
             results.value = [...results.value, payload.result];
           }
-          if (payload.filenameMatch) {
-            // 增量追加文件名命中（避免重复）
-            if (!filenameResults.value.includes(payload.filenameMatch)) {
-              filenameResults.value = [
-                ...filenameResults.value,
-                payload.filenameMatch,
-              ];
-            }
-          }
         }
       );
     } catch (err) {
@@ -240,7 +227,6 @@ export const useSearchStore = defineStore("search", () => {
       });
       // 用权威结果覆盖（保证与 Rust 端最终状态一致，避免增量事件丢失/乱序）
       results.value = resp.contentResults;
-      filenameResults.value = resp.filenameResults;
       truncated.value = resp.truncated;
       // 同步 matchedCount（若 Rust 端最终与增量累计不一致，以权威为准）
       const totalAuthoritative = resp.contentResults.reduce(
@@ -251,9 +237,8 @@ export const useSearchStore = defineStore("search", () => {
       matchedFiles.value = resp.contentResults.length;
       return resp;
     } catch (err) {
-      console.error("跨文件搜索失败:", err);
+      console.error("内容搜索失败:", err);
       results.value = [];
-      filenameResults.value = [];
       truncated.value = false;
       return { contentResults: [], filenameResults: [], truncated: false };
     } finally {
@@ -264,11 +249,15 @@ export const useSearchStore = defineStore("search", () => {
     }
   }
 
+  // 关闭统一搜索条时取消进行中的内容搜索（避免后台扫描浪费）
+  watch(visible, (v) => {
+    if (!v) void cancelSearch();
+  });
+
   return {
     // state
     query,
     results,
-    filenameResults,
     loading,
     options,
     visible,

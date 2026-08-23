@@ -15,7 +15,6 @@ import {
   openWorkspace,
   closeWorkspace,
   closeAllTabs,
-  openFileInTab,
   waitForPinia,
   dismissAllDialogs,
   resetPersistenceSettings,
@@ -67,20 +66,28 @@ describe("跨文件搜索结果跳转", () => {
   });
 
   it("搜索关键词返回匹配文件结果", async () => {
-    // 通过 store 触发搜索
+    // 先打开统一搜索条（挂载会 clear 旧查询），再设置关键词
+    await browser.execute(() => {
+      // @ts-ignore
+      const search = window.__pinia__._s.get("search");
+      search.visible = true;
+    });
+    await browser.pause(200);
     const result = await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setOptions({ regex: false, caseSensitive: false, wholeWord: false });
       search.setQuery("abc123");
-      search.visible = true;
       Promise.resolve(search.search())
         .then(() => done({
           ok: true,
           resultsCount: search.results.length,
-          filenameCount: search.filenameResults.length,
-          results: search.results.map((r: any) => ({ filePath: r.filePath, line: r.line, preview: r.preview?.substring(0, 50) })),
+          results: search.results.map((r: any) => ({
+            filePath: r.filePath,
+            firstLine: r.matches?.[0]?.lineNumber ?? null,
+            preview: r.matches?.[0]?.lineContent?.substring(0, 50) ?? "",
+          })),
         }))
         .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
     });
@@ -97,39 +104,27 @@ describe("跨文件搜索结果跳转", () => {
   });
 
   it("点击搜索结果打开对应文件到新 tab", async () => {
-    // 先搜索
-    await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const search = pinia._s.get("search");
-      search.setOptions({ regex: false, caseSensitive: false, wholeWord: false });
-      search.setQuery("abc123");
-      search.visible = true;
-      Promise.resolve(search.search())
-        .then(() => done(null))
-        .catch((err: unknown) => done(err ? String(err) : null));
-    });
-
-    // 等待搜索结果渲染
-    await browser.pause(500);
-
-    // 获取第一个搜索结果
-    const firstResult = await browser.execute(() => {
+    // 打开统一搜索条
+    await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
-      if (search.results.length === 0) return null;
-      const r = search.results[0];
-      return { filePath: r.filePath, line: r.line };
+      search.visible = true;
     });
-    expect(firstResult).not.toBeNull();
+    await browser.pause(200);
 
-    // 调用 onSearchSelectFile 模拟点击搜索结果
-    // App.vue 的 onSearchSelectFile 会 openFile + scrollToLine
-    const fileAPath = resolve(wsPath, "file-a.md").replace(/\\/g, "/");
-    await openFileInTab(browser, fileAPath);
+    // 输入关键词触发搜索（内容命中渲染到 .gsb__item）
+    const input = await browser.$(".gsb__input input");
+    await input.setValue("abc123");
+
+    // 等待内容命中结果渲染
+    const firstResult = await browser.$(".gsb__item");
+    await firstResult.waitForExist({ timeout: 10000 });
+
+    // 点击结果项打开文件
+    await firstResult.click();
     await browser.pause(500);
 
-    // 验证 tab 已打开
+    // 验证 tab 已打开且为内容命中的文件之一
     const tabsState = await browser.execute(() => {
       // @ts-ignore
       const tabs = window.__pinia__._s.get("tabs");
@@ -142,8 +137,8 @@ describe("跨文件搜索结果跳转", () => {
     expect(tabsState.activePath).toContain("file-a.md");
   });
 
-  it("搜索面板可见性切换", async () => {
-    // 通过 store 显示搜索面板
+  it("统一搜索条可见性切换", async () => {
+    // 通过 store 打开统一搜索条
     await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
@@ -151,8 +146,8 @@ describe("跨文件搜索结果跳转", () => {
     });
     await browser.pause(300);
 
-    const panel = await browser.$(".search-panel");
-    expect(await panel.isDisplayed()).toBe(true);
+    const gsb = await browser.$(".gsb");
+    expect(await gsb.isDisplayed()).toBe(true);
 
     // 关闭
     await browser.execute(() => {
@@ -162,17 +157,22 @@ describe("跨文件搜索结果跳转", () => {
     });
     await browser.pause(300);
 
-    expect(await panel.isExisting()).toBe(false);
+    expect(await gsb.isExisting()).toBe(false);
   });
 
   it("正则表达式搜索", async () => {
+    await browser.execute(() => {
+      // @ts-ignore
+      const search = window.__pinia__._s.get("search");
+      search.visible = true;
+    });
+    await browser.pause(200);
     const result = await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setOptions({ regex: true, caseSensitive: false, wholeWord: false });
       search.setQuery("abc\\d+"); // 匹配 abc123
-      search.visible = true;
       Promise.resolve(search.search())
         .then(() => done({
           ok: true,
@@ -186,24 +186,22 @@ describe("跨文件搜索结果跳转", () => {
   });
 
   it("文件名搜索", async () => {
-    const result = await browser.executeAsync((done: (res: unknown) => void) => {
+    // 打开统一搜索条
+    await browser.execute(() => {
       // @ts-ignore
-      const pinia = window.__pinia__;
-      const search = pinia._s.get("search");
-      search.setOptions({ regex: false, caseSensitive: false, wholeWord: false });
-      search.setQuery("file-b");
+      const search = window.__pinia__._s.get("search");
       search.visible = true;
-      Promise.resolve(search.search())
-        .then(() => done({
-          ok: true,
-          filenameCount: search.filenameResults.length,
-          contentCount: search.results.length,
-        }))
-        .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
     });
+    await browser.pause(200);
 
-    expect(result as any).toMatchObject({ ok: true });
-    // file-b 应在文件名匹配中出现
-    expect((result as any).filenameCount).toBeGreaterThanOrEqual(1);
+    // 输入文件名（前端模糊匹配，无需 Rust）
+    const input = await browser.$(".gsb__input input");
+    await input.setValue("file-b");
+    await browser.pause(300);
+
+    // 结果区应出现含 file-b.md 的条目（文件名分组）
+    const items = await browser.$$(".gsb__item");
+    const texts = await Promise.all(items.map((i) => i.getText()));
+    expect(texts.some((t) => t.includes("file-b.md"))).toBe(true);
   });
 });

@@ -138,6 +138,22 @@ describe("useShortcuts - matchGlobalKeydown", () => {
     ).toBe("save");
   });
 
+  it("统一搜索条：Ctrl+P 匹配 global-search，Ctrl+Shift+F 匹配 find-in-files", () => {
+    const { matchGlobalKeydown } = useShortcuts();
+    // Ctrl+P → global-search（统一搜索条主入口）
+    expect(
+      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "p", ctrlKey: true }))
+    ).toBe("global-search");
+    // Ctrl+Shift+F → find-in-files（重指向统一搜索条）
+    expect(
+      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, shiftKey: true }))
+    ).toBe("find-in-files");
+    // 不带 Shift 的 Ctrl+F 是 editor 作用域 find，不应被全局匹配
+    expect(
+      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "f", ctrlKey: true }))
+    ).toBeNull();
+  });
+
   it("未命中返回 null（无修饰键/未知组合）", () => {
     const { matchGlobalKeydown } = useShortcuts();
     expect(matchGlobalKeydown(new KeyboardEvent("keydown", { key: "x" }))).toBeNull();

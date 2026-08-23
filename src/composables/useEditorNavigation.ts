@@ -25,8 +25,6 @@ export interface DialogPromptLike {
 /** useEditorNavigation 依赖 */
 export interface EditorNavDeps {
   editorRef: Ref<EditorViewLike | null>;
-  /** 来自 useFileActions.openFile，用于搜索结果跳转 */
-  openFile: (path: string) => Promise<void>;
   imagePaste: ImagePasteLike;
   tableDialogVisible: Ref<boolean>;
   dialog: DialogPromptLike;
@@ -38,19 +36,11 @@ export interface EditorNavDeps {
  * 从 App.vue 提取，保持原有行为不变。
  */
 export function useEditorNavigation(deps: EditorNavDeps) {
-  const { editorRef, openFile, imagePaste, tableDialogVisible, dialog } = deps;
+  const { editorRef, imagePaste, tableDialogVisible, dialog } = deps;
 
   function onJumpToLine(line: number): void {
     editorRef.value?.scrollToLine(line);
     editorRef.value?.focus();
-  }
-
-  async function onSearchSelectFile(filePath: string, line: number): Promise<void> {
-    await openFile(filePath);
-    requestAnimationFrame(() => {
-      editorRef.value?.scrollToLine(line);
-      editorRef.value?.focus();
-    });
   }
 
   function onDropImagePath(absolutePath: string): void {
@@ -135,7 +125,6 @@ export function useEditorNavigation(deps: EditorNavDeps) {
 
   return {
     onJumpToLine,
-    onSearchSelectFile,
     onDropImagePath,
     onEditorContextAction,
     onTableInsertConfirm,
