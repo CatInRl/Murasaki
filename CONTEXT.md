@@ -606,14 +606,16 @@ issue #104 范围：性能修复 + UX 导航。
 
 ## 国际化 (Internationalization, i18n)
 
-0.4.0 起支持中英双语 UI。详见 [ADR-0013](docs/adr/0013-i18n-via-vue-i18n-with-zh-cn-and-en-bilingual.md)。
+0.4.0 起支持多语言 UI。基础框架见 [ADR-0013](docs/adr/0013-i18n-via-vue-i18n-with-zh-cn-and-en-bilingual.md)，多语言落地（日语 + 单源化 + 语言探测）详见 [ADR-0016](docs/adr/0016-multilang-single-source-and-locale-detection.md)。
 
-- **框架**：vue-i18n 9.x（前端）+ Rust 端小型翻译表（菜单文案）。
-- **支持语言**：`zh-CN`（中文，默认）/ `en`（英文）。
+- **框架**：vue-i18n 9.x（前端）+ Rust 菜单文案单源化（[build.rs](src-tauri/build.rs) 构建时从 locale JSON 生成常量，经 include 引入，无第二份手写翻译表）。
+- **单一事实来源**：语言元数据与 message 收敛到 `src/locales/registry.ts`（`LOCALE_DEFS` / `AppLocale` / `SUPPORTED_LOCALES` / `DEFAULT_LOCALE` / `localeMessages`）；新增语言只需加一个 `LOCALE_DEFS` 条目 + 对应 `src/locales/{lang}` 目录。
+- **支持语言**：`zh-CN`（中文，默认）/ `en`（英文）/ `ja`（日本語）。回退语言为 `en`（新语言缺 key 显示英文）。
+- **首次启动探测**：全新安装（`settings.json` 的 `language` 从未写入）首次启动探测系统语言作为默认（zh→zh-CN、ja→ja、其余→en）；已持久化语言的既有用户跳过探测。
+- **key 同步校验**：`src/locales/locales.test.ts` 强制所有语言各模块与 zh-CN 的 key 树完全一致，防 key 漂移。
 - **切换入口**：系统设置 → 常规 → 语言。切换即时生效（前端 vue-i18n 运行时切换 + Rust 菜单重建），无需重启。
 - **持久化**：`settings.json` 的 `language` 字段。
 - **不翻译的内容**：markdown 主题名（GitHub/Newsprint 等）、代码块语言标签、Agent 工具名、markdown 语法。
-- **已知折衷**：前端 vue-i18n 与 Rust 翻译表是两套独立翻译源（0.4.0 仅 30 项菜单文案，可接受；语言数 ≥3 时评估统一方案）。
 
 ## 设计系统基础 (Design System Foundation)
 

@@ -46,6 +46,7 @@ import { useShortcuts } from "./shortcuts/useShortcuts";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
 import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
 import { setLocale } from "./i18n";
+import { mapSystemLocale } from "./utils/systemLocale";
 import { useI18n } from "vue-i18n";
 import {
   fieldsForCategory,
@@ -323,8 +324,20 @@ onMounted(async () => {
   // 应用保存的编辑模式（运行时切换，无需重启）
   editorBridge.setEditorMode(persistence.settings.editorMode);
   // 应用保存的界面语言（ADR-0013，前端 i18n + Rust 菜单）
-  setLocale(persistence.settings.language);
-  void invoke("reload_menu", { lang: persistence.settings.language }).catch((err: unknown) =>
+  // 首次启动（language 从未写入）时先探测系统语言作为默认并持久化（issue #141）；
+  // 已持久化语言的既有用户跳过探测，保持原设置。
+  let effectiveLanguage = persistence.settings.language;
+  if (persistence.languageEmpty) {
+    try {
+      const detected = await invoke<string>("detect_system_locale");
+      effectiveLanguage = mapSystemLocale(detected);
+      await persistence.updateSettings({ language: effectiveLanguage });
+    } catch (err) {
+      console.warn("探测系统语言失败，使用默认语言:", err);
+    }
+  }
+  setLocale(effectiveLanguage);
+  void invoke("reload_menu", { lang: effectiveLanguage }).catch((err: unknown) =>
     console.warn("初始化菜单语言失败:", err)
   );
   // 同步已保存的快捷键覆盖到原生菜单（菜单项快捷键提示跟随用户自定义）

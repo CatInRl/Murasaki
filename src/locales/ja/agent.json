@@ -1,0 +1,105 @@
+{
+  "title": "Agent",
+  "clearConversation": "現在のワークスペースの会話をクリア",
+  "collapsePanel": "パネルを折りたたむ",
+  "clearConfirm": "現在のワークスペースの会話をクリアしますか？この操作は元に戻せません。",
+  "contextTokens": "≈ {count} tokens",
+  "removeContext": "現在のドキュメントのコンテキストを削除",
+  "tokenOverLimit": "{used} / {limit} tokens、上限を超えました",
+  "tokenOverLimitTooltip": "累計 prompt token がソフト制限を超えました。会話をクリアすることをお勧めします",
+  "tokenApproaching": "{used} / {limit} tokens",
+  "tokenApproachingTooltip": "累計 prompt token がソフト制限に近づいています",
+  "compressionBadge": "コンテキスト圧縮を適用済み",
+  "truncated": "切り詰め",
+  "systemPrompt": "あなたは Murasaki の AI アシスタントです。ユーザーが Markdown ドキュメントを編集・管理できるよう支援します。簡潔かつ明確に回答してください。",
+  "maxRoundsReached": "（最大ツール呼び出しラウンド数に達しました）",
+  "truncatedSuffix": "... [切り詰め]",
+  "callingTools": "（ツール呼び出し中）",
+  "toolResultLabel": "{name} の結果",
+  "errors": {
+    "noProvider": "有効な AI provider が設定されていません",
+    "apiKeyFailed": "API key の取得に失敗しました: {error}"
+  },
+  "context": {
+    "unsaved": "（未保存）",
+    "selectionLabel": "選択範囲",
+    "header": "--- 現在のドキュメントコンテキスト ---",
+    "path": "パス",
+    "cursor": "カーソル: {line} 行目",
+    "contentHeader": "--- ドキュメントの内容 ---",
+    "footer": "--- ドキュメントコンテキストの終わり ---",
+    "userMessageLabel": "ユーザーメッセージ"
+  },
+  "noWorkspace": {
+    "title": "ワークスペースを開くと Agent が有効になります",
+    "desc": "Agent は編集を支援するためにワークスペースのコンテキストを必要とします",
+    "action": "ワークスペースを開く"
+  },
+  "noProvider": {
+    "title": "AI サービスが設定されていません",
+    "desc": "設定で AI Provider を構成してください",
+    "action": "設定を開く"
+  },
+  "emptyConversation": {
+    "title": "Agent にメッセージを送信して会話を開始",
+    "desc": "Agent は現在のワークスペースに基づいて編集と生成を支援できます"
+  },
+  "inputPlaceholder": "Agent にメッセージを送信...",
+  "stop": "停止",
+  "thinking": "考え中...",
+  "interrupted": "中断しました",
+  "newContent": "↓ 新しい内容",
+  "toolCallCalling": "呼び出し中...",
+  "toolCallsSummaryCalling": "{calling}/{total} 呼び出し中",
+  "toolCallsSummaryError": "{total} のツール · {error} 失敗",
+  "toolCallsSummaryDone": "{total} のツール",
+  "toolCallArgs": "引数：",
+  "toolCallResult": "結果：",
+  "toolCardTitle": "ツール · {summary}",
+  "proposals": {
+    "title": "提案 ({count})",
+    "lines": "{count} 行",
+    "accept": "受け入れる",
+    "reject": "拒否",
+    "accepted": "受け入れ済み",
+    "rejected": "拒否済み",
+    "expired": "期限切れ",
+    "confirmTitle": "{count} 行の置換を受け入れますか？",
+    "confirmReplace": "置換を確認"
+  },
+  "newFileProposals": {
+    "title": "新規ファイルの提案 ({count})",
+    "lines": "{count} 行",
+    "accept": "受け入れる",
+    "reject": "拒否",
+    "retry": "再試行",
+    "acceptTitle": "受け入れてファイルを作成",
+    "created": "作成済み",
+    "rejected": "拒否済み"
+  },
+  "contextMenu": {
+    "copy": "コピー",
+    "copyMarkdown": "Markdown ソースをコピー",
+    "insertToEditor": "エディターに挿入",
+    "regenerate": "現在のメッセージから再生成"
+  },
+  "tools": {
+    "unknownError": "不明なエラー",
+    "unknownTool": "不明なツール: {name}",
+    "invalidJson": "引数 JSON の解析に失敗しました",
+    "docChars": "{count} 文字を取得しました",
+    "docCharsTruncated": "{count}+ 文字を取得しました（切り詰め）",
+    "noSelection": "選択範囲なし",
+    "selectionChars": "{count} 文字の選択範囲を取得しました",
+    "outlineCount": "{count} 個の見出し",
+    "filesCount": "{count} 個のファイル",
+    "readChars": "{count} 文字",
+    "readCharsTruncated": "{count}+ 文字（切り詰め）",
+    "searchHits": "{count} 件のヒット",
+    "searchHitsTruncated": "{count}+ 件のヒット（切り詰め）",
+    "insertLines": "{count} 行を挿入",
+    "replaceLines": "{count} 行を置換",
+    "replaceLinesConfirm": "{count} 行を置換（再確認が必要）",
+    "newFileProposal": "新規ファイル {path} を提案（{count} 行）"
+  }
+}

@@ -23,6 +23,13 @@ export const usePersistenceStore = defineStore("persistence", () => {
   const settings = ref<SettingsState>({ ...DEFAULT_SETTINGS });
   const recentEntries = ref<RecentEntry[]>([]);
   const persistedTabs = ref<TabsState>({ tabs: [], activeIndex: 0 });
+  /**
+   * settings.json 的 `language` 字段是否从未被写入（首次启动，issue #141）。
+   * 初始 false；loadSettings 时依据读到的 saved 判定：
+   * saved 为空对象或 `saved.language === undefined` 视为从未写入 → true。
+   * 仅供上层（App.vue 启动段）决定是否做系统语言探测，本 store 不改语言。
+   */
+  const languageEmpty = ref(false);
 
   // LazyStore 实例（懒加载，首次调用方法时初始化）
   let settingsStore: LazyStore | null = null;
@@ -59,6 +66,8 @@ export const usePersistenceStore = defineStore("persistence", () => {
         // 合并默认值，避免新版本增加字段时旧配置缺失
         settings.value = { ...DEFAULT_SETTINGS, ...saved };
       }
+      // 判定 language 是否从未被写入（无 saved 或 saved 缺该字段视为从未写入）
+      languageEmpty.value = !saved || saved.language === undefined;
     } catch (err) {
       console.warn("加载设置失败:", err);
     }
@@ -175,6 +184,7 @@ export const usePersistenceStore = defineStore("persistence", () => {
     settings,
     recentEntries,
     persistedTabs,
+    languageEmpty,
     // settings actions
     loadSettings,
     saveSettings,

@@ -1,3 +1,8 @@
+import { DEFAULT_LOCALE } from "./locales/registry";
+import type { AppLocale } from "./locales/registry";
+
+export type { AppLocale } from "./locales/registry";
+
 /**
  * 文件树节点（与 Rust 端 TreeNode 对齐）
  */
@@ -32,12 +37,6 @@ export interface RecentEntry {
  * 侧栏视图类型
  */
 export type SidebarView = "files" | "outline";
-
-/**
- * 界面语言（ADR-0013）
- * 在 types.ts 定义为规范类型来源，i18n.ts 与各模块从此处导入
- */
-export type AppLocale = "zh-CN" | "en";
 
 /**
  * 标签页数据结构
@@ -252,7 +251,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   aiCumulativeTokenSoftLimit: 51200,
   aiProposeReplaceConfirmThreshold: 50,
   checkUpdatesOnStartup: true,
-  language: "zh-CN",
+  language: DEFAULT_LOCALE,
   entryOverflowMode: "hover",
   fullwidthToMarkdown: true,
   shortcuts: {},

@@ -6,13 +6,20 @@
  * Design ref: settings-general.html
  */
 import { computed } from "vue";
-import type { SettingsState, AppLocale } from "../../types";
+import type { SettingsState } from "../../types";
 import { AGENT_ENABLED } from "../../features";
+import { LOCALE_DEFS } from "../../locales/registry";
+import type { AppLocale } from "../../locales/registry";
 
 const props = defineProps<{ modelValue: SettingsState }>();
 const emit = defineEmits<{ "update:modelValue": [SettingsState] }>();
 
 const draft = computed(() => props.modelValue);
+
+/** 语言下拉选项（来自 LOCALE_DEFS 单一来源，新增语言自动包含） */
+const localeOptions = Object.entries(LOCALE_DEFS) as Array<
+  [AppLocale, { displayName: string }]
+>;
 
 function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): void {
   emit("update:modelValue", { ...draft.value, [key]: value });
@@ -39,8 +46,13 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
               :value="draft.language"
               @change="patch('language', ($event.target as HTMLSelectElement).value as AppLocale)"
             >
-              <option value="zh-CN">{{ $t('settings.general.languageZhCN') }}</option>
-              <option value="en">{{ $t('settings.general.languageEn') }}</option>
+              <option
+                v-for="[code, def] in localeOptions"
+                :key="code"
+                :value="code"
+              >
+                {{ def.displayName }}
+              </option>
             </select>
             <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="9 18 15 12 9 6" />

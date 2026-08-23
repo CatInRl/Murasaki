@@ -50,7 +50,8 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .lock()
         .map_err(|e| e.to_string())?
         .clone();
-    let t = i18n::menu_texts(&lang);
+    // 按 menu.json 的实际点号 key 查询当前语言文案
+    let mt = |key: &str| i18n::menu_text(&lang, key);
     let overrides = state
         .shortcut_overrides
         .lock()
@@ -69,72 +70,72 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
     };
 
     // === File menu ===
-    let mut file_builder = SubmenuBuilder::new(app, t.file_menu)
-        .text("new-file", i18n::with_accel(t.file_new, &accel("new-file", "Ctrl+N")))
-        .text("new-folder", t.file_new_folder)
+    let mut file_builder = SubmenuBuilder::new(app, mt("fileMenu"))
+        .text("new-file", i18n::with_accel(mt("file.newFile"), &accel("new-file", "Ctrl+N")))
+        .text("new-folder", mt("file.newFolder"))
         .separator()
-        .text("open-file", i18n::with_accel(t.file_open_file, &accel("open-file", "Ctrl+O")))
-        .text("open-folder", i18n::with_accel(t.file_open_folder, &accel("open-folder", "Ctrl+Shift+O")))
+        .text("open-file", i18n::with_accel(mt("file.openFile"), &accel("open-file", "Ctrl+O")))
+        .text("open-folder", i18n::with_accel(mt("file.openFolder"), &accel("open-folder", "Ctrl+Shift+O")))
         .separator();
 
     // "最近打开" 双子菜单：最近文件夹 + 最近文件
     // build_recent_submenu 会更新 id_to_path 映射
-    let recent_folders_submenu = build_recent_submenu(app, t.recent_folders, t.no_recent, &folders, "recent-folder", &state.id_to_path)?;
-    let recent_files_submenu = build_recent_submenu(app, t.recent_files, t.no_recent, &files, "recent-file", &state.id_to_path)?;
+    let recent_folders_submenu = build_recent_submenu(app, mt("recentFolders"), mt("noRecent"), &folders, "recent-folder", &state.id_to_path)?;
+    let recent_files_submenu = build_recent_submenu(app, mt("recentFiles"), mt("noRecent"), &files, "recent-file", &state.id_to_path)?;
     file_builder = file_builder
         .item(&recent_folders_submenu)
         .item(&recent_files_submenu)
         .separator()
-        .text("save", i18n::with_accel(t.file_save, &accel("save", "Ctrl+S")))
-        .text("save-as", i18n::with_accel(t.file_save_as, &accel("save-as", "Ctrl+Shift+S")))
+        .text("save", i18n::with_accel(mt("file.save"), &accel("save", "Ctrl+S")))
+        .text("save-as", i18n::with_accel(mt("file.saveAs"), &accel("save-as", "Ctrl+Shift+S")))
         .separator()
-        .text("export-html", t.file_export_html)
-        .text("export-pdf", t.file_export_pdf)
-        .text("copy-rich-text", t.file_copy_rich_text)
+        .text("export-html", mt("file.exportHtml"))
+        .text("export-pdf", mt("file.exportPdf"))
+        .text("copy-rich-text", mt("file.copyRichText"))
         .separator()
-        .text("close-tab", i18n::with_accel(t.file_close_tab, &accel("close-tab", "Ctrl+W")))
-        .text("reload-file", i18n::with_accel(t.file_reload_file, &accel("reload-file", "Ctrl+R")))
-        .text("close-workspace", t.file_close_workspace)
+        .text("close-tab", i18n::with_accel(mt("file.closeTab"), &accel("close-tab", "Ctrl+W")))
+        .text("reload-file", i18n::with_accel(mt("file.reloadFile"), &accel("reload-file", "Ctrl+R")))
+        .text("close-workspace", mt("file.closeWorkspace"))
         .separator()
-        .text("settings", t.file_settings)
+        .text("settings", mt("file.settings"))
         .separator()
-        .text("quit", i18n::with_accel(t.file_quit, &accel("quit", "Ctrl+Q")));
+        .text("quit", i18n::with_accel(mt("file.quit"), &accel("quit", "Ctrl+Q")));
 
     let file_menu = file_builder.build()?;
 
     // === Edit menu ===
-    let edit_menu = SubmenuBuilder::new(app, t.edit_menu)
-        .text("undo", i18n::with_accel(t.edit_undo, &accel("undo", "Ctrl+Z")))
-        .text("redo", i18n::with_accel(t.edit_redo, &accel("redo", "Ctrl+Y")))
+    let edit_menu = SubmenuBuilder::new(app, mt("editMenu"))
+        .text("undo", i18n::with_accel(mt("edit.undo"), &accel("undo", "Ctrl+Z")))
+        .text("redo", i18n::with_accel(mt("edit.redo"), &accel("redo", "Ctrl+Y")))
         .separator()
-        .text("cut", i18n::with_accel(t.edit_cut, &accel("cut", "Ctrl+X")))
-        .text("copy", i18n::with_accel(t.edit_copy, &accel("copy", "Ctrl+C")))
-        .text("paste", i18n::with_accel(t.edit_paste, &accel("paste", "Ctrl+V")))
-        .text("select-all", i18n::with_accel(t.edit_select_all, &accel("select-all", "Ctrl+A")))
+        .text("cut", i18n::with_accel(mt("edit.cut"), &accel("cut", "Ctrl+X")))
+        .text("copy", i18n::with_accel(mt("edit.copy"), &accel("copy", "Ctrl+C")))
+        .text("paste", i18n::with_accel(mt("edit.paste"), &accel("paste", "Ctrl+V")))
+        .text("select-all", i18n::with_accel(mt("edit.selectAll"), &accel("select-all", "Ctrl+A")))
         .separator()
-        .text("find", i18n::with_accel(t.edit_find, &accel("find", "Ctrl+F")))
-        .text("replace", i18n::with_accel(t.edit_replace, &accel("replace", "Ctrl+H")))
-        .text("find-in-files", i18n::with_accel(t.edit_find_in_files, &accel("find-in-files", "Ctrl+Shift+F")))
+        .text("find", i18n::with_accel(mt("edit.find"), &accel("find", "Ctrl+F")))
+        .text("replace", i18n::with_accel(mt("edit.replace"), &accel("replace", "Ctrl+H")))
+        .text("find-in-files", i18n::with_accel(mt("edit.findInFiles"), &accel("find-in-files", "Ctrl+Shift+F")))
         .build()?;
 
     // === Paragraph menu ===
-    let paragraph_menu = SubmenuBuilder::new(app, t.paragraph_menu)
-        .text("heading-1", i18n::with_accel(t.para_heading1, &accel("heading-1", "Ctrl+1")))
-        .text("heading-2", i18n::with_accel(t.para_heading2, &accel("heading-2", "Ctrl+2")))
-        .text("heading-3", i18n::with_accel(t.para_heading3, &accel("heading-3", "Ctrl+3")))
-        .text("heading-4", i18n::with_accel(t.para_heading4, &accel("heading-4", "Ctrl+4")))
-        .text("heading-5", i18n::with_accel(t.para_heading5, &accel("heading-5", "Ctrl+5")))
-        .text("heading-6", i18n::with_accel(t.para_heading6, &accel("heading-6", "Ctrl+6")))
-        .text("normal", i18n::with_accel(t.para_normal, &accel("normal", "Ctrl+0")))
+    let paragraph_menu = SubmenuBuilder::new(app, mt("paragraphMenu"))
+        .text("heading-1", i18n::with_accel(mt("paragraph.heading1"), &accel("heading-1", "Ctrl+1")))
+        .text("heading-2", i18n::with_accel(mt("paragraph.heading2"), &accel("heading-2", "Ctrl+2")))
+        .text("heading-3", i18n::with_accel(mt("paragraph.heading3"), &accel("heading-3", "Ctrl+3")))
+        .text("heading-4", i18n::with_accel(mt("paragraph.heading4"), &accel("heading-4", "Ctrl+4")))
+        .text("heading-5", i18n::with_accel(mt("paragraph.heading5"), &accel("heading-5", "Ctrl+5")))
+        .text("heading-6", i18n::with_accel(mt("paragraph.heading6"), &accel("heading-6", "Ctrl+6")))
+        .text("normal", i18n::with_accel(mt("paragraph.normal"), &accel("normal", "Ctrl+0")))
         .separator()
-        .text("code-block", i18n::with_accel(t.para_code_block, &accel("code-block", "Ctrl+Shift+K")))
-        .text("blockquote", i18n::with_accel(t.para_blockquote, &accel("blockquote", "Ctrl+Shift+Q")))
-        .text("unordered-list", i18n::with_accel(t.para_unordered_list, &accel("unordered-list", "Ctrl+Shift+]")))
-        .text("ordered-list", i18n::with_accel(t.para_ordered_list, &accel("ordered-list", "Ctrl+Shift+[")))
-        .text("task-list", i18n::with_accel(t.para_task_list, &accel("task-list", "Ctrl+Shift+X")))
+        .text("code-block", i18n::with_accel(mt("paragraph.codeBlock"), &accel("code-block", "Ctrl+Shift+K")))
+        .text("blockquote", i18n::with_accel(mt("paragraph.blockquote"), &accel("blockquote", "Ctrl+Shift+Q")))
+        .text("unordered-list", i18n::with_accel(mt("paragraph.unorderedList"), &accel("unordered-list", "Ctrl+Shift+]")))
+        .text("ordered-list", i18n::with_accel(mt("paragraph.orderedList"), &accel("ordered-list", "Ctrl+Shift+[")))
+        .text("task-list", i18n::with_accel(mt("paragraph.taskList"), &accel("task-list", "Ctrl+Shift+X")))
         .separator()
-        .text("horizontal-rule", t.para_horizontal_rule)
-        .text("insert-table", t.para_insert_table)
+        .text("horizontal-rule", mt("paragraph.horizontalRule"))
+        .text("insert-table", mt("paragraph.insertTable"))
         .build()?;
 
     // === Theme menu ===
@@ -166,7 +167,7 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .checked(current_theme == "theme-academic")
         .build(app)?;
 
-    let theme_menu = SubmenuBuilder::new(app, t.theme_menu)
+    let theme_menu = SubmenuBuilder::new(app, mt("themeMenu"))
         .item(&theme_murasaki)
         .item(&theme_github)
         .item(&theme_newsprint)
@@ -175,10 +176,10 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .build()?;
 
     // === Help menu ===
-    let help_menu = SubmenuBuilder::new(app, t.help_menu)
-        .text("docs", t.help_docs)
-        .text("about", t.help_about)
-        .text("check-updates", t.help_check_updates)
+    let help_menu = SubmenuBuilder::new(app, mt("helpMenu"))
+        .text("docs", mt("help.docs"))
+        .text("about", mt("help.about"))
+        .text("check-updates", mt("help.checkUpdates"))
         .build()?;
 
     let menu = MenuBuilder::new(app)

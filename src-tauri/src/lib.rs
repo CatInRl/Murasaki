@@ -8,6 +8,7 @@ use commands::assets;
 use commands::chats;
 use commands::drafts;
 use commands::files;
+use commands::locale;
 use commands::menu::{self, RecentMenuState};
 use commands::outline;
 use commands::pdf;
@@ -434,6 +435,7 @@ pub fn run() {
             menu::reload_menu,
             menu::update_shortcut_labels,
             settings::open_settings,
+            locale::detect_system_locale,
             pdf::export_pdf,
             ai_providers::get_ai_providers,
             ai_providers::save_ai_provider,
