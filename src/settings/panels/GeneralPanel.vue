@@ -7,6 +7,7 @@
  */
 import { computed } from "vue";
 import type { SettingsState, AppLocale } from "../../types";
+import { AGENT_ENABLED } from "../../features";
 
 const props = defineProps<{ modelValue: SettingsState }>();
 const emit = defineEmits<{ "update:modelValue": [SettingsState] }>();
@@ -103,8 +104,8 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
       </div>
     </section>
 
-    <!-- Agent -->
-    <section class="settings-section">
+    <!-- Agent（AGENT_ENABLED 关闭时整体隐藏，恢复仅需置 true） -->
+    <section v-if="AGENT_ENABLED" class="settings-section">
       <h2 class="settings-section-title">{{ $t('settings.general.agent') }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">

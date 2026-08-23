@@ -22,6 +22,7 @@ export interface AppLifecycleDeps {
       sidebarView: "files" | "outline";
       lastWorkspacePath: string | null;
       language: AppLocale;
+      shortcuts: Record<string, string | null>;
     };
     updateSettings(patch: Record<string, unknown>): Promise<unknown>;
     loadSettings(): Promise<unknown>;
@@ -191,6 +192,10 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
         // 始终调用，即使值未变也保证前端与 Rust 状态一致
         setLocale(persistence.settings.language);
         void invoke("reload_menu", { lang: persistence.settings.language });
+        // 同步快捷键覆盖到原生菜单（菜单项右侧快捷键提示跟随用户自定义）
+        void invoke("update_shortcut_labels", {
+          overrides: persistence.settings.shortcuts ?? {},
+        });
       }
     );
 

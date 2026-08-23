@@ -17,8 +17,15 @@ use commands::watcher::{self, WatcherState};
 
 /// E2E 测试模式标志：msedgedriver 启动 murasaki.exe 时会附加 `--remote-debugging-port=PORT`
 /// 检测到该参数即表示运行在 tauri-driver E2E 环境下
+///
+/// WebView2 Runtime 150 之后，msedgedriver 不再把 `--remote-debugging-port` 作为
+/// 命令行参数传给应用，而是通过 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 环境变量注入，
+/// 因此两种来源都需检测。
 fn is_e2e_mode() -> bool {
     std::env::args().any(|a| a.starts_with("--remote-debugging-port="))
+        || std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
+            .map(|v| v.contains("--remote-debugging-port="))
+            .unwrap_or(false)
 }
 
 /// 判断路径是文件还是目录（用于拖拽打开 / 命令行参数打开文件关联，issue #92 / #113）
@@ -51,11 +58,38 @@ fn emit_open_path(app: &tauri::AppHandle, path: &str) {
 }
 
 /// 解析 `--user-data-dir=PATH` 参数（msedgedriver 会传给 murasaki）
+/// 同时兼容 WebView2 Runtime 150 的环境变量注入方式
 fn parse_user_data_dir() -> Option<std::path::PathBuf> {
     for arg in std::env::args().skip(1) {
         if let Some(p) = arg.strip_prefix("--user-data-dir=") {
             let p = p.trim_matches('"');
             return Some(std::path::PathBuf::from(p));
+        }
+    }
+    if let Ok(env_args) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+        for token in env_args.split_whitespace() {
+            if let Some(p) = token.strip_prefix("--user-data-dir=") {
+                let p = p.trim_matches('"');
+                return Some(std::path::PathBuf::from(p));
+            }
+        }
+    }
+    None
+}
+
+/// 从 argv 或 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 环境变量中提取
+/// `--remote-debugging-port=PORT`，返回端口字符串
+fn find_remote_debugging_port_str() -> Option<String> {
+    for arg in std::env::args().skip(1) {
+        if let Some(p) = arg.strip_prefix("--remote-debugging-port=") {
+            return Some(p.to_string());
+        }
+    }
+    if let Ok(env_args) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+        for token in env_args.split_whitespace() {
+            if let Some(p) = token.strip_prefix("--remote-debugging-port=") {
+                return Some(p.to_string());
+            }
         }
     }
     None
@@ -70,6 +104,65 @@ fn find_available_port() -> u16 {
         .unwrap_or(9222)
 }
 
+/// 重写 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 环境变量中的
+/// `--remote-debugging-port=PORT`（含 `=0`），改为实际选定的端口。
+///
+/// 关键背景：WebView2 Runtime 150+ 的 msedgedriver 不再把调试参数作为命令行
+/// 参数传给应用，而是通过 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 环境变量注入，
+/// 且其中固定为 `--remote-debugging-port=0`。WebView2 读取该环境变量后会让浏览器
+/// 进程在随机端口监听，导致 murasaki 代码里 `additional_browser_args` 注入的
+/// 固定端口被忽略、后台 writer 轮询的端口永远连不上。
+///
+/// 因此必须在创建 WebView2 环境前把环境变量里的 `=0` 替换为实际端口，
+/// 这样无论 WebView2 以环境变量还是 additional_browser_args 为准，端口都一致。
+fn rewrite_env_debug_port(port: u16) {
+    let Ok(mut env_args) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") else {
+        return;
+    };
+
+    // 用正则替换 `--remote-debugging-port=<任意值>` 为固定端口
+    // （不使用 regex crate，手动字符串替换）
+    const PREFIX: &str = "--remote-debugging-port=";
+    let mut result = String::new();
+    let mut rest = env_args.as_str();
+    let mut replaced = false;
+    loop {
+        match rest.find(PREFIX) {
+            Some(idx) => {
+                result.push_str(&rest[..idx + PREFIX.len()]);
+                rest = &rest[idx + PREFIX.len()..];
+                // 跳过端口值直到空白符
+                let val_end = rest
+                    .find(char::is_whitespace)
+                    .unwrap_or(rest.len());
+                let old_val = &rest[..val_end];
+                if !replaced {
+                    result.push_str(&port.to_string());
+                    replaced = true;
+                } else {
+                    // 多余的 --remote-debugging-port 一律移除
+                    result.truncate(result.len() - PREFIX.len());
+                }
+                rest = &rest[val_end..];
+                let _ = old_val;
+            }
+            None => {
+                result.push_str(rest);
+                break;
+            }
+        }
+    }
+
+    env_args = result;
+    if replaced {
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", env_args);
+        e2e_trace(&format!(
+            "已重写 WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: --remote-debugging-port={}",
+            port
+        ));
+    }
+}
+
 /// 检测命令行参数中的 `--remote-debugging-port=PORT`，返回
 /// (WebView2 additional_browser_args, 实际监听端口)
 ///
@@ -77,13 +170,7 @@ fn find_available_port() -> u16 {
 /// 但 WebView2 不会创建 DevToolsActivePort 文件告知 msedgedriver 实际端口。
 /// 因此 murasaki 用一个固定端口替代 port=0，并启动后台线程创建该文件。
 fn detect_remote_debugging_args() -> Option<(String, u16)> {
-    let mut port_str: Option<String> = None;
-    for arg in std::env::args().skip(1) {
-        if let Some(p) = arg.strip_prefix("--remote-debugging-port=") {
-            port_str = Some(p.to_string());
-        }
-    }
-    let port_str = port_str?;
+    let port_str = find_remote_debugging_port_str()?;
 
     let port: u16 = if port_str == "0" {
         let p = find_available_port();
@@ -92,6 +179,9 @@ fn detect_remote_debugging_args() -> Option<(String, u16)> {
     } else {
         port_str.parse().unwrap_or(9222)
     };
+
+    // WebView2 Runtime 150+ 从环境变量读取调试参数，先重写环境变量确保端口一致
+    rewrite_env_debug_port(port);
 
     // 仅注入 remote-debugging-port，不覆盖 wry 默认的 additional_browser_args
     // 若包含 --disable-features 会导致 WebView2 启动失败（实测无子进程）
@@ -155,6 +245,25 @@ fn extract_ws_url(json: &str) -> Option<String> {
     Some(after_quote[..end].to_string())
 }
 
+/// 将 murasaki 内部 E2E 调试信息写入 %TEMP%\murasaki-devtools.log（附加模式）
+/// msedgedriver 启动的 murasaki 其 stderr 不会被 tauri-driver 转发，落盘便于诊断
+fn e2e_trace(msg: &str) {
+    use std::io::Write;
+    let log_path = std::env::temp_dir().join("murasaki-devtools.log");
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let _ = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+        .and_then(|mut f| {
+            writeln!(f, "[ts={}] {}", now, msg)
+        });
+    eprintln!("[murasaki] {}", msg);
+}
+
 /// 启动后台线程创建 DevToolsActivePort 文件
 ///
 /// WebView2 不创建 DevToolsActivePort 文件（Chromium 浏览器的特性），
@@ -162,16 +271,16 @@ fn extract_ws_url(json: &str) -> Option<String> {
 /// 该线程轮询 CDP /json/version 拿到 webSocketDebuggerUrl 后写入文件。
 fn spawn_devtools_active_port_writer(port: u16, user_data_dir: std::path::PathBuf) {
     if user_data_dir.as_os_str().is_empty() {
-        eprintln!("[murasaki] 无 --user-data-dir，跳过 DevToolsActivePort 创建");
+        e2e_trace("无 --user-data-dir，跳过 DevToolsActivePort 创建");
         return;
     }
 
     std::thread::spawn(move || {
-        eprintln!(
-            "[murasaki] DevToolsActivePort writer 启动: port={}, dir={}",
+        e2e_trace(&format!(
+            "DevToolsActivePort writer 启动: port={}, dir={}",
             port,
             user_data_dir.display()
-        );
+        ));
 
         for attempt in 0..60 {
             std::thread::sleep(std::time::Duration::from_millis(500));
@@ -180,17 +289,17 @@ fn spawn_devtools_active_port_writer(port: u16, user_data_dir: std::path::PathBu
                 Some(b) => b,
                 None => {
                     if attempt % 5 == 0 {
-                        eprintln!("[murasaki] CDP 未就绪，尝试 {} (port={})", attempt, port);
+                        e2e_trace(&format!("CDP 未就绪，尝试 {} (port={})", attempt, port));
                     }
                     continue;
                 }
             };
 
-            eprintln!("[murasaki] CDP 已响应，attempt={} body_len={}", attempt, body.len());
+            e2e_trace(&format!("CDP 已响应，attempt={} body_len={}", attempt, body.len()));
 
             let ws_url = extract_ws_url(&body);
             if let Some(ws_url) = ws_url {
-                eprintln!("[murasaki] ws_url={}", ws_url);
+                e2e_trace(&format!("ws_url={}", ws_url));
                 // ws://127.0.0.1:PORT/devtools/browser/UUID -> /devtools/browser/UUID
                 let ws_path = ws_url
                     .splitn(4, '/')
@@ -204,28 +313,28 @@ fn spawn_devtools_active_port_writer(port: u16, user_data_dir: std::path::PathBu
                     let _ = std::fs::create_dir_all(&user_data_dir);
                     match std::fs::write(&file_path, &content) {
                         Ok(_) => {
-                            eprintln!(
-                                "[murasaki] DevToolsActivePort 已写入: {} (port={}, path={})",
+                            e2e_trace(&format!(
+                                "DevToolsActivePort 已写入: {} (port={}, path={})",
                                 file_path.display(),
                                 port,
                                 ws_path
-                            );
+                            ));
                             return;
                         }
                         Err(e) => {
-                            eprintln!("[murasaki] 写入 DevToolsActivePort 失败: {}", e);
+                            e2e_trace(&format!("写入 DevToolsActivePort 失败: {}", e));
                             return;
                         }
                     }
                 } else {
-                    eprintln!("[murasaki] ws_path 解析失败");
+                    e2e_trace("ws_path 解析失败");
                 }
             } else {
-                eprintln!("[murasaki] ws_url 解析失败，body 前 200 字符: {}", body.chars().take(200).collect::<String>());
+                e2e_trace(&format!("ws_url 解析失败，body 前 200 字符: {}", body.chars().take(200).collect::<String>()));
             }
         }
 
-        eprintln!("[murasaki] DevToolsActivePort writer 超时（30s）");
+        e2e_trace("DevToolsActivePort writer 超时（30s）");
     });
 }
 
@@ -243,12 +352,13 @@ pub fn run() {
             .map(|d| d.as_millis())
             .unwrap_or(0);
         let content = format!(
-            "[ts={}] argv:\n  {}\n  APPDATA={}\n  LOCALAPPDATA={}\n  PWD={}\n",
+            "[ts={}] argv:\n  {}\n  APPDATA={}\n  LOCALAPPDATA={}\n  PWD={}\n  WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS={}\n",
             now,
             args_str,
             std::env::var("APPDATA").unwrap_or_default(),
             std::env::var("LOCALAPPDATA").unwrap_or_default(),
-            std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default()
+            std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default(),
+            std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default()
         );
         let _ = std::fs::OpenOptions::new()
             .create(true)
@@ -322,6 +432,7 @@ pub fn run() {
             menu::update_recent_menu,
             menu::set_theme_checked,
             menu::reload_menu,
+            menu::update_shortcut_labels,
             settings::open_settings,
             pdf::export_pdf,
             ai_providers::get_ai_providers,
@@ -353,10 +464,10 @@ pub fn run() {
                 .fullscreen(false);
 
             if let Some((extra_args, port)) = detect_remote_debugging_args() {
-                eprintln!(
-                    "[murasaki] 检测到 --remote-debugging-port，注入 WebView2 args: {}",
-                    extra_args
-                );
+                e2e_trace(&format!(
+                    "检测到 --remote-debugging-port，注入 WebView2 args: {} (port={})",
+                    extra_args, port
+                ));
                 builder = builder.additional_browser_args(&extra_args);
 
                 // 启动后台线程创建 DevToolsActivePort 文件

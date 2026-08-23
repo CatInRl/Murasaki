@@ -9,10 +9,12 @@ import { DEFAULT_SETTINGS, type SettingsState } from "../types";
 import {
   GENERAL_FIELDS,
   EDITOR_FIELDS,
+  SHORTCUTS_FIELD,
   fieldsForCategory,
   isCategoryDirty,
   isDirty,
   restoreCategoryDefaults,
+  shortcutsEqual,
 } from "./settingsLogic";
 
 function clone(s: SettingsState): SettingsState {
@@ -39,12 +41,43 @@ describe("settingsLogic - fieldsForCategory", () => {
     expect(EDITOR_FIELDS).toContain("editorFontPreset");
     expect(EDITOR_FIELDS).toContain("showLineNumbers");
     expect(EDITOR_FIELDS).toContain("softWrap");
+    expect(EDITOR_FIELDS).toContain("entryOverflowMode");
+    expect(EDITOR_FIELDS).toContain("fullwidthToMarkdown");
+  });
+
+  it("shortcuts 返回快捷键覆盖表字段", () => {
+    expect(fieldsForCategory("shortcuts")).toEqual(SHORTCUTS_FIELD);
+    expect(SHORTCUTS_FIELD).toEqual(["shortcuts"]);
   });
 
   it("ai 返回空数组（provider 走独立持久化）", () => {
     expect(fieldsForCategory("ai")).toEqual([]);
   });
 });
+
+describe("settingsLogic - shortcutsEqual", () => {
+  it("undefined / {} 视为相等", () => {
+    expect(shortcutsEqual(undefined, {})).toBe(true);
+    expect(shortcutsEqual(undefined, undefined)).toBe(true);
+  });
+
+  it("键值完全一致时相等（键顺序无关）", () => {
+    expect(shortcutsEqual({ save: "Ctrl+S", quit: "Ctrl+Q" }, { quit: "Ctrl+Q", save: "Ctrl+S" })).toBe(true);
+  });
+
+  it("值不同时不相等", () => {
+    expect(shortcutsEqual({ save: "Ctrl+S" }, { save: "Ctrl+Shift+S" })).toBe(false);
+  });
+
+  it("键集合不同时不相等", () => {
+    expect(shortcutsEqual({ save: "Ctrl+S" }, { save: "Ctrl+S", quit: "Ctrl+Q" })).toBe(false);
+  });
+
+  it("null（禁用）与字符串值不同", () => {
+    expect(shortcutsEqual({ save: null }, { save: "Ctrl+S" })).toBe(false);
+  });
+});
+
 
 describe("settingsLogic - isCategoryDirty", () => {
   it("draft 与 snapshot 完全一致时 general 不 dirty", () => {
@@ -81,12 +114,51 @@ describe("settingsLogic - isCategoryDirty", () => {
     expect(isCategoryDirty(draft, snapshot, "general")).toBe(false);
   });
 
+  it("修改 fullwidthToMarkdown 后 editor 变 dirty", () => {
+    const draft = clone(DEFAULT_SETTINGS);
+    const snapshot = clone(DEFAULT_SETTINGS);
+    draft.fullwidthToMarkdown = false;
+    expect(isCategoryDirty(draft, snapshot, "editor")).toBe(true);
+  });
+
   it("ai 分类永远不 dirty（不参与 draft 模型）", () => {
     const draft = clone(DEFAULT_SETTINGS);
     const snapshot = clone(DEFAULT_SETTINGS);
     draft.showHiddenFiles = true;
     draft.editorFontSize = 20;
     expect(isCategoryDirty(draft, snapshot, "ai")).toBe(false);
+  });
+
+  it("shortcuts 无改动时不 dirty", () => {
+    const draft = clone(DEFAULT_SETTINGS);
+    const snapshot = clone(DEFAULT_SETTINGS);
+    expect(isCategoryDirty(draft, snapshot, "shortcuts")).toBe(false);
+  });
+
+  it("修改 shortcuts 后 shortcuts 变 dirty（语义比较，不看引用）", () => {
+    const draft = clone(DEFAULT_SETTINGS);
+    const snapshot = clone(DEFAULT_SETTINGS);
+    // 模拟重新赋值但值不变 → 不 dirty
+    draft.shortcuts = { ...snapshot.shortcuts };
+    expect(isCategoryDirty(draft, snapshot, "shortcuts")).toBe(false);
+    // 值变化 → dirty
+    draft.shortcuts = { save: "Ctrl+Shift+S" };
+    expect(isCategoryDirty(draft, snapshot, "shortcuts")).toBe(true);
+  });
+
+  it("禁用某快捷键（null）使 shortcuts 变 dirty", () => {
+    const draft = clone(DEFAULT_SETTINGS);
+    const snapshot = clone(DEFAULT_SETTINGS);
+    draft.shortcuts = { save: null };
+    expect(isCategoryDirty(draft, snapshot, "shortcuts")).toBe(true);
+  });
+
+  it("修改 shortcuts 不影响 general / editor 的 dirty 状态", () => {
+    const draft = clone(DEFAULT_SETTINGS);
+    const snapshot = clone(DEFAULT_SETTINGS);
+    draft.shortcuts = { save: "Ctrl+Shift+S" };
+    expect(isCategoryDirty(draft, snapshot, "general")).toBe(false);
+    expect(isCategoryDirty(draft, snapshot, "editor")).toBe(false);
   });
 });
 
@@ -108,6 +180,13 @@ describe("settingsLogic - isDirty", () => {
     const draft = clone(DEFAULT_SETTINGS);
     const snapshot = clone(DEFAULT_SETTINGS);
     draft.softWrap = false;
+    expect(isDirty(draft, snapshot)).toBe(true);
+  });
+
+  it("仅 shortcuts 改动时为 true", () => {
+    const draft = clone(DEFAULT_SETTINGS);
+    const snapshot = clone(DEFAULT_SETTINGS);
+    draft.shortcuts = { save: "Ctrl+Alt+S" };
     expect(isDirty(draft, snapshot)).toBe(true);
   });
 
@@ -148,6 +227,8 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
       editorMode: "source",
       editorFontFamily: "Consolas",
       showLineNumbers: false,
+      entryOverflowMode: "wrap",
+      fullwidthToMarkdown: false,
     };
     const result = restoreCategoryDefaults(draft, "editor");
     expect(result.editorFontSize).toBe(DEFAULT_SETTINGS.editorFontSize);
@@ -156,6 +237,8 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
     expect(result.showLineNumbers).toBe(DEFAULT_SETTINGS.showLineNumbers);
     expect(result.editorLineHeight).toBe(DEFAULT_SETTINGS.editorLineHeight);
     expect(result.softWrap).toBe(DEFAULT_SETTINGS.softWrap);
+    expect(result.entryOverflowMode).toBe(DEFAULT_SETTINGS.entryOverflowMode);
+    expect(result.fullwidthToMarkdown).toBe(DEFAULT_SETTINGS.fullwidthToMarkdown);
     // general 字段保持改动
     expect(result.showHiddenFiles).toBe(true);
   });
@@ -168,6 +251,20 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
     };
     const result = restoreCategoryDefaults(draft, "ai");
     expect(result).toEqual(draft);
+  });
+
+  it("恢复 shortcuts 分类：覆盖表清空，其他分类不变", () => {
+    const draft: SettingsState = {
+      ...DEFAULT_SETTINGS,
+      shortcuts: { save: "Ctrl+Shift+S", quit: null },
+      showHiddenFiles: true,
+      editorFontSize: 20,
+    };
+    const result = restoreCategoryDefaults(draft, "shortcuts");
+    expect(result.shortcuts).toEqual({});
+    // 其他分类保持改动
+    expect(result.showHiddenFiles).toBe(true);
+    expect(result.editorFontSize).toBe(20);
   });
 
   it("不 mutate 输入 draft", () => {

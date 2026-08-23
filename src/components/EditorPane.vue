@@ -31,6 +31,8 @@ interface Props {
   lineHeight?: number;
   /** 编辑器等宽字体族 */
   fontFamily?: string;
+  /** 中文符号转 Markdown 记号（行首输入 + 空格自动转换，0.8.0） */
+  fullwidthToMarkdown?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -45,6 +47,7 @@ const props = withDefaults(defineProps<Props>(), {
   fontSize: 14,
   lineHeight: 1.6,
   fontFamily: "JetBrains Mono",
+  fullwidthToMarkdown: false,
 });
 
 const emit = defineEmits<{
@@ -258,6 +261,7 @@ defineExpose({
         :font-family="fontFamily"
         :markdown-theme="previewTheme"
         :current-file-path="currentFilePath"
+        :fullwidth-to-markdown="fullwidthToMarkdown"
         @update:model-value="onInput"
         @cursor-change="onCursorChange"
         @context-action="(a) => emit('context-action', a)"

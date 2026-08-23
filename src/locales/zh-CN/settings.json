@@ -2,7 +2,8 @@
   "categories": {
     "general": "常规",
     "editor": "编辑器",
-    "ai": "AI"
+    "ai": "AI",
+    "shortcuts": "快捷键"
   },
   "sidebarAriaLabel": "设置分类",
   "general": {
@@ -49,7 +50,16 @@
     "showLineNumbers": "显示行号",
     "showLineNumbersDesc": "在编辑器左侧显示行号",
     "softWrap": "自动换行",
-    "softWrapDesc": "长行自动折行显示"
+    "softWrapDesc": "长行自动折行显示",
+    "entryOverflow": "长条目显示",
+    "entryOverflowDesc": "文件树/大纲中过长条目超出宽度时的显示方式",
+    "entryOverflowHover": "悬停显示完整",
+    "entryOverflowWrap": "自动换行",
+    "fullwidthToMarkdown": "中文符号自动转 Markdown 记号",
+    "fullwidthToMarkdownDesc": "行首输入全角/中文符号后加空格，自动转换为对应 Markdown 记号（如 》→>、···→```）",
+    "fullwidthToMarkdownTableInput": "输入（行首）",
+    "fullwidthToMarkdownTableOutput": "转换后",
+    "fullwidthToMarkdownTableNote": "备注"
   },
   "ai": {
     "title": "AI",
@@ -102,5 +112,61 @@
     "save": "保存",
     "saving": "保存中…"
   },
-  "unsavedMessage": "设置有未保存的修改，是否保存？"
+  "unsavedMessage": "设置有未保存的修改，是否保存？",
+  "shortcuts": {
+    "title": "快捷键",
+    "description": "点击右侧快捷键徽标即可录制新的组合键；Esc 取消录制。行尾图标可恢复默认绑定或禁用该快捷键。",
+    "categories": {
+      "file": "文件",
+      "edit": "编辑",
+      "paragraph": "段落",
+      "view": "视图",
+      "agent": "Agent"
+    },
+    "newFile": "新建文件",
+    "newFolder": "新建文件夹",
+    "openFile": "打开文件",
+    "openFolder": "打开文件夹",
+    "save": "保存",
+    "saveAs": "另存为",
+    "exportHtml": "导出 HTML",
+    "exportPdf": "导出 PDF",
+    "copyRichText": "复制为富文本",
+    "closeTab": "关闭标签页",
+    "reloadFile": "重新加载文件",
+    "closeWorkspace": "关闭工作区",
+    "settings": "设置",
+    "quit": "退出",
+    "undo": "撤销",
+    "redo": "重做",
+    "selectAll": "全选",
+    "find": "查找",
+    "replace": "替换",
+    "findInFiles": "在文件中查找",
+    "heading1": "标题 1",
+    "heading2": "标题 2",
+    "heading3": "标题 3",
+    "heading4": "标题 4",
+    "heading5": "标题 5",
+    "heading6": "标题 6",
+    "normal": "普通文本",
+    "codeBlock": "代码块",
+    "blockquote": "引用块",
+    "unorderedList": "无序列表",
+    "orderedList": "有序列表",
+    "taskList": "任务列表",
+    "toggleSidebar": "切换侧栏",
+    "toggleOutline": "切换大纲",
+    "switchTabNext": "下一个标签页",
+    "switchTabPrev": "上一个标签页",
+    "fullscreen": "全屏",
+    "toggleStatusbar": "切换状态栏",
+    "unset": "未设置",
+    "recording": "按快捷键…",
+    "recordTitle": "点击录制新快捷键",
+    "restoreDefault": "恢复默认",
+    "disable": "禁用",
+    "conflict": "与「{commands}」冲突",
+    "invalidHint": "该组合不可用：字符键必须搭配 Ctrl 或 Alt 使用（功能键如 F1-F12、Esc、方向键可直接绑定）。"
+  }
 }

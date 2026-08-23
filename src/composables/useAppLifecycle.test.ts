@@ -34,6 +34,7 @@ function makeDeps(overrides: Partial<AppLifecycleDeps> = {}): AppLifecycleDeps {
         sidebarView: "files" as const,
         lastWorkspacePath: null,
         language: "zh-CN" as const,
+        shortcuts: {},
       }),
       updateSettings: vi.fn().mockResolvedValue(undefined),
       loadSettings: vi.fn().mockResolvedValue(undefined),

@@ -10,6 +10,7 @@
 import { computed } from "vue";
 import type { SettingsState, ReadingFontPreset } from "../../types";
 import { READING_FONT_PRESETS, READING_FONT_PRESET_LABELS } from "../../types";
+import { FULLWIDTH_TO_MARKDOWN_MAPPINGS } from "../../editor/fullwidthToMarkdown";
 
 const props = defineProps<{ modelValue: SettingsState }>();
 const emit = defineEmits<{ "update:modelValue": [SettingsState] }>();
@@ -110,6 +111,30 @@ function stepFontSize(delta: number): void {
 
       <div class="setting-row">
         <div class="setting-label-column">
+          <span class="setting-label">{{ $t('settings.editor.entryOverflow') }}</span>
+          <span class="setting-description">{{ $t('settings.editor.entryOverflowDesc') }}</span>
+        </div>
+        <div class="setting-control-column">
+          <div class="segmented-control" role="radiogroup" :aria-label="$t('settings.editor.entryOverflow')">
+            <button
+              v-for="opt in [
+                { v: 'hover', l: $t('settings.editor.entryOverflowHover') },
+                { v: 'wrap', l: $t('settings.editor.entryOverflowWrap') },
+              ]"
+              :key="opt.v"
+              type="button"
+              class="segmented-item"
+              :class="{ active: draft.entryOverflowMode === opt.v }"
+              @click="patch('entryOverflowMode', opt.v as SettingsState['entryOverflowMode'])"
+            >
+              {{ opt.l }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label-column">
           <span class="setting-label">{{ $t('settings.editor.fontSize') }}</span>
           <span class="setting-description">{{ $t('settings.editor.fontSizeDesc') }}</span>
         </div>
@@ -192,6 +217,42 @@ function stepFontSize(delta: number): void {
             </svg>
           </div>
         </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label-column">
+          <span class="setting-label">{{ $t('settings.editor.fullwidthToMarkdown') }}</span>
+          <span class="setting-description">{{ $t('settings.editor.fullwidthToMarkdownDesc') }}</span>
+        </div>
+        <div class="setting-control-column">
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              :checked="draft.fullwidthToMarkdown"
+              @change="patch('fullwidthToMarkdown', ($event.target as HTMLInputElement).checked)"
+            />
+            <span class="toggle-track" aria-hidden="true"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- 只读映射表：中文符号 | 转换后 -->
+      <div class="mapping-table" v-if="draft.fullwidthToMarkdown">
+        <table>
+          <thead>
+            <tr>
+              <th>{{ $t('settings.editor.fullwidthToMarkdownTableInput') }}</th>
+              <th>{{ $t('settings.editor.fullwidthToMarkdownTableOutput') }}</th>
+              <th v-if="FULLWIDTH_TO_MARKDOWN_MAPPINGS.some(m => m.note)">{{ $t('settings.editor.fullwidthToMarkdownTableNote') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="m in FULLWIDTH_TO_MARKDOWN_MAPPINGS" :key="m.input">
+              <td><code>{{ m.input }}</code></td>
+              <td><code>{{ m.output }}</code></td>
+              <td v-if="FULLWIDTH_TO_MARKDOWN_MAPPINGS.some(mm => mm.note)">{{ m.note ?? "" }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
   </div>

@@ -89,6 +89,9 @@ export interface CommandsDeps {
   // 其他函数
   openSettings: () => Promise<void>;
   toggleFullscreen: () => Promise<void>;
+
+  // 快捷键系统：匹配全局快捷键，命中返回命令 ID（未命中返回 null）
+  matchGlobalKeydown: (e: KeyboardEvent) => string | null;
 }
 
 /**
@@ -106,6 +109,7 @@ export function useCommands(deps: CommandsDeps) {
     editorRef, currentTheme, sidebarView, statusBarVisible,
     tableDialogVisible,
     openSettings, toggleFullscreen, updater,
+    matchGlobalKeydown,
   } = deps;
 
   /** 由原生菜单触发的命令分发 */
@@ -281,74 +285,43 @@ export function useCommands(deps: CommandsDeps) {
         await updater.check(false);
         break;
       }
+      // 视图命令（由快捷键系统分发；保留菜单兼容入口）
+      case "toggle-sidebar": {
+        // 有工作区 → 文件树；无工作区 → 大纲
+        sidebarView.value = workspace.hasWorkspace ? "files" : "outline";
+        break;
+      }
+      case "toggle-outline": {
+        sidebarView.value = "outline";
+        break;
+      }
+      case "switch-tab-next": {
+        tabsStore.switchNext();
+        break;
+      }
+      case "switch-tab-prev": {
+        tabsStore.switchPrev();
+        break;
+      }
+      case "fullscreen": {
+        await toggleFullscreen();
+        break;
+      }
+      case "toggle-statusbar": {
+        statusBarVisible.value = !statusBarVisible.value;
+        break;
+      }
       default:
         break;
     }
   }
 
-  /** 全局快捷键处理 */
+  /** 全局快捷键处理：委托给快捷键系统匹配，命中则分发命令 */
   function onKeyDown(e: KeyboardEvent): void {
-    const ctrl = e.ctrlKey || e.metaKey;
-    // Ctrl+W：关闭当前 tab
-    if (ctrl && e.key === "w" && !e.shiftKey) {
+    const cmdId = matchGlobalKeydown(e);
+    if (cmdId) {
       e.preventDefault();
-      if (tabsStore.activeTabId) {
-        void onCloseTabRequest(tabsStore.activeTabId);
-      }
-      return;
-    }
-    // Ctrl+Tab：切换到下一个 tab
-    if (ctrl && e.key === "Tab" && !e.shiftKey) {
-      e.preventDefault();
-      tabsStore.switchNext();
-      return;
-    }
-    // Ctrl+Shift+Tab：切换到上一个 tab
-    if (ctrl && e.shiftKey && e.key === "Tab") {
-      e.preventDefault();
-      tabsStore.switchPrev();
-      return;
-    }
-    // Ctrl+S：保存
-    if (ctrl && e.key === "s" && !e.shiftKey) {
-      e.preventDefault();
-      void saveCurrentFile();
-      return;
-    }
-    // Ctrl+Shift+E：切换到文件树（无工作区时切换到大纲）
-    if (ctrl && e.shiftKey && (e.key === "E" || e.key === "e")) {
-      e.preventDefault();
-      sidebarView.value = workspace.hasWorkspace ? "files" : "outline";
-      return;
-    }
-    // Ctrl+Shift+M：切换到大纲
-    if (ctrl && e.shiftKey && (e.key === "M" || e.key === "m")) {
-      e.preventDefault();
-      sidebarView.value = "outline";
-      return;
-    }
-    // Ctrl+Shift+F：在文件中查找（打开搜索面板）
-    if (ctrl && e.shiftKey && (e.key === "F" || e.key === "f")) {
-      e.preventDefault();
-      searchStore.visible = true;
-      return;
-    }
-    // Ctrl+R：重新加载当前文件
-    if (ctrl && !e.shiftKey && (e.key === "r" || e.key === "R")) {
-      e.preventDefault();
-      void reloadCurrentFile();
-      return;
-    }
-    // F11：切换全屏
-    if (e.key === "F11") {
-      e.preventDefault();
-      void toggleFullscreen();
-      return;
-    }
-    // Alt+Shift+S：切换状态栏显隐
-    if (e.altKey && e.shiftKey && (e.key === "s" || e.key === "S")) {
-      e.preventDefault();
-      statusBarVisible.value = !statusBarVisible.value;
+      void handleMenuEvent(cmdId);
       return;
     }
   }

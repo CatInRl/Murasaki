@@ -11,6 +11,9 @@ use crate::i18n;
 ///   供 build_app_menu 在菜单重建时恢复正确的 checked 状态
 /// - current_language: 当前界面语言（"zh-CN" / "en"），供 build_app_menu
 ///   在菜单重建时使用对应语言的文案
+/// - shortcut_overrides: 快捷键覆盖表（commandId → accelerator），由前端
+///   update_shortcut_labels 推送。菜单项右侧的快捷键提示据此与设置面板
+///   中用户自定义的绑定保持一致。值为 None 表示该命令被禁用（不显示快捷键）
 ///
 /// 使用稳定的 ID（基于路径类型前缀 + 序号）配合 id_to_path 映射反查，
 /// 避免在菜单重建期间用户点击旧菜单项时因索引错位打开错误路径。
@@ -20,6 +23,7 @@ pub struct RecentMenuState {
     pub id_to_path: Mutex<HashMap<String, String>>,
     pub current_theme: Mutex<String>,
     pub current_language: Mutex<String>,
+    pub shortcut_overrides: Mutex<HashMap<String, Option<String>>>,
 }
 
 impl Default for RecentMenuState {
@@ -30,6 +34,7 @@ impl Default for RecentMenuState {
             id_to_path: Mutex::new(HashMap::new()),
             current_theme: Mutex::new("theme-murasaki".to_string()),
             current_language: Mutex::new(i18n::DEFAULT_LANG.to_string()),
+            shortcut_overrides: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -46,14 +51,30 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .map_err(|e| e.to_string())?
         .clone();
     let t = i18n::menu_texts(&lang);
+    let overrides = state
+        .shortcut_overrides
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
+    // 解析菜单项的实际快捷键提示：
+    // - 无覆盖 → 使用默认 accelerator
+    // - Some(Some(a)) → 使用用户覆盖的 accelerator
+    // - Some(None) → 该快捷键被禁用（accel 为空，菜单不显示快捷键）
+    let accel = |menu_id: &str, default: &str| -> String {
+        match overrides.get(menu_id) {
+            Some(Some(a)) => a.clone(),
+            Some(None) => String::new(),
+            None => default.to_string(),
+        }
+    };
 
     // === File menu ===
     let mut file_builder = SubmenuBuilder::new(app, t.file_menu)
-        .text("new-file", i18n::with_accel(t.file_new, "Ctrl+N"))
+        .text("new-file", i18n::with_accel(t.file_new, &accel("new-file", "Ctrl+N")))
         .text("new-folder", t.file_new_folder)
         .separator()
-        .text("open-file", i18n::with_accel(t.file_open_file, "Ctrl+O"))
-        .text("open-folder", i18n::with_accel(t.file_open_folder, "Ctrl+Shift+O"))
+        .text("open-file", i18n::with_accel(t.file_open_file, &accel("open-file", "Ctrl+O")))
+        .text("open-folder", i18n::with_accel(t.file_open_folder, &accel("open-folder", "Ctrl+Shift+O")))
         .separator();
 
     // "最近打开" 双子菜单：最近文件夹 + 最近文件
@@ -64,53 +85,53 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .item(&recent_folders_submenu)
         .item(&recent_files_submenu)
         .separator()
-        .text("save", i18n::with_accel(t.file_save, "Ctrl+S"))
-        .text("save-as", i18n::with_accel(t.file_save_as, "Ctrl+Shift+S"))
+        .text("save", i18n::with_accel(t.file_save, &accel("save", "Ctrl+S")))
+        .text("save-as", i18n::with_accel(t.file_save_as, &accel("save-as", "Ctrl+Shift+S")))
         .separator()
         .text("export-html", t.file_export_html)
         .text("export-pdf", t.file_export_pdf)
         .text("copy-rich-text", t.file_copy_rich_text)
         .separator()
-        .text("close-tab", i18n::with_accel(t.file_close_tab, "Ctrl+W"))
-        .text("reload-file", i18n::with_accel(t.file_reload_file, "Ctrl+R"))
+        .text("close-tab", i18n::with_accel(t.file_close_tab, &accel("close-tab", "Ctrl+W")))
+        .text("reload-file", i18n::with_accel(t.file_reload_file, &accel("reload-file", "Ctrl+R")))
         .text("close-workspace", t.file_close_workspace)
         .separator()
         .text("settings", t.file_settings)
         .separator()
-        .text("quit", i18n::with_accel(t.file_quit, "Ctrl+Q"));
+        .text("quit", i18n::with_accel(t.file_quit, &accel("quit", "Ctrl+Q")));
 
     let file_menu = file_builder.build()?;
 
     // === Edit menu ===
     let edit_menu = SubmenuBuilder::new(app, t.edit_menu)
-        .text("undo", i18n::with_accel(t.edit_undo, "Ctrl+Z"))
-        .text("redo", i18n::with_accel(t.edit_redo, "Ctrl+Y"))
+        .text("undo", i18n::with_accel(t.edit_undo, &accel("undo", "Ctrl+Z")))
+        .text("redo", i18n::with_accel(t.edit_redo, &accel("redo", "Ctrl+Y")))
         .separator()
-        .text("cut", i18n::with_accel(t.edit_cut, "Ctrl+X"))
-        .text("copy", i18n::with_accel(t.edit_copy, "Ctrl+C"))
-        .text("paste", i18n::with_accel(t.edit_paste, "Ctrl+V"))
-        .text("select-all", i18n::with_accel(t.edit_select_all, "Ctrl+A"))
+        .text("cut", i18n::with_accel(t.edit_cut, &accel("cut", "Ctrl+X")))
+        .text("copy", i18n::with_accel(t.edit_copy, &accel("copy", "Ctrl+C")))
+        .text("paste", i18n::with_accel(t.edit_paste, &accel("paste", "Ctrl+V")))
+        .text("select-all", i18n::with_accel(t.edit_select_all, &accel("select-all", "Ctrl+A")))
         .separator()
-        .text("find", i18n::with_accel(t.edit_find, "Ctrl+F"))
-        .text("replace", i18n::with_accel(t.edit_replace, "Ctrl+H"))
-        .text("find-in-files", i18n::with_accel(t.edit_find_in_files, "Ctrl+Shift+F"))
+        .text("find", i18n::with_accel(t.edit_find, &accel("find", "Ctrl+F")))
+        .text("replace", i18n::with_accel(t.edit_replace, &accel("replace", "Ctrl+H")))
+        .text("find-in-files", i18n::with_accel(t.edit_find_in_files, &accel("find-in-files", "Ctrl+Shift+F")))
         .build()?;
 
     // === Paragraph menu ===
     let paragraph_menu = SubmenuBuilder::new(app, t.paragraph_menu)
-        .text("heading-1", i18n::with_accel(t.para_heading1, "Ctrl+1"))
-        .text("heading-2", i18n::with_accel(t.para_heading2, "Ctrl+2"))
-        .text("heading-3", i18n::with_accel(t.para_heading3, "Ctrl+3"))
-        .text("heading-4", i18n::with_accel(t.para_heading4, "Ctrl+4"))
-        .text("heading-5", i18n::with_accel(t.para_heading5, "Ctrl+5"))
-        .text("heading-6", i18n::with_accel(t.para_heading6, "Ctrl+6"))
-        .text("normal", i18n::with_accel(t.para_normal, "Ctrl+0"))
+        .text("heading-1", i18n::with_accel(t.para_heading1, &accel("heading-1", "Ctrl+1")))
+        .text("heading-2", i18n::with_accel(t.para_heading2, &accel("heading-2", "Ctrl+2")))
+        .text("heading-3", i18n::with_accel(t.para_heading3, &accel("heading-3", "Ctrl+3")))
+        .text("heading-4", i18n::with_accel(t.para_heading4, &accel("heading-4", "Ctrl+4")))
+        .text("heading-5", i18n::with_accel(t.para_heading5, &accel("heading-5", "Ctrl+5")))
+        .text("heading-6", i18n::with_accel(t.para_heading6, &accel("heading-6", "Ctrl+6")))
+        .text("normal", i18n::with_accel(t.para_normal, &accel("normal", "Ctrl+0")))
         .separator()
-        .text("code-block", i18n::with_accel(t.para_code_block, "Ctrl+Shift+K"))
-        .text("blockquote", i18n::with_accel(t.para_blockquote, "Ctrl+Shift+Q"))
-        .text("unordered-list", i18n::with_accel(t.para_unordered_list, "Ctrl+Shift+]"))
-        .text("ordered-list", i18n::with_accel(t.para_ordered_list, "Ctrl+Shift+["))
-        .text("task-list", i18n::with_accel(t.para_task_list, "Ctrl+Shift+X"))
+        .text("code-block", i18n::with_accel(t.para_code_block, &accel("code-block", "Ctrl+Shift+K")))
+        .text("blockquote", i18n::with_accel(t.para_blockquote, &accel("blockquote", "Ctrl+Shift+Q")))
+        .text("unordered-list", i18n::with_accel(t.para_unordered_list, &accel("unordered-list", "Ctrl+Shift+]")))
+        .text("ordered-list", i18n::with_accel(t.para_ordered_list, &accel("ordered-list", "Ctrl+Shift+[")))
+        .text("task-list", i18n::with_accel(t.para_task_list, &accel("task-list", "Ctrl+Shift+X")))
         .separator()
         .text("horizontal-rule", t.para_horizontal_rule)
         .text("insert-table", t.para_insert_table)
@@ -299,6 +320,28 @@ pub fn reload_menu(
     {
         let mut current = state.current_language.lock().map_err(|e| e.to_string())?;
         *current = lang;
+    }
+    let menu = build_app_menu(&app).map_err(|e| e.to_string())?;
+    app.set_menu(menu).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// 前端调用：同步快捷键覆盖到原生菜单
+/// 覆盖表为 commandId → accelerator 字符串；值为 null 表示该命令的快捷键被禁用。
+/// 更新 shortcut_overrides 并重建菜单，使菜单项右侧的快捷键提示与设置面板中
+/// 用户自定义的绑定保持一致。
+#[tauri::command]
+pub fn update_shortcut_labels(
+    app: AppHandle,
+    state: tauri::State<'_, RecentMenuState>,
+    overrides: HashMap<String, Option<String>>,
+) -> Result<(), String> {
+    {
+        let mut current = state
+            .shortcut_overrides
+            .lock()
+            .map_err(|e| e.to_string())?;
+        *current = overrides;
     }
     let menu = build_app_menu(&app).map_err(|e| e.to_string())?;
     app.set_menu(menu).map_err(|e| e.to_string())?;

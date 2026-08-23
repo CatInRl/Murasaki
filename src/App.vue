@@ -42,6 +42,7 @@ import { useEditorNavigation } from "./composables/useEditorNavigation";
 import { useCompareWindow } from "./composables/useCompareWindow";
 import { useTabClose } from "./composables/useTabClose";
 import { useCommands } from "./composables/useCommands";
+import { useShortcuts } from "./shortcuts/useShortcuts";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
 import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
 import { setLocale } from "./i18n";
@@ -325,6 +326,12 @@ onMounted(async () => {
   void invoke("reload_menu", { lang: persistence.settings.language }).catch((err: unknown) =>
     console.warn("初始化菜单语言失败:", err)
   );
+  // 同步已保存的快捷键覆盖到原生菜单（菜单项快捷键提示跟随用户自定义）
+  void invoke("update_shortcut_labels", {
+    overrides: persistence.settings.shortcuts ?? {},
+  }).catch((err: unknown) =>
+    console.warn("初始化菜单快捷键失败:", err)
+  );
   // 恢复侧栏视图
   if (persistence.settings.sidebarView) {
     sidebarView.value = persistence.settings.sidebarView;
@@ -493,6 +500,8 @@ async function toggleFullscreen(): Promise<void> {
 }
 
 // ===== 命令分发（菜单事件 + 全局快捷键）=====
+// 快捷键系统：读取 settings.shortcuts 覆盖，提供全局 keydown 匹配
+const { matchGlobalKeydown } = useShortcuts();
 const { handleMenuEvent, onKeyDown } = useCommands({
   onNewTab, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
   reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, copyRichText,
@@ -502,6 +511,7 @@ const { handleMenuEvent, onKeyDown } = useCommands({
   tableDialogVisible,
   openSettings, toggleFullscreen,
   updater: { check: checkForUpdate },
+  matchGlobalKeydown,
 });
 
 // ===== 拖拽/命令行打开文件或文件夹（issue #92 / #113）=====
@@ -681,6 +691,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :font-size="persistence.settings.editorFontSize"
             :line-height="persistence.settings.editorLineHeight"
             :font-family="persistence.settings.editorFontFamily"
+            :fullwidth-to-markdown="persistence.settings.fullwidthToMarkdown"
             @cursor-change="onCursorChange"
             @open-internal="openFile"
             @drop-image-path="onDropImagePath"

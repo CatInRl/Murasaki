@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { List } from "lucide-vue-next";
 import { NScrollbar } from "naive-ui";
 import type { OutlineItem } from "../types";
+import { usePersistenceStore } from "../stores/usePersistenceStore";
 import EmptyState from "./EmptyState.vue";
 import Skeleton from "./Skeleton.vue";
 
@@ -20,6 +21,11 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: "jump-to-line", line: number): void;
 }>();
+
+const persistence = usePersistenceStore();
+
+/** 长条目显示方案：wrap=自动换行 / hover=省略号+悬停显示完整 */
+const wrapMode = computed(() => persistence.settings.entryOverflowMode === "wrap");
 
 /** 计算最小层级（用于缩进归一化） */
 const minLevel = computed(() => {
@@ -52,9 +58,9 @@ function normLevel(level: number): number {
           v-for="(item, idx) in items"
           :key="idx"
           class="outline-item"
-          :class="[`level-${normLevel(item.level)}`]"
+          :class="[`level-${normLevel(item.level)}`, { 'wrap-mode': wrapMode }]"
           :style="{ paddingLeft: (item.level - minLevel) * 14 + 12 + 'px' }"
-          :title="$t('editor.outline.lineTooltip', { line: item.line })"
+          :title="`${item.text}（${$t('editor.outline.lineTooltip', { line: item.line })}）`"
           @click="emit('jump-to-line', item.line)"
         >
           <span class="outline-dot" aria-hidden="true"></span>
@@ -175,6 +181,22 @@ function normLevel(level: number): number {
   white-space: nowrap;
   flex: 1;
   min-width: 0;
+}
+
+/* 长条目自动换行方案（设置-编辑器-长条目显示） */
+.outline-item.wrap-mode {
+  height: auto;
+  min-height: 28px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  overflow: visible;
+}
+.outline-item.wrap-mode .outline-text {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 /* 触屏：放大行高 */

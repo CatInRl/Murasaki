@@ -24,7 +24,7 @@ import {
   Image as ImageIcon,
   Clipboard,
 } from "lucide-vue-next";
-import { paragraphKeymap } from "../composables/useEditorCommands";
+import { buildEditorShortcutExtension, useShortcuts } from "../shortcuts/useShortcuts";
 import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
 import type { MenuItem } from "../stores/useContextMenuStore";
@@ -38,6 +38,7 @@ import {
 import { useProposalsStore } from "../stores/useProposalsStore";
 import { wysiwygExtensions, recomputeWysiwygEffect } from "../editor/wysiwyg/wysiwygPlugin";
 import { setCurrentFilePath } from "../composables/useMarkdownRenderer";
+import { fullwidthToMarkdownExtension } from "../editor/fullwidthToMarkdown";
 
 /**
  * Murasaki syntax theme — purple-tinted, writing-first (ADR-0006).
@@ -234,6 +235,8 @@ interface Props {
   markdownTheme?: string;
   /** 当前文件路径（用于 WYSIWYG 模式解析相对图片路径，ADR-0015） */
   currentFilePath?: string | null;
+  /** 中文符号转 Markdown 记号（行首输入 + 空格自动转换，0.8.0） */
+  fullwidthToMarkdown?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -247,6 +250,7 @@ const props = withDefaults(defineProps<Props>(), {
   fontFamily: "JetBrains Mono",
   markdownTheme: "murasaki",
   currentFilePath: null,
+  fullwidthToMarkdown: false,
 });
 
 const emit = defineEmits<{
@@ -284,6 +288,10 @@ const wysiwygComp = new Compartment();
 const fontComp = new Compartment();
 // 语言高亮：非 markdown 文件通过此 Compartment 运行时切换 CodeMirror 语言
 const languageComp = new Compartment();
+// 快捷键覆盖：settings.shortcuts 变化时重建编辑器快捷键 keymap（shortcutComp）
+const shortcutComp = new Compartment();
+// 快捷键覆盖表（响应式：设置保存后自动更新）
+const { overrides } = useShortcuts();
 
 function buildExtensions() {
   return [
@@ -305,12 +313,10 @@ function buildExtensions() {
       ...foldKeymap,
       ...completionKeymap,
       indentWithTab,
-      // 段落快捷键（Ctrl+1-6/0、Ctrl+Shift+K/Q/X/[/]）
-      { key: "Ctrl-f", preventDefault: true, run: openSearchPanel },
-      { key: "Ctrl-h", preventDefault: true, run: openSearchPanel },
     ]),
-    // 段落格式化快捷键（高优先级，避免被 defaultKeymap 拦截）
-    paragraphKeymap(),
+    // 快捷键扩展（高优先级，避免被 defaultKeymap 拦截；含 Enter 引用块换行处理）
+    // 由设置中的快捷键覆盖动态生成，settings://saved 后通过 shortcutComp 重建
+    shortcutComp.of(buildEditorShortcutExtension(overrides.value)),
     // 语言高亮：markdown 走 GFM，其他文本/代码文件走解析出的 CodeMirror 语言
     languageComp.of(buildLanguageExtension()),
     lineNumbersComp.of(props.showLineNumbers ? lineNumbers() : []),
@@ -320,6 +326,15 @@ function buildExtensions() {
     fontComp.of(buildFontTheme()),
     // WYSIWYG ViewPlugin 仅在 wysiwyg 模式下叠加（运行时通过 Compartment 切换）
     wysiwygComp.of(props.editorMode === "wysiwyg" ? wysiwygExtensions : []),
+    // 中文符号转 Markdown 记号（0.8.0）：行首输入全角符号 + 空格自动转换
+    // isEnabled / isMarkdown 为实时谓词（读取 props 响应式值），开关/文件切换无需重建扩展
+    fullwidthToMarkdownExtension({
+      isEnabled: () => props.fullwidthToMarkdown,
+      isMarkdown: () =>
+        props.currentFilePath
+          ? isMarkdownFile(props.currentFilePath)
+          : true, // 未命名新文件默认按 markdown 处理（与 App.vue 约定一致）
+    }),
     foldGutter({ openText: "▾", closedText: "▸" }),
     murasakiTheme,
     syntaxHighlighting(murasakiHighlightStyle),
@@ -504,12 +519,13 @@ watch(
           isApplyingExternalValue = false;
         }
       }
-      // 确保 wysiwygComp + fontComp 与当前 editorMode 一致（issue #115）
-      // cached state 可能在不同编辑模式下缓存，setState 恢复后需重新应用当前模式
+      // 确保 wysiwygComp + fontComp + shortcutComp 与当前配置一致（issue #115）
+      // cached state 可能在不同配置下缓存，setState 恢复后需重新应用当前配置
       view.dispatch({
         effects: [
           wysiwygComp.reconfigure(props.editorMode === "wysiwyg" ? wysiwygExtensions : []),
           fontComp.reconfigure(buildFontTheme()),
+          shortcutComp.reconfigure(buildEditorShortcutExtension(overrides.value)),
         ],
       });
     } else {
@@ -585,6 +601,16 @@ watch(
         wysiwygComp.reconfigure(v === "wysiwyg" ? wysiwygExtensions : []),
         fontComp.reconfigure(buildFontTheme()),
       ],
+    });
+  }
+);
+
+// 快捷键覆盖变更（settings://saved 触发 settings.shortcuts 更新）→ 重建编辑器快捷键 keymap
+watch(
+  () => overrides.value,
+  () => {
+    viewRef.value?.dispatch({
+      effects: shortcutComp.reconfigure(buildEditorShortcutExtension(overrides.value)),
     });
   }
 );

@@ -33,7 +33,12 @@ export const EDITOR_FIELDS: (keyof SettingsState)[] = [
   "editorFontPreset",
   "showLineNumbers",
   "softWrap",
+  "entryOverflowMode",
+  "fullwidthToMarkdown",
 ];
+
+/** 快捷键分类下受 footer Save 管理的字段（覆盖表整体比较） */
+export const SHORTCUTS_FIELD: (keyof SettingsState)[] = ["shortcuts"];
 
 /** 返回某分类下参与 draft 比较的字段列表（ai 不参与，provider 走独立持久化） */
 export function fieldsForCategory(
@@ -44,9 +49,29 @@ export function fieldsForCategory(
       return GENERAL_FIELDS;
     case "editor":
       return EDITOR_FIELDS;
+    case "shortcuts":
+      return SHORTCUTS_FIELD;
     default:
       return [];
   }
+}
+
+/**
+ * 深比较快捷键覆盖表（Record 按键名逐项比较，缺省视为 {}）。
+ * 用于 dirty 判断——draft/snapshot 的 shortcuts 对象引用不同时，
+ * 需语义比较键值是否一致。
+ */
+export function shortcutsEqual(
+  a: Record<string, string | null> | undefined,
+  b: Record<string, string | null> | undefined
+): boolean {
+  const ak = a ?? {};
+  const bk = b ?? {};
+  const keys = new Set([...Object.keys(ak), ...Object.keys(bk)]);
+  for (const k of keys) {
+    if (ak[k] !== bk[k]) return false;
+  }
+  return true;
 }
 
 /** 判断指定分类是否有未保存改动 */
@@ -55,17 +80,23 @@ export function isCategoryDirty(
   snapshot: SettingsState,
   category: SettingsCategory
 ): boolean {
-  return fieldsForCategory(category).some((f) => draft[f] !== snapshot[f]);
+  return fieldsForCategory(category).some((f) => {
+    if (f === "shortcuts") {
+      return !shortcutsEqual(draft.shortcuts, snapshot.shortcuts);
+    }
+    return draft[f] !== snapshot[f];
+  });
 }
 
-/** 判断是否有任意未保存改动（general + editor，不含 ai） */
+/** 判断是否有任意未保存改动（general + editor + shortcuts，不含 ai） */
 export function isDirty(
   draft: SettingsState,
   snapshot: SettingsState
 ): boolean {
   return (
     isCategoryDirty(draft, snapshot, "general") ||
-    isCategoryDirty(draft, snapshot, "editor")
+    isCategoryDirty(draft, snapshot, "editor") ||
+    isCategoryDirty(draft, snapshot, "shortcuts")
   );
 }
 
@@ -101,7 +132,12 @@ export function restoreCategoryDefaults(
         editorFontPreset: DEFAULT_SETTINGS.editorFontPreset,
         showLineNumbers: DEFAULT_SETTINGS.showLineNumbers,
         softWrap: DEFAULT_SETTINGS.softWrap,
+        entryOverflowMode: DEFAULT_SETTINGS.entryOverflowMode,
+        fullwidthToMarkdown: DEFAULT_SETTINGS.fullwidthToMarkdown,
       };
+    case "shortcuts":
+      // 覆盖表置空 = 所有命令回退到注册表默认绑定
+      return { ...draft, shortcuts: {} };
     default:
       return { ...draft };
   }

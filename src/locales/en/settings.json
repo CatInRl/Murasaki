@@ -2,7 +2,8 @@
   "categories": {
     "general": "General",
     "editor": "Editor",
-    "ai": "AI"
+    "ai": "AI",
+    "shortcuts": "Shortcuts"
   },
   "sidebarAriaLabel": "Settings categories",
   "general": {
@@ -49,7 +50,16 @@
     "showLineNumbers": "Show Line Numbers",
     "showLineNumbersDesc": "Show line numbers on the left of the source editor",
     "softWrap": "Soft Wrap",
-    "softWrapDesc": "Wrap long lines to fit the editor width"
+    "softWrapDesc": "Wrap long lines to fit the editor width",
+    "entryOverflow": "Long Entry Display",
+    "entryOverflowDesc": "How overly long entries in the file tree / outline are shown when they exceed the width",
+    "entryOverflowHover": "Hover for full text",
+    "entryOverflowWrap": "Auto wrap",
+    "fullwidthToMarkdown": "Convert Chinese symbols to Markdown markers",
+    "fullwidthToMarkdownDesc": "At line start, a full-width/Chinese symbol followed by a space is auto-converted to the matching Markdown marker (e.g. 》→>, ···→```)",
+    "fullwidthToMarkdownTableInput": "Input (line start)",
+    "fullwidthToMarkdownTableOutput": "Converted to",
+    "fullwidthToMarkdownTableNote": "Note"
   },
   "ai": {
     "title": "AI",
@@ -102,5 +112,61 @@
     "save": "Save",
     "saving": "Saving…"
   },
-  "unsavedMessage": "You have unsaved settings changes. Save them?"
+  "unsavedMessage": "You have unsaved settings changes. Save them?",
+  "shortcuts": {
+    "title": "Shortcuts",
+    "description": "Click a shortcut badge to record a new combination; press Esc to cancel. Row icons restore the default binding or disable the shortcut.",
+    "categories": {
+      "file": "File",
+      "edit": "Edit",
+      "paragraph": "Paragraph",
+      "view": "View",
+      "agent": "Agent"
+    },
+    "newFile": "New File",
+    "newFolder": "New Folder",
+    "openFile": "Open File",
+    "openFolder": "Open Folder",
+    "save": "Save",
+    "saveAs": "Save As",
+    "exportHtml": "Export HTML",
+    "exportPdf": "Export PDF",
+    "copyRichText": "Copy Rich Text",
+    "closeTab": "Close Tab",
+    "reloadFile": "Reload File",
+    "closeWorkspace": "Close Workspace",
+    "settings": "Settings",
+    "quit": "Quit",
+    "undo": "Undo",
+    "redo": "Redo",
+    "selectAll": "Select All",
+    "find": "Find",
+    "replace": "Replace",
+    "findInFiles": "Find in Files",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "heading4": "Heading 4",
+    "heading5": "Heading 5",
+    "heading6": "Heading 6",
+    "normal": "Normal Text",
+    "codeBlock": "Code Block",
+    "blockquote": "Blockquote",
+    "unorderedList": "Unordered List",
+    "orderedList": "Ordered List",
+    "taskList": "Task List",
+    "toggleSidebar": "Toggle Sidebar",
+    "toggleOutline": "Toggle Outline",
+    "switchTabNext": "Next Tab",
+    "switchTabPrev": "Previous Tab",
+    "fullscreen": "Fullscreen",
+    "toggleStatusbar": "Toggle Status Bar",
+    "unset": "Unset",
+    "recording": "Press shortcut…",
+    "recordTitle": "Click to record a new shortcut",
+    "restoreDefault": "Restore Default",
+    "disable": "Disable",
+    "conflict": "Conflicts with {commands}",
+    "invalidHint": "That combination is not allowed: character keys must be combined with Ctrl or Alt (function keys such as F1-F12, Esc and arrow keys can be bound directly)."
+  }
 }

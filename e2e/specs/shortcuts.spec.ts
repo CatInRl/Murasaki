@@ -66,6 +66,42 @@ async function waitForStoreState(
   await browser.waitUntil(predicate, { timeout, interval: 100 });
 }
 
+/** 通过 persistence.updateSettings 写入快捷键覆盖（模拟设置窗口保存到磁盘） */
+async function setShortcutOverrides(
+  browser: Browser,
+  shortcuts: Record<string, string | null>
+): Promise<void> {
+  await browser.executeAsync((sc: Record<string, string | null>, done: (res: unknown) => void) => {
+    // @ts-ignore
+    const pinia = window.__pinia__;
+    const persistence = pinia._s.get("persistence");
+    Promise.resolve(persistence.updateSettings({ shortcuts: sc }))
+      .then(() => done(null))
+      .catch((err: unknown) => done(err ? String(err) : null));
+  }, shortcuts);
+  await browser.pause(300);
+}
+
+/** 模拟设置窗口保存：emit settings://saved 事件（触发主窗口 loadSettings + update_shortcut_labels） */
+async function emitSettingsSaved(browser: Browser): Promise<void> {
+  await browser.executeAsync((done: (res: unknown) => void) => {
+    // @ts-ignore
+    window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
+      event: "settings://saved",
+      payload: {},
+    }).then(
+      () => done(null),
+      (err: unknown) => done(err ? String(err) : null)
+    );
+  });
+  await browser.pause(500);
+}
+
+/** 状态栏当前是否隐藏 */
+async function statusbarHidden(browser: Browser): Promise<boolean> {
+  return browser.execute(() => !document.querySelector(".status-bar"));
+}
+
 describe("快捷键", () => {
   beforeAll(async () => {
     browser = await createSession();
@@ -428,5 +464,63 @@ describe("快捷键", () => {
     // 恢复后再次验证 session 仍响应（弱断言，与测试名声明一致）
     const aliveAfterRestore = await browser.execute(() => document.readyState).catch(() => null);
     expect(aliveAfterRestore).toBe("complete");
+  });
+
+  // ============ 自定义快捷键实时生效 ============
+
+  it("自定义快捷键保存后实时生效（新绑定立即生效、旧绑定失效）", async () => {
+    // 0. 隔离：确保无历史覆盖，且状态栏初始可见
+    await setShortcutOverrides(browser, {});
+    expect(await statusbarHidden(browser)).toBe(false);
+
+    // 1. 模拟设置窗口保存：写盘 + emit settings://saved
+    await setShortcutOverrides(browser, { "toggle-statusbar": "Alt+Shift+T" });
+    await emitSettingsSaved(browser);
+
+    // 2. 验证内存中的快捷键覆盖已生效
+    const stored = await browser.execute(() => {
+      // @ts-ignore
+      return window.__pinia__._s.get("persistence").settings.shortcuts;
+    });
+    expect(stored?.["toggle-statusbar"]).toBe("Alt+Shift+T");
+
+    // 3. 新绑定 Alt+Shift+T 立即生效：状态栏隐藏
+    await pressShortcut(browser, "t", { alt: true, shift: true });
+    await browser.waitUntil(async () => statusbarHidden(browser), {
+      timeout: 3000,
+      interval: 100,
+    });
+
+    // 4. 旧绑定 Alt+Shift+S 已失效：状态栏保持隐藏（不再切换）
+    await pressShortcut(browser, "s", { alt: true, shift: true });
+    await browser.pause(300);
+    expect(await statusbarHidden(browser)).toBe(true);
+
+    // 5. 清理：恢复默认覆盖，并把状态栏切回可见（默认 Alt+Shift+S）
+    await setShortcutOverrides(browser, {});
+    await emitSettingsSaved(browser);
+    await pressShortcut(browser, "s", { alt: true, shift: true });
+    await browser.waitUntil(async () => !(await statusbarHidden(browser)), {
+      timeout: 3000,
+      interval: 100,
+    });
+  });
+
+  it("update_shortcut_labels 命令调用无错误（原生菜单快捷键提示同步）", async () => {
+    // 直接调用 Rust 命令（重建后的 release 二进制），验证覆盖表能同步到原生菜单
+    const err = await browser.executeAsync((done: (res: unknown) => void) => {
+      // @ts-ignore
+      window.__TAURI_INTERNALS__.invoke("update_shortcut_labels", {
+        overrides: { "toggle-statusbar": "Alt+Shift+T", "close-tab": null },
+      }).then(
+        () => done(null),
+        (e: unknown) => done(e ? String(e) : null)
+      );
+    });
+    expect(err).toBe(null);
+
+    // 清理：恢复默认覆盖并重新同步
+    await setShortcutOverrides(browser, {});
+    await emitSettingsSaved(browser);
   });
 });

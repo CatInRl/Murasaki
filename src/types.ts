@@ -162,6 +162,13 @@ export const READING_FONT_PRESET_LABELS: Record<ReadingFontPreset, string> = {
   d: "settings.editor.fontPresetD",
 };
 
+/**
+ * 侧栏长条目（文件树文件名 / 大纲标题）超出宽度时的显示方案
+ * - hover：省略号截断，悬停显示完整内容
+ * - wrap：自动换行显示完整内容
+ */
+export type SidebarEntryOverflow = "hover" | "wrap";
+
 export interface SettingsState {
   /** UI 模式已固定为浅色（0.5.0 移除深色模式，issue #114） */
   uiMode: "light";
@@ -204,6 +211,19 @@ export interface SettingsState {
   checkUpdatesOnStartup: boolean;
   /** 界面语言（默认 zh-CN，ADR-0013） */
   language: AppLocale;
+  /** 侧栏长条目显示方案：hover=省略号+悬停显示完整 / wrap=自动换行 */
+  entryOverflowMode: SidebarEntryOverflow;
+  /**
+   * 中文符号自动转 Markdown 记号（默认开，0.8.0）。
+   * 行首输入全角/中文符号后加空格，整串自动转换为 markdown 结构记号。
+   * 映射表固定内置（见 editor/fullwidthToMarkdown.ts），设置面板只读展示。
+   */
+  fullwidthToMarkdown: boolean;
+  /**
+   * 快捷键覆盖表（commandId → 绑定，null=禁用）。
+   * 只存与默认绑定不同的条目；未覆盖的命令回退到注册表默认绑定（resolveShortcut）。
+   */
+  shortcuts: Record<string, string | null>;
 }
 
 /**
@@ -233,6 +253,9 @@ export const DEFAULT_SETTINGS: SettingsState = {
   aiProposeReplaceConfirmThreshold: 50,
   checkUpdatesOnStartup: true,
   language: "zh-CN",
+  entryOverflowMode: "hover",
+  fullwidthToMarkdown: true,
+  shortcuts: {},
 };
 
 /**

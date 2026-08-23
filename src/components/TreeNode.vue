@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   Pencil,
@@ -19,6 +19,7 @@ import { NInput } from "naive-ui";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
 import { useDialogStore } from "../stores/useDialogStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
+import { usePersistenceStore } from "../stores/usePersistenceStore";
 import type { MenuItem } from "../stores/useContextMenuStore";
 import type { TreeNode } from "../types";
 import {
@@ -50,7 +51,11 @@ const emit = defineEmits<{
 const fileOps = useFileOpsStore();
 const dialog = useDialogStore();
 const contextMenu = useContextMenuStore();
+const persistence = usePersistenceStore();
 const { t } = useI18n();
+
+/** 长条目显示方案：wrap=自动换行 / hover=省略号+悬停显示完整 */
+const wrapMode = computed(() => persistence.settings.entryOverflowMode === "wrap");
 
 const expanded = ref(false); // 默认收起所有子文件夹
 
@@ -375,6 +380,7 @@ function cancelCreating(): void {
         'is-md': isMarkdownFile(node.name),
         'is-image': isImageFile(node.name),
         'is-drop-target': isDropTarget,
+        'wrap-mode': wrapMode,
       }"
       :style="{ paddingLeft: level * 14 + 8 + 'px' }"
       :draggable="(node.type === 'file') || (node.type === 'directory')"
@@ -448,7 +454,7 @@ function cancelCreating(): void {
           <polyline points="14 2 14 8 20 8"/>
         </svg>
       </template>
-      <span class="node-name" :title="node.path">{{ node.name }}</span>
+      <span class="node-name" :title="node.name">{{ node.name }}</span>
     </div>
 
     <!-- 重命名输入框（替换节点行） -->
@@ -644,6 +650,21 @@ export default { name: "TreeNode" };
   white-space: nowrap;
   flex: 1;
   min-width: 0;
+}
+
+/* 长条目自动换行方案（设置-编辑器-长条目显示） */
+.node-row.wrap-mode {
+  height: auto;
+  min-height: 26px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+.node-row.wrap-mode .node-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.35;
+  word-break: break-word;
 }
 .node-children {
   /* 子节点容器无需额外样式，缩进由 paddingLeft 处理 */

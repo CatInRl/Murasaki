@@ -2,117 +2,201 @@
 /**
  * ShortcutPanel — 快捷键设置面板（issue #97）
  *
- * 显示所有应用快捷键，按功能分类组织：
- * - 文件操作 / 编辑操作 / 段落格式化 / 视图切换 / Agent
+ * 按功能分类展示所有可自定义快捷键（单一事实源 shortcutRegistry）：
+ * - 文件 / 编辑 / 段落 / 视图 / Agent
  *
- * 快捷键数据来自 menu.rs 与 useEditorCommands.ts，保持与原生菜单一致。
- * 当前版本以展示为主，不支持自定义录制（0.5.0 后续版本再实现）。
+ * 交互：
+ * - 点击快捷键徽标进入录制态，按下组合键完成录制（Esc 取消）
+ * - 行尾图标：恢复该命令默认绑定 / 禁用该命令快捷键
+ * - 与默认绑定不同的命令会实时提示与其他命令的绑定冲突
+ *
+ * 通过 v-model 写回 SettingsApp 的 draft（显式 Save 模型，保存才落盘）。
  */
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { RotateCcw, X } from "lucide-vue-next";
+import type { SettingsState } from "../../types";
+import {
+  CATEGORY_ORDER,
+  SHORTCUT_COMMANDS,
+  type ShortcutCommand,
+} from "../../shortcuts/shortcutRegistry";
+import {
+  detectConflicts,
+  effectiveShortcuts,
+  eventToShortcut,
+  isDefaultShortcut,
+  isUsableShortcut,
+  resetShortcutOverride,
+  setShortcutOverride,
+} from "../../shortcuts/shortcutsLogic";
+
+const props = defineProps<{ modelValue: SettingsState }>();
+const emit = defineEmits<{ "update:modelValue": [SettingsState] }>();
 
 const { t } = useI18n();
 
-interface ShortcutEntry {
-  id: string;
-  labelKey: string;
-  shortcut: string;
-  category: "file" | "edit" | "paragraph" | "view" | "agent";
+const draft = computed(() => props.modelValue);
+
+function patchShortcuts(next: Record<string, string | null>): void {
+  emit("update:modelValue", { ...draft.value, shortcuts: next });
 }
 
-/**
- * 静态快捷键清单（与原生菜单保持一致，后续改为动态生成）
- * key 使用 vue-i18n 路径，便于国际化
- */
-const SHORTCUTS: ShortcutEntry[] = [
-  // 文件操作
-  { id: "new-file", labelKey: "settings.shortcuts.newFile", shortcut: "Ctrl+N", category: "file" },
-  { id: "open-file", labelKey: "settings.shortcuts.openFile", shortcut: "Ctrl+O", category: "file" },
-  { id: "open-folder", labelKey: "settings.shortcuts.openFolder", shortcut: "Ctrl+Shift+O", category: "file" },
-  { id: "save", labelKey: "settings.shortcuts.save", shortcut: "Ctrl+S", category: "file" },
-  { id: "save-as", labelKey: "settings.shortcuts.saveAs", shortcut: "Ctrl+Shift+S", category: "file" },
-  { id: "close-tab", labelKey: "settings.shortcuts.closeTab", shortcut: "Ctrl+W", category: "file" },
-  { id: "reload-file", labelKey: "settings.shortcuts.reloadFile", shortcut: "Ctrl+R", category: "file" },
-  { id: "quit", labelKey: "settings.shortcuts.quit", shortcut: "Ctrl+Q", category: "file" },
+/** 命令 ID → 有效绑定（默认或覆盖） */
+const effective = computed(() => effectiveShortcuts(draft.value.shortcuts));
 
-  // 编辑操作
-  { id: "undo", labelKey: "settings.shortcuts.undo", shortcut: "Ctrl+Z", category: "edit" },
-  { id: "redo", labelKey: "settings.shortcuts.redo", shortcut: "Ctrl+Y", category: "edit" },
-  { id: "cut", labelKey: "settings.shortcuts.cut", shortcut: "Ctrl+X", category: "edit" },
-  { id: "copy", labelKey: "settings.shortcuts.copy", shortcut: "Ctrl+C", category: "edit" },
-  { id: "paste", labelKey: "settings.shortcuts.paste", shortcut: "Ctrl+V", category: "edit" },
-  { id: "select-all", labelKey: "settings.shortcuts.selectAll", shortcut: "Ctrl+A", category: "edit" },
-  { id: "find", labelKey: "settings.shortcuts.find", shortcut: "Ctrl+F", category: "edit" },
-  { id: "replace", labelKey: "settings.shortcuts.replace", shortcut: "Ctrl+H", category: "edit" },
-  { id: "find-in-files", labelKey: "settings.shortcuts.findInFiles", shortcut: "Ctrl+Shift+F", category: "edit" },
-
-  // 段落格式化
-  { id: "heading-1", labelKey: "settings.shortcuts.heading1", shortcut: "Ctrl+1", category: "paragraph" },
-  { id: "heading-2", labelKey: "settings.shortcuts.heading2", shortcut: "Ctrl+2", category: "paragraph" },
-  { id: "heading-3", labelKey: "settings.shortcuts.heading3", shortcut: "Ctrl+3", category: "paragraph" },
-  { id: "heading-4", labelKey: "settings.shortcuts.heading4", shortcut: "Ctrl+4", category: "paragraph" },
-  { id: "heading-5", labelKey: "settings.shortcuts.heading5", shortcut: "Ctrl+5", category: "paragraph" },
-  { id: "heading-6", labelKey: "settings.shortcuts.heading6", shortcut: "Ctrl+6", category: "paragraph" },
-  { id: "normal", labelKey: "settings.shortcuts.normal", shortcut: "Ctrl+0", category: "paragraph" },
-  { id: "code-block", labelKey: "settings.shortcuts.codeBlock", shortcut: "Ctrl+Shift+K", category: "paragraph" },
-  { id: "blockquote", labelKey: "settings.shortcuts.blockquote", shortcut: "Ctrl+Shift+Q", category: "paragraph" },
-  { id: "unordered-list", labelKey: "settings.shortcuts.unorderedList", shortcut: "Ctrl+Shift+]", category: "paragraph" },
-  { id: "ordered-list", labelKey: "settings.shortcuts.orderedList", shortcut: "Ctrl+Shift+[", category: "paragraph" },
-  { id: "task-list", labelKey: "settings.shortcuts.taskList", shortcut: "Ctrl+Shift+X", category: "paragraph" },
-
-  // 视图切换
-  { id: "toggle-sidebar", labelKey: "settings.shortcuts.toggleSidebar", shortcut: "Ctrl+Shift+E", category: "view" },
-  { id: "toggle-outline", labelKey: "settings.shortcuts.toggleOutline", shortcut: "Ctrl+Shift+M", category: "view" },
-  { id: "switch-tab-next", labelKey: "settings.shortcuts.switchTabNext", shortcut: "Ctrl+Tab", category: "view" },
-  { id: "switch-tab-prev", labelKey: "settings.shortcuts.switchTabPrev", shortcut: "Ctrl+Shift+Tab", category: "view" },
-  { id: "fullscreen", labelKey: "settings.shortcuts.fullscreen", shortcut: "F11", category: "view" },
-  { id: "toggle-statusbar", labelKey: "settings.shortcuts.toggleStatusbar", shortcut: "Alt+Shift+S", category: "view" },
-];
-
-const CATEGORY_LABELS: Record<ShortcutEntry["category"], string> = {
-  file: "settings.shortcuts.categories.file",
-  edit: "settings.shortcuts.categories.edit",
-  paragraph: "settings.shortcuts.categories.paragraph",
-  view: "settings.shortcuts.categories.view",
-  agent: "settings.shortcuts.categories.agent",
-};
-
-/** 按分类分组的快捷键列表 */
-const groupedShortcuts = computed(() => {
-  const groups: Record<string, ShortcutEntry[]> = {
-    file: [],
-    edit: [],
-    paragraph: [],
-    view: [],
-  };
-  for (const s of SHORTCUTS) {
-    groups[s.category].push(s);
+/** 命令 ID → 与之共享同一绑定的其他命令（冲突提示用） */
+const conflictMap = computed(() => {
+  const map = new Map<string, ShortcutCommand[]>();
+  for (const conflict of detectConflicts(draft.value.shortcuts)) {
+    for (const cmd of conflict.commands) {
+      const others = conflict.commands.filter((c) => c.id !== cmd.id);
+      map.set(cmd.id, others);
+    }
   }
-  return Object.entries(groups)
-    .filter(([, v]) => v.length > 0)
-    .map(([cat, list]) => ({
-      category: cat as ShortcutEntry["category"],
-      label: t(CATEGORY_LABELS[cat as ShortcutEntry["category"]]),
-      list,
-    }));
+  return map;
 });
+
+/** 按分类分组（CATEGORY_ORDER 排序，跳过空组） */
+const groups = computed(() =>
+  CATEGORY_ORDER.map((category) => ({
+    category,
+    label: t(`settings.shortcuts.categories.${category}`),
+    list: SHORTCUT_COMMANDS.filter((c) => c.category === category),
+  })).filter((g) => g.list.length > 0)
+);
+
+function conflictText(cmd: ShortcutCommand): string {
+  const others = conflictMap.value.get(cmd.id) ?? [];
+  if (others.length === 0) return "";
+  const names = others.map((c) => t(c.labelKey)).join("、");
+  return t("settings.shortcuts.conflict", { commands: names });
+}
+
+// ===== 录制 =====
+
+/** 正在录制快捷键的命令 ID（null=无） */
+const recordingId = ref<string | null>(null);
+/** 无效组合提示（如无修饰符的字符键） */
+const invalidHint = ref<string | null>(null);
+
+function toggleRecord(cmdId: string): void {
+  recordingId.value = recordingId.value === cmdId ? null : cmdId;
+  invalidHint.value = null;
+}
+
+function stopRecord(): void {
+  recordingId.value = null;
+  invalidHint.value = null;
+}
+
+function onRecordKeydown(e: KeyboardEvent): void {
+  if (e.key === "Escape") {
+    stopRecord();
+    return;
+  }
+  const shortcut = eventToShortcut(e);
+  if (!shortcut) return; // 纯修饰键按下，等待完整组合
+  if (!isUsableShortcut(shortcut)) {
+    // 无修饰符的字符键会吞掉打字，不允许作为绑定
+    invalidHint.value = t("settings.shortcuts.invalidHint");
+    return;
+  }
+  const cmdId = recordingId.value!;
+  patchShortcuts(setShortcutOverride(draft.value.shortcuts, cmdId, shortcut));
+  stopRecord();
+}
+
+/** 录制期间全局捕获 keydown（阻止应用/浏览器默认行为，如 Ctrl+W 关窗） */
+function onCaptureKeydown(e: KeyboardEvent): void {
+  if (!recordingId.value) return;
+  e.preventDefault();
+  e.stopPropagation();
+  onRecordKeydown(e);
+}
+
+onMounted(() => window.addEventListener("keydown", onCaptureKeydown, true));
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onCaptureKeydown, true);
+  stopRecord();
+});
+
+// ===== 行操作 =====
+
+function restoreOne(cmdId: string): void {
+  patchShortcuts(resetShortcutOverride(draft.value.shortcuts, cmdId));
+}
+
+function disableOne(cmdId: string): void {
+  patchShortcuts(setShortcutOverride(draft.value.shortcuts, cmdId, null));
+}
 </script>
 
 <template>
   <div>
-    <h1 class="settings-page-title">{{ $t('settings.shortcuts.title') }}</h1>
-    <p class="settings-page-description">{{ $t('settings.shortcuts.description') }}</p>
+    <h1 class="settings-page-title">{{ t('settings.shortcuts.title') }}</h1>
+    <p class="settings-page-description">{{ t('settings.shortcuts.description') }}</p>
 
-    <div v-for="group in groupedShortcuts" :key="group.category" class="settings-section">
+    <p v-if="invalidHint" class="shortcut-hint" role="alert">
+      {{ invalidHint }}
+    </p>
+
+    <div v-for="group in groups" :key="group.category" class="settings-section">
       <h2 class="settings-section-title">{{ group.label }}</h2>
       <div class="shortcut-list">
         <div
-          v-for="entry in group.list"
-          :key="entry.id"
+          v-for="cmd in group.list"
+          :key="cmd.id"
           class="shortcut-row"
+          :class="{ 'is-recording': recordingId === cmd.id }"
         >
-          <span class="shortcut-label">{{ t(entry.labelKey) }}</span>
-          <span class="shortcut-key">{{ entry.shortcut }}</span>
+          <div class="shortcut-info">
+            <span class="shortcut-label">{{ t(cmd.labelKey) }}</span>
+            <span v-if="conflictMap.get(cmd.id)?.length" class="shortcut-conflict">
+              {{ conflictText(cmd) }}
+            </span>
+          </div>
+
+          <div class="shortcut-actions">
+            <button
+              type="button"
+              class="shortcut-key-btn"
+              :class="{ recording: recordingId === cmd.id }"
+              :title="t('settings.shortcuts.recordTitle')"
+              @click="toggleRecord(cmd.id)"
+            >
+              <template v-if="recordingId === cmd.id">
+                {{ t('settings.shortcuts.recording') }}
+              </template>
+              <template v-else-if="effective[cmd.id]">
+                {{ effective[cmd.id] }}
+              </template>
+              <template v-else>
+                <span class="unset">{{ t('settings.shortcuts.unset') }}</span>
+              </template>
+            </button>
+
+            <button
+              v-if="!isDefaultShortcut(draft.shortcuts, cmd.id)"
+              type="button"
+              class="icon-button"
+              :title="t('settings.shortcuts.restoreDefault')"
+              :aria-label="t('settings.shortcuts.restoreDefault')"
+              @click="restoreOne(cmd.id)"
+            >
+              <RotateCcw :size="14" />
+            </button>
+            <button
+              v-if="effective[cmd.id]"
+              type="button"
+              class="icon-button"
+              :title="t('settings.shortcuts.disable')"
+              :aria-label="t('settings.shortcuts.disable')"
+              @click="disableOne(cmd.id)"
+            >
+              <X :size="14" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -121,10 +205,19 @@ const groupedShortcuts = computed(() => {
 
 <style scoped>
 .settings-page-description {
-  margin: 0 0 20px;
+  margin: -12px 0 20px;
   color: var(--murasaki-ink-3, #999);
   font-size: 13px;
   line-height: 1.5;
+}
+.shortcut-hint {
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--murasaki-error, #d93025);
+  background: color-mix(in srgb, var(--murasaki-error, #d93025) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--murasaki-error, #d93025) 35%, transparent);
+  border-radius: var(--murasaki-radius-md, 6px);
 }
 .shortcut-list {
   display: flex;
@@ -135,6 +228,7 @@ const groupedShortcuts = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
   padding: 8px 12px;
   border-radius: var(--murasaki-radius-sm, 4px);
   transition: background-color 0.15s ease;
@@ -142,14 +236,36 @@ const groupedShortcuts = computed(() => {
 .shortcut-row:hover {
   background-color: var(--murasaki-surface-2, #f5f5f5);
 }
+.shortcut-row.is-recording {
+  background-color: var(--murasaki-purple-50, #f3f0ff);
+}
+.shortcut-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
 .shortcut-label {
   font-size: 14px;
   color: var(--murasaki-ink, #333);
 }
-.shortcut-key {
+.shortcut-conflict {
+  font-size: 12px;
+  color: var(--murasaki-error, #d93025);
+}
+.shortcut-actions {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.shortcut-key-btn {
+  display: inline-flex;
+  align-items: center;
+  min-width: 96px;
+  min-height: 24px;
+  justify-content: center;
+  padding: 2px 10px;
   font-family: var(--murasaki-font-mono, monospace);
   font-size: 12px;
   font-weight: 500;
@@ -158,5 +274,47 @@ const groupedShortcuts = computed(() => {
   border: 1px solid var(--murasaki-border, #e0e0e0);
   border-radius: 4px;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.shortcut-key-btn:hover {
+  border-color: var(--murasaki-ring, #7c6cf0);
+  color: var(--murasaki-ink, #333);
+}
+.shortcut-key-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--murasaki-ring, #7c6cf0);
+}
+.shortcut-key-btn.recording {
+  border-color: var(--murasaki-primary, #7c6cf0);
+  color: var(--murasaki-primary, #7c6cf0);
+  background: var(--murasaki-purple-50, #f3f0ff);
+}
+.shortcut-key-btn .unset {
+  color: var(--murasaki-ink-3, #999);
+  font-family: var(--murasaki-font-ui, sans-serif);
+  font-weight: 400;
+}
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--murasaki-ink-3, #999);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--murasaki-radius-sm, 4px);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.icon-button:hover {
+  color: var(--murasaki-ink, #333);
+  background: var(--murasaki-surface-2, #f5f5f5);
+}
+.icon-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--murasaki-ring, #7c6cf0);
 }
 </style>

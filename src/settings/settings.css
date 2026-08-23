@@ -484,3 +484,40 @@ body {
   line-height: 1.3;
   color: var(--murasaki-ink);
 }
+
+/* === 中文符号映射表（0.8.0 只读展示）=== */
+.mapping-table {
+  width: 100%;
+  max-width: 420px;
+  margin-top: 4px;
+  overflow: hidden;
+  border: 1px solid var(--murasaki-border);
+  border-radius: var(--murasaki-radius-md);
+}
+.mapping-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--murasaki-text-xs);
+}
+.mapping-table th,
+.mapping-table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--murasaki-line);
+}
+.mapping-table thead th {
+  color: var(--murasaki-ink-3);
+  font-weight: 500;
+  background: var(--murasaki-surface);
+}
+.mapping-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.mapping-table code {
+  font-family: var(--murasaki-font-mono);
+  font-size: var(--murasaki-text-xs);
+  color: var(--murasaki-ink);
+  background: var(--murasaki-muted);
+  border-radius: var(--murasaki-radius-sm);
+  padding: 0 4px;
+}
