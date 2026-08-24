@@ -19,6 +19,11 @@
 
 - **Tab 栏工作区内外区分**：工作区外文件 tab 前导图标替换为 ↗ 角标（激活态变紫），hover 提示加「工作区外：」前缀；无工作区时隐藏全部角标；不持久化、不改变 tab 顺序。
 
+### Fixed
+
+- **Windows 包启动报「无法定位程序输入点 TaskDialogIndirect」**：0.8.0 的 `build.rs` 为支持菜单单源化而误删了 `tauri_build::build()` 调用，导致应用清单未嵌入 Common Controls v6 依赖、comctl32 回退到 v5；已恢复该调用。
+- **更新弹窗发布说明显示「无发布说明」**：`release.yml` 未向 tauri-action 传 `releaseBody`，导致 `latest.json` 的 `notes` 为空；已透传 CHANGELOG 变更记录作为发布说明。
+
 ## [0.7.1] - 2026-08-19
 
 本版本修复 0.7.0 引入的 HTML 文件相关体验问题：HTML 源码支持左侧编辑、分隔条拖拽跨 iframe 失效。

@@ -1,4 +1,9 @@
 fn main() {
+    // 必须先调用 tauri_build::build()：
+    // 负责嵌入 Windows 应用清单（Common Controls v6 依赖）与资源生成。
+    // 缺省会导致 comctl32 回退到 v5，运行时报“无法定位输入点 TaskDialogIndirect”。
+    tauri_build::build();
+
     let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let locales_dir = manifest_dir.join("../src/locales");
 

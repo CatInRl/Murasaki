@@ -141,6 +141,7 @@ murasaki/
 - 统一全局搜索条：Ctrl+P / Ctrl+Shift+F 拉起顶部浮动搜索条，混合「标签 + 最近 + 文件名 + 内容命中」，键盘导航 + 高级选项，取代 find-in-files 底部面板
 - Tab 栏工作区内外区分：工作区外 tab 加 ↗ 角标（激活变紫），hover 提示加「工作区外：」前缀，无工作区隐藏角标
 - 多语言支持：新增日语全量翻译，原生菜单 build.rs 单源生成，系统语言首启探测
+- 【0.8.0 重发】修复：build.rs 误删 `tauri_build::build()` 导致 Windows 包启动报 TaskDialogIndirect（恢复调用）；release.yml 未传 releaseBody 导致更新弹窗「无发布说明」（透传 CHANGELOG）
 
 ### 历史版本
 

@@ -25,6 +25,8 @@ jobs:
       release-upload-url: ${{ steps.create-release.outputs.upload_url }}
       release-id: ${{ steps.create-release.outputs.id }}
       tag: ${{ steps.vars.outputs.tag }}
+      # 发布说明正文：透传给 tauri-action 的 releaseBody，写入 latest.json 的 notes 字段
+      release-body: ${{ steps.changelog.outputs.release_body }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,6 +62,10 @@ jobs:
           echo "=== 提取的 CHANGELOG 内容预览 ==="
           head -n 20 /tmp/changelog-section.md
           echo "================================"
+          # 用 heredoc 把多行正文写入 GITHUB_OUTPUT（避免转义问题），供 latest.json notes 使用
+          echo "release_body<<CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
+          cat /tmp/changelog-section.md >> "$GITHUB_OUTPUT"
+          echo "CHANGELOG_EOF" >> "$GITHUB_OUTPUT"
 
       - name: 生成 Release Notes（安装说明 + CHANGELOG）
         id: notes
@@ -172,6 +178,8 @@ jobs:
           releaseId: ${{ needs.create-release.outputs.release-id }}
           tagName: ${{ needs.create-release.outputs.tag }}
           updaterJsonPreferNsis: true
+          # 发布说明：写入 latest.json 的 notes 字段，供应用内更新弹窗展示
+          releaseBody: ${{ needs.create-release.outputs.release-body }}
           args: ${{ matrix.args }}
 
   # === 发布完成通知 ===
