@@ -85,7 +85,10 @@ function onAction(id: string, onClick: () => void): void {
             >
               <div
                 class="toast-progress-bar"
-                :style="{ width: `${Math.max(0, Math.min(100, toast.progress ?? 0))}%` }"
+                :class="{ indeterminate: toast.progress === undefined }"
+                :style="toast.progress === undefined
+                  ? undefined
+                  : { width: `${Math.max(0, Math.min(100, toast.progress))}%` }"
               />
             </div>
           </div>
@@ -190,6 +193,18 @@ function onAction(id: string, onClick: () => void): void {
   background: var(--toast-color);
   border-radius: 2px;
   transition: width var(--murasaki-duration-base) var(--murasaki-ease);
+}
+
+/* indeterminate：未知总大小时以移动短条表示“进行中”，而非静止的 0% */
+.toast-progress-bar.indeterminate {
+  width: 40%;
+  transition: none;
+  animation: murasaki-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes murasaki-indeterminate {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
 }
 
 .toast-actions {

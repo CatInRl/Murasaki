@@ -191,6 +191,36 @@ describe("useUpdater - downloadAndInstall", () => {
     expect(downloading.value).toBe(false);
   });
 
+  it("根据 DownloadEvent 实时累计并更新进度 toast", async () => {
+    mockedCheck.mockResolvedValue(mockUpdate);
+    let onEvent: ((e: unknown) => void) | undefined;
+    mockUpdate.downloadAndInstall.mockImplementation((cb) => {
+      onEvent = cb;
+      return Promise.resolve();
+    });
+    mockedRelaunch.mockResolvedValue(undefined);
+
+    const deps = makeDeps();
+    const { check, downloadAndInstall } = useUpdater(deps);
+
+    const info = await check();
+    const install = downloadAndInstall(info!);
+
+    // Started：已知总长度
+    onEvent!({ event: "Started", data: { contentLength: 100 } });
+    // Progress：累计 25 / 100 → 25%
+    onEvent!({ event: "Progress", data: { chunkLength: 25 } });
+    // Progress：累计 75 / 100 → 75%
+    onEvent!({ event: "Progress", data: { chunkLength: 50 } });
+
+    await install;
+
+    expect(deps.toast.update).toHaveBeenLastCalledWith("toast-1", {
+      title: "正在下载更新… 75%",
+      progress: 75,
+    });
+  });
+
   it("未先 check 就调用 downloadAndInstall → toast 错误", async () => {
     const deps = makeDeps();
     const { downloadAndInstall } = useUpdater(deps);

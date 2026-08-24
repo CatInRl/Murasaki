@@ -116,10 +116,26 @@ export function useUpdater(deps: UpdaterDeps) {
       return;
     }
     downloading.value = true;
-    // indeterminate 进度 toast：duration=0 不自动消失，无 progress 值（indeterminate）
+    // 先显示无进度的 toast（indeterminate）：duration=0 不自动消失，无 progress 值
     const toastId = toast.progress("正在下载更新…", { duration: 0 });
+    // 累计已下载字节与总字节，用于把真实进度写回 toast
+    let downloaded = 0;
+    let total: number | undefined;
     try {
-      await pendingUpdate.downloadAndInstall();
+      await pendingUpdate.downloadAndInstall((event) => {
+        if (event.event === "Started" && event.data.contentLength != null) {
+          total = event.data.contentLength;
+        } else if (event.event === "Progress") {
+          downloaded += event.data.chunkLength;
+          const pct = total && total > 0
+            ? Math.min(100, Math.round((downloaded / total) * 100))
+            : 0;
+          toast.update(toastId, {
+            title: total ? `正在下载更新… ${pct}%` : "正在下载更新…",
+            progress: total ? pct : undefined,
+          });
+        }
+      });
       toast.dismiss(toastId);
       toast.success("更新已安装，即将重启…");
       await relaunch();
