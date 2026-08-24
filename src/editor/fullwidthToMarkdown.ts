@@ -3,7 +3,7 @@
  *
  * 中文输入法下，行首的结构记号（`>` `[` `]` `` ``` `` `-` `#` `*` `~`）
  * 需切换中英才能输入。本模块提供固定内置的映射表与转换逻辑：
- * 行首（允许前导空格）输入连续的全角/中文符号后加空格，整串一次性
+ * 行首（允许前导空格）输入连续的全角/中文符号后加空格或回车，整串一次性
  * 自动转换为对应 markdown 结构记号，避免中英切换打断写作。
  *
  * 术语定义见 CONTEXT.md「中文符号转 Markdown 记号」。
@@ -55,7 +55,7 @@ export interface LineStartSymbolConversion {
   from: number;
   /** 替换区间终点（行内字符偏移，即光标所在列） */
   to: number;
-  /** 替换文本（转换后的记号 + 触发空格） */
+  /** 替换文本（仅转换后的 Markdown 记号，触发字符由调用方追加） */
   insert: string;
 }
 
@@ -70,7 +70,7 @@ export interface LineStartSymbolConversion {
  * - 允许前导空格（`[ \t]*`），转换时保留前导空格。
  * - 对前导空格后的连续符号串做贪心最长匹配 tokenize（多字符规则优先）。
  * - 只要出现无法被映射表消费的字符（即非"行首连续全角符号"），整串不转换。
- * - 触发空格不包含在 `run` 中，由调用方在 `insert` 尾部补充。
+ * - 触发字符（空格/回车）不包含在 `run` 中，由调用方在 `insert` 尾部补充。
  */
 export function convertLineStartSymbol(
   lineText: string,
@@ -90,16 +90,28 @@ export function convertLineStartSymbol(
     out += rule.output;
     pos += rule.input.length;
   }
-  return { from: leading.length, to: cursorCol, insert: out + " " };
+  return { from: leading.length, to: cursorCol, insert: out };
 }
 
 /**
- * 判断位置是否落在代码范围内（FencedCode / CodeBlock / InlineCode）。
+ * 判断位置处的行首符号转换是否应被"代码范围"拦截。
+ *
+ * 默认规则：FencedCode / CodeBlock / InlineCode 内不转换（代码内容保留原样）。
+ * 例外：围栏代码块（FencedCode）内、行首输入 ``` 属于闭合围栏
+ * （CommonMark 中行首 ``` 结束当前围栏块），不属于代码内容，应允许转换，
+ * 否则闭合围栏永远无法通过本功能输入。
  * 与 emoji 替换的 collectCodeRanges 同源语法树节点名。
+ *
+ * @param pos    符号串起点（绝对坐标）
+ * @param output 转换后的 Markdown 记号（如 ```）
  */
-function isInCodeRange(state: EditorState, pos: number): boolean {
+function isBlockedByCodeRange(
+  state: EditorState,
+  pos: number,
+  output: string
+): boolean {
   const tree = ensureSyntaxTree(state, pos + 1) ?? syntaxTree(state);
-  let inside = false;
+  let inside: string | null = null;
   tree.iterate({
     enter(ref) {
       if (inside || ref.to <= pos) return false;
@@ -109,48 +121,67 @@ function isInCodeRange(state: EditorState, pos: number): boolean {
           ref.name === "CodeBlock" ||
           ref.name === "InlineCode")
       ) {
-        inside = true;
+        inside = ref.name;
         return false;
       }
     },
   });
-  return inside;
+  if (!inside) return false;
+  if (inside === "FencedCode" && output === "```") return false;
+  return true;
 }
 
 /**
- * 提取"键入单个空格"事务的插入位置。
- * 仅匹配键盘输入（input.type），排除 IME 组合提交（input.type.compose，
- * 组合提交不插入空格字符，且 inserted 通常非单个空格）与粘贴/拖放。
+ * 提取"键入触发字符"事务（单个空格 或 单个回车）。
  *
- * @returns 空格插入位置（旧文档坐标）；非单空格键入或含其他改动返回 null。
+ * - 空格：userEvent 为 `input.type`（排除 IME 组合提交 `input.type.compose`、粘贴/拖放）。
+ * - 回车：userEvent 为 `input`（@codemirror/commands 的 insertNewlineAndIndent /
+ *   insertNewline 均以 `input` 标注），且为纯 `\n` 插入（可带跟随缩进，
+ *   来自 insertNewlineAndIndent 根据前导空白计算的 indent）。
+ *   多个改动（多光标回车 / 替换选区）不视为触发。
+ *
+ * @returns 触发字符插入起点（旧文档坐标）与插入文本；非触发事务返回 null。
  */
-function insertedTypedSpace(tr: Transaction): number | null {
+function insertedTypedTrigger(tr: Transaction): {
+  pos: number;
+  insert: string;
+} | null {
   const userEvent = tr.annotation(Transaction.userEvent);
-  if (typeof userEvent !== "string" || !userEvent.startsWith("input.type")) {
-    return null;
-  }
+  if (userEvent !== "input.type" && userEvent !== "input") return null;
+
   let pos: number | null = null;
+  let insert = "";
   let valid = true;
   tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-    // 纯插入（旧文档无删除 fromA === toA）且插入内容为单个空格
-    const isSingleSpace =
-      fromA === toA && inserted.length === 1 && inserted.sliceString(0) === " ";
-    if (isSingleSpace) {
-      if (pos === null) pos = fromA;
-      else valid = false; // 多光标同时键入空格 → 不转换
-    } else {
-      valid = false;
+    const text = inserted.sliceString(0);
+    // 纯插入（旧文档无删除 fromA === toA）
+    let ok = fromA === toA && text.length > 0;
+    if (ok) {
+      if (userEvent === "input.type") {
+        // 空格触发：仅接受单个空格
+        ok = text === " ";
+      } else {
+        // 回车触发：仅接受以换行开头（可带跟随缩进）的纯插入
+        ok = text.startsWith("\n");
+      }
     }
+    if (!ok || pos !== null) {
+      // 任一改动不满足触发条件，或多改动（多光标）→ 不转换
+      valid = false;
+      return;
+    }
+    pos = fromA;
+    insert = text;
   });
-  return valid ? pos : null;
+  return valid && pos !== null ? { pos, insert } : null;
 }
 
 /**
  * 中文符号转 Markdown 记号 CM6 扩展。
  *
- * 通过 transactionFilter 在"键入空格"事务上叠加行首转换：
+ * 通过 transactionFilter 在"键入空格/回车"事务上叠加行首转换：
  * - 设置关闭 / 非 markdown 文件 / 代码范围内 → 原样放行。
- * - 命中转换 → 用单个事务替换原事务（符号串 → 记号 + 空格），一个撤销步。
+ * - 命中转换 → 用单个事务替换原事务（符号串 → 记号 + 触发字符），一个撤销步。
  * - `isEnabled` / `isMarkdown` 为实时谓词（由调用方闭包捕获响应式状态），
  *   因此开关 / 文件切换无需重建扩展即可生效。
  */
@@ -165,20 +196,20 @@ export function fullwidthToMarkdownExtension(options: {
     if (!options.isEnabled()) return tr;
     if (!options.isMarkdown()) return tr;
 
-    const pos = insertedTypedSpace(tr);
-    if (pos === null) return tr;
+    const trigger = insertedTypedTrigger(tr);
+    if (trigger === null) return tr;
 
     const state = tr.startState;
-    const line = state.doc.lineAt(pos);
-    const conv = convertLineStartSymbol(line.text, pos - line.from);
+    const line = state.doc.lineAt(trigger.pos);
+    const conv = convertLineStartSymbol(line.text, trigger.pos - line.from);
     if (!conv) return tr;
 
     const from = line.from + conv.from;
-    if (isInCodeRange(state, from)) return tr;
+    if (isBlockedByCodeRange(state, from, conv.insert)) return tr;
 
-    // 单个事务完成转换 + 空格，Ctrl+Z 一次还原为原始全角符号
+    // 单个事务完成转换 + 触发字符（空格 / 回车+缩进），Ctrl+Z 一次还原为原始全角符号
     return {
-      changes: { from, to: pos, insert: conv.insert },
+      changes: { from, to: trigger.pos, insert: conv.insert + trigger.insert },
       userEvent: "input.fullwidthToMarkdown",
     };
   });

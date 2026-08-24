@@ -910,12 +910,16 @@ export const wysiwygTheme = EditorView.theme({
   },
   // 引用块：CM6 mark decoration 样式（无法用 <blockquote> 标签，需独立样式）
   // 引用 --md-* 变量与 markdown-content.css 保持视觉一致
+  // 注意：mark decoration 是行内 span，垂直 padding 不会撑开行盒（多行引用会挤压/重叠），
+  // 因此只保留水平 padding，用 lineHeight 提供上下间距，保证引用内容完整展示。
   ".murasaki-wysiwyg-blockquote": {
     borderLeft: "3px solid var(--md-quote-border, var(--murasaki-purple-300, #d8b4fe))",
     background: "var(--md-quote-bg, var(--murasaki-purple-50, #faf5ff))",
     color: "var(--md-quote-color, var(--murasaki-muted-foreground, #737373))",
     fontStyle: "var(--md-quote-style, italic)",
-    padding: "10px 16px",
+    paddingLeft: "16px",
+    paddingRight: "16px",
+    lineHeight: "1.8",
     borderRadius: "0 var(--murasaki-radius-sm, 4px) var(--murasaki-radius-sm, 4px) 0",
   },
   ".murasaki-wysiwyg-bullet": {

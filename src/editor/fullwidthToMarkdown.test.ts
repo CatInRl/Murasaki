@@ -23,7 +23,7 @@ describe("convertLineStartSymbol - 单字符映射", () => {
     expect(convertLineStartSymbol("》", 1)).toEqual({
       from: 0,
       to: 1,
-      insert: "> ",
+      insert: ">",
     });
   });
 
@@ -31,7 +31,7 @@ describe("convertLineStartSymbol - 单字符映射", () => {
     expect(convertLineStartSymbol("·", 1)).toEqual({
       from: 0,
       to: 1,
-      insert: "- ",
+      insert: "-",
     });
   });
 
@@ -39,7 +39,7 @@ describe("convertLineStartSymbol - 单字符映射", () => {
     expect(convertLineStartSymbol("＊", 1)).toEqual({
       from: 0,
       to: 1,
-      insert: "* ",
+      insert: "*",
     });
   });
 
@@ -47,7 +47,7 @@ describe("convertLineStartSymbol - 单字符映射", () => {
     expect(convertLineStartSymbol("＃", 1)).toEqual({
       from: 0,
       to: 1,
-      insert: "# ",
+      insert: "#",
     });
   });
 
@@ -55,7 +55,7 @@ describe("convertLineStartSymbol - 单字符映射", () => {
     expect(convertLineStartSymbol("～", 1)).toEqual({
       from: 0,
       to: 1,
-      insert: "~ ",
+      insert: "~",
     });
   });
 
@@ -63,7 +63,7 @@ describe("convertLineStartSymbol - 单字符映射", () => {
     expect(convertLineStartSymbol("－", 1)).toEqual({
       from: 0,
       to: 1,
-      insert: "- ",
+      insert: "-",
     });
   });
 });
@@ -73,7 +73,7 @@ describe("convertLineStartSymbol - 多字符规则优先", () => {
     expect(convertLineStartSymbol("···", 3)).toEqual({
       from: 0,
       to: 3,
-      insert: "``` ",
+      insert: "```",
     });
   });
 
@@ -81,7 +81,7 @@ describe("convertLineStartSymbol - 多字符规则优先", () => {
     expect(convertLineStartSymbol("【】", 2)).toEqual({
       from: 0,
       to: 2,
-      insert: "[] ",
+      insert: "[]",
     });
   });
 
@@ -89,7 +89,7 @@ describe("convertLineStartSymbol - 多字符规则优先", () => {
     expect(convertLineStartSymbol("＊＊＊", 3)).toEqual({
       from: 0,
       to: 3,
-      insert: "*** ",
+      insert: "***",
     });
   });
 });
@@ -99,7 +99,7 @@ describe("convertLineStartSymbol - 嵌套/连续符号", () => {
     expect(convertLineStartSymbol("》》", 2)).toEqual({
       from: 0,
       to: 2,
-      insert: ">> ",
+      insert: ">>",
     });
   });
 
@@ -107,7 +107,7 @@ describe("convertLineStartSymbol - 嵌套/连续符号", () => {
     expect(convertLineStartSymbol("》》》", 3)).toEqual({
       from: 0,
       to: 3,
-      insert: ">>> ",
+      insert: ">>>",
     });
   });
 
@@ -115,7 +115,7 @@ describe("convertLineStartSymbol - 嵌套/连续符号", () => {
     expect(convertLineStartSymbol("＃＃", 2)).toEqual({
       from: 0,
       to: 2,
-      insert: "## ",
+      insert: "##",
     });
   });
 
@@ -123,7 +123,7 @@ describe("convertLineStartSymbol - 嵌套/连续符号", () => {
     expect(convertLineStartSymbol("【】》", 3)).toEqual({
       from: 0,
       to: 3,
-      insert: "[]> ",
+      insert: "[]>",
     });
   });
 });
@@ -133,7 +133,7 @@ describe("convertLineStartSymbol - 前导空格", () => {
     expect(convertLineStartSymbol("  》", 3)).toEqual({
       from: 2,
       to: 3,
-      insert: "> ",
+      insert: ">",
     });
   });
 
@@ -141,7 +141,7 @@ describe("convertLineStartSymbol - 前导空格", () => {
     expect(convertLineStartSymbol("\t·", 2)).toEqual({
       from: 1,
       to: 2,
-      insert: "- ",
+      insert: "-",
     });
   });
 });
@@ -215,6 +215,17 @@ function typeSpace(state: EditorState, pos: number): EditorState {
     .state;
 }
 
+/** 在 pos 处模拟"键入回车"事务（insertNewlineAndIndent 的 userEvent 为 input） */
+function typeNewline(state: EditorState, pos: number): EditorState {
+  return state
+    .update({
+      changes: { from: pos, to: pos, insert: "\n" },
+      userEvent: "input",
+      selection: { anchor: pos + 1 },
+    })
+    .state;
+}
+
 describe("fullwidthToMarkdownExtension - 运行时转换", () => {
   it("行首 》，键入空格 → 转为 > ", () => {
     const s = typeSpace(makeState("》"), 1);
@@ -247,6 +258,50 @@ describe("fullwidthToMarkdownExtension - 运行时转换", () => {
   });
 });
 
+describe("fullwidthToMarkdownExtension - 回车触发", () => {
+  it("行首 ···，键入回车 → 转为 ``` 开围栏", () => {
+    const s = typeNewline(makeState("···"), 3);
+    expect(s.doc.toString()).toBe("```\n");
+  });
+
+  it("行首 》，键入回车 → 转为 > ", () => {
+    const s = typeNewline(makeState("》"), 1);
+    expect(s.doc.toString()).toBe(">\n");
+  });
+
+  it("前导空格保留：  ··· 回车 →   ``` ", () => {
+    const s = typeNewline(makeState("  ···"), 5);
+    expect(s.doc.toString()).toBe("  ```\n");
+  });
+
+  it("回车携带跟随缩进（insertNewlineAndIndent）时缩进保留", () => {
+    const s = makeState("  ···");
+    const next = s
+      .update({
+        changes: { from: 5, to: 5, insert: "\n  " },
+        userEvent: "input",
+        selection: { anchor: 8 },
+      })
+      .state;
+    expect(next.doc.toString()).toBe("  ```\n  ");
+  });
+
+  it("多光标同时键入回车不转换", () => {
+    const s = makeState("》\n·");
+    const next = s
+      .update({
+        changes: [
+          { from: 1, to: 1, insert: "\n" },
+          { from: 3, to: 3, insert: "\n" },
+        ],
+        userEvent: "input",
+        selection: { anchor: 2, head: 5 },
+      })
+      .state;
+    expect(next.doc.toString()).toBe("》\n\n·\n");
+  });
+});
+
 describe("fullwidthToMarkdownExtension - 门控（gating）", () => {
   it("功能关闭时不转换", () => {
     const s = typeSpace(makeState("》", { enabled: false }), 1);
@@ -266,6 +321,21 @@ describe("fullwidthToMarkdownExtension - 门控（gating）", () => {
   it("围栏代码块内带前导空格的符号也不转换（会命中的 run 被代码范围拦截）", () => {
     const s = typeSpace(makeState("```\n  》\n```"), 7);
     expect(s.doc.toString()).toBe("```\n  》 \n```");
+  });
+
+  it("围栏代码块内行首 ··· 视为闭合围栏，允许转换", () => {
+    const s = typeNewline(makeState("```js\ncode\n···"), 14);
+    expect(s.doc.toString()).toBe("```js\ncode\n```\n");
+  });
+
+  it("围栏代码块内行首 ··· 加空格同样允许转换（闭合围栏）", () => {
+    const s = typeSpace(makeState("```js\ncode\n···"), 14);
+    expect(s.doc.toString()).toBe("```js\ncode\n``` ");
+  });
+
+  it("围栏代码块内非围栏符号（》→>）仍不转换", () => {
+    const s = typeNewline(makeState("```js\ncode\n》"), 12);
+    expect(s.doc.toString()).toBe("```js\ncode\n》\n");
   });
 
   it("多光标同时键入空格不转换", () => {
