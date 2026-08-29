@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseTable, reflowTable, displayWidth, addColumn, removeColumn, addRow, removeRow, setAlignment } from "./tableReflow";
+import { parseTable, reflowTable, displayWidth, addColumn, removeColumn, addRow, removeRow, setAlignment, setCell } from "./tableReflow";
 
 // 源示例取自 high-fi UX：补空格对齐到中文显示宽度
 const source = [
@@ -86,6 +86,11 @@ describe("reflowTable", () => {
     expectPipeAligned(out);
   });
 
+  it("含 emoji 等非 BMP 字符的列仍按显示宽度对齐", () => {
+    const t = parseTable(["| 表情 | 值 |", "|------|---|", "| 😀 | 1 |", "| 普通文字 | 2 |"].join("\n"))!;
+    expectPipeAligned(reflowTable(t));
+  });
+
   it("序列化时把 `|` 转义为 `\\|`", () => {
     const t = parseTable(["| a | b |", "|---|---|", "| x | y |"].join("\n"))!;
     t.cells[1][0] = "x | y";
@@ -125,6 +130,25 @@ describe("reflowTable", () => {
     expect(out).toContain("A<br>B");
     // 往返：reflow(parse(out)) === out（<br> 往返稳定）
     expect(reflowTable(parseTable(out)!)).toBe(out);
+  });
+});
+
+describe("setCell", () => {
+  it("单格改字返回新模型，不动对齐，原模型不变", () => {
+    const t = parseTable(source)!;
+    const out = setCell(t, 1, 0, "已改");
+    // 原模型与对齐不受影响
+    expect(t.cells[1][0]).toBe("就地编辑");
+    expect(t.align).toEqual(out.align);
+    // 新模型改了目标格
+    expect(out.cells[1][0]).toBe("已改");
+    expect(out).not.toBe(t);
+  });
+
+  it("坐标越界返回 clone 不作修改", () => {
+    const t = parseTable(source)!;
+    expect(setCell(t, 99, 0, "x").cells[1][0]).toBe("就地编辑");
+    expect(setCell(t, 1, 99, "x").cells[1][0]).toBe("就地编辑");
   });
 });
 

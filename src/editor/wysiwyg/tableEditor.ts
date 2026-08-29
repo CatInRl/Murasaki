@@ -49,7 +49,29 @@ export class TableEditor {
     this.table = wrapper.ownerDocument.createElement("table");
     this.table.className = "murasaki-wysiwyg-table-grid";
     this.rebuildTableDOM();
+    this.attachEdgeCapsules(wrapper);
     return this.table;
+  }
+
+  /** T1.4 悬停插入胶囊：表格右缘(＋列)/底缘(＋行)，无锚点时追加末尾。 */
+  private attachEdgeCapsules(wrapper: HTMLElement): void {
+    const doc = wrapper.ownerDocument;
+    const mkCap = (title: string, className: string, onClick: () => void): HTMLButtonElement => {
+      const b = doc.createElement("button");
+      b.type = "button";
+      b.textContent = "＋";
+      b.title = `${title}（对锚点格生效）`;
+      b.className = `murasaki-table-edge-cap ${className}`;
+      b.addEventListener("mousedown", (e) => e.preventDefault()); // 防止点击移走单元格焦点
+      b.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
+      });
+      return b;
+    };
+    wrapper.appendChild(mkCap("锚点格右侧插列", "murasaki-table-edge-cap-right", () => this.addColumnAfterAnchor()));
+    wrapper.appendChild(mkCap("锚点格下方插行", "murasaki-table-edge-cap-bottom", () => this.addRowAfterAnchor()));
   }
 
   /** 用当前 model 重建 <table> 内部结构（含 th/td、对齐样式、事件绑定）。 */
@@ -175,6 +197,11 @@ export class TableEditor {
     });
   }
 
+  /** 定位单元格 DOM（th/td 通用）。 */
+  private cellAt(row: number, col: number): HTMLTableCellElement | null {
+    return this.table.querySelector(`[data-row="${row}"][data-col="${col}"]`) as HTMLTableCellElement | null;
+  }
+
   /** 清除锚点高亮。 */
   private clearAnchor(): void {
     this.table.querySelectorAll(".murasaki-anchor-cell").forEach((c) => c.classList.remove("murasaki-anchor-cell"));
@@ -186,7 +213,7 @@ export class TableEditor {
     let c = nextCol;
     if (c < 0) { c = cols - 1; if (r > 0) r--; else { c = cols - 1; } }
     if (c >= cols) { c = 0; if (r < rows - 1) r++; else { c = 0; } }
-    const cell = this.table.querySelector(`[data-row="${r}"][data-col="${c}"]`) as HTMLTableCellElement | null;
+    const cell = this.cellAt(r, c);
     if (cell) {
       cell.focus();
       // 光标移到单元格末尾
@@ -342,8 +369,7 @@ export class TableEditor {
 
   /** 聚焦指定单元格。 */
   focusCell(row: number, col: number): void {
-    const cell = this.table.querySelector(`[data-row="${row}"][data-col="${col}"]`) as HTMLTableCellElement | null;
-    if (cell) cell.focus();
+    this.cellAt(row, col)?.focus();
   }
 
   // ===== 提交（T1.5 写回） =====

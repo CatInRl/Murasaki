@@ -1097,6 +1097,8 @@ export const wysiwygTheme = EditorView.theme({
   // T1.2 就地编辑：表格网格 + 单元格悬停/可编辑提示 + 锚点格高亮
   ".murasaki-wysiwyg-table-edit": {
     cursor: "text",
+    // 悬停胶囊（右缘/底缘 ＋）以绝对定位相对表格块定位
+    position: "relative",
   },
   ".murasaki-wysiwyg-table-edit .murasaki-wysiwyg-table-grid": {
     borderCollapse: "collapse",
@@ -1152,6 +1154,43 @@ export const wysiwygTheme = EditorView.theme({
     background: "var(--murasaki-purple-50, #faf5ff)",
     color: "var(--murasaki-primary, #9333ea)",
     borderColor: "var(--murasaki-primary, #9333ea)",
+  },
+  // T1.4 悬停插入胶囊：默认透明，悬浮表格块时显示于右缘(＋列)/底缘(＋行)
+  ".murasaki-table-edge-cap": {
+    position: "absolute",
+    width: "18px",
+    height: "18px",
+    boxSizing: "border-box",
+    borderRadius: "50%",
+    border: "1px solid var(--murasaki-primary, #9333ea)",
+    background: "var(--murasaki-surface, #ffffff)",
+    color: "var(--murasaki-primary, #9333ea)",
+    fontSize: "13px",
+    lineHeight: "16px",
+    textAlign: "center",
+    padding: 0,
+    cursor: "pointer",
+    opacity: 0,
+    transition: "opacity 0.15s",
+    zIndex: 2,
+    userSelect: "none",
+  },
+  ".murasaki-wysiwyg-table-edit:hover .murasaki-table-edge-cap": {
+    opacity: 1,
+  },
+  ".murasaki-table-edge-cap-right": {
+    right: "-9px",
+    top: "50%",
+    transform: "translateY(-50%)",
+  },
+  ".murasaki-table-edge-cap-bottom": {
+    left: "50%",
+    bottom: "-9px",
+    transform: "translateX(-50%)",
+  },
+  ".murasaki-table-edge-cap:hover": {
+    background: "var(--murasaki-primary, #9333ea)",
+    color: "#fff",
   },
   ".murasaki-wysiwyg-mermaid svg": {
     maxWidth: "100%",

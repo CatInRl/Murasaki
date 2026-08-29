@@ -146,6 +146,18 @@ export function setAlignment(t: TableModel, col: number, align: CellAlign): Tabl
 }
 
 /**
+ * 设置单格文本；返回新模型（不动对齐，改字保留分隔行）。
+ * 坐标越界时忽略，返回 clone。
+ */
+export function setCell(t: TableModel, r: number, c: number, text: string): TableModel {
+  const out = cloneTable(t);
+  if (c < 0 || c >= out.align.length) return out;
+  if (r < 0 || r >= out.cells.length) return out;
+  out.cells[r][c] = text;
+  return out;
+}
+
+/**
  * 规范化表格：按每列最长显示宽补空格对齐管道符；分隔行按对齐符号重建。
  * 单元格内换行（`\n`）写回为字面 `<br>`，按转义后的文本计宽补空格。
  */
