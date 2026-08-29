@@ -23,11 +23,11 @@ export function displayWidth(text: string): number {
   return w;
 }
 
-/** 切分一行成单元格，识别转义竖线 `\|`（不拆分），并还原为 `|`。 */
+/** 切分一行成单元格，识别转义竖线 `\|`（不拆分），并还原为 `|`；字面 `<br>` 还原为 `\n`。 */
 function splitCells(line: string): string[] {
   const t = line.trim().replace(/^\|/, "").replace(/\|$/, "");
   const parts = t.split(/(?<!\\)\|/);
-  return parts.map((c) => c.trim().replace(/\\\|/g, "|"));
+  return parts.map((c) => c.trim().replace(/\\\|/g, "|").replace(/<br>/gi, "\n"));
 }
 
 /** 判断一行是否为分隔行（仅含 - 与 :、至少一个 -）。 */
@@ -77,7 +77,8 @@ export function parseTable(source: string): TableModel | null {
 }
 
 function escapeCell(text: string): string {
-  return text.replace(/\|/g, "\\|");
+  // 换行 → 字面 <br>（多行格，GFM 表格内不允许裸换行），竖线 → \|
+  return text.replace(/\n/g, "<br>").replace(/\|/g, "\\|");
 }
 
 // ===== 结构性操作（T1.4，纯函数） =====
@@ -146,12 +147,13 @@ export function setAlignment(t: TableModel, col: number, align: CellAlign): Tabl
 
 /**
  * 规范化表格：按每列最长显示宽补空格对齐管道符；分隔行按对齐符号重建。
- * 换行符（`\n`）在单元格内写回为 `<br>`（由编辑层负责），此处保留并计入列宽。
+ * 单元格内换行（`\n`）写回为字面 `<br>`，按转义后的文本计宽补空格。
  */
 export function reflowTable(t: TableModel): string {
   const cols = t.align.length;
+  // 先逐格转义（`\n`→`<br>`、`|`→`\|`），再以转义后的文本计算列宽，避免多行格错位
+  const rows = t.cells.map((r) => r.slice(0, cols).map(escapeCell));
   const widths = new Array<number>(cols).fill(3);
-  const rows = t.cells.map((r) => r.slice(0, cols));
   for (const row of rows) {
     row.forEach((cell, i) => {
       const w = displayWidth(cell);
@@ -165,7 +167,7 @@ export function reflowTable(t: TableModel): string {
   };
 
   const fmtRow = (cells: string[]): string =>
-    "| " + cells.map((c, i) => padTo(escapeCell(c), widths[i])).join(" | ") + " |";
+    "| " + cells.map((c, i) => padTo(c, widths[i])).join(" | ") + " |";
 
   const sep = t.align.map((a, i) => {
     // 分隔行每列至少 3 个 `-`（GFM 惯例）

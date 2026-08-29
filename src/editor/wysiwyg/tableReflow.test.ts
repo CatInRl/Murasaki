@@ -108,6 +108,24 @@ describe("reflowTable", () => {
     const out = reflowTable(t);
     expect(out.split("\n")).toHaveLength(3);
   });
+
+  it("多行格 `\\n` 写回为字面 `<br>`，不产生裸换行（防拆行）", () => {
+    const t = parseTable(["| a | b |", "|---|---|", "| x | y |"].join("\n"))!;
+    t.cells[1][0] = "第一行\n第二行";
+    const out = reflowTable(t);
+    expect(out).toContain("第一行<br>第二行");
+    // 任何单元格行内都不出现裸换行（外层按行 join，`\n` 只能是行分隔）
+    expect(out.split("\n")).toHaveLength(3);
+  });
+
+  it("字面 `<br>` 解析还原为 `\\n`，并往返幂等为 `<br>`", () => {
+    const t = parseTable(["| a   | b |", "|---|---|", "| A<br>B | c |"].join("\n"))!;
+    expect(t.cells[1][0]).toBe("A\nB");
+    const out = reflowTable(t);
+    expect(out).toContain("A<br>B");
+    // 往返：reflow(parse(out)) === out（<br> 往返稳定）
+    expect(reflowTable(parseTable(out)!)).toBe(out);
+  });
 });
 
 describe("结构性操作", () => {
