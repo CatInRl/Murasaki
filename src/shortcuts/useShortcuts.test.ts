@@ -11,6 +11,8 @@ import { EditorState } from "@codemirror/state";
 import { defaultKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import type { ShortcutOverrides } from "./shortcutsLogic";
+import { parseShortcut } from "./shortcutsLogic";
+import { SHORTCUT_COMMANDS } from "./shortcutRegistry";
 import { buildEditorShortcutExtension, useShortcuts } from "./useShortcuts";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
 
@@ -236,5 +238,109 @@ describe("useShortcuts - matchGlobalKeydown", () => {
     expect(
       matchGlobalKeydown(new KeyboardEvent("keydown", { key: "1", ctrlKey: true }))
     ).toBeNull();
+  });
+});
+
+// ===== 遍历全部注册命令 =====
+
+describe("useShortcuts - 全部命令默认设置生效", () => {
+  it("每个 global 命令的默认绑定在对应键盘事件下命中该命令", () => {
+    const persistence = usePersistenceStore();
+    persistence.settings.shortcuts = {};
+    const { matchGlobalKeydown } = useShortcuts();
+    for (const c of SHORTCUT_COMMANDS) {
+      if (c.scope !== "global" || !c.defaultShortcut) continue;
+      const p = parseShortcut(c.defaultShortcut)!;
+      const ev = new KeyboardEvent("keydown", {
+        key: p.key,
+        ctrlKey: p.ctrl,
+        altKey: p.alt,
+        shiftKey: p.shift,
+      });
+      // 默认绑定唯一 → 命中确定为其自身
+      expect(matchGlobalKeydown(ev)).toBe(c.id);
+    }
+  });
+
+  it("每个 global 命令未添加的默认绑定不会误命中", () => {
+    // 反向：带正确修饰但不带目标键 → 不命中；依赖 Ctrl 主修饰键规则一致
+    const persistence = usePersistenceStore();
+    persistence.settings.shortcuts = {};
+    const { matchGlobalKeydown } = useShortcuts();
+    for (const c of SHORTCUT_COMMANDS) {
+      if (c.scope !== "global" || !c.defaultShortcut) continue;
+      const p = parseShortcut(c.defaultShortcut)!;
+      // 无修饰键的默认绑定（如 F11）在缺修饰键时依然命中，跳过此类
+      if (!p.ctrl && !p.alt) continue;
+      // 缺修饰键 → 不命中
+      const ev = new KeyboardEvent("keydown", { key: p.key });
+      expect(matchGlobalKeydown(ev)).not.toBe(c.id);
+    }
+  });
+});
+
+describe("useShortcuts - 全部 global 命令修改设置生效", () => {
+  // 用 三修饰键 + 唯一字母 作新绑定：不与任何默认（最多双修饰）冲突，且彼此唯一
+  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+  it("每个 global 命令改绑唯一新键后命中该命令，旧默认失效", () => {
+    let i = 0;
+    for (const c of SHORTCUT_COMMANDS) {
+      if (c.scope !== "global") continue;
+      const letter = LETTERS[i++ % 26];
+      const newBinding = `Ctrl+Alt+Shift+${letter}`;
+
+      setActivePinia(createPinia());
+      const persistence = usePersistenceStore();
+      persistence.settings.shortcuts = { [c.id]: newBinding };
+      const { matchGlobalKeydown, effective } = useShortcuts();
+
+      // 新绑定命中
+      const newEv = new KeyboardEvent("keydown", {
+        key: letter,
+        ctrlKey: true,
+        shiftKey: true,
+        altKey: true,
+      });
+      expect(matchGlobalKeydown(newEv)).toBe(c.id);
+      expect(effective.value[c.id]).toBe(newBinding);
+
+      // 旧默认失效
+      if (c.defaultShortcut) {
+        const p = parseShortcut(c.defaultShortcut)!;
+        const oldEv = new KeyboardEvent("keydown", {
+          key: p.key,
+          ctrlKey: p.ctrl,
+          altKey: p.alt,
+          shiftKey: p.shift,
+        });
+        expect(matchGlobalKeydown(oldEv)).toBeNull();
+      }
+    }
+  });
+
+  it("每个 global 命令改绑后再恢复默认：旧绑定重新生效", () => {
+    let i = 0;
+    for (const c of SHORTCUT_COMMANDS) {
+      if (c.scope !== "global" || !c.defaultShortcut) continue;
+      const letter = LETTERS[i++ % 26];
+
+      setActivePinia(createPinia());
+      const persistence = usePersistenceStore();
+      persistence.settings.shortcuts = { [c.id]: `Ctrl+Alt+Shift+${letter}` };
+      const { matchGlobalKeydown } = useShortcuts();
+
+      // 恢复默认：清空覆盖
+      persistence.settings.shortcuts = {};
+
+      const p = parseShortcut(c.defaultShortcut)!;
+      const oldEv = new KeyboardEvent("keydown", {
+        key: p.key,
+        ctrlKey: p.ctrl,
+        altKey: p.alt,
+        shiftKey: p.shift,
+      });
+      expect(matchGlobalKeydown(oldEv)).toBe(c.id);
+    }
   });
 });

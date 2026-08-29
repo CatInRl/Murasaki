@@ -136,21 +136,55 @@ class TaskCheckboxWidget extends WidgetType {
 
 // ===== T7.2 块级 Widgets =====
 
+/** 判断 widget 范围是否与当前选区相交（用于选中高亮）。 */
+function selectionIntersects(
+  from: number,
+  to: number,
+  selection: { from: number; to: number } | null
+): boolean {
+  if (!selection) return false;
+  return from < selection.to && to > selection.from;
+}
+
+/**
+ * 块级 widget 基类：叠加选区高亮 class。
+ * - selected：本 widget 是否被当前选区覆盖（Ctrl+A 全选时所有块级区域标记选中）。
+ * - 选区变化触发 wysiwygField 重算 → 重建 widget → toDOM 重渲染时带上高亮。
+ * 子类约束：构造器把 selected 传给 super；eq 需合并 this.sameSelection(other)；
+ * 根元素 class 需追加 this.selectionClass()。
+ */
+abstract class WysiwygBlockWidget extends WidgetType {
+  protected readonly selected: boolean;
+
+  protected constructor(selected: boolean) {
+    super();
+    this.selected = selected;
+  }
+
+  protected sameSelection(other: WidgetType): boolean {
+    return other instanceof WysiwygBlockWidget && other.selected === this.selected;
+  }
+
+  protected selectionClass(): string {
+    return this.selected ? " murasaki-wysiwyg-selected" : "";
+  }
+}
+
 /**
  * 代码块 widget：替换整个 FencedCode，用 Shiki 异步高亮渲染。
  * toDOM 先返回 <pre><code> 占位，codeToHtml 完成后替换为高亮 HTML。
  * 占位阶段保持代码可读，避免视觉跳变。
  */
-class CodeBlockWidget extends WidgetType {
-  constructor(private lang: string, private code: string, private from: number) {
-    super();
+class CodeBlockWidget extends WysiwygBlockWidget {
+  constructor(private lang: string, private code: string, private from: number, selected: boolean) {
+    super(selected);
   }
   eq(other: CodeBlockWidget): boolean {
-    return other.lang === this.lang && other.code === this.code;
+    return other.lang === this.lang && other.code === this.code && this.sameSelection(other);
   }
   toDOM(): HTMLElement {
     const wrapper = document.createElement("div");
-    wrapper.className = "murasaki-wysiwyg-codeblock-wrapper code-block-wrapper";
+    wrapper.className = `murasaki-wysiwyg-codeblock-wrapper code-block-wrapper${this.selectionClass()}`;
 
     // 语言标签栏（issue #85 / T2）：有语言时显示，空语言不显示
     if (this.lang) {
@@ -200,16 +234,16 @@ class CodeBlockWidget extends WidgetType {
  *
  * id 由调用方传入（来自 WysiwygPluginValue 实例计数器），保证 SVG id 唯一。
  */
-class MermaidWidget extends WidgetType {
-  constructor(private code: string, private id: string, private from: number) {
-    super();
+class MermaidWidget extends WysiwygBlockWidget {
+  constructor(private code: string, private id: string, private from: number, selected: boolean) {
+    super(selected);
   }
   eq(other: MermaidWidget): boolean {
-    return other.code === this.code;
+    return other.code === this.code && this.sameSelection(other);
   }
   toDOM(): HTMLElement {
     const container = document.createElement("div");
-    container.className = "murasaki-wysiwyg-mermaid mermaid";
+    container.className = `murasaki-wysiwyg-mermaid mermaid${this.selectionClass()}`;
     // 占位：出错时显示源码，便于排错
     container.textContent = this.code;
     void mermaid
@@ -240,16 +274,16 @@ class MermaidWidget extends WidgetType {
  * 渲染在其代码块下方的实时预览卡。替换的是代码块结尾的换行符（见 computeDecorations）。
  * 源码仍保持可编辑（围栏 CodeMark dim），预览随键入实时更新。
  */
-class DiagramPreviewWidget extends WidgetType {
-  constructor(private lang: string, private code: string) {
-    super();
+class DiagramPreviewWidget extends WysiwygBlockWidget {
+  constructor(private lang: string, private code: string, selected: boolean) {
+    super(selected);
   }
   eq(other: DiagramPreviewWidget): boolean {
-    return other.lang === this.lang && other.code === this.code;
+    return other.lang === this.lang && other.code === this.code && this.sameSelection(other);
   }
   toDOM(): HTMLElement {
     const card = document.createElement("div");
-    card.className = "murasaki-wysiwyg-diagram-preview";
+    card.className = `murasaki-wysiwyg-diagram-preview${this.selectionClass()}`;
 
     const head = document.createElement("div");
     head.className = "murasaki-wysiwyg-diagram-preview-head";
@@ -306,16 +340,16 @@ class DiagramPreviewWidget extends WidgetType {
  * - ignoreEvent 对 click 返回 false（让 CM 处理点击定位光标），但 click handler
  *   在 Ctrl/Cmd 按下时调用 preventDefault 阻止 CM 定位，转而打开链接
  */
-class LinkWidget extends WidgetType {
-  constructor(private text: string, private url: string) {
-    super();
+class LinkWidget extends WysiwygBlockWidget {
+  constructor(private text: string, private url: string, selected: boolean) {
+    super(selected);
   }
   eq(other: LinkWidget): boolean {
-    return other.text === this.text && other.url === this.url;
+    return other.text === this.text && other.url === this.url && this.sameSelection(other);
   }
   toDOM(): HTMLElement {
     const a = document.createElement("a");
-    a.className = "murasaki-wysiwyg-link";
+    a.className = `murasaki-wysiwyg-link${this.selectionClass()}`;
     a.textContent = this.text;
     a.href = this.url;
     a.title = this.url;
@@ -352,23 +386,23 @@ class LinkWidget extends WidgetType {
 }
 
 /** 图片 widget：替换 ![alt](url)，渲染为实际 <img>。 */
-class ImageWidget extends WidgetType {
+class ImageWidget extends WysiwygBlockWidget {
   /** 构造时解析好的 src（基于当前文件路径）。eq 比较此值，路径变化时触发重渲染。 */
   private resolvedSrc: string;
 
-  constructor(private alt: string, url: string) {
-    super();
+  constructor(private alt: string, url: string, selected: boolean) {
+    super(selected);
     // ADR-0015：在构造时解析 src（而非 toDOM 时），这样 eq 比较解析后的值，
     // 当 currentFilePath 变化时（切 tab），新 widget 的 resolvedSrc 不同，
     // eq 返回 false，CM6 会调用 toDOM 重新渲染图片。
     this.resolvedSrc = resolveImageSrc(url, getCurrentFilePath());
   }
   eq(other: ImageWidget): boolean {
-    return other.alt === this.alt && other.resolvedSrc === this.resolvedSrc;
+    return other.alt === this.alt && other.resolvedSrc === this.resolvedSrc && this.sameSelection(other);
   }
   toDOM(): HTMLElement {
     const img = document.createElement("img");
-    img.className = "murasaki-wysiwyg-image";
+    img.className = `murasaki-wysiwyg-image${this.selectionClass()}`;
     img.alt = this.alt;
     img.src = this.resolvedSrc;
     img.title = this.alt;
@@ -384,16 +418,16 @@ class ImageWidget extends WidgetType {
  * 表格 widget：替换 Table 节点，用 markdown-it 渲染对齐表格 HTML。
  * 复用 useMarkdownRenderer 的 markdown-it 实例（含 markdown-it-multimd-table 对齐支持）。
  */
-class TableWidget extends WidgetType {
-  constructor(private source: string, private from: number) {
-    super();
+class TableWidget extends WysiwygBlockWidget {
+  constructor(private source: string, private from: number, selected: boolean) {
+    super(selected);
   }
   eq(other: TableWidget): boolean {
-    return other.source === this.source;
+    return other.source === this.source && this.sameSelection(other);
   }
   toDOM(): HTMLElement {
     const wrapper = document.createElement("div");
-    wrapper.className = "murasaki-wysiwyg-table";
+    wrapper.className = `murasaki-wysiwyg-table${this.selectionClass()}`;
     try {
       // T6.4 (#103)：表格单元格内可能含内联 HTML（markdown-it html:true 透传），
       // 注入 innerHTML 前用 sanitizeInlineHtml 净化防 XSS
@@ -421,19 +455,19 @@ class TableWidget extends WidgetType {
  * 数学公式 widget：替换 $...$ / $$...$$，用 KaTeX 同步渲染。
  * displayMode=true → 块级 <div>；false → 行内 <span>。
  */
-class MathWidget extends WidgetType {
-  constructor(private expr: string, private displayMode: boolean, private from: number) {
-    super();
+class MathWidget extends WysiwygBlockWidget {
+  constructor(private expr: string, private displayMode: boolean, private from: number, selected: boolean) {
+    super(selected);
   }
   eq(other: MathWidget): boolean {
-    return other.expr === this.expr && other.displayMode === this.displayMode;
+    return other.expr === this.expr && other.displayMode === this.displayMode && this.sameSelection(other);
   }
   toDOM(): HTMLElement {
     const el = document.createElement(this.displayMode ? "div" : "span");
     // 块级公式追加 modifier class，便于在 wysiwygTheme 中区分块级居中样式（T6）
     el.className = this.displayMode
-      ? "murasaki-wysiwyg-math murasaki-wysiwyg-math-block katex katex-display"
-      : "murasaki-wysiwyg-math katex";
+      ? `murasaki-wysiwyg-math murasaki-wysiwyg-math-block katex katex-display${this.selectionClass()}`
+      : `murasaki-wysiwyg-math katex${this.selectionClass()}`;
     try {
       el.innerHTML = katex.renderToString(this.expr, {
         displayMode: this.displayMode,
@@ -463,16 +497,16 @@ class MathWidget extends WidgetType {
  * Emoji shortcode widget：替换 `:smile:` 等短代码为实际 emoji 字符。
  * 行内 widget，显示 emoji unicode 字符，光标离开段时渲染。
  */
-class EmojiWidget extends WidgetType {
-  constructor(private emoji: string, private shortcode: string) {
-    super();
+class EmojiWidget extends WysiwygBlockWidget {
+  constructor(private emoji: string, private shortcode: string, selected: boolean) {
+    super(selected);
   }
   eq(other: EmojiWidget): boolean {
-    return other.shortcode === this.shortcode;
+    return other.shortcode === this.shortcode && this.sameSelection(other);
   }
   toDOM(): HTMLElement {
     const span = document.createElement("span");
-    span.className = "murasaki-wysiwyg-emoji";
+    span.className = `murasaki-wysiwyg-emoji${this.selectionClass()}`;
     span.textContent = this.emoji;
     span.title = `:${this.shortcode}:`; // hover 显示原始 shortcode
     return span;
@@ -493,17 +527,17 @@ class EmojiWidget extends WidgetType {
  *
  * 仅在光标离开 frontmatter 范围时生成此 widget（光标进入时显示原始文本可编辑）。
  */
-class FrontmatterCardWidget extends WidgetType {
-  constructor(private content: string, private from: number) {
-    super();
+class FrontmatterCardWidget extends WysiwygBlockWidget {
+  constructor(private content: string, private from: number, selected: boolean) {
+    super(selected);
   }
   eq(other: FrontmatterCardWidget): boolean {
-    return other.content === this.content;
+    return other.content === this.content && this.sameSelection(other);
   }
   toDOM(): HTMLElement {
     const wrapper = document.createElement("div");
     // markdown-body class on editor container makes .front-matter-card selectors match
-    wrapper.className = "murasaki-wysiwyg-frontmatter";
+    wrapper.className = `murasaki-wysiwyg-frontmatter${this.selectionClass()}`;
     // 复用预览/导出的卡片渲染（含 title/date/tags 字段样式化）
     wrapper.innerHTML = renderFrontMatterCard(this.content);
     // 点击卡片：发出事件让 SourceEditor 切源码模式并定位光标
@@ -533,16 +567,16 @@ class FrontmatterCardWidget extends WidgetType {
  *
  * 点击 widget：发出 murasaki-focus-block 事件定位光标到块起始位置（与其他块 widget 一致）。
  */
-class HtmlWidget extends WidgetType {
-  constructor(private source: string, private from: number) {
-    super();
+class HtmlWidget extends WysiwygBlockWidget {
+  constructor(private source: string, private from: number, selected: boolean) {
+    super(selected);
   }
   eq(other: HtmlWidget): boolean {
-    return other.source === this.source;
+    return other.source === this.source && this.sameSelection(other);
   }
   toDOM(): HTMLElement {
     const wrapper = document.createElement("div");
-    wrapper.className = "murasaki-wysiwyg-html";
+    wrapper.className = `murasaki-wysiwyg-html${this.selectionClass()}`;
     // T6.4 (#103)：净化后注入 innerHTML —— 防止用户输入的 HTML 包含 XSS payload
     wrapper.innerHTML = sanitizeInlineHtml(this.source);
     // 点击 widget：发出事件定位光标到块起始位置
@@ -561,34 +595,42 @@ class HtmlWidget extends WidgetType {
 }
 
 /** 根据块级 widget 描述符构造对应 WidgetType 实例。 */
-function createBlockWidget(d: BlockWidgetDeco, nextMermaidId: () => string): WidgetType {
+function createBlockWidget(
+  d: BlockWidgetDeco,
+  nextMermaidId: () => string,
+  selected: boolean
+): WidgetType {
   switch (d.widget) {
     case "codeBlock":
-      return new CodeBlockWidget(d.lang, d.code, d.from);
+      return new CodeBlockWidget(d.lang, d.code, d.from, selected);
     case "mermaid":
-      return new MermaidWidget(d.code, nextMermaidId(), d.from);
+      return new MermaidWidget(d.code, nextMermaidId(), d.from, selected);
     case "diagramPreview":
-      return new DiagramPreviewWidget(d.lang, d.code);
+      return new DiagramPreviewWidget(d.lang, d.code, selected);
     case "link":
-      return new LinkWidget(d.text, d.url);
+      return new LinkWidget(d.text, d.url, selected);
     case "image":
-      return new ImageWidget(d.alt, d.url);
+      return new ImageWidget(d.alt, d.url, selected);
     case "table":
-      return new TableWidget(d.source, d.from);
+      return new TableWidget(d.source, d.from, selected);
     case "math":
-      return new MathWidget(d.expr, d.displayMode, d.from);
+      return new MathWidget(d.expr, d.displayMode, d.from, selected);
     case "emoji":
-      return new EmojiWidget(d.emoji, d.shortcode);
+      return new EmojiWidget(d.emoji, d.shortcode, selected);
     case "frontmatter":
-      return new FrontmatterCardWidget(d.content, d.from);
+      return new FrontmatterCardWidget(d.content, d.from, selected);
     case "html":
-      return new HtmlWidget(d.source, d.from);
+      return new HtmlWidget(d.source, d.from, selected);
   }
 }
 
 // ===== 描述符 → CodeMirror Decoration =====
 
-function toDecorationSet(decos: ComputedDeco[], nextMermaidId: () => string): DecorationSet {
+function toDecorationSet(
+  decos: ComputedDeco[],
+  nextMermaidId: () => string,
+  selection: { from: number; to: number } | null
+): DecorationSet {
   const ranges = decos.map((d) => {
     if (d.type === "mark") {
       const cls =
@@ -612,8 +654,9 @@ function toDecorationSet(decos: ComputedDeco[], nextMermaidId: () => string): De
     if (d.type === "render") {
       return Decoration.mark({ class: d.cssClass }).range(d.from, d.to);
     }
-    // blockWidget：用渲染 widget 替换原始 markdown
-    return Decoration.replace({ widget: createBlockWidget(d, nextMermaidId) }).range(d.from, d.to);
+    // blockWidget：用渲染 widget 替换原始 markdown；选区覆盖时叠加选中高亮
+    const selected = selectionIntersects(d.from, d.to, selection);
+    return Decoration.replace({ widget: createBlockWidget(d, nextMermaidId, selected) }).range(d.from, d.to);
   });
   return Decoration.set(ranges, true);
 }
@@ -661,6 +704,14 @@ export const recomputeWysiwygEffect = StateEffect.define<void>();
  * 如需优化可再引入 ViewPlugin 监听 viewport 并 dispatch effect。
  */
 function computeDecorationsForState(state: EditorState): DecorationSet {
+  // 选区范围（锚点↔头）。空选区（光标）→ null，不叠加选中高亮。
+  const sel = state.selection.main;
+  const selection = sel.empty
+    ? null
+    : {
+        from: Math.min(sel.anchor, sel.head),
+        to: Math.max(sel.anchor, sel.head),
+      };
   const decos = computeDecorations({
     doc: state.doc.toString(),
     selectionHead: state.selection.main.head,
@@ -669,7 +720,7 @@ function computeDecorationsForState(state: EditorState): DecorationSet {
     // StateField 不访问 viewport —— 全量计算（大文档性能可接受）
     viewport: undefined,
   });
-  return toDecorationSet(decos, nextMermaidId);
+  return toDecorationSet(decos, nextMermaidId, selection);
 }
 
 /**
@@ -881,6 +932,14 @@ export const wysiwygTheme = EditorView.theme({
   ".murasaki-wysiwyg-mark-dim": {
     opacity: "0.4",
     fontSize: "80%",
+  },
+  // 块级 widget 的选区高亮（Ctrl+A 全选时叠加选中底色/描边）：
+  // WYSIWYG 下块级元素被替换为渲染 widget，原生选区不会覆盖其上，
+  // 用 CSS 类模拟选中态，保证「全选」在视觉上也成立。
+  ".murasaki-wysiwyg-selected": {
+    backgroundColor: "var(--md-code-selection, rgba(147, 51, 234, 0.08))",
+    outline: "1px solid var(--md-code-selection-outline, rgba(147, 51, 234, 0.30))",
+    borderRadius: "4px",
   },
   // 行内代码：与预览 .markdown-body code 一致的视觉样式（背景/圆角/等宽字体）。
   // 覆盖整段（含反引号）；内层高亮 token span 会被后代选择器重置，

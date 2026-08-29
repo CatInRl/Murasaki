@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { setLocale } from "../i18n";
 import { READING_FONT_PRESETS, type ReadingFontPreset, type AppLocale } from "../types";
+import { toMenuAccelerators } from "../shortcuts/shortcutsLogic";
 
 /** useAppLifecycle 依赖的 store/状态切片 */
 export interface AppLifecycleDeps {
@@ -194,7 +195,7 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
         void invoke("reload_menu", { lang: persistence.settings.language });
         // 同步快捷键覆盖到原生菜单（菜单项右侧快捷键提示跟随用户自定义）
         void invoke("update_shortcut_labels", {
-          overrides: persistence.settings.shortcuts ?? {},
+          overrides: toMenuAccelerators(persistence.settings.shortcuts ?? {}),
         });
       }
     );

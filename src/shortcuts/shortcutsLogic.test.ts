@@ -20,10 +20,13 @@ import {
   detectConflicts,
   isUsableShortcut,
   formatShortcut,
+  formatShortcutForDisplay,
+  toMenuAccelerator,
+  toMenuAccelerators,
   setShortcutOverride,
   resetShortcutOverride,
 } from "./shortcutsLogic";
-import { DEFAULT_SHORTCUTS } from "./shortcutRegistry";
+import { SHORTCUT_COMMANDS, DEFAULT_SHORTCUTS } from "./shortcutRegistry";
 
 function keyEvent(partial: Partial<KeyboardEvent>): KeyboardEvent {
   return { ctrlKey: false, shiftKey: false, altKey: false, metaKey: false, key: "", ...partial } as KeyboardEvent;
@@ -344,5 +347,133 @@ describe("shortcutsLogic - formatShortcut", () => {
 
   it("无绑定返回 null", () => {
     expect(formatShortcut(null)).toBeNull();
+  });
+});
+
+describe("shortcutsLogic - formatShortcutForDisplay", () => {
+  it("非 mac 平台保持 Ctrl 原样", () => {
+    expect(formatShortcutForDisplay("Ctrl+Shift+K", false)).toBe("Ctrl+Shift+K");
+  });
+
+  it("mac 平台上主修饰键 Ctrl 渲染为 ⌘", () => {
+    expect(formatShortcutForDisplay("Ctrl+Shift+K", true)).toBe("⌘+Shift+K");
+    expect(formatShortcutForDisplay("Ctrl+Alt+S", true)).toBe("⌘+Alt+S");
+  });
+
+  it("无绑定返回 null", () => {
+    expect(formatShortcutForDisplay(null, true)).toBeNull();
+  });
+});
+
+describe("shortcutsLogic - toMenuAccelerator", () => {
+  it("Ctrl 主修饰键映射为 CmdOrCtrl", () => {
+    expect(toMenuAccelerator("Ctrl+Shift+K")).toBe("CmdOrCtrl+Shift+K");
+    expect(toMenuAccelerator("Ctrl+S")).toBe("CmdOrCtrl+S");
+  });
+
+  it("无 Ctrl 的绑定保持不变", () => {
+    expect(toMenuAccelerator("F11")).toBe("F11");
+    expect(toMenuAccelerator("Shift+Tab")).toBe("Shift+Tab");
+  });
+
+  it("禁用/无效返回 null", () => {
+    expect(toMenuAccelerator(null)).toBeNull();
+    expect(toMenuAccelerator(undefined)).toBeNull();
+  });
+
+  it("toMenuAccelerators 批量转换并保留 null 禁用项", () => {
+    const overrides = { save: "Ctrl+Shift+S", find: "Ctrl+F", quit: null };
+    expect(toMenuAccelerators(overrides)).toEqual({
+      save: "CmdOrCtrl+Shift+S",
+      find: "CmdOrCtrl+F",
+      quit: null,
+    });
+  });
+});
+
+// ===== 遍历全部注册命令 =====
+
+describe("全部注册命令 - 默认设置生效", () => {
+  it("默认设置下每个命令的生效绑定 == 注册表默认绑定", () => {
+    for (const c of SHORTCUT_COMMANDS) {
+      const def = normalizeShortcut(c.defaultShortcut);
+      expect(resolveShortcut({}, c.id)).toBe(def);
+      expect(effectiveShortcuts({})[c.id]).toBe(def);
+      expect(isDefaultShortcut({}, c.id)).toBe(true);
+    }
+  });
+
+  it("缺省绑定为 null 的命令在默认设置下保持未绑定", () => {
+    for (const c of SHORTCUT_COMMANDS) {
+      if (c.defaultShortcut === null) {
+        expect(effectiveShortcuts({})[c.id]).toBeNull();
+      }
+    }
+  });
+
+  it("每个非空默认绑定都能解析（parse）且能映射为合法 CM 键（editor 作用域）", () => {
+    for (const c of SHORTCUT_COMMANDS) {
+      if (!c.defaultShortcut) continue;
+      expect(parseShortcut(c.defaultShortcut)).not.toBeNull();
+      if (c.scope === "editor") {
+        expect(toCmKey(c.defaultShortcut)).not.toBeNull();
+      }
+      // 编辑器作用域的字符+修饰键默认绑定必须为可用绑定（能生成 keymap 项）
+      if (c.scope === "editor") {
+        expect(isUsableShortcut(c.defaultShortcut)).toBe(true);
+      }
+    }
+  });
+
+  it("默认设置下无任何冲突（每个全局绑定唯一，保证事件能确定性命中）", () => {
+    const bindingToCmds = new Map<string, string[]>();
+    for (const c of SHORTCUT_COMMANDS) {
+      const binding = resolveShortcut({}, c.id);
+      if (!binding) continue;
+      const key = canonicalizeShortcut(binding)!;
+      bindingToCmds.set(key, [...(bindingToCmds.get(key) ?? []), c.id]);
+    }
+    const dups = [...bindingToCmds.entries()].filter(([, ids]) => ids.length > 1);
+    expect(dups).toEqual([]);
+    expect(detectConflicts({})).toEqual([]);
+  });
+});
+
+describe("全部注册命令 - 修改设置生效", () => {
+  it("每个命令改绑后：生效绑定更新、标记为非默认", () => {
+    for (const c of SHORTCUT_COMMANDS) {
+      const custom = "Ctrl+Alt+Shift+Z";
+      const overridden = setShortcutOverride({}, c.id, custom);
+      expect(effectiveShortcuts(overridden)[c.id]).toBe(custom);
+      expect(resolveShortcut(overridden, c.id)).toBe(custom);
+      expect(isDefaultShortcut(overridden, c.id)).toBe(false);
+    }
+  });
+
+  it("每个命令改绑为与默认相同 → 覆盖移除（覆盖表保持最小）", () => {
+    for (const c of SHORTCUT_COMMANDS) {
+      expect(setShortcutOverride({}, c.id, c.defaultShortcut)).toEqual({});
+    }
+  });
+
+  it("每个命令禁用（null）→ 生效绑定为空", () => {
+    for (const c of SHORTCUT_COMMANDS) {
+      const disabled = setShortcutOverride({}, c.id, null);
+      expect(effectiveShortcuts(disabled)[c.id]).toBeNull();
+      // 默认绑定本就为 null 的命令，禁用与默认相同 → 仍为默认（true）；仅对原本有绑定的命令断言被改
+      if (c.defaultShortcut !== null) {
+        expect(isDefaultShortcut(disabled, c.id)).toBe(false);
+      }
+    }
+  });
+
+  it("每个命令重置覆盖后恢复默认绑定", () => {
+    for (const c of SHORTCUT_COMMANDS) {
+      const custom = "Ctrl+Alt+Shift+Z";
+      const overridden = setShortcutOverride({}, c.id, custom);
+      const reset = resetShortcutOverride(overridden, c.id);
+      expect(effectiveShortcuts(reset)[c.id]).toBe(normalizeShortcut(c.defaultShortcut));
+      expect(resolveShortcut(reset, c.id)).toBe(normalizeShortcut(c.defaultShortcut));
+    }
   });
 });

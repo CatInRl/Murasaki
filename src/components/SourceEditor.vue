@@ -25,6 +25,7 @@ import {
   Clipboard,
 } from "lucide-vue-next";
 import { buildEditorShortcutExtension, useShortcuts } from "../shortcuts/useShortcuts";
+import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
 import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
 import type { MenuItem } from "../stores/useContextMenuStore";
@@ -649,12 +650,12 @@ function onContextMenu(e: MouseEvent): void {
 
 function buildEditorMenuItems(): MenuItem[] {
   return [
-    { label: t("common.cut"), icon: Scissors, shortcut: "Ctrl+X", action: () => runExecCommand("cut") },
-    { label: t("common.copy"), icon: Copy, shortcut: "Ctrl+C", action: () => runExecCommand("copy") },
-    { label: t("common.paste"), icon: ClipboardPaste, shortcut: "Ctrl+V", action: () => runExecCommand("paste") },
-    { label: t("editor.contextMenu.selectAll"), icon: TextSelect, shortcut: "Ctrl+A", action: () => runSelectAll() },
+    { label: t("common.cut"), icon: Scissors, shortcut: formatShortcutForDisplay("Ctrl+X"), action: () => runExecCommand("cut") },
+    { label: t("common.copy"), icon: Copy, shortcut: formatShortcutForDisplay("Ctrl+C"), action: () => runExecCommand("copy") },
+    { label: t("common.paste"), icon: ClipboardPaste, shortcut: formatShortcutForDisplay("Ctrl+V"), action: () => runExecCommand("paste") },
+    { label: t("editor.contextMenu.selectAll"), icon: TextSelect, shortcut: formatShortcutForDisplay("Ctrl+A"), action: () => runSelectAll() },
     { separator: true },
-    { label: t("editor.contextMenu.findReplace"), icon: Search, shortcut: "Ctrl+F", action: () => runFindReplace() },
+    { label: t("editor.contextMenu.findReplace"), icon: Search, shortcut: formatShortcutForDisplay("Ctrl+F"), action: () => runFindReplace() },
     { label: t("editor.toolbar.insertTable"), icon: Table, action: () => emit("context-action", "insert-table") },
     { label: t("editor.contextMenu.link"), icon: LinkIcon, action: () => emit("context-action", "insert-link") },
     { label: t("editor.contextMenu.image"), icon: ImageIcon, action: () => emit("context-action", "insert-image") },

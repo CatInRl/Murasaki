@@ -43,6 +43,7 @@ import { useCompareWindow } from "./composables/useCompareWindow";
 import { useTabClose } from "./composables/useTabClose";
 import { useCommands } from "./composables/useCommands";
 import { useShortcuts } from "./shortcuts/useShortcuts";
+import { toMenuAccelerators } from "./shortcuts/shortcutsLogic";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
 import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
 import { setLocale } from "./i18n";
@@ -342,7 +343,7 @@ onMounted(async () => {
   );
   // 同步已保存的快捷键覆盖到原生菜单（菜单项快捷键提示跟随用户自定义）
   void invoke("update_shortcut_labels", {
-    overrides: persistence.settings.shortcuts ?? {},
+    overrides: toMenuAccelerators(persistence.settings.shortcuts ?? {}),
   }).catch((err: unknown) =>
     console.warn("初始化菜单快捷键失败:", err)
   );

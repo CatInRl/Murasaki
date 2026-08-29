@@ -13,6 +13,7 @@ import {
   commandById,
   type ShortcutCommand,
 } from "./shortcutRegistry";
+import { isMac } from "../utils/platform";
 
 // ===== 键名规范化 =====
 
@@ -346,4 +347,45 @@ export function detectConflicts(overrides: ShortcutOverrides): ShortcutConflict[
 /** 展示用：快捷键字符串（规范格式），无绑定返回 null（面板显示"未设置"） */
 export function formatShortcut(shortcut: string | null | undefined): string | null {
   return normalizeShortcut(shortcut);
+}
+
+// ===== 跨平台展示 / 菜单加速器 =====
+
+/**
+ * 展示用快捷键字符串（跨平台）。
+ * - macOS 上主修饰键 Ctrl 渲染为 ⌘ 符号（符合 Mac 用户心智）
+ * - 其余平台保持 "Ctrl+Shift+K" 原样
+ * 通过注入 isMac 判断（默认按运行时平台），保持纯函数便于测试。
+ */
+export function formatShortcutForDisplay(
+  shortcut: string | null | undefined,
+  isMacPlatform: boolean = isMac()
+): string | null {
+  const normalized = normalizeShortcut(shortcut);
+  if (!normalized) return null;
+  return isMacPlatform ? normalized.replace(/Ctrl\+/g, "⌘+") : normalized;
+}
+
+/**
+ * 转 Tauri 原生菜单加速器（快捷键覆盖表推送 Rust 用）。
+ * 主修饰键统一映射为 "CmdOrCtrl"——Tauri 在 macOS 上渲染为 ⌘、其余平台渲染为
+ * Ctrl，从而一份配置适配全平台。
+ */
+export function toMenuAccelerator(
+  shortcut: string | null | undefined
+): string | null {
+  const normalized = normalizeShortcut(shortcut);
+  if (!normalized) return null;
+  // normalized 已是规范格式（主修饰键为 "Ctrl"），直接替换为 "CmdOrCtrl"
+  // 不再二次规范化，避免 "CmdOrCtrl" 被当作普通按键解析
+  return normalized.replace(/Ctrl\+/g, "CmdOrCtrl+");
+}
+
+/** 批量转换快捷键覆盖表 → 菜单加速器表（简化调用方） */
+export function toMenuAccelerators(overrides: ShortcutOverrides): ShortcutOverrides {
+  const result: ShortcutOverrides = {};
+  for (const [id, binding] of Object.entries(overrides)) {
+    result[id] = toMenuAccelerator(binding);
+  }
+  return result;
 }

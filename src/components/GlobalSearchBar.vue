@@ -27,6 +27,7 @@ import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { basename, normalizePath } from "../utils/path";
 import { isMarkdownFile } from "../utils/fileKind";
 import { useShortcuts } from "../shortcuts/useShortcuts";
+import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
 import {
   buildGroups,
   type SearchContentFileSource,
@@ -358,7 +359,7 @@ function groupChip(kind: SearchGroupKind): "tabs" | "recent" | null {
   return null;
 }
 
-const shortcutLabel = computed(() => effective.value["global-search"] ?? "Ctrl+P");
+const shortcutLabel = computed(() => formatShortcutForDisplay(effective.value["global-search"] ?? "Ctrl+P"));
 
 // 打开时：聚焦输入框 + 清空上一次查询（空查询默认态）
 onMounted(() => {

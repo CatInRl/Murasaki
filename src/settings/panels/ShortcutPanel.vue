@@ -25,6 +25,7 @@ import {
   detectConflicts,
   effectiveShortcuts,
   eventToShortcut,
+  formatShortcutForDisplay,
   isDefaultShortcut,
   isUsableShortcut,
   resetShortcutOverride,
@@ -169,7 +170,7 @@ function disableOne(cmdId: string): void {
                 {{ t('settings.shortcuts.recording') }}
               </template>
               <template v-else-if="effective[cmd.id]">
-                {{ effective[cmd.id] }}
+                {{ formatShortcutForDisplay(effective[cmd.id]) }}
               </template>
               <template v-else>
                 <span class="unset">{{ t('settings.shortcuts.unset') }}</span>

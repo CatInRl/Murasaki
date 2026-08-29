@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { BookOpen, FileText } from "lucide-vue-next";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
 import { basename, dirname } from "../utils/path";
+import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
 import EmptyState from "./EmptyState.vue";
 
 const persistence = usePersistenceStore();
@@ -40,9 +41,9 @@ function onAction(key: string) {
 
 // 底部快捷键提示
 const shortcutHints = computed(() => [
-  { keys: "Ctrl+O", label: t("editor.welcome.shortcutOpen") },
-  { keys: "Ctrl+N", label: t("editor.welcome.shortcutNew") },
-  { keys: "Ctrl+Shift+O", label: t("editor.welcome.shortcutOpenFolder") },
+  { keys: formatShortcutForDisplay("Ctrl+O"), label: t("editor.welcome.shortcutOpen") },
+  { keys: formatShortcutForDisplay("Ctrl+N"), label: t("editor.welcome.shortcutNew") },
+  { keys: formatShortcutForDisplay("Ctrl+Shift+O"), label: t("editor.welcome.shortcutOpenFolder") },
 ]);
 </script>
 
