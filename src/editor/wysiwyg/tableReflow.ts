@@ -1,0 +1,121 @@
+/**
+ * Markdown 管道符表格的解析与规范化核心（T1.1）。
+ *
+ * 纯函数、无 DOM 依赖，供 WYSIWYG 就地表格编辑（T1.5 写回）复用。
+ * 对齐分三态：'l' 左 / 'c' 中 / 'r' 右，来自分隔行 `:---` `:---:` `---:`。
+ */
+
+export type CellAlign = "l" | "c" | "r";
+
+export interface TableModel {
+  cells: string[][];
+  align: CellAlign[];
+}
+
+/** 单元格文本 → 显示宽度：CJK/全角/emoji 计 2，其余计 1（补空格对齐用）。 */
+export function displayWidth(text: string): number {
+  let w = 0;
+  for (const ch of text) {
+    const cp = ch.codePointAt(0)!;
+    if (cp >= 0x1100) w += 2;
+    else w += 1;
+  }
+  return w;
+}
+
+/** 切分一行成单元格，识别转义竖线 `\|`（不拆分），并还原为 `|`。 */
+function splitCells(line: string): string[] {
+  const t = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  const parts = t.split(/(?<!\\)\|/);
+  return parts.map((c) => c.trim().replace(/\\\|/g, "|"));
+}
+
+/** 判断一行是否为分隔行（仅含 - 与 :、至少一个 -）。 */
+function isSeparator(text: string): boolean {
+  return /^:?-{1,}:?$/.test(text);
+}
+
+/**
+ * 将一段 Markdown 表格源码解析为内存模型。
+ * 返回 null 表示非法/非表格。仅处理表格块本身。
+ */
+export function parseTable(source: string): TableModel | null {
+  const lines = source.split("\n").filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return null;
+
+  const headerCells = splitCells(lines[0]);
+  if (headerCells.length === 0) return null;
+
+  // 定位分隔行（第二行或其后首个仅含 -/: 的行）
+  let sepIndex = -1;
+  for (let i = 1; i < lines.length; i++) {
+    const parts = splitCells(lines[i]);
+    if (parts.length >= 1 && parts.every((a) => isSeparator(a)) && parts.some((a) => a.includes("-"))) {
+      sepIndex = i;
+      break;
+    }
+  }
+  if (sepIndex === -1) return null;
+
+  const align: CellAlign[] = splitCells(lines[sepIndex]).map((s) => {
+    if (s.startsWith(":") && s.endsWith(":")) return "c";
+    if (s.endsWith(":")) return "r";
+    if (s.startsWith(":")) return "l";
+    return "l";
+  });
+
+  const cells: string[][] = [headerCells];
+  for (let i = sepIndex + 1; i < lines.length; i++) {
+    cells.push(splitCells(lines[i]));
+  }
+
+  const cols = Math.max(align.length, ...cells.map((r) => r.length));
+  for (const row of cells) while (row.length < cols) row.push("");
+  while (align.length < cols) align.push("l");
+
+  return { cells, align };
+}
+
+function escapeCell(text: string): string {
+  return text.replace(/\|/g, "\\|");
+}
+
+/**
+ * 规范化表格：按每列最长显示宽补空格对齐管道符；分隔行按对齐符号重建。
+ * 换行符（`\n`）在单元格内写回为 `<br>`（由编辑层负责），此处保留并计入列宽。
+ */
+export function reflowTable(t: TableModel): string {
+  const cols = t.align.length;
+  const widths = new Array<number>(cols).fill(3);
+  const rows = t.cells.map((r) => r.slice(0, cols));
+  for (const row of rows) {
+    row.forEach((cell, i) => {
+      const w = displayWidth(cell);
+      if (w > widths[i]) widths[i] = w;
+    });
+  }
+
+  const padTo = (text: string, width: number): string => {
+    const gap = width - displayWidth(text);
+    return gap > 0 ? text + " ".repeat(gap) : text;
+  };
+
+  const fmtRow = (cells: string[]): string =>
+    "| " + cells.map((c, i) => padTo(escapeCell(c), widths[i])).join(" | ") + " |";
+
+  const sep = t.align.map((a, i) => {
+    // 分隔行每列至少 3 个 `-`（GFM 惯例）
+    const n = Math.max(3, widths[i] - 1);
+    switch (a) {
+      case "c":
+        return ":" + "-".repeat(n) + ":";
+      case "r":
+        return "-".repeat(n) + ":";
+      default:
+        return ":" + "-".repeat(n);
+    }
+  });
+
+  const [header, ...body] = rows;
+  return [fmtRow(header), "| " + sep.join(" | ") + " |", ...body.map(fmtRow)].join("\n");
+}
