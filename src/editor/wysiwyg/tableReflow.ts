@@ -80,6 +80,70 @@ function escapeCell(text: string): string {
   return text.replace(/\|/g, "\\|");
 }
 
+// ===== 结构性操作（T1.4，纯函数） =====
+
+/** 复制模型（避免原地修改共享数组）。 */
+export function cloneTable(t: TableModel): TableModel {
+  return {
+    cells: t.cells.map((r) => r.slice()),
+    align: t.align.slice(),
+  };
+}
+
+function requireCols(t: TableModel, n: number): TableModel {
+  const cols = Math.max(n, t.align.length, ...t.cells.map((r) => r.length));
+  for (const row of t.cells) while (row.length < cols) row.push("");
+  while (t.align.length < cols) t.align.push("l");
+  return t;
+}
+
+/** 在第 col（0-based）位置前插入空列；col 越界则追加到末尾。 */
+export function addColumn(t: TableModel, col: number): TableModel {
+  const out = cloneTable(t);
+  requireCols(out, out.align.length);
+  const at = Math.min(Math.max(0, col), out.align.length);
+  for (const row of out.cells) row.splice(at, 0, "");
+  out.align.splice(at, 0, "l");
+  return out;
+}
+
+/** 删除第 col 列；列数少于等于 1 时不允许删除（返回新模型）。 */
+export function removeColumn(t: TableModel, col: number): TableModel {
+  if (t.align.length <= 1) return cloneTable(t);
+  const out = cloneTable(t);
+  const at = Math.min(Math.max(0, col), out.align.length - 1);
+  for (const row of out.cells) row.splice(at, 1);
+  out.align.splice(at, 1);
+  return out;
+}
+
+/** 在第 row（0-based，含表头）位置前插入空行；row=0 表示表头下第一行。 */
+export function addRow(t: TableModel, row: number): TableModel {
+  const out = cloneTable(t);
+  requireCols(out, out.align.length);
+  const at = Math.min(Math.max(1, row), out.cells.length);
+  out.cells.splice(at, 0, new Array<string>(out.align.length).fill(""));
+  return out;
+}
+
+/** 删除第 row 行（0 为表头）；数据行少于等于 1 时不允许删除（返回新模型）。 */
+export function removeRow(t: TableModel, row: number): TableModel {
+  // 至少保留 表头 + 1 数据行（行数 >= 2）
+  if (t.cells.length <= 2) return cloneTable(t);
+  const out = cloneTable(t);
+  const at = Math.min(Math.max(1, row), out.cells.length - 1);
+  out.cells.splice(at, 1);
+  return out;
+}
+
+/** 设置对齐；返回新模型。 */
+export function setAlignment(t: TableModel, col: number, align: CellAlign): TableModel {
+  const at = Math.min(Math.max(0, col), t.align.length - 1);
+  const out = cloneTable(t);
+  out.align[at] = align;
+  return out;
+}
+
 /**
  * 规范化表格：按每列最长显示宽补空格对齐管道符；分隔行按对齐符号重建。
  * 换行符（`\n`）在单元格内写回为 `<br>`（由编辑层负责），此处保留并计入列宽。

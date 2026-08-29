@@ -450,6 +450,20 @@ onMounted(() => {
       userEvent: "input.toggleTask",
     });
   }) as EventListener);
+  // 监听 WYSIWYG 表格提交写回（T1.5）：把 DOM 编辑器收集到的新表格源码写回 CM 文档。
+  // 走 view.dispatch（默认进入 undo 栈），因此 Edit 可撤销、Ctrl+Z 一处生效（T1.6）。
+  hostRef.value.addEventListener("murasaki-table-commit", ((e: CustomEvent) => {
+    const { from, to, source } = e.detail as { from: number; to: number; source: string };
+    view.dispatch({
+      changes: { from, to, insert: source },
+      userEvent: "input.tableEdit",
+    });
+    // 光标停在表格块起始，便于继续编辑原始 markdown / 供 CM 重渲染 widget
+    view.dispatch({
+      selection: { anchor: from },
+      scrollIntoView: false,
+    });
+  }) as EventListener);
   // 监听块级 widget 点击事件：把光标定位到块起始位置，触发原始 markdown 编辑
   // CodeBlock/Mermaid/Table/Math widget 点击后发出 murasaki-focus-block
   hostRef.value.addEventListener("murasaki-focus-block", ((e: CustomEvent) => {

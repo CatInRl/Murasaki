@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseTable, reflowTable, displayWidth } from "./tableReflow";
+import { parseTable, reflowTable, displayWidth, addColumn, removeColumn, addRow, removeRow, setAlignment } from "./tableReflow";
 
 // 源示例取自 high-fi UX：补空格对齐到中文显示宽度
 const source = [
@@ -107,5 +107,78 @@ describe("reflowTable", () => {
     const t = parseTable(["| a | b |", "|---|---|", "| | |"].join("\n"))!;
     const out = reflowTable(t);
     expect(out.split("\n")).toHaveLength(3);
+  });
+});
+
+describe("结构性操作", () => {
+  const t = parseTable([
+    "| 功能 | 状态 | 负责人 |",
+    "|:---|:---:|---:|",
+    "| 就地编辑 | 进行中 | UI 组 |",
+    "| 行列增删 | 待办 | 引擎组 |",
+  ].join("\n"))!;
+
+  it("addColumn：在中第 1 列前插入空列，对齐同步插入 l，往返有效", () => {
+    const out = addColumn(t, 1);
+    expect(out.align).toEqual(["l", "l", "c", "r"]);
+    expect(out.cells[0]).toEqual(["功能", "", "状态", "负责人"]);
+    // 不影响原模型
+    expect(t.cells[0]).toEqual(["功能", "状态", "负责人"]);
+    expect(parseTable(reflowTable(out))!.align).toEqual(["l", "l", "c", "r"]);
+  });
+
+  it("addColumn：越界 col 追加到末尾", () => {
+    const out = addColumn(t, 99);
+    expect(out.align).toHaveLength(4);
+    expect(out.cells[0][3]).toBe("");
+  });
+
+  it("removeColumn：删除第 2 列，对齐收敛", () => {
+    const out = removeColumn(t, 2);
+    expect(out.align).toEqual(["l", "c"]);
+    expect(out.cells[0]).toEqual(["功能", "状态"]);
+  });
+
+  it("removeColumn：仅剩 1 列时不允许删除", () => {
+    const one = parseTable(["| A |", "|---|", "| 1 |"].join("\n"))!;
+    const out = removeColumn(one, 0);
+    expect(out.align).toHaveLength(1);
+  });
+
+  it("addRow：在表头后（row=1）插入空数据行", () => {
+    const out = addRow(t, 1);
+    expect(out.cells).toHaveLength(4);
+    expect(out.cells[1]).toEqual(["", "", ""]);
+    // 原第一行未被改
+    expect(out.cells[2][0]).toBe("就地编辑");
+  });
+
+  it("removeRow：删除第 1 数据行", () => {
+    const out = removeRow(t, 1);
+    expect(out.cells).toHaveLength(2);
+    expect(out.cells[1][0]).toBe("行列增删");
+  });
+
+  it("removeRow：数据行少于等于 1 不允许删除", () => {
+    const two = parseTable(["| A |", "|---|", "| 1 |"].join("\n"))!;
+    const out = removeRow(two, 1);
+    expect(out.cells).toHaveLength(2);
+  });
+
+  it("setAlignment：设置某列为居中，往返保留", () => {
+    const out = setAlignment(t, 0, "c");
+    expect(out.align[0]).toBe("c");
+    expect(parseTable(reflowTable(out))!.align[0]).toBe("c");
+  });
+
+  it("结构性操作组合：增列→删行→对齐→往返为合法表格", () => {
+    let m = addColumn(t, 2);
+    m = removeRow(m, 1);
+    m = setAlignment(m, 1, "r");
+    const out = reflowTable(m);
+    const r = parseTable(out);
+    expect(r).not.toBeNull();
+    expect(r!.cells[0]).toEqual(["功能", "状态", "", "负责人"]);
+    expect(r!.align[1]).toBe("r");
   });
 });

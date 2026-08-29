@@ -32,7 +32,7 @@ import {
   expireAllProposalsEffect,
   proposalActionEffect,
 } from "../../agent/proposals";
-import { currentShikiTheme, getMarkdownRenderer, resolveShikiThemeOption, getCurrentFilePath } from "../../composables/useMarkdownRenderer";
+import { currentShikiTheme, resolveShikiThemeOption, getCurrentFilePath } from "../../composables/useMarkdownRenderer";
 import {
   computeDecorations,
   getParagraphRange,
@@ -41,6 +41,8 @@ import {
 } from "./computeDecorations";
 import { findEmojiShortcodesInRange } from "./emojiReplacement";
 import { sanitizeInlineHtml } from "./htmlSanitizer";
+import { parseTable } from "./tableReflow";
+import { TableEditor } from "./tableEditor";
 import { renderFrontMatterCard } from "../../composables/useFrontMatter";
 import { resolveImageSrc } from "../../utils/imagePath";
 import { renderPlantUmlCode } from "../../utils/plantuml";
@@ -415,8 +417,12 @@ class ImageWidget extends WysiwygBlockWidget {
 }
 
 /**
- * 表格 widget：替换 Table 节点，用 markdown-it 渲染对齐表格 HTML。
- * 复用 useMarkdownRenderer 的 markdown-it 实例（含 markdown-it-multimd-table 对齐支持）。
+ * 表格 widget：替换 Table 节点，就地编辑（T1.2）。
+ *
+ * 用 T1.1 纯函数核心 parseTable 把 markdown 管道符解析为内存单元格模型，
+ * 渲染为可编辑（contenteditable）的 <table>。点击/聚焦单元格设为锚点并高亮，
+ * 其它单元格悬停显示可编辑提示；光标离开表格块（widget 重建）回到只读渲染态。
+ * 单元格内容以纯文本（转义）呈现，便于直接编辑；真正的写回由 T1.5 处理。
  */
 class TableWidget extends WysiwygBlockWidget {
   constructor(private source: string, private from: number, selected: boolean) {
@@ -427,27 +433,87 @@ class TableWidget extends WysiwygBlockWidget {
   }
   toDOM(): HTMLElement {
     const wrapper = document.createElement("div");
-    wrapper.className = `murasaki-wysiwyg-table${this.selectionClass()}`;
-    try {
-      // T6.4 (#103)：表格单元格内可能含内联 HTML（markdown-it html:true 透传），
-      // 注入 innerHTML 前用 sanitizeInlineHtml 净化防 XSS
-      wrapper.innerHTML = sanitizeInlineHtml(getMarkdownRenderer().md.render(this.source));
-    } catch {
-      // 渲染失败：显示原始 markdown 源码
+    wrapper.className = `murasaki-wysiwyg-table murasaki-wysiwyg-table-edit${this.selectionClass()}`;
+
+    const model = parseTable(this.source);
+    if (!model) {
+      // 非法表格：降级显示原始 markdown 源码
       wrapper.textContent = this.source;
+      return wrapper;
     }
-    // 点击 widget：发出事件定位光标到块起始位置
-    wrapper.addEventListener("click", () => {
-      wrapper.dispatchEvent(new CustomEvent("murasaki-focus-block", {
-        bubbles: true,
-        detail: { from: this.from },
-      }));
+
+    // T1.2-T1.6：就地表格编辑器（contentEditable 单元格 + 锚点 + 结构化操作）
+    const to = this.from + this.source.length;
+    const editor = new TableEditor(this.source, {
+      // 提交（写回）：替换 [from, to] 的原始表格源码为规范化后的新源码，
+      // 由 SourceEditor dispatch 进入 CM 文档（因此可撤销，T1.6）。
+      onCommit: (nextSource) => {
+        wrapper.dispatchEvent(new CustomEvent("murasaki-table-commit", {
+          bubbles: true,
+          detail: { from: this.from, to, source: nextSource },
+        }));
+      },
     });
+
+    const table = editor.render(wrapper);
+    wrapper.appendChild(table);
+    wrapper.dataset.from = String(this.from);
+    this.attachToolbar(wrapper, editor);
     return wrapper;
   }
-  // click 由 widget 自己处理（定位光标），其他事件交给 CM
+
+  /** 悬停工具条 + 行列增删（T1.4）。 */
+  private attachToolbar(wrapper: HTMLElement, editor: TableEditor): void {
+    const doc = wrapper.ownerDocument;
+    const toolbar = doc.createElement("div");
+    toolbar.className = "murasaki-wysiwyg-table-toolbar";
+    toolbar.contentEditable = "false";
+
+    const mkBtn = (label: string, title: string, onClick: () => void) => {
+      const b = doc.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.title = `${title} 对锚点格（绿色格）生效`;
+      b.className = "murasaki-wysiwyg-table-tool";
+      b.addEventListener("mousedown", (e) => e.preventDefault()); // 防止点击移走单元格焦点
+      b.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
+      });
+      return b;
+    };
+
+    const addColBtn = mkBtn("＋列", "锚点格右侧插列", () => editor.addColumnAfterAnchor());
+    const delColBtn = mkBtn("－列", "删除锚点列", () => editor.removeColumnAtAnchor());
+    const addRowBtn = mkBtn("＋行", "锚点格下方插行", () => editor.addRowAfterAnchor());
+    const delRowBtn = mkBtn("－行", "删除锚点行", () => editor.removeRowAtAnchor());
+    const alignL = mkBtn("⇤", "左对齐", () => editor.setAnchorAlignment("l"));
+    const alignC = mkBtn("⇔", "居中对齐", () => editor.setAnchorAlignment("c"));
+    const alignR = mkBtn("⇥", "右对齐", () => editor.setAnchorAlignment("r"));
+
+    // 删除按钮的边界保护置灰：列数须 >1、行数须 >2，锚点变化/结构变化时刷新
+    const refreshDeletable = () => {
+      delColBtn.disabled = !editor.canDeleteColumn();
+      delRowBtn.disabled = !editor.canDeleteRow();
+    };
+    editor.onAnchorChange = refreshDeletable;
+    refreshDeletable();
+
+    toolbar.append(addColBtn, delColBtn, addRowBtn, delRowBtn, alignL, alignC, alignR);
+    wrapper.appendChild(toolbar);
+  }
+  // 表格内所有键盘/DOM 编辑事件由浏览器 contentEditable 处理，不交还 CM
+  // （click 也由单元格 focus 接管，不再跳到块首）；ctrl/meta 组合键交还 CM 处理。
   ignoreEvent(event: Event): boolean {
-    return event.type === "click";
+    if (
+      event instanceof KeyboardEvent &&
+      (event.ctrlKey || event.metaKey) &&
+      (event.key === "z" || event.key === "y" || event.key === "a" || event.key === "s")
+    ) {
+      return false;
+    }
+    return true;
   }
 }
 
@@ -1027,6 +1093,65 @@ export const wysiwygTheme = EditorView.theme({
   // 导致表头与表体列宽各自计算而错位；恢复 normal 可保证表头/表体逐列对齐。
   ".murasaki-wysiwyg-table": {
     whiteSpace: "normal",
+  },
+  // T1.2 就地编辑：表格网格 + 单元格悬停/可编辑提示 + 锚点格高亮
+  ".murasaki-wysiwyg-table-edit": {
+    cursor: "text",
+  },
+  ".murasaki-wysiwyg-table-edit .murasaki-wysiwyg-table-grid": {
+    borderCollapse: "collapse",
+    width: "auto",
+    margin: "8px 0",
+  },
+  ".murasaki-wysiwyg-table-edit th, .murasaki-wysiwyg-table-edit td": {
+    border: "1px solid var(--md-table-border, var(--murasaki-line, rgba(0,0,0,0.12)))",
+    padding: "4px 12px",
+    minWidth: "48px",
+    minHeight: "24px",
+    outline: "none",
+    backgroundColor: "transparent",
+  },
+  ".murasaki-wysiwyg-table-edit th": {
+    background: "var(--md-table-th-bg, var(--murasaki-surface-2))",
+    fontWeight: "600",
+  },
+  ".murasaki-wysiwyg-table-edit td:hover": {
+    background: "var(--md-table-row-hover-bg, var(--murasaki-purple-50, #faf5ff))",
+  },
+  // 锚点格（当前聚焦）：绿色高亮，配合右缘/底缘 + 胶囊指示可插入位置
+  ".murasaki-wysiwyg-table-edit .murasaki-anchor-cell": {
+    boxShadow: "0 0 0 2px var(--murasaki-primary, #9333ea) inset",
+    backgroundColor: "var(--md-table-row-hover-bg, var(--murasaki-purple-50, #faf5ff))",
+  },
+  // T1.4 悬停工具条：聚焦单元格时置顶显示增删/对齐工具
+  ".murasaki-wysiwyg-table-toolbar": {
+    display: "flex",
+    gap: "2px",
+    alignItems: "center",
+    padding: "2px 4px",
+    marginBottom: "4px",
+    background: "var(--murasaki-surface, #ffffff)",
+    border: "1px solid var(--murasaki-line, rgba(0,0,0,0.1))",
+    borderRadius: "var(--murasaki-radius-sm, 6px)",
+    width: "max-content",
+    maxWidth: "100%",
+    flexWrap: "wrap",
+    userSelect: "none",
+  },
+  ".murasaki-wysiwyg-table-tool": {
+    fontSize: "12px",
+    lineHeight: "1",
+    padding: "4px 8px",
+    border: "1px solid var(--murasaki-line, rgba(0,0,0,0.1))",
+    borderRadius: "var(--murasaki-radius-sm, 4px)",
+    background: "var(--murasaki-surface-2, transparent)",
+    color: "var(--murasaki-ink-2, #52525b)",
+    cursor: "pointer",
+  },
+  ".murasaki-wysiwyg-table-tool:hover": {
+    background: "var(--murasaki-purple-50, #faf5ff)",
+    color: "var(--murasaki-primary, #9333ea)",
+    borderColor: "var(--murasaki-primary, #9333ea)",
   },
   ".murasaki-wysiwyg-mermaid svg": {
     maxWidth: "100%",
