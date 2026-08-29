@@ -41,9 +41,9 @@ function onAction(key: string) {
 
 // 底部快捷键提示
 const shortcutHints = computed(() => [
-  { keys: formatShortcutForDisplay("Ctrl+O"), label: t("editor.welcome.shortcutOpen") },
-  { keys: formatShortcutForDisplay("Ctrl+N"), label: t("editor.welcome.shortcutNew") },
-  { keys: formatShortcutForDisplay("Ctrl+Shift+O"), label: t("editor.welcome.shortcutOpenFolder") },
+  { keys: formatShortcutForDisplay("Ctrl+O") ?? "", label: t("editor.welcome.shortcutOpen") },
+  { keys: formatShortcutForDisplay("Ctrl+N") ?? "", label: t("editor.welcome.shortcutNew") },
+  { keys: formatShortcutForDisplay("Ctrl+Shift+O") ?? "", label: t("editor.welcome.shortcutOpenFolder") },
 ]);
 </script>
 

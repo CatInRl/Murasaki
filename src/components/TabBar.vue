@@ -142,7 +142,7 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
 
   const hasPath = !!tab.path;
   const items: MenuItem[] = [
-    { label: t("editor.tabBar.close"), icon: X, shortcut: formatShortcutForDisplay("Ctrl+W"), action: () => emit("close-tab", tab.id) },
+    { label: t("editor.tabBar.close"), icon: X, shortcut: formatShortcutForDisplay("Ctrl+W") ?? "", action: () => emit("close-tab", tab.id) },
     { label: t("editor.tabBar.closeOthers"), action: () => emit("close-others", tab.id) },
     { label: t("editor.tabBar.closeRight"), action: () => emit("close-right", tab.id) },
     { label: t("editor.tabBar.closeLeft"), action: () => emit("close-left", tab.id) },
