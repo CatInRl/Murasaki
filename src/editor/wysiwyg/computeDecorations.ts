@@ -461,20 +461,19 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
         return false; // 不进入子节点
       }
 
-      // 表格：块级 widget
+      // 表格：块级 widget（就地可编辑，始终渲染）
       if (name === "Table") {
         if (!inViewport(from, to, viewport)) return false;
         if (overlapsAnyProposal(from, to, proposalRanges)) return false;
 
-        // 块级元素：光标在节点范围内才显示源码，不依赖段落重叠
-        const cursorInRange = selectionHead >= from && selectionHead <= to;
-        if (cursorInRange) {
-          // 光标在表格内：TableDelimiter 走默认 dim（继续遍历子节点）
-          return true;
-        }
+        // T1.2 就地编辑：表格始终渲染为可编辑 <table> widget，不随光标翻回源码。
+        // 语义：光标在表内/表外都显示可编辑表格；CM 文档与 contentEditable DOM 分离，
+        // 单元格文本改动由提交（Esc / 失焦 / 结构操作）时一次整表写回。
+        // 若光标在表内仍翻回 raw source，会导致：① 点击单元格后整表闪成源码；
+        // ② 提交后 commit 把光标移到块起始触发 widget 销毁，违反「提交并留在表格」。
         const source = doc.slice(from, to);
         decos.push({ type: "blockWidget", widget: "table", from, to, source });
-        return false; // 不进入子节点
+        return false; // 不进入子节点（TableDelimiter 等在 widget 内部，无需 dim 标记）
       }
 
       // T6.4 (#103)：HTML 块 —— 渲染为 widget（光标离开段时）

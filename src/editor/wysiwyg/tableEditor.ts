@@ -12,9 +12,14 @@
  */
 import { TableModel, CellAlign, parseTable, reflowTable, addColumn, removeColumn, addRow, removeRow, setAlignment } from "./tableReflow";
 
-/** 提交回调：把新的 markdown 表格源码交回宿主（wysiwygPlugin 通过事件 → SourceEditor dispatch）。 */
+/**
+ * 提交回调：把新的 markdown 表格源码交回宿主（wysiwygPlugin 通过事件 → SourceEditor dispatch）。
+ * @param nextSource 规范化后的表格源码。
+ * @param anchorCell 提交时的锚点单元格（可能为 null，如无聚焦格时由胶囊追加）。
+ *                   宿主在写回并重建表格块后可据此把焦点/光标放回同一单元格（“提交并留在表格”）。
+ */
 export interface TableEditorHooks {
-  onCommit: (nextSource: string) => void;
+  onCommit: (nextSource: string, anchorCell?: CellCoord | null) => void;
 }
 
 /** 单元格相对坐标。 */
@@ -317,9 +322,21 @@ export class TableEditor {
     return this.model.cells.length > 2;
   }
 
+  /**
+   * 把当前 DOM 的单元格文本改动刷新进 model。
+   *
+   * 结构操作用的 `this.model` 是编辑器构造时的快照，不包含用户随后在 contentEditable
+   * 里输入的未提交文本。若直接 `func(model)` 后 `rebuildTableDOM()`，会依据过期快照重建，
+   * 把刚输入的文本清空。因此在应用任何结构改动前，先收集 DOM 里的最新文本回填 model。
+   */
+  private syncModelFromDom(): void {
+    this.model = this.collectModel();
+  }
+
   /** 在锚点列之后插入一列；无锚点则追加末尾。 */
   addColumnAfterAnchor(): CellCoord | null {
     const at = this.anchor ? this.anchor.col + 1 : this.model.align.length;
+    this.syncModelFromDom();
     this.model = addColumn(this.model, at);
     this.rebuildTableDOM();
     this.focusCell(this.anchor?.row ?? 1, at);
@@ -330,6 +347,7 @@ export class TableEditor {
   /** 删除锚点列（列数 >1 时）。 */
   removeColumnAtAnchor(): void {
     if (!this.anchor) return;
+    this.syncModelFromDom();
     this.model = removeColumn(this.model, this.anchor.col);
     const col = Math.min(this.anchor.col, this.model.align.length - 1);
     this.rebuildTableDOM();
@@ -340,6 +358,7 @@ export class TableEditor {
   /** 在锚点行之后插入一行。 */
   addRowAfterAnchor(): CellCoord | null {
     const at = this.anchor ? this.anchor.row + 1 : this.model.cells.length;
+    this.syncModelFromDom();
     this.model = addRow(this.model, at);
     this.rebuildTableDOM();
     this.focusCell(at, this.anchor?.col ?? 0);
@@ -350,6 +369,7 @@ export class TableEditor {
   /** 删除锚点行（数据行 >1 时）。 */
   removeRowAtAnchor(): void {
     if (!this.anchor) return;
+    this.syncModelFromDom();
     const row = Math.max(1, this.anchor.row);
     this.model = removeRow(this.model, row);
     const r = Math.min(row, this.model.cells.length - 1);
@@ -361,10 +381,25 @@ export class TableEditor {
   /** 设置锚点列对齐。 */
   setAnchorAlignment(align: CellAlign): void {
     if (!this.anchor) return;
+    this.syncModelFromDom();
     this.model = setAlignment(this.model, this.anchor.col, align);
     this.rebuildTableDOM();
     this.focusCell(this.anchor?.row ?? 1, this.anchor.col);
     this.commit();
+  }
+
+  /** 当前锚点列的对齐（无锚点返回 null），供工具条对齐按钮激活态。 */
+  get activeAlignment(): CellAlign | null {
+    if (!this.anchor) return null;
+    return this.model.align[this.anchor.col] ?? null;
+  }
+
+  /** 锚点横向移动 ±1 列（clamp 到列界，供工具条「上一列/下一列」）。 */
+  navigateColumn(delta: 1 | -1): void {
+    if (!this.anchor) return;
+    const cols = this.model.align.length;
+    const next = Math.min(Math.max(0, this.anchor.col + delta), cols - 1);
+    if (next !== this.anchor.col) this.focusCell(this.anchor.row, next);
   }
 
   /** 聚焦指定单元格。 */
@@ -399,13 +434,20 @@ export class TableEditor {
     return { cells, align: this.model.align.slice(0, header.length) };
   }
 
-  /** 提交：收集 DOM → 规范化 → onCommit。之后清除锚点。 */
+  /** 当前锚点单元格（只读访问，供宿主/工具条判断是否处于编辑态）。 */
+  get activeAnchor(): CellCoord | null {
+    return this.anchor;
+  }
+
+  /** 提交：收集 DOM → 规范化 → onCommit(携带锚点)。之后清除锚点并通知宿主刷新。 */
   commit(): void {
-    if (this.anchor) this.clearAnchor();
+    const anchor = this.anchor;
+    if (anchor) this.clearAnchor();
     this.anchor = null;
     const model = this.collectModel();
     // 非法结构（空行）仍可规范化，reflowTable 对空 cells 防御
     const src = reflowTable(model);
-    this.hooks.onCommit(src);
+    this.onAnchorChange?.();
+    this.hooks.onCommit(src, anchor);
   }
 }

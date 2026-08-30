@@ -477,13 +477,13 @@ describe("computeDecorations — 表格 widget (T7.2)", () => {
     expect(tw[0].source).toContain("|---|---|");
   });
 
-  it("光标在表格内 → TableDelimiter dim，不生成 widget", () => {
+  it("光标在表格内 → 仍生成 table widget（就地编辑，不翻回源码）", () => {
     const doc = "| a | b |\n|---|---|\n| 1 | 2 |\n\nbody";
-    const d = compute(doc, 3);
-    expect(blockWidgets(d).filter((w) => w.widget === "table")).toHaveLength(0);
-    const td = marks(d).filter((m) => m.markType === "TableDelimiter");
-    expect(td.length).toBeGreaterThan(0);
-    expect(td.every((m) => m.kind === "dim")).toBe(true);
+    const d = compute(doc, 3); // 光标位于表内（如 |a|）
+    const tw = blockWidgets(d).filter((w) => w.widget === "table");
+    expect(tw).toHaveLength(1);
+    // 无 TableDelimiter 的行级 dim 标记（已在 widget 内部，不单独生成）
+    expect(marks(d).filter((m) => m.markType === "TableDelimiter")).toHaveLength(0);
   });
 });
 

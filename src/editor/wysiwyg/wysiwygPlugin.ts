@@ -447,10 +447,11 @@ class TableWidget extends WysiwygBlockWidget {
     const editor = new TableEditor(this.source, {
       // 提交（写回）：替换 [from, to] 的原始表格源码为规范化后的新源码，
       // 由 SourceEditor dispatch 进入 CM 文档（因此可撤销，T1.6）。
-      onCommit: (nextSource) => {
+      // 携带锚点坐标：提交后表格块重建，宿主据此把焦点/光标放回同一单元格（留在表格内）。
+      onCommit: (nextSource, anchorCell) => {
         wrapper.dispatchEvent(new CustomEvent("murasaki-table-commit", {
           bubbles: true,
-          detail: { from: this.from, to, source: nextSource },
+          detail: { from: this.from, to, source: nextSource, anchorCell: anchorCell ?? null },
         }));
       },
     });
@@ -462,19 +463,29 @@ class TableWidget extends WysiwygBlockWidget {
     return wrapper;
   }
 
-  /** 悬停工具条 + 行列增删（T1.4）。 */
+  /** 悬停工具条 + 行列增删 + 对齐（T1.4，与 murasaki-ui-design/pages/ux-wysiwyg-table.html 保持一致）。 */
   private attachToolbar(wrapper: HTMLElement, editor: TableEditor): void {
     const doc = wrapper.ownerDocument;
     const toolbar = doc.createElement("div");
     toolbar.className = "murasaki-wysiwyg-table-toolbar";
     toolbar.contentEditable = "false";
 
-    const mkBtn = (label: string, title: string, onClick: () => void) => {
+    // 分隔条（设计稿；按钮分组间用细竖线隔开）
+    const divider = (): HTMLSpanElement => {
+      const d = doc.createElement("span");
+      d.className = "murasaki-wysiwyg-table-tool-divider";
+      d.setAttribute("aria-hidden", "true");
+      return d;
+    };
+
+    // 工具按钮：innerHTML 由调用方提供（图标/图标+文字），样式类统一给 .murasaki-wysiwyg-table-tool
+    const mkBtn = (inner: string, title: string, onClick: () => void, opts: { active?: boolean; data?: string } = {}) => {
       const b = doc.createElement("button");
       b.type = "button";
-      b.textContent = label;
-      b.title = `${title} 对锚点格（绿色格）生效`;
-      b.className = "murasaki-wysiwyg-table-tool";
+      b.title = title;
+      b.className = "murasaki-wysiwyg-table-tool" + (opts.active ? " active" : "");
+      if (opts.data !== undefined) b.dataset.align = opts.data;
+      b.innerHTML = inner;
       b.addEventListener("mousedown", (e) => e.preventDefault()); // 防止点击移走单元格焦点
       b.addEventListener("click", (e) => {
         e.preventDefault();
@@ -484,23 +495,61 @@ class TableWidget extends WysiwygBlockWidget {
       return b;
     };
 
-    const addColBtn = mkBtn("＋列", "锚点格右侧插列", () => editor.addColumnAfterAnchor());
-    const delColBtn = mkBtn("－列", "删除锚点列", () => editor.removeColumnAtAnchor());
-    const addRowBtn = mkBtn("＋行", "锚点格下方插行", () => editor.addRowAfterAnchor());
-    const delRowBtn = mkBtn("－行", "删除锚点行", () => editor.removeRowAtAnchor());
-    const alignL = mkBtn("⇤", "左对齐", () => editor.setAnchorAlignment("l"));
-    const alignC = mkBtn("⇔", "居中对齐", () => editor.setAnchorAlignment("c"));
-    const alignR = mkBtn("⇥", "右对齐", () => editor.setAnchorAlignment("r"));
+    const ic = (d: string): string =>
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">${d}</svg>`;
 
-    // 删除按钮的边界保护置灰：列数须 >1、行数须 >2，锚点变化/结构变化时刷新
-    const refreshDeletable = () => {
+    // 上部：表格标签 + 上一列/下一列（拖移锚点横向移动）
+    const label = doc.createElement("span");
+    label.className = "murasaki-wysiwyg-table-tool-label";
+    label.textContent = "表格";
+    const prevColBtn = mkBtn(ic("<path d=\"m15 18-6-6 6-6\"/>"), "上一列", () => editor.navigateColumn(-1));
+    const nextColBtn = mkBtn(ic("<path d=\"m9 18 6-6-6-6\"/>"), "下一列", () => editor.navigateColumn(1));
+
+    // 中部：插入行/插入列
+    const rowsIcon = ic("<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M21 9H3\"/><path d=\"M21 15H3\"/>");
+    const colsIcon = ic("<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M9 3v18\"/><path d=\"M15 3v18\"/>");
+    const addRowBtn = mkBtn(`${rowsIcon}<span>行</span>`, "插入行", () => editor.addRowAfterAnchor());
+    const addColBtn = mkBtn(`${colsIcon}<span>列</span>`, "插入列", () => editor.addColumnAfterAnchor());
+
+    // 删除行/删除列（删除列旋转 90° 与设计稿一致）
+    const trashIcon = ic("<path d=\"M3 6h18\"/><path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\"/><path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\"/><line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\"/><line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\"/>");
+    const delRowBtn = mkBtn(trashIcon, "删除行", () => editor.removeRowAtAnchor());
+    const delColBtn = mkBtn(trashIcon, "删除列", () => editor.removeColumnAtAnchor());
+    delColBtn.classList.add("murasaki-wysiwyg-table-tool-rotate");
+
+    // 对齐：左/中/右，激活态随锚点列对齐刷新
+    const alignL = mkBtn(ic("<path d=\"M21 6H3\"/><path d=\"M15 12H3\"/><path d=\"M17 18H3\"/>"), "左对齐", () => editor.setAnchorAlignment("l"), { data: "l" });
+    const alignC = mkBtn(ic("<path d=\"M21 6H3\"/><path d=\"M17 12H7\"/><path d=\"M16 18H8\"/>"), "居中对齐", () => editor.setAnchorAlignment("c"), { data: "c" });
+    const alignR = mkBtn(ic("<path d=\"M21 6H3\"/><path d=\"M21 12H9\"/><path d=\"M21 18H7\"/>"), "右对齐", () => editor.setAnchorAlignment("r"), { data: "r" });
+    const alignBtns = [alignL, alignC, alignR];
+
+    // 锚点变化 → 刷新边界按钮置灰 + 对齐激活态 + 编辑态样式（无锚点时隐藏工具条）
+    const syncActive = () => {
       delColBtn.disabled = !editor.canDeleteColumn();
       delRowBtn.disabled = !editor.canDeleteRow();
+      const align = editor.activeAlignment;
+      alignBtns.forEach((b) => b.classList.toggle("active", b.dataset.align === align));
+      wrapper.classList.toggle("murasaki-wysiwyg-table-edit-active", editor.activeAnchor != null);
     };
-    editor.onAnchorChange = refreshDeletable;
-    refreshDeletable();
+    editor.onAnchorChange = syncActive;
+    syncActive();
 
-    toolbar.append(addColBtn, delColBtn, addRowBtn, delRowBtn, alignL, alignC, alignR);
+    toolbar.append(
+      label,
+      divider(),
+      prevColBtn,
+      nextColBtn,
+      divider(),
+      addRowBtn,
+      addColBtn,
+      divider(),
+      delRowBtn,
+      delColBtn,
+      divider(),
+      alignL,
+      alignC,
+      alignR,
+    );
     wrapper.appendChild(toolbar);
   }
   // 表格内所有键盘/DOM 编辑事件由浏览器 contentEditable 处理，不交还 CM
@@ -1125,35 +1174,72 @@ export const wysiwygTheme = EditorView.theme({
     boxShadow: "0 0 0 2px var(--murasaki-primary, #9333ea) inset",
     backgroundColor: "var(--md-table-row-hover-bg, var(--murasaki-purple-50, #faf5ff))",
   },
-  // T1.4 悬停工具条：聚焦单元格时置顶显示增删/对齐工具
-  ".murasaki-wysiwyg-table-toolbar": {
-    display: "flex",
-    gap: "2px",
+  // T1.4 悬停工具条：聚焦单元格时显示增删/对齐工具。
+  // 默认隐藏、悬浮于表格正上方并水平居中（absolute）；仅在编辑激活（有锚点格）时显示，
+  // 避免常驻占位把下一行内容往下推。样式与 murasaki-ui-design/pages/ux-wysiwyg-table.html 一致。
+  ".murasaki-wysiwyg-table-edit .murasaki-wysiwyg-table-toolbar": {
+    display: "none",
+    position: "absolute",
+    top: "-42px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    gap: "3px",
     alignItems: "center",
-    padding: "2px 4px",
-    marginBottom: "4px",
-    background: "var(--murasaki-surface, #ffffff)",
-    border: "1px solid var(--murasaki-line, rgba(0,0,0,0.1))",
-    borderRadius: "var(--murasaki-radius-sm, 6px)",
+    padding: "2px 6px",
+    background: "var(--murasaki-card, var(--murasaki-surface, #ffffff))",
+    border: "1px solid var(--murasaki-border, var(--murasaki-line, rgba(0,0,0,0.1)))",
+    borderRadius: "var(--murasaki-radius-md, 8px)",
+    boxShadow: "var(--murasaki-shadow-sm, 0 1px 3px rgba(0,0,0,0.10))",
     width: "max-content",
     maxWidth: "100%",
     flexWrap: "wrap",
     userSelect: "none",
+    zIndex: 3,
+  },
+  ".murasaki-wysiwyg-table-edit-active .murasaki-wysiwyg-table-toolbar": {
+    display: "flex",
+  },
+  ".murasaki-wysiwyg-table-tool-label": {
+    fontSize: "11px",
+    fontWeight: "600",
+    color: "var(--murasaki-muted-foreground, var(--murasaki-ink-3, #a1a1aa))",
+    padding: "0 2px",
+  },
+  ".murasaki-wysiwyg-table-tool-divider": {
+    width: "1px",
+    height: "16px",
+    background: "var(--murasaki-border, var(--murasaki-line, rgba(0,0,0,0.1)))",
+    margin: "0 2px",
   },
   ".murasaki-wysiwyg-table-tool": {
-    fontSize: "12px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "2px",
+    fontSize: "11px",
     lineHeight: "1",
-    padding: "4px 8px",
-    border: "1px solid var(--murasaki-line, rgba(0,0,0,0.1))",
-    borderRadius: "var(--murasaki-radius-sm, 4px)",
-    background: "var(--murasaki-surface-2, transparent)",
+    padding: "3px 5px",
+    border: "none",
+    borderRadius: "var(--murasaki-radius-sm, 5px)",
+    background: "transparent",
     color: "var(--murasaki-ink-2, #52525b)",
     cursor: "pointer",
+    transition: "background 120ms, color 120ms",
   },
   ".murasaki-wysiwyg-table-tool:hover": {
-    background: "var(--murasaki-purple-50, #faf5ff)",
+    background: "var(--murasaki-muted, var(--murasaki-surface-2, #f3f4f6))",
     color: "var(--murasaki-primary, #9333ea)",
-    borderColor: "var(--murasaki-primary, #9333ea)",
+  },
+  ".murasaki-wysiwyg-table-tool.active": {
+    background: "var(--murasaki-purple-100, #f3e8ff)",
+    color: "var(--murasaki-primary, #9333ea)",
+  },
+  ".murasaki-wysiwyg-table-tool:disabled": {
+    opacity: 0.4,
+    cursor: "not-allowed",
+  },
+  // 删除列：垂直方向垃圾桶 → 旋转 90°（与设计稿一致）
+  ".murasaki-wysiwyg-table-tool-rotate svg": {
+    transform: "rotate(90deg)",
   },
   // T1.4 悬停插入胶囊：默认透明，悬浮表格块时显示于右缘(＋列)/底缘(＋行)
   ".murasaki-table-edge-cap": {

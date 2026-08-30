@@ -19,7 +19,7 @@ let getSelectionSpy: ReturnType<typeof vi.spyOn> | undefined;
 const rangeHolder: { range: Range | null } = { range: null };
 const selectionStub = {
   rangeCount: 1,
-  getRangeAt: (i: number) => rangeHolder.range as unknown as Range,
+  getRangeAt: (_i: number) => rangeHolder.range as unknown as Range,
   removeAllRanges: () => {},
   addRange: () => {},
   collapse: () => {},
@@ -110,7 +110,7 @@ describe("悬停插入胶囊", () => {
   });
 
   it("有锚点时点右缘胶囊 → 在锚点列之后插列", () => {
-    const { wrapper, focus, lastCommit, cellAt } = setup();
+    const { wrapper, focus, lastCommit } = setup();
     focus(1, 0); // 锚点 = 列 0
     (wrapper.querySelector(".murasaki-table-edge-cap-right") as HTMLButtonElement).click();
     const out = parseTable(lastCommit())!;
@@ -227,6 +227,28 @@ describe("Tab / 多行格", () => {
     expect(parseTable(lastCommit())).not.toBeNull();
     expect(cellAt(1, 0).classList.contains("murasaki-anchor-cell")).toBe(false);
   });
+
+  it("commit 携带当前锚点坐标（供宿主重建后重聚焦/留在表格内）", () => {
+    const { editor, focus, commit } = setup();
+    focus(1, 2); // 锚点 = (1,2)
+    editor.commit();
+    const last = commit.mock.calls[commit.mock.calls.length - 1] as [string, { row: number; col: number }];
+    expect(last[1]).toEqual({ row: 1, col: 2 });
+  });
+
+  it("commit 无锚点时 anchorCell 为 null", () => {
+    const { editor, commit } = setup();
+    editor.commit();
+    const last = commit.mock.calls[commit.mock.calls.length - 1] as [string, unknown];
+    expect(last[1]).toBeNull();
+  });
+
+  it("工具条锚点变化时 activeAnchor 反映编辑态", () => {
+    const { editor, focus } = setup();
+    expect(editor.activeAnchor).toBeNull();
+    focus(0, 1);
+    expect(editor.activeAnchor).toEqual({ row: 0, col: 1 });
+  });
 });
 
 describe("工具条 / 结构化操作与边界保护", () => {
@@ -259,5 +281,57 @@ describe("工具条 / 结构化操作与边界保护", () => {
     focus(1, 0); // 列 0 默认左
     editor.setAnchorAlignment("c");
     expect(parseTable(lastCommit())!.align[0]).toBe("c");
+  });
+
+  it("addColumnAfterAnchor 前先收集 DOM 文本，保留用户未提交内容（不因过期快照清空）", () => {
+    const { editor, focus, cellAt, lastCommit } = setup();
+    focus(1, 0); // 锚点 = 数据行 1 列 0
+    cellAt(1, 1).textContent = "编辑中"; // 用户在 DOM 里改动（未提交）
+    editor.addColumnAfterAnchor(); // 在列 0 后插列，原列 1 后移
+    const out = parseTable(lastCommit())!;
+    expect(out.cells[1][0]).toBe("就地编辑");
+    expect(out.cells[1][2]).toBe("编辑中"); // 原(1,1)改动保留（而非退回构造快照的"进行中"）
+  });
+
+  it("setAnchorAlignment 前先收集 DOM 文本，保留用户未提交内容", () => {
+    const { editor, focus, cellAt, lastCommit } = setup();
+    focus(1, 0);
+    cellAt(1, 0).textContent = "我改过的"; // 未提交
+    editor.setAnchorAlignment("c");
+    expect(parseTable(lastCommit())!.cells[1][0]).toBe("我改过的");
+  });
+});
+
+describe("navigateColumn / activeAlignment", () => {
+  it("navigateColumn 向右/向左移动锚点", () => {
+    const { editor, focus, cellAt } = setup();
+    focus(1, 0); // 锚点 (1,0)
+    const right = vi.spyOn(cellAt(1, 1), "focus");
+    editor.navigateColumn(1);
+    expect(right).toHaveBeenCalled();
+
+    focus(1, 1); // jsdom 的 focus() 不触发 focus 事件，需重新设锚 (1,1)
+    const left = vi.spyOn(cellAt(1, 0), "focus");
+    editor.navigateColumn(-1);
+    expect(left).toHaveBeenCalled();
+  });
+
+  it("navigateColumn 在列边界 clamp（不越界）", () => {
+    const { editor, focus, cellAt } = setup();
+    focus(1, 0); // 最左列
+    const stay = vi.spyOn(cellAt(1, 0), "focus");
+    const left = vi.spyOn(cellAt(1, 1), "focus");
+    editor.navigateColumn(-1);
+    expect(stay).not.toHaveBeenCalled(); // 已是最左列，不重新聚焦
+    expect(left).not.toHaveBeenCalled(); // 不越界跳到列 1
+  });
+
+  it("activeAlignment 反映锚点列对齐，无锚点为 null", () => {
+    const { editor, focus } = setup();
+    expect(editor.activeAlignment).toBeNull();
+    focus(0, 1); // 列 1 = 居中
+    expect(editor.activeAlignment).toBe("c");
+    focus(0, 2); // 列 2 = 右
+    expect(editor.activeAlignment).toBe("r");
   });
 });

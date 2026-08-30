@@ -453,16 +453,35 @@ onMounted(() => {
   // 监听 WYSIWYG 表格提交写回（T1.5）：把 DOM 编辑器收集到的新表格源码写回 CM 文档。
   // 走 view.dispatch（默认进入 undo 栈），因此 Edit 可撤销、Ctrl+Z 一处生效（T1.6）。
   hostRef.value.addEventListener("murasaki-table-commit", ((e: CustomEvent) => {
-    const { from, to, source } = e.detail as { from: number; to: number; source: string };
+    const { from, to, source, anchorCell } = e.detail as {
+      from: number;
+      to: number;
+      source: string;
+      anchorCell?: { row: number; col: number } | null;
+    };
     view.dispatch({
       changes: { from, to, insert: source },
       userEvent: "input.tableEdit",
     });
-    // 光标停在表格块起始，便于继续编辑原始 markdown / 供 CM 重渲染 widget
-    view.dispatch({
-      selection: { anchor: from },
-      scrollIntoView: false,
-    });
+    // 表格块会随源码变化重建。若提交时带锚点坐标，把焦点/光标放回同一个单元格，
+    // 实现「Esc 提交并留在表格」；重建为同步完成，若未命中则在下帧重试（不再翻回源码）。
+    if (anchorCell) {
+      const refocus = (): boolean => {
+        const cell = hostRef.value?.querySelector(
+          `.murasaki-wysiwyg-table-edit [data-row="${anchorCell.row}"][data-col="${anchorCell.col}"]`
+        ) as HTMLTableCellElement | null;
+        if (!cell) return false;
+        cell.focus();
+        const rng = document.createRange();
+        rng.selectNodeContents(cell);
+        rng.collapse(false);
+        const sel = document.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(rng);
+        return true;
+      };
+      if (!refocus()) requestAnimationFrame(() => refocus());
+    }
   }) as EventListener);
   // 监听块级 widget 点击事件：把光标定位到块起始位置，触发原始 markdown 编辑
   // CodeBlock/Mermaid/Table/Math widget 点击后发出 murasaki-focus-block
