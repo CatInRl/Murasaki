@@ -193,6 +193,10 @@ export class TableEditor {
     cell.addEventListener("blur", () => {
       // 延迟到事件循环末尾，让点击工具条/其它单元格的 focus 先发生
       setTimeout(() => {
+        // 若表格块已被 CM 重建/移除（提交写回会替换 widget，触发旧表脱离文档），
+        // 本次失焦提交交由发起重建的结构化操作自身完成，这里不应再提交——
+        // 否则每次结构化操作都会因重建 detach 而级联触发多次重复提交（多表格下重复写回）。
+        if (!this.table.isConnected) return;
         const cellEls = Array.from(this.table.querySelectorAll("[data-row]")) as HTMLTableCellElement[];
         if (cellEls.some((c) => c === cell.ownerDocument.activeElement)) return;
         if (this.anchor && this.anchor.row === row && this.anchor.col === col) {

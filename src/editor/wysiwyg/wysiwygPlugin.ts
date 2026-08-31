@@ -1148,6 +1148,9 @@ export const wysiwygTheme = EditorView.theme({
     cursor: "text",
     // 悬停胶囊（右缘/底缘 ＋）以绝对定位相对表格块定位
     position: "relative",
+    // 块宽度收拢到表格宽度，使正上方的悬浮工具条可相对表格水平居中
+    width: "fit-content",
+    maxWidth: "100%",
   },
   ".murasaki-wysiwyg-table-edit .murasaki-wysiwyg-table-grid": {
     borderCollapse: "collapse",
@@ -1180,7 +1183,7 @@ export const wysiwygTheme = EditorView.theme({
   ".murasaki-wysiwyg-table-edit .murasaki-wysiwyg-table-toolbar": {
     display: "none",
     position: "absolute",
-    top: "-42px",
+    top: "-60px",
     left: "50%",
     transform: "translateX(-50%)",
     gap: "3px",
