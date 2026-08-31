@@ -30,11 +30,7 @@
   },
   "editor": {
     "title": "编辑器",
-    "editorMode": "编辑模式",
-    "editorModeDesc": "选择编辑器的显示模式",
-    "editorModeSource": "源码",
-    "editorModeSplit": "分屏",
-    "editorModeWysiwyg": "所见即所得",
+    "display": "编辑器显示",
     "fontSize": "字体大小",
     "fontSizeDesc": "编辑器字体大小（px）",
     "lineHeight": "行高",

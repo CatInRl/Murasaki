@@ -11,6 +11,8 @@ use crate::i18n;
 ///   供 build_app_menu 在菜单重建时恢复正确的 checked 状态
 /// - current_language: 当前界面语言（"zh-CN" / "en"），供 build_app_menu
 ///   在菜单重建时使用对应语言的文案
+/// - current_mode: 当前编辑模式（"source" / "split" / "wysiwyg"），供 build_app_menu
+///   在菜单重建时恢复 "视图 / 显示模式" 子菜单正确的勾选状态
 /// - shortcut_overrides: 快捷键覆盖表（commandId → accelerator），由前端
 ///   update_shortcut_labels 推送。菜单项右侧的快捷键提示据此与设置面板
 ///   中用户自定义的绑定保持一致。值为 None 表示该命令被禁用（不显示快捷键）
@@ -23,6 +25,7 @@ pub struct RecentMenuState {
     pub id_to_path: Mutex<HashMap<String, String>>,
     pub current_theme: Mutex<String>,
     pub current_language: Mutex<String>,
+    pub current_mode: Mutex<String>,
     pub shortcut_overrides: Mutex<HashMap<String, Option<String>>>,
 }
 
@@ -34,6 +37,7 @@ impl Default for RecentMenuState {
             id_to_path: Mutex::new(HashMap::new()),
             current_theme: Mutex::new("theme-murasaki".to_string()),
             current_language: Mutex::new(i18n::DEFAULT_LANG.to_string()),
+            current_mode: Mutex::new("split".to_string()),
             shortcut_overrides: Mutex::new(HashMap::new()),
         }
     }
@@ -175,6 +179,31 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .item(&theme_academic)
         .build()?;
 
+    // === View / 显示模式 menu ===
+    // 使用 CheckMenuItem 以支持互斥勾选，checked 由 current_mode 决定
+    let current_mode = state
+        .current_mode
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
+    let mode_source = CheckMenuItemBuilder::new(mt("view.modeSource"))
+        .id("mode-source")
+        .checked(current_mode == "source")
+        .build(app)?;
+    let mode_split = CheckMenuItemBuilder::new(mt("view.modeSplit"))
+        .id("mode-split")
+        .checked(current_mode == "split")
+        .build(app)?;
+    let mode_wysiwyg = CheckMenuItemBuilder::new(mt("view.modeWysiwyg"))
+        .id("mode-wysiwyg")
+        .checked(current_mode == "wysiwyg")
+        .build(app)?;
+    let view_menu = SubmenuBuilder::new(app, mt("viewMenu"))
+        .item(&mode_source)
+        .item(&mode_split)
+        .item(&mode_wysiwyg)
+        .build()?;
+
     // === Help menu ===
     let help_menu = SubmenuBuilder::new(app, mt("helpMenu"))
         .text("docs", mt("help.docs"))
@@ -187,6 +216,7 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .item(&edit_menu)
         .item(&paragraph_menu)
         .item(&theme_menu)
+        .item(&view_menu)
         .item(&help_menu)
         .build()?;
 
@@ -301,6 +331,45 @@ pub fn set_theme_checked(
                     if let Some(check_item) = sub_item.as_check_menuitem() {
                         check_item
                             .set_checked(id == theme_id)
+                            .map_err(|e| e.to_string())?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// 前端调用：设置 "视图 / 显示模式" 子菜单的互斥勾选状态
+/// 同时更新 current_mode，以便后续菜单重建（如 update_recent_menu）时恢复正确勾选
+#[tauri::command]
+pub fn set_mode_checked(
+    app: AppHandle,
+    state: tauri::State<'_, RecentMenuState>,
+    mode_id: String,
+) -> Result<(), String> {
+    // 从 "mode-source" 解析出 "source"，供 current_mode 存储
+    let mode = mode_id
+        .strip_prefix("mode-")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| mode_id.clone());
+
+    {
+        let mut current = state.current_mode.lock().map_err(|e| e.to_string())?;
+        *current = mode;
+    }
+
+    // 更新 "视图 / 显示模式" 子菜单中三个 CheckMenuItem 的互斥勾选
+    let mode_ids = ["mode-source", "mode-split", "mode-wysiwyg"];
+    let menu = app.menu().ok_or("菜单未初始化")?;
+    for item in menu.items().map_err(|e| e.to_string())? {
+        if let Some(submenu) = item.as_submenu() {
+            for sub_item in submenu.items().map_err(|e| e.to_string())? {
+                let id = sub_item.id().as_ref();
+                if mode_ids.contains(&id) {
+                    if let Some(check_item) = sub_item.as_check_menuitem() {
+                        check_item
+                            .set_checked(id == mode_id)
                             .map_err(|e| e.to_string())?;
                     }
                 }

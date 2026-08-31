@@ -432,6 +432,7 @@ pub fn run() {
             watcher::stop_all_watching,
             menu::update_recent_menu,
             menu::set_theme_checked,
+            menu::set_mode_checked,
             menu::reload_menu,
             menu::update_shortcut_labels,
             settings::open_settings,

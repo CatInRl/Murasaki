@@ -30,11 +30,7 @@
   },
   "editor": {
     "title": "Editor",
-    "editorMode": "Editor Mode",
-    "editorModeDesc": "Choose the editor display mode",
-    "editorModeSource": "Source",
-    "editorModeSplit": "Split",
-    "editorModeWysiwyg": "WYSIWYG",
+    "display": "Editor Display",
     "fontSize": "Font Size",
     "fontSizeDesc": "Editor font size (px)",
     "lineHeight": "Line Height",

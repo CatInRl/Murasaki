@@ -324,6 +324,10 @@ onMounted(async () => {
   );
   // 应用保存的编辑模式（运行时切换，无需重启）
   editorBridge.setEditorMode(persistence.settings.editorMode);
+  // 同步原生 "视图 / 显示模式" 菜单勾选（watcher 不触发首值时补一次）
+  void invoke("set_mode_checked", {
+    modeId: "mode-" + persistence.settings.editorMode,
+  });
   // 应用保存的界面语言（ADR-0013，前端 i18n + Rust 菜单）
   // 首次启动（language 从未写入）时先探测系统语言作为默认并持久化（issue #141）；
   // 已持久化语言的既有用户跳过探测，保持原设置。
@@ -527,6 +531,7 @@ const { handleMenuEvent, onKeyDown } = useCommands({
   openSettings, toggleFullscreen,
   updater: { check: checkForUpdate },
   matchGlobalKeydown,
+  persistence: { updateSettings: (patch) => persistence.updateSettings(patch) },
 });
 
 // ===== 拖拽/命令行打开文件或文件夹（issue #92 / #113）=====

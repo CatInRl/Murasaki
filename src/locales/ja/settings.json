@@ -30,11 +30,7 @@
   },
   "editor": {
     "title": "エディター",
-    "editorMode": "編集モード",
-    "editorModeDesc": "エディターの表示モードを選択します",
-    "editorModeSource": "ソース",
-    "editorModeSplit": "分割",
-    "editorModeWysiwyg": "WYSIWYG",
+    "display": "エディター表示",
     "fontSize": "フォントサイズ",
     "fontSizeDesc": "エディターのフォントサイズ（px）",
     "lineHeight": "行の高さ",

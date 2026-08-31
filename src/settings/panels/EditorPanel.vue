@@ -2,7 +2,8 @@
 /**
  * EditorPanel — 编辑器设置面板
  *
- * 设置项：编辑模式、字体大小、行高、字体族、显示行号、软折行
+ * 设置项：字体大小、行高、字体族、显示行号、软折行
+ * 编辑模式不在设置中配置，改由菜单栏"视图 / 显示模式"切换（issue #147）。
  * Design ref: settings-editor.html
  *
  * Mermaid/KaTeX/任务列表渲染默认开启，不暴露设置项（spec 决策）。
@@ -43,38 +44,9 @@ function stepFontSize(delta: number): void {
   <div>
     <h1 class="settings-page-title">{{ $t('settings.editor.title') }}</h1>
 
-    <!-- 编辑模式 -->
-    <section class="settings-section">
-      <h2 class="settings-section-title">{{ $t('settings.editor.editorMode') }}</h2>
-      <div class="setting-row">
-        <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.editor.editorMode') }}</span>
-          <span class="setting-description">{{ $t('settings.editor.editorModeDesc') }}</span>
-        </div>
-        <div class="setting-control-column">
-          <div class="segmented-control" role="radiogroup" :aria-label="$t('settings.editor.editorMode')">
-            <button
-              v-for="opt in [
-                { v: 'source', l: $t('settings.editor.editorModeSource') },
-                { v: 'split', l: $t('settings.editor.editorModeSplit') },
-                { v: 'wysiwyg', l: $t('settings.editor.editorModeWysiwyg') },
-              ]"
-              :key="opt.v"
-              type="button"
-              class="segmented-item"
-              :class="{ active: draft.editorMode === opt.v }"
-              @click="patch('editorMode', opt.v as SettingsState['editorMode'])"
-            >
-              {{ opt.l }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- 编辑器显示 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">{{ $t('settings.editor.editorMode') }}</h2>
+      <h2 class="settings-section-title">{{ $t('settings.editor.display') }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">
           <span class="setting-label">{{ $t('settings.editor.showLineNumbers') }}</span>

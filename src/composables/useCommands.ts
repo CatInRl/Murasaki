@@ -55,6 +55,11 @@ export interface CommandsDeps {
     visible: boolean;
   };
 
+  // settings 持久化切片（显示模式菜单切换时写回设置）
+  persistence: {
+    updateSettings(patch: Record<string, unknown>): Promise<unknown>;
+  };
+
   // file ops store 切片
   fileOps: {
     createDirectory: (parent: string, name: string) => Promise<unknown>;
@@ -110,6 +115,7 @@ export function useCommands(deps: CommandsDeps) {
     tableDialogVisible,
     openSettings, toggleFullscreen, updater,
     matchGlobalKeydown,
+    persistence,
   } = deps;
 
   /** 由原生菜单触发的命令分发 */
@@ -163,6 +169,15 @@ export function useCommands(deps: CommandsDeps) {
       case "settings":
         await openSettings();
         break;
+      // 显示模式（视图 / 显示模式菜单）：写回设置，经 useAppLifecycle watcher
+      // 同步到 editorBridge（运行时可切换），同时触发原生菜单勾选同步
+      case "mode-source":
+      case "mode-split":
+      case "mode-wysiwyg": {
+        const mode = menuId.replace("mode-", "");
+        await persistence.updateSettings({ editorMode: mode });
+        break;
+      }
       case "theme-murasaki":
         currentTheme.value = "murasaki";
         break;

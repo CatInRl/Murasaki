@@ -3,6 +3,7 @@
   "editMenu": "編集",
   "paragraphMenu": "段落",
   "themeMenu": "テーマ",
+  "viewMenu": "表示",
   "helpMenu": "ヘルプ",
   "recentFolders": "最近使ったフォルダー",
   "recentFiles": "最近使ったファイル",
@@ -54,6 +55,11 @@
     "docs": "ドキュメントを見る",
     "about": "Murasaki について",
     "checkUpdates": "更新を確認…"
+  },
+  "view": {
+    "modeSource": "ソース",
+    "modeSplit": "分割",
+    "modeWysiwyg": "WYSIWYG"
   },
   "aboutText": "Murasaki v{version}\n軽量なローカル Markdown ファイル管理エディター\nTauri 2.x + Vue 3 + CodeMirror 6 採用"
 }
