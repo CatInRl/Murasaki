@@ -132,15 +132,17 @@ murasaki/
 
 完整 changelog 详见 [CHANGELOG.md](CHANGELOG.md)。版本发布时必须同步更新该文件。
 
-### 当前版本：0.8.3（2026-08-29）
+### 当前版本：0.8.4（2026-09-03）
 
-**macOS 快捷键原生适配与全选视觉修复**：原生菜单加速器统一改用 `CmdOrCtrl`，macOS 上显示 ⌘；设置面板/全局搜索条/右键菜单/欢迎页等快捷键提示在 macOS 上渲染为 ⌘，用户自定义快捷键同步菜单时同样跟随平台主修饰键。修复 WYSIWYG 模式 Ctrl+A 全选时块级部件（代码块/表格/Mermaid）不显示选中高亮。
+**显示模式改由菜单切换、编辑时大纲实时更新、WYSIWYG 表格编辑增强**：显示模式不再在设置中配置，改由菜单栏「视图 / 显示模式」互斥切换；编辑器中未保存新增内容实时反映到大纲；所见即所得表格支持方向键导航、表头编辑与贴合上方的居中工具条。
 
-- macOS 快捷键适配：新建 `src/utils/platform.ts`；`shortcutsLogic` 新增 `formatShortcutForDisplay` 与 `toMenuAccelerator(s)`；`menu.rs` 默认加速器改为 `CmdOrCtrl`；推送覆盖表用 `toMenuAccelerators` 转换；各展示处用 `formatShortcutForDisplay`
+- 显示模式菜单（#147）：新增「视图」子菜单（源码/分屏/所见即所得，CheckMenuItem 互斥勾选），`set_mode_checked` 命令同步菜单与状态；移除设置面板编辑模式配置，三语言菜单文案同步
+- 大纲实时更新（#170）：Rust 新增 `parse_outline_str`（单一解析源，无磁盘/mtime）；前端 `useOutline.updateLiveText` 200ms 防抖 + 序列号防回跳；Sidebar 仅大纲视图可见时按 `activeContent` 刷新；移除未用的保存后 `refresh()`
+- WYSIWYG 表格：方向键导航、表头编辑、删除边界约束、结构化操作前同步 DOM、工具条贴合表格并置中
 
 ### 历史版本
 
-- 0.8.2（2026-08-24）：更新进度显示——订阅 `DownloadEvent` 累计字节并计算下载百分比写回进度 toast；服务器不带 `Content-Length` 时改为流动动画短条，修复「进度条停滞不动」
+- 0.8.3（2026-08-29）：macOS 快捷键原生适配（统一 `CmdOrCtrl` 显示 ⌘）与全选视觉修复（块级部件选中高亮）
 - 0.8.1（2026-08-24）：0.8.0 体验优化与修复——中文符号转 Markdown 记号支持空格/回车双触发、围栏代码块内可输入闭合 ` ``` `；修复 WYSIWYG 引用块行高不足导致内容显示不全
 - 0.8.0（2026-08-24）：中文输入与导航体验——中文符号自动转 Markdown 记号、快捷键自定义、统一全局搜索条取代跨文件搜索面板、Tab 栏区分工作区内外文件、多语言支持扩展（新增日语）；【0.8.0 重发】修复 build.rs 误删 `tauri_build::build()` 导致 Windows 包启动报 TaskDialogIndirect、release.yml 未传 releaseBody 导致更新弹窗「无发布说明」
 - 0.7.1（2026-08-19）：HTML 文件体验修复（源码左侧可编辑、分隔条拖拽跨 iframe 修复）
