@@ -670,6 +670,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
         <template v-else>
           <Sidebar
             :current-file-path="currentFilePath"
+            :current-content="activeContent"
             :active-view="sidebarView"
             :has-workspace="workspace.hasWorkspace"
             @select-file="openFile"

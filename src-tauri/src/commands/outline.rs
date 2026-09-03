@@ -137,6 +137,13 @@ pub fn parse_outline(path: String) -> Result<Vec<OutlineItem>, String> {
     Ok(outline)
 }
 
+/// 从编辑器实时文本解析大纲（编辑态刷新用，不访问磁盘、不依赖 mtime）
+/// 与 `parse_outline` 共用 `parse_outline_from_text`，保证单一解析源
+#[tauri::command]
+pub fn parse_outline_str(text: String) -> Vec<OutlineItem> {
+    parse_outline_from_text(&text)
+}
+
 /// 清除指定文件的大纲缓存（文件被删除/重命名时调用）
 #[tauri::command]
 pub fn invalidate_outline_cache(path: String) -> Result<(), String> {
@@ -153,4 +160,84 @@ pub fn clear_outline_cache() -> Result<(), String> {
     let cache = cache.as_mut().unwrap();
     cache.clear();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn items(text: &str) -> Vec<OutlineItem> {
+        parse_outline_str(text.to_string())
+    }
+
+    fn summary(items: &[OutlineItem]) -> Vec<(u32, u8, String)> {
+        items
+            .iter()
+            .map(|i| (i.line, i.level, i.text.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn 解析标题层级与行号() {
+        let text = "# 一级\n正文\n## 二级\n### 三级";
+        let got = summary(&items(text));
+        assert_eq!(
+            got,
+            vec![
+                (1, 1, "一级".to_string()),
+                (3, 2, "二级".to_string()),
+                (4, 3, "三级".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn 空标题不解析() {
+        let text = "## \n#\n## 有效标题";
+        let got = summary(&items(text));
+        assert_eq!(got, vec![(3, 2, "有效标题".to_string())]);
+    }
+
+    #[test]
+    fn 代码块内井号跳过() {
+        let text = "# 标题\n```\n# 这不是标题\n```\n## 结论";
+        let got = summary(&items(text));
+        assert_eq!(
+            got,
+            vec![(1, 1, "标题".to_string()), (5, 2, "结论".to_string())]
+        );
+    }
+
+    #[test]
+    fn 波浪线代码块内井号跳过() {
+        let text = "# 标题\n~~~\n### 跳过\n~~~\n## 保留";
+        let got = summary(&items(text));
+        assert_eq!(
+            got,
+            vec![(1, 1, "标题".to_string()), (5, 2, "保留".to_string())]
+        );
+    }
+
+    #[test]
+    fn 超出六级不算标题() {
+        let text = "####### 七级\n## 正常";
+        let got = summary(&items(text));
+        assert_eq!(got, vec![(2, 2, "正常".to_string())]);
+    }
+
+    #[test]
+    fn 无空格井号不算标题() {
+        let text = "#不用空格\n## 正常";
+        let got = summary(&items(text));
+        assert_eq!(got, vec![(2, 2, "正常".to_string())]);
+    }
+
+    #[test]
+    fn 与磁盘命令共用同一解析源() {
+        // 相同文本结果一致（parse_outline_from_text 即 parse_outline 内部解析函数）
+        let text = "# A\n```\n# hidden\n```\n## B";
+        let via_str = summary(&items(text));
+        let via_disk = summary(&parse_outline_from_text(text));
+        assert_eq!(via_str, via_disk);
+    }
 }

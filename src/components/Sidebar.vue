@@ -9,6 +9,8 @@ import type { SidebarView } from "../types";
 interface Props {
   /** 当前打开的文件路径（用于大纲解析） */
   currentFilePath?: string | null;
+  /** 当前打开文件的实时内容（用于编辑态实时刷新大纲，#170） */
+  currentContent?: string;
   /** 侧栏当前视图（受控） */
   activeView?: SidebarView;
   /** 是否已打开工作区（控制"文件树"按钮可见性） */
@@ -17,6 +19,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   currentFilePath: null,
+  currentContent: "",
   activeView: "files",
   hasWorkspace: false,
 });
@@ -34,11 +37,19 @@ function setView(view: SidebarView): void {
 
 // 大纲：监听当前文件路径，自动拉取
 const filePathRef = toRef(props, "currentFilePath");
-const { outline: outlineItems, loading: outlineLoading } = useOutline(filePathRef);
-
 // 大纲仅对 markdown 文件有意义：非 md 时隐藏大纲 tab，强制文件树视图
 const isCurrentMarkdown = computed(() =>
   props.currentFilePath ? isMarkdownFile(props.currentFilePath) : true
+);
+// 编辑态实时刷新仅在"大纲视图可见"时启用（#170）
+const liveOutlineEnabled = computed(
+  () => effectiveView(props.activeView) === "outline"
+);
+const currentContentRef = toRef(props, "currentContent");
+const { outline: outlineItems, loading: outlineLoading } = useOutline(
+  filePathRef,
+  currentContentRef,
+  liveOutlineEnabled
 );
 /** 有效活动视图：非 md 文件始终强制文件树 */
 function effectiveView(view: SidebarView): SidebarView {

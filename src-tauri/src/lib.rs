@@ -417,6 +417,7 @@ pub fn run() {
             search::search_workspace,
             search::cancel_search,
             outline::parse_outline,
+            outline::parse_outline_str,
             outline::invalidate_outline_cache,
             outline::clear_outline_cache,
             drafts::save_draft,
