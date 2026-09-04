@@ -553,12 +553,16 @@ class TableWidget extends WysiwygBlockWidget {
     wrapper.appendChild(toolbar);
   }
   // 表格内所有键盘/DOM 编辑事件由浏览器 contentEditable 处理，不交还 CM
-  // （click 也由单元格 focus 接管，不再跳到块首）；ctrl/meta 组合键交还 CM 处理。
+  // （click 也由单元格 focus 接管，不再跳到块首）。
+  // Ctrl/Cmd+Z / Y 必须交还浏览器原生撤销/重做：表格内文本改动发生在 contentEditable DOM，
+  // 并未写入 CM 文档；若把撤销交给 CM，会用「上一次整表写回/无关事务」去撤销，导致
+  // 表格内按 Ctrl+Z 无法正常撤销刚输入的内容。
+  // 仅把 Ctrl/Cmd+A（全选）与 Ctrl/Cmd+S（保存）这类全局命令交还 CM。
   ignoreEvent(event: Event): boolean {
     if (
       event instanceof KeyboardEvent &&
       (event.ctrlKey || event.metaKey) &&
-      (event.key === "z" || event.key === "y" || event.key === "a" || event.key === "s")
+      (event.key === "a" || event.key === "s")
     ) {
       return false;
     }
@@ -1178,14 +1182,13 @@ export const wysiwygTheme = EditorView.theme({
     backgroundColor: "var(--md-table-row-hover-bg, var(--murasaki-purple-50, #faf5ff))",
   },
   // T1.4 悬停工具条：聚焦单元格时显示增删/对齐工具。
-  // 默认隐藏、悬浮于表格正上方并水平居中（absolute）；仅在编辑激活（有锚点格）时显示，
+  // 默认隐藏、贴近表格左缘上方（absolute）；仅在编辑激活（有锚点格）时显示，
   // 避免常驻占位把下一行内容往下推。样式与 murasaki-ui-design/pages/ux-wysiwyg-table.html 一致。
   ".murasaki-wysiwyg-table-edit .murasaki-wysiwyg-table-toolbar": {
     display: "none",
     position: "absolute",
-    top: "-60px",
-    left: "50%",
-    transform: "translateX(-50%)",
+    top: "-44px",
+    left: "0",
     gap: "3px",
     alignItems: "center",
     padding: "2px 6px",

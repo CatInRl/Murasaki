@@ -167,11 +167,11 @@ export class TableEditor {
         }
         return;
       }
-      // Esc：提交并留下（整表写回）
+      // Esc：提交并留下（整表写回），写回后继续保持编辑态
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        this.commit();
+        this.commit(true);
         return;
       }
       // Tab / Shift+Tab：横向导航
@@ -200,7 +200,10 @@ export class TableEditor {
         const cellEls = Array.from(this.table.querySelectorAll("[data-row]")) as HTMLTableCellElement[];
         if (cellEls.some((c) => c === cell.ownerDocument.activeElement)) return;
         if (this.anchor && this.anchor.row === row && this.anchor.col === col) {
-          this.commit();
+          // 失焦离开表格：提交时不带锚点（stay=false），宿主写回后不会再把焦点拉回，
+          // 编辑态（工具条/锚点高亮）随之退出。若带锚点提交，SourceEditor 会 refocus 抢回焦点，
+          // 造成"点了别处却还停在编辑态"/"切到第二张表却进不了编辑态"。
+          this.commit(false);
         }
       }, 0);
     });
@@ -443,10 +446,15 @@ export class TableEditor {
     return this.anchor;
   }
 
-  /** 提交：收集 DOM → 规范化 → onCommit(携带锚点)。之后清除锚点并通知宿主刷新。 */
-  commit(): void {
-    const anchor = this.anchor;
-    if (anchor) this.clearAnchor();
+  /**
+   * 提交：收集 DOM → 规范化 → onCommit(携带锚点与否由 stayInTable 决定)。之后清除锚点并通知宿主刷新。
+   * @param stayInTable 提交后是否把焦点留在表格内：
+   *   - true（默认，Esc / 结构化操作）：携带当前锚点，宿主写回重建后重聚焦同一单元格；
+   *   - false（失焦离开表格）：不携带锚点，宿主写回后不重聚焦，编辑态随之退出。
+   */
+  commit(stayInTable = true): void {
+    const anchor = stayInTable ? this.anchor : null;
+    if (this.anchor) this.clearAnchor();
     this.anchor = null;
     const model = this.collectModel();
     // 非法结构（空行）仍可规范化，reflowTable 对空 cells 防御
