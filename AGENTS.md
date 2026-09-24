@@ -134,10 +134,13 @@ murasaki/
 
 ### 当前版本：0.8.5（2026-09-24）
 
-**修复冷启动打开文件与启动恢复体验**：应用未运行时双击 `.md` 文件现在能正确打开目标文件；启动恢复上次 tabs 时不再逐个文件切换。
+**修复冷启动打开文件、启动恢复体验与 WYSIWYG 编辑态**：应用未运行时双击 `.md` 文件现在能正确打开目标文件；启动恢复上次 tabs 时不再逐个文件切换；所见即所得模式下编辑态范围收窄到光标所在行/块，全选时自带背景的块级部件也有选中反馈。
 
 - 冷启动文件关联（#92/#113）：废弃 Rust 侧"延时 800ms 推 `open-from-argv` 事件"（前端注册监听器晚于该延时会丢事件，表现为只恢复旧 tabs），改为拉取模型——`setup` 把 argv 路径暂存到新增的 `PendingOpenState`（[commands/launch.rs](src-tauri/src/commands/launch.rs)），前端初始化完成后调用 `take_pending_open_path` 取走并复用 `onOpenPath`；`classify_path` / `first_non_flag_arg` 一并收敛到 launch.rs，单实例（应用已运行）仍走事件推送
 - 启动 tabs 恢复：`openFile` / `newTab` 新增 `activate` 选项，`restore()` 全部以 `activate: false` 装载、最后一次性激活目标 tab，避免编辑器随 `tabId` 变化反复整体替换 EditorState
+- WYSIWYG 编辑态范围：新增 `getCursorLineRange`（行内标记按光标所在行判定，替代整段判定，修相邻行误翻源码）；新增 `startsBlockLine` 并让 `getParagraphRange` 在会中断段落的块级起始行截断（围栏/ATX 标题/引用/列表项/分隔线/HTML 块起始），修光标进代码块后上方段落误翻源码；光标在代码块内时整个块为激活范围，围栏 CodeMark 保持 dim
+- WYSIWYG 全选视觉：代码块（Shiki pre）/图表卡片/预览卡/表格/frontmatter 等自带不透明背景的块级部件，用 `::after` 半透明紫覆盖层显示选中态（`pointer-events: none`，不设 z-index，供锚点胶囊与工具条保持上层）
+- WYSIWYG 表格提交：失焦/Esc 提交前判重，reflow 后源码与文档原文一致则跳过 dispatch，避免未改动的进出表格把文件标记为待保存
 
 ### 历史版本
 
