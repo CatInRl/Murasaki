@@ -132,9 +132,16 @@ murasaki/
 
 完整 changelog 详见 [CHANGELOG.md](CHANGELOG.md)。版本发布时必须同步更新该文件。
 
-### 当前版本：0.8.4（2026-09-03）
+### 当前版本：0.8.5（2026-09-24）
 
-**显示模式改由菜单切换、编辑时大纲实时更新、WYSIWYG 表格编辑增强**：显示模式不再在设置中配置，改由菜单栏「视图 / 显示模式」互斥切换；编辑器中未保存新增内容实时反映到大纲；所见即所得表格支持方向键导航、表头编辑与贴合上方的居中工具条。
+**修复冷启动打开文件与启动恢复体验**：应用未运行时双击 `.md` 文件现在能正确打开目标文件；启动恢复上次 tabs 时不再逐个文件切换。
+
+- 冷启动文件关联（#92/#113）：废弃 Rust 侧"延时 800ms 推 `open-from-argv` 事件"（前端注册监听器晚于该延时会丢事件，表现为只恢复旧 tabs），改为拉取模型——`setup` 把 argv 路径暂存到新增的 `PendingOpenState`（[commands/launch.rs](src-tauri/src/commands/launch.rs)），前端初始化完成后调用 `take_pending_open_path` 取走并复用 `onOpenPath`；`classify_path` / `first_non_flag_arg` 一并收敛到 launch.rs，单实例（应用已运行）仍走事件推送
+- 启动 tabs 恢复：`openFile` / `newTab` 新增 `activate` 选项，`restore()` 全部以 `activate: false` 装载、最后一次性激活目标 tab，避免编辑器随 `tabId` 变化反复整体替换 EditorState
+
+### 历史版本
+
+- 0.8.4（2026-09-03）：**显示模式改由菜单切换、编辑时大纲实时更新、WYSIWYG 表格编辑增强**：显示模式不再在设置中配置，改由菜单栏「视图 / 显示模式」互斥切换；编辑器中未保存新增内容实时反映到大纲；所见即所得表格支持方向键导航、表头编辑与贴合上方的居中工具条。
 
 - 显示模式菜单（#147）：新增「视图」子菜单（源码/分屏/所见即所得，CheckMenuItem 互斥勾选），`set_mode_checked` 命令同步菜单与状态；移除设置面板编辑模式配置，三语言菜单文案同步
 - 大纲实时更新（#170）：Rust 新增 `parse_outline_str`（单一解析源，无磁盘/mtime）；前端 `useOutline.updateLiveText` 200ms 防抖 + 序列号防回跳；Sidebar 仅大纲视图可见时按 `activeContent` 刷新；移除未用的保存后 `refresh()`
