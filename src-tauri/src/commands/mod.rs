@@ -4,6 +4,7 @@ pub mod assets;
 pub mod chats;
 pub mod drafts;
 pub mod files;
+pub mod launch;
 pub mod locale;
 pub mod menu;
 pub mod outline;

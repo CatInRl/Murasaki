@@ -8,6 +8,7 @@ use commands::assets;
 use commands::chats;
 use commands::drafts;
 use commands::files;
+use commands::launch::{self, PendingOpenState};
 use commands::locale;
 use commands::menu::{self, RecentMenuState};
 use commands::outline;
@@ -29,30 +30,16 @@ fn is_e2e_mode() -> bool {
             .unwrap_or(false)
 }
 
-/// 判断路径是文件还是目录（用于拖拽打开 / 命令行参数打开文件关联，issue #92 / #113）
-fn classify_path(p: &std::path::Path) -> &'static str {
-    if p.is_dir() {
-        "folder"
-    } else {
-        "file"
-    }
-}
-
-/// 返回首个非 `--flag` 的命令行参数（文件/文件夹路径）。
-/// 用于首次启动时文件关联（双击 .md 文件）与命令行拖入打开。
-fn first_non_flag_arg() -> Option<String> {
-    std::env::args().skip(1).find(|a| !a.starts_with("--") && !a.is_empty())
-}
-
 /// 通知前端打开命令行传入的文件/文件夹路径（issue #92 / #113）。
 /// - 文件：在 tab 中打开
 /// - 文件夹：设为工作区
-/// 通过 `open-from-argv` 事件透传给前端 useAppLifecycle 处理。
+/// 仅用于第二实例（应用已在运行时）场景，通过 `open-from-argv` 事件推送给前端；
+/// 首次启动场景由 [`commands::launch::take_pending_open_path`] 拉取，避免竞态。
 fn emit_open_path(app: &tauri::AppHandle, path: &str) {
     if let Some(window) = app.get_webview_window("main") {
         let payload = serde_json::json!({
             "path": path,
-            "type": classify_path(std::path::Path::new(path)),
+            "type": launch::classify_path(std::path::Path::new(path)),
         });
         let _ = window.emit("open-from-argv", payload);
     }
@@ -401,6 +388,7 @@ pub fn run() {
         .manage(WatcherState::default())
         .manage(search::SearchState::default())
         .manage(RecentMenuState::default())
+        .manage(PendingOpenState::default())
         .invoke_handler(tauri::generate_handler![
             files::list_tree,
             files::create_file,
@@ -414,6 +402,7 @@ pub fn run() {
             files::path_exists,
             files::path_type,
             files::reveal_in_explorer,
+            launch::take_pending_open_path,
             search::search_workspace,
             search::cancel_search,
             outline::parse_outline,
@@ -498,14 +487,12 @@ pub fn run() {
             })?;
             app.set_menu(menu)?;
 
-            // 首次启动时处理命令行传入的文件/文件夹路径（文件关联 / 命令行拖入打开，issue #92 / #113）
-            // 前端事件监听器在 onMounted 注册，可能尚未就绪，延迟 800ms 发射避免竞态
-            if let Some(path) = first_non_flag_arg() {
-                let handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(800));
-                    emit_open_path(&handle, &path);
-                });
+            // 首次启动时命令行传入的文件/文件夹路径（文件关联 / 命令行拖入打开，issue #92 / #113）
+            // 暂存到状态，前端初始化完成后通过 `take_pending_open_path` 主动取走。
+            // 不再用"延时 emit"：前端挂载 + 设置/工作区/tab 恢复耗时不确定，
+            // 事件可能在监听器注册前发出而丢失（冷启动只恢复旧 tabs，双击的文件没打开）。
+            if let Some(path) = launch::first_non_flag_arg() {
+                app.state::<PendingOpenState>().set(path);
             }
 
             Ok(())

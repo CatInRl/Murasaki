@@ -52,16 +52,20 @@ export const useTabsStore = defineStore("tabs", () => {
    * - 若该路径已在某个 tab 中，则激活该 tab
    * - 否则创建新 tab
    *
+   * `activate: false` 用于启动恢复：只把 tab 放进列表、不切换激活项，
+   * 避免恢复过程中编辑器（tabId 变化会整体替换 EditorState）逐个文件切换一遍。
+   *
    * 草稿恢复与 mtime 冲突检测（ADR 0001）：
    *   - 若有草稿且草稿的 knownMtime == 文件当前 mtime → 用草稿内容（用户上次未保存）
    *   - 若有草稿但 knownMtime != 文件当前 mtime → 磁盘在外部被改过，丢弃草稿，使用磁盘内容
    *     （草稿已过期，强行使用会让用户失去外部更新的内容）
    */
-  async function openFile(path: string): Promise<Tab> {
+  async function openFile(path: string, options: { activate?: boolean } = {}): Promise<Tab> {
+    const activate = options.activate ?? true;
     // 检查是否已打开
     const existing = tabs.value.find((t) => t.path === path);
     if (existing) {
-      activeTabId.value = existing.id;
+      if (activate) activeTabId.value = existing.id;
       return existing;
     }
 
@@ -103,7 +107,7 @@ export const useTabsStore = defineStore("tabs", () => {
         scroll: { x: 0, y: 0 },
       };
       tabs.value.push(tab);
-      activeTabId.value = tab.id;
+      if (activate) activeTabId.value = tab.id;
       return tab;
     } catch (err) {
       console.error("打开文件失败:", err);
@@ -113,8 +117,9 @@ export const useTabsStore = defineStore("tabs", () => {
 
   /**
    * 创建新标签页（未关联文件）
+   * `activate: false` 用于启动恢复（见 openFile 同名参数）
    */
-  function newTab(initialContent = ""): Tab {
+  function newTab(initialContent = "", options: { activate?: boolean } = {}): Tab {
     const tab: Tab = {
       id: genId(),
       path: null,
@@ -129,7 +134,7 @@ export const useTabsStore = defineStore("tabs", () => {
       scroll: { x: 0, y: 0 },
     };
     tabs.value.push(tab);
-    activeTabId.value = tab.id;
+    if (options.activate ?? true) activeTabId.value = tab.id;
     return tab;
   }
 
@@ -411,12 +416,15 @@ export const useTabsStore = defineStore("tabs", () => {
       if (state.tabs.length === 0) return;
 
       // 阶段 1：按持久化顺序恢复每个 tab，记录持久化路径到 tab id 的映射
+      // 全部传 activate:false —— 恢复期间不切换激活项：
+      // 每个 tab 激活都会让编辑器整体替换 EditorState（见 SourceEditor 的 tabId watch），
+      // 逐个激活会表现为启动时把每个文件都切换一遍
       const orderedTabIds: string[] = []; // 按持久化顺序记录 tab id
 
       for (const persisted of state.tabs) {
         if (persisted.path) {
           try {
-            const tab = await openFile(persisted.path);
+            const tab = await openFile(persisted.path, { activate: false });
             // 覆盖光标/滚动位置（openFile 不恢复这些）
             if (tab) {
               tab.cursor = persisted.cursor;
@@ -429,7 +437,7 @@ export const useTabsStore = defineStore("tabs", () => {
           }
         } else {
           // 未保存的新文件 tab
-          const tab = newTab(persisted.content);
+          const tab = newTab(persisted.content, { activate: false });
           orderedTabIds.push(tab.id);
         }
       }
@@ -447,9 +455,14 @@ export const useTabsStore = defineStore("tabs", () => {
         }
       }
 
-      // 阶段 3：恢复激活索引
-      if (state.activeIndex >= 0 && state.activeIndex < tabs.value.length) {
-        activeTabId.value = tabs.value[state.activeIndex].id;
+      // 阶段 3：一次性恢复激活 tab（仅在最后切一次，避免逐文件切换）
+      // activeIndex 越界时回落到最后一个 tab，保持与旧行为一致（旧逻辑默认激活最后恢复的 tab）
+      const activeIdx =
+        state.activeIndex >= 0 && state.activeIndex < tabs.value.length
+          ? state.activeIndex
+          : tabs.value.length - 1;
+      if (activeIdx >= 0) {
+        activeTabId.value = tabs.value[activeIdx].id;
       }
     } finally {
       restoring.value = false;

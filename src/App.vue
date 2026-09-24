@@ -414,7 +414,22 @@ onMounted(async () => {
 
   initialized.value = true;
 
-  // 11. 启动时静默检查更新（可被设置关闭，ADR-0012）
+  // 11. 冷启动时的文件关联 / 命令行打开（issue #92 / #113）
+  //     Rust 在 setup 阶段把 argv 中的路径暂存，此处（事件监听器就绪、状态落盘门控已开启、
+  //     文件监听已启动）主动取走。不能用"延时 emit 事件"：前端挂载 + 设置/工作区/tab
+  //     恢复耗时不确定，事件可能早于监听器注册而丢失，表现为启动后只恢复旧 tabs。
+  try {
+    const pending = await invoke<{ path: string; type: "file" | "folder" } | null>(
+      "take_pending_open_path"
+    );
+    if (pending?.path) {
+      void onOpenPath(pending.path, pending.type === "folder" ? "folder" : "file");
+    }
+  } catch (err) {
+    console.warn("[Murasaki] 读取启动参数路径失败:", err);
+  }
+
+  // 12. 启动时静默检查更新（可被设置关闭，ADR-0012）
   //     silent=true：不弹 toast / 不弹对话框，仅填充 availableUpdate 状态
   if (persistence.settings.checkUpdatesOnStartup) {
     void checkForUpdate(true);
