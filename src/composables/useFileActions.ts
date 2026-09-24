@@ -2,6 +2,7 @@ import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialo
 import { basename } from "../utils/path";
 import { exportHtml } from "./useHtmlExport";
 import { fileSystem } from "../services/fileSystem";
+import { EDITABLE_TEXT_EXTENSIONS, MARKDOWN_EXTENSIONS } from "../utils/fileKind";
 import { i18n } from "../i18n";
 import type { Ref } from "vue";
 import type { Tab } from "../types";
@@ -91,8 +92,12 @@ export function useFileActions(deps: FileActionsDeps) {
   async function openFileViaDialog(): Promise<void> {
     const selected = await openDialog({
       multiple: false,
-      filters: [{ name: "Markdown", extensions: ["md", "markdown", "mdown", "mkd"] }],
-      title: t("common.openMarkdownTitle"),
+      filters: [
+        { name: t("common.fileFilter.markdown"), extensions: MARKDOWN_EXTENSIONS },
+        { name: t("common.fileFilter.textCode"), extensions: EDITABLE_TEXT_EXTENSIONS },
+        { name: t("common.fileFilter.allFiles"), extensions: ["*"] },
+      ],
+      title: t("common.openFileTitle"),
     });
     if (typeof selected === "string" && selected) {
       await openFile(selected);
@@ -118,7 +123,7 @@ export function useFileActions(deps: FileActionsDeps) {
     const selected = await openDialog({
       directory: false,
       save: true,
-      filters: [{ name: "Markdown", extensions: ["md"] }],
+      filters: [{ name: t("common.fileFilter.markdown"), extensions: MARKDOWN_EXTENSIONS }],
       title: t("common.saveAs"),
       defaultPath: workspace.workspacePath ?? undefined,
     });

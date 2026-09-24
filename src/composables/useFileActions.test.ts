@@ -25,10 +25,11 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 
 import { exportHtml } from "./useHtmlExport";
 import { fileSystem } from "../services/fileSystem";
-import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 
 const mockedExportHtml = exportHtml as unknown as ReturnType<typeof vi.fn>;
 const mockedExportPdf = fileSystem.exportPdf as unknown as ReturnType<typeof vi.fn>;
+const mockedOpenDialog = openDialog as unknown as ReturnType<typeof vi.fn>;
 const mockedSaveDialog = saveDialog as unknown as ReturnType<typeof vi.fn>;
 
 function makeTab(overrides: Partial<Tab> = {}): Tab {
@@ -83,7 +84,42 @@ function makeDeps(overrides: Partial<FileActionsDeps> = {}): FileActionsDeps {
 beforeEach(() => {
   mockedExportHtml.mockReset();
   mockedExportPdf.mockReset();
+  mockedOpenDialog.mockReset();
   mockedSaveDialog.mockReset();
+});
+
+describe("useFileActions - openFileViaDialog", () => {
+  it("过滤器覆盖 Markdown / 文本与代码 / 所有文件三类", async () => {
+    mockedOpenDialog.mockResolvedValue(null);
+    const deps = makeDeps();
+    const { openFileViaDialog } = useFileActions(deps);
+    await openFileViaDialog();
+
+    const options = mockedOpenDialog.mock.calls[0][0];
+    expect(options.title).toBe("打开文件");
+    expect(options.filters.map((f: { name: string }) => f.name)).toEqual([
+      "Markdown 文档",
+      "文本与代码文件",
+      "所有文件",
+    ]);
+    expect(options.filters[0].extensions).toEqual(
+      expect.arrayContaining(["md", "markdown", "mdown", "mkd"])
+    );
+    expect(options.filters[1].extensions).toEqual(
+      expect.arrayContaining(["html", "txt", "json", "yaml", "py"])
+    );
+    expect(options.filters[2].extensions).toEqual(["*"]);
+  });
+
+  it("选中非 Markdown 文件也能打开", async () => {
+    mockedOpenDialog.mockResolvedValue("/test/page.html");
+    const deps = makeDeps();
+    const { openFileViaDialog } = useFileActions(deps);
+    await openFileViaDialog();
+
+    expect(deps.tabsStore.openFile).toHaveBeenCalledWith("/test/page.html");
+    expect(deps.persistence.addRecent).toHaveBeenCalledWith("/test/page.html", "file");
+  });
 });
 
 describe("useFileActions - exportCurrentPdf", () => {

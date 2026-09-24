@@ -1,7 +1,7 @@
 import type { Ref } from "vue";
 import type { EditorView } from "@codemirror/view";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { getVersion } from "@tauri-apps/api/app";
+import { getAppVersion } from "../utils/appVersion";
 import {
   setHeading,
   toggleList,
@@ -288,12 +288,7 @@ export function useCommands(deps: CommandsDeps) {
       }
       case "about": {
         // 动态读取打包版本号（tauri.conf.json 的 version），避免硬编码过期
-        let version = "";
-        try {
-          version = await getVersion();
-        } catch {
-          version = "0.0.0";
-        }
+        const version = await getAppVersion();
         dialog.alert({ title: "关于 Murasaki", message: `Murasaki v${version}\n轻量级本地 Markdown 文件管理编辑器\n基于 Tauri 2.x + Vue 3 + CodeMirror 6` });
         break;
       }

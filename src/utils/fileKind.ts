@@ -40,6 +40,12 @@ const TEXT_CODE_EXTS = new Set([
   "md", "markdown", "mdown", "mkd", "rst", "tex", "graphql", "gql", "dart",
 ]);
 
+/** Markdown 扩展名清单（数组形式，供文件对话框过滤器复用） */
+export const MARKDOWN_EXTENSIONS = [...MARKDOWN_EXTS];
+
+/** 可编辑文本/代码扩展名清单（数组形式，供文件对话框过滤器复用） */
+export const EDITABLE_TEXT_EXTENSIONS = [...TEXT_CODE_EXTS];
+
 /**
  * 是否 Markdown 文件
  * @param name 文件名或路径（内部调用 extname）

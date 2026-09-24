@@ -1,5 +1,6 @@
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { basename } from "../utils/path";
+import { MARKDOWN_EXTENSIONS } from "../utils/fileKind";
 import { i18n } from "../i18n";
 import type { AlertVariant } from "../stores/useDialogStore";
 
@@ -61,7 +62,7 @@ export interface TabCloseDeps {
 /**
  * Tab 关闭逻辑：
  * - 单个关闭：未保存检查 / agent 运行中合并对话框（Ticket #24c）
- * - 批量关闭：使用 doCloseTab 避免连续弹框（草稿自动写入）
+ * - 批量关闭：无未保存改动时静默关闭；存在未保存改动时只弹**一次**汇总确认
  *
  * 所有对话框均改走 dialog store（unsavedChanges / confirm）。
  */
@@ -85,7 +86,7 @@ export function useTabClose(deps: TabCloseDeps) {
       }
     }
     const selected = await saveDialog({
-      filters: [{ name: "Markdown", extensions: ["md"] }],
+      filters: [{ name: t("common.fileFilter.markdown"), extensions: MARKDOWN_EXTENSIONS }],
       title: t("common.saveAs"),
       defaultPath: workspace.workspacePath ?? undefined,
     });
@@ -175,40 +176,71 @@ export function useTabClose(deps: TabCloseDeps) {
     await tabsStore.doCloseTab(tabId);
   }
 
-  // ===== 批量关闭（右键菜单触发，使用 doCloseTab 避免连续弹框）=====
+  // ===== 批量关闭（右键菜单触发）=====
+
+  /**
+   * 批量关闭：
+   * - 待关闭集合内无未保存改动 → 静默关闭（不引入确认噪音）
+   * - 存在未保存改动 → 只弹**一次**汇总确认；取消则整批中止，不关闭任何 tab
+   * - 选择保存 → 逐个保存（无路径走另存为），任一取消/失败则中止整批
+   */
+  async function closeMany(ids: string[]): Promise<void> {
+    const targets = ids
+      .map((id) => tabsStore.tabs.find((t) => t.id === id))
+      .filter((tab): tab is TabLike => Boolean(tab));
+    if (targets.length === 0) return;
+
+    const dirty = targets.filter((tab) => tab.isDirty);
+    if (dirty.length > 0) {
+      const names = dirty
+        .map((tab) => (tab.path ? basename(tab.path) : t("common.untitled")))
+        .join(", ");
+      // 未命名 tab 没有草稿兜底，丢弃即永久丢失 → 显式提示
+      const base = t("common.dialog.batchCloseMessage", { count: dirty.length, names });
+      const message = dirty.some((tab) => !tab.path)
+        ? `${base}\n\n${t("common.dialog.batchCloseUntitledWarning")}`
+        : base;
+
+      const choice = await dialog.unsavedChanges({
+        title: t("common.dialog.batchCloseTitle"),
+        message,
+        saveText: t("common.saveAllAndClose"),
+        discardText: t("common.closeWithoutSaving"),
+        cancelText: t("common.cancel"),
+      });
+      if (choice === "cancel") return;
+
+      if (choice === "save") {
+        for (const tab of dirty) {
+          const ok = await saveBeforeClose(tab.id, tab);
+          if (!ok) return;
+        }
+      }
+    }
+
+    for (const tab of targets) {
+      await tabsStore.doCloseTab(tab.id);
+    }
+  }
 
   async function onCloseOthers(tabId: string): Promise<void> {
-    const idx = tabsStore.tabs.findIndex((t) => t.id === tabId);
-    if (idx < 0) return;
-    const toClose = tabsStore.tabs.filter((_, i) => i !== idx).map((t) => t.id);
-    for (const id of toClose) {
-      await tabsStore.doCloseTab(id);
-    }
+    await closeMany(tabsStore.tabs.filter((t) => t.id !== tabId).map((t) => t.id));
   }
 
   async function onCloseRight(tabId: string): Promise<void> {
     const idx = tabsStore.tabs.findIndex((t) => t.id === tabId);
     if (idx < 0) return;
-    const toClose = tabsStore.tabs.filter((_, i) => i > idx).map((t) => t.id);
-    for (const id of toClose) {
-      await tabsStore.doCloseTab(id);
-    }
+    await closeMany(tabsStore.tabs.filter((_, i) => i > idx).map((t) => t.id));
   }
 
   async function onCloseLeft(tabId: string): Promise<void> {
     const idx = tabsStore.tabs.findIndex((t) => t.id === tabId);
     if (idx < 0) return;
-    const toClose = tabsStore.tabs.filter((_, i) => i < idx).map((t) => t.id);
-    for (const id of toClose) {
-      await tabsStore.doCloseTab(id);
-    }
+    await closeMany(tabsStore.tabs.filter((_, i) => i < idx).map((t) => t.id));
   }
 
   async function onCloseAllTabs(): Promise<void> {
-    const toClose = tabsStore.tabs.map((t) => t.id);
-    for (const id of toClose) {
-      await tabsStore.doCloseTab(id);
-    }
+    await closeMany(tabsStore.tabs.map((t) => t.id));
   }
 
   return {

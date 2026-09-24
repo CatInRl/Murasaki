@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { BookOpen, FileText } from "lucide-vue-next";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
 import { basename, dirname } from "../utils/path";
+import { getAppVersion } from "../utils/appVersion";
 import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
 import EmptyState from "./EmptyState.vue";
 
@@ -18,8 +19,13 @@ const emit = defineEmits<{
   (e: "open-settings"): void;
 }>();
 
-// 应用版本（与 package.json / tauri.conf.json 保持一致）
-const APP_VERSION = "0.1.0";
+// 应用版本号：运行时读取打包版本（tauri.conf.json），避免硬编码过期
+const appVersion = ref("");
+const versionText = computed(() => (appVersion.value ? `v${appVersion.value}` : ""));
+
+onMounted(async () => {
+  appVersion.value = await getAppVersion();
+});
 
 const recentFolders = computed(() => persistence.getRecentFolders(5));
 const recentFiles = computed(() => persistence.getRecentFiles(5));
@@ -167,8 +173,8 @@ const shortcutHints = computed(() => [
 
       <!-- 底部：版本号 + 设置入口 -->
       <footer class="welcome-footer">
-        <span class="version-text">v{{ APP_VERSION }}</span>
-        <span class="footer-sep">·</span>
+        <span v-if="versionText" class="version-text">{{ versionText }}</span>
+        <span v-if="versionText" class="footer-sep">·</span>
         <a class="settings-link" href="#" @click.prevent="emit('open-settings')">
           {{ $t('editor.welcome.settings') }}
         </a>
