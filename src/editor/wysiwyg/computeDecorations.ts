@@ -222,9 +222,48 @@ function isBlankLine(text: string): boolean {
 }
 
 /**
+ * 计算光标所在行的 [from, to] 范围（不含换行符）。
+ *
+ * 行内标记（强调/链接/图片/语法记）的激活判断用「光标所在行」而非整段：
+ * 同一段落内无空行的连续多行文本，若按整段判断，光标停留在第一行时，
+ * 相邻行（如 `**加粗**`/`[链接]`）也会被当作光标所在段而翻回原始源码（问题2b）。
+ * 语义：只有光标实际停留的行进入编辑态，相邻行保持渲染。
+ */
+function getCursorLineRange(doc: string, pos: number): { from: number; to: number } {
+  const from = doc.lastIndexOf("\n", pos - 1) + 1;
+  const nl = doc.indexOf("\n", pos);
+  const to = nl === -1 ? doc.length : nl;
+  return { from, to };
+}
+
+/**
+ * 判断一行是否以「会中断段落」的块级起始符开头（CommonMark 4.1-4.6 / 5.1 / 5.3）：
+ * - 围栏代码块：``` 或 ~~~
+ * - ATX 标题：# 后跟空格或行尾
+ * - 引用块：> 后跟空格或行尾
+ * - 无序列表项：- / * / + 后跟空格（无序列表可中断段落）
+ * - 有序列表项：1. （仅以 1 开头可中断段落）
+ * - 分隔线：--- / *** / ___（3 个及以上）
+ * - HTML 块起始：< 后跟字母 / ! / /（1-6 型可中断段落）
+ * 允许 0-3 空格缩进（CommonMark 块级缩进上限）。
+ *
+ * 注意：GFM 表格（|）要求表格前有空行，不会与段落无空行相邻，无需在此处理；
+ * 有序列表非 1 开头（如 5.）按 CommonMark 属于段落延续，不视为边界。
+ */
+function startsBlockLine(line: string): boolean {
+  return /^ {0,3}(?:```|~~~|#{1,6}(?:[ \t]|$)|>(?:[ \t]|$)|[-*+][ \t]|1\.[ \t]|(?:\*{3,}|-{3,}|_{3,})[ \t]*$|<[a-zA-Z!/])/.test(line);
+}
+
+/**
  * 计算光标所在「当前段」的文档范围 [from, to]。
  * 段落定义（ADR-0008）：空行分隔的连续非空文本行。
  * 仅扫描段落本身，复杂度 O(段落大小)，与文档大小无关。
+ *
+ * 边界处理（问题2）：除空行外，遇到「会中断段落」的块级起始行也停止扩展。
+ * CommonMark 中围栏代码/标题/列表/引用/分隔线/HTML 块可以无空行直接中断段落，
+ * 因此这些块与相邻段落在语法上是两个独立块。若不在此处截断，光标进入代码块等
+ * 块级元素时，段落范围会蔓延覆盖上方段落，导致上方段落的链接/图片/数学公式等
+ * 误翻回原始 markdown（相邻元素误进入编辑态）。
  */
 export function getParagraphRange(doc: string, pos: number): { from: number; to: number } {
   // 定位光标所在行
@@ -232,14 +271,21 @@ export function getParagraphRange(doc: string, pos: number): { from: number; to:
   let lineEnd = doc.indexOf("\n", pos);
   if (lineEnd === -1) lineEnd = doc.length;
 
+  // 光标所在行本身以块级起始符开头（围栏/标题/列表/引用等）：
+  // 该行是新块的起点，段落范围从本行开始，不再向上并入上方段落
+  // （否则光标进入代码块时，上方段落的链接/图片等会误翻回原始源码）。
+  const cursorStartsBlock = startsBlockLine(doc.slice(lineStart, lineEnd));
+
   // 向上扩展到段落起点
   let from = lineStart;
-  while (from > 0) {
-    const prevLineEnd = from - 1; // 前一行的换行符位置
-    const prevLineStart = doc.lastIndexOf("\n", prevLineEnd - 1) + 1;
-    const prevLineText = doc.slice(prevLineStart, prevLineEnd);
-    if (isBlankLine(prevLineText)) break;
-    from = prevLineStart;
+  if (!cursorStartsBlock) {
+    while (from > 0) {
+      const prevLineEnd = from - 1; // 前一行的换行符位置
+      const prevLineStart = doc.lastIndexOf("\n", prevLineEnd - 1) + 1;
+      const prevLineText = doc.slice(prevLineStart, prevLineEnd);
+      if (isBlankLine(prevLineText) || startsBlockLine(prevLineText)) break;
+      from = prevLineStart;
+    }
   }
 
   // 向下扩展到段落终点
@@ -249,7 +295,7 @@ export function getParagraphRange(doc: string, pos: number): { from: number; to:
     const nextLineEnd = doc.indexOf("\n", nextLineStart);
     const nextLineEndAbs = nextLineEnd === -1 ? doc.length : nextLineEnd;
     const nextLineText = doc.slice(nextLineStart, nextLineEndAbs);
-    if (isBlankLine(nextLineText)) break;
+    if (isBlankLine(nextLineText) || startsBlockLine(nextLineText)) break;
     to = nextLineEndAbs;
   }
   return { from, to };
@@ -355,10 +401,19 @@ function findMathRanges(
  */
 export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   const { doc, selectionHead, tree, proposalRanges, viewport } = input;
-  const para = getParagraphRange(doc, selectionHead);
+  const cursorLine = getCursorLineRange(doc, selectionHead);
+  // 提前计算 frontmatter 范围：供块内 HorizontalRule 避让用（frontmatter 的 --- 分隔符
+  // 属于卡片整体，不应被替换为 hr widget）。
+  const fmRange = findFrontmatterRange(doc);
   const decos: ComputedDeco[] = [];
   /** 代码范围（FencedCode/CodeBlock/InlineCode），用于排除数学公式匹配。 */
   const codeRanges: Array<{ from: number; to: number }> = [];
+  /**
+   * 光标所在代码块的范围（前序遍历先于其子节点，供 CodeMark 判定用）。
+   * 光标在代码块内时，整个块处于「可编辑源码」态：围栏 CodeMark 应 dim（淡化显示），
+   * 而非按 para（仅覆盖内容行）判定为 hide 而消失。
+   */
+  let cursorCodeBlockRange: { from: number; to: number } | null = null;
 
   tree.iterate({
     enter(ref) {
@@ -390,7 +445,8 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
         if (overlapsAnyProposal(from, to, proposalRanges)) return false;
 
         if (cursorInRange) {
-          // 光标在代码块内：围栏 CodeMark 走默认 dim（继续遍历子节点）
+          // 光标在代码块内：整个块为激活范围，块内 CodeMark 保持 dim
+          cursorCodeBlockRange = { from, to };
           // 若为可实时预览的图表（mermaid/plantuml/katex/math），
           // 在代码块下方追加实时预览卡（替换块尾换行符为块级 widget）
           if (name === "FencedCode") {
@@ -429,7 +485,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
         if (!inViewport(from, to, viewport)) return;
         if (overlapsAnyProposal(from, to, proposalRanges)) return;
 
-        const inParagraph = to >= para.from && from <= para.to;
+        const inParagraph = to >= cursorLine.from && from <= cursorLine.to;
         if (inParagraph) {
           // 光标在段内：LinkMark 走默认 dim（继续遍历子节点）
           return;
@@ -499,7 +555,11 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
         if (!inViewport(from, to, viewport)) return;
         if (overlapsAnyProposal(from, to, proposalRanges)) return;
 
-        const inParagraph = to >= para.from && from <= para.to;
+        // 光标在代码块内：以整个块为激活范围（围栏 CodeMark 保持 dim）；
+        // 否则按当前段判断（段内标记 dim，段外标记 hide）。
+        const inParagraph = cursorCodeBlockRange
+          ? to >= cursorCodeBlockRange.from && from <= cursorCodeBlockRange.to
+          : to >= cursorLine.from && from <= cursorLine.to;
 
         if (name === "ListMark") {
           const text = doc.slice(from, to);
@@ -552,7 +612,9 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       if (name === "HorizontalRule") {
         if (!inViewport(from, to, viewport)) return;
         if (overlapsAnyProposal(from, to, proposalRanges)) return;
-        const inParagraph = to >= para.from && from <= para.to;
+        // frontmatter 的 --- 分隔符属于卡片整体：不生成 hr widget，保持 dim 可编辑
+        const inFrontmatter = fmRange && from >= fmRange.from && to <= fmRange.to;
+        const inParagraph = inFrontmatter || (to >= cursorLine.from && from <= cursorLine.to);
         if (inParagraph) {
           decos.push({ type: "mark", from, to, kind: "dim", markType: name });
         } else {
@@ -604,7 +666,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   for (const mr of mathRanges) {
     if (!inViewport(mr.from, mr.to, viewport)) continue;
     if (overlapsAnyProposal(mr.from, mr.to, proposalRanges)) continue;
-    const inParagraph = mr.to >= para.from && mr.from <= para.to;
+    const inParagraph = mr.to >= cursorLine.from && mr.from <= cursorLine.to;
     if (inParagraph) continue; // 光标在段内：显示原始 markdown（可编辑）
     decos.push({
       type: "blockWidget",
@@ -631,7 +693,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
     if (inAnyCodeRange(from, to, codeRanges)) continue;
     if (!inViewport(from, to, viewport)) continue;
     if (overlapsAnyProposal(from, to, proposalRanges)) continue;
-    const inParagraph = to >= para.from && from <= para.to;
+    const inParagraph = to >= cursorLine.from && from <= cursorLine.to;
     if (inParagraph) continue; // 光标在段内：显示原始 shortcode（可编辑）
     decos.push({
       type: "blockWidget",
@@ -645,7 +707,6 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
 
   // Frontmatter 卡片：检测文档起始的 YAML frontmatter（T6.2 / #100）
   // 光标离开 frontmatter 范围 → 渲染为样式化卡片 widget；光标进入 → 显示原始文本可编辑
-  const fmRange = findFrontmatterRange(doc);
   if (fmRange) {
     if (inViewport(fmRange.from, fmRange.to, viewport)) {
       if (!overlapsAnyProposal(fmRange.from, fmRange.to, proposalRanges)) {

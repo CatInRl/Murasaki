@@ -459,6 +459,9 @@ onMounted(() => {
       source: string;
       anchorCell?: { row: number; col: number } | null;
     };
+    // 判重：进表格后未做任何修改（或改动被撤销回原样）时，失焦/Esc 也会触发一次提交。
+    // 若 reflow 后的源码与文档原文完全一致，直接跳过 dispatch，避免空变动把文件标记为待保存。
+    if (view.state.doc.sliceString(from, to) === source) return;
     view.dispatch({
       changes: { from, to, insert: source },
       userEvent: "input.tableEdit",

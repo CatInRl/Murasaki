@@ -88,6 +88,31 @@ describe("getParagraphRange", () => {
     const doc = "aaa\n   \nbbb";
     expect(getParagraphRange(doc, 8)).toEqual({ from: 8, to: 11 });
   });
+
+  it("围栏代码块上方段落（无空行）：光标在代码块内时段落不向上蔓延（问题2）", () => {
+    const doc = "para [link](http://x.com)\n```py\ncode\n```\nnext";
+    // 光标在 code 行（代码块内）：CommonMark 中围栏中断段落，段落应仅覆盖代码内容行
+    const codeIdx = doc.indexOf("code");
+    expect(getParagraphRange(doc, codeIdx)).toEqual({ from: codeIdx, to: codeIdx + 4 });
+  });
+
+  it("光标行本身是列表项起始 → 段落从本行开始，不并入上方段落", () => {
+    const doc = "para\n- item A\n- item B";
+    // 光标在 item A：列表项是独立块，段落仅覆盖当前项
+    expect(getParagraphRange(doc, 6)).toEqual({ from: 5, to: 13 });
+  });
+
+  it("标题行下方无空行的段落：光标在段落时不会并入上方标题", () => {
+    const doc = "## 标题\n正文";
+    // 光标在行尾：段落从「正文」行首开始，不含上方标题行
+    expect(getParagraphRange(doc, 8)).toEqual({ from: 6, to: 8 });
+  });
+
+  it("块级起始判断不误伤普通段落行", () => {
+    // 非 1 开头的有序列表（5.）与 #tag 均属段落延续，不是边界
+    const doc = "text\n5. item\n#tag";
+    expect(getParagraphRange(doc, 5)).toEqual({ from: 0, to: 17 });
+  });
 });
 
 // ===== 强调（粗体/斜体） =====
@@ -462,6 +487,28 @@ describe("computeDecorations — 图片 widget (T7.2)", () => {
     const doc = "![alt](https://example.com/x.png)\n\nbody";
     const d = compute(doc, 5);
     expect(blockWidgets(d).filter((w) => w.widget === "image")).toHaveLength(0);
+  });
+});
+
+// ===== 问题2b：相邻行激活收敛到光标所在行 =====
+
+describe("computeDecorations — 相邻行激活（问题2b）", () => {
+  it("光标在第一行 → 相邻行链接保持渲染（生成 widget，不翻回源码）", () => {
+    const doc = "para\n**bold** [link](http://x.com)";
+    const d = compute(doc, 1); // 光标在第一行 "para"
+    const linkW = blockWidgets(d).filter((w) => w.widget === "link");
+    expect(linkW).toHaveLength(1);
+    // 相邻行（非光标行）的强调语法标记走 hide（渲染态），而非 dim（源码态）
+    const em = marks(d).filter((m) => m.markType === "EmphasisMark");
+    expect(em.length).toBeGreaterThan(0);
+    expect(em.every((m) => m.kind === "hide")).toBe(true);
+  });
+
+  it("光标在第二行 → 该行链接进入编辑态（不生成 widget）", () => {
+    const doc = "para\n**bold** [link](http://x.com)";
+    const d = compute(doc, 12); // 光标在第二行接线附近
+    const linkW = blockWidgets(d).filter((w) => w.widget === "link");
+    expect(linkW).toHaveLength(0);
   });
 });
 

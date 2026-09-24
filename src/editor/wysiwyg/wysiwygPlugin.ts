@@ -1055,10 +1055,25 @@ export const wysiwygTheme = EditorView.theme({
   // 块级 widget 的选区高亮（Ctrl+A 全选时叠加选中底色/描边）：
   // WYSIWYG 下块级元素被替换为渲染 widget，原生选区不会覆盖其上，
   // 用 CSS 类模拟选中态，保证「全选」在视觉上也成立。
+  // position:relative 供 ::after 覆盖层相对块自身定位。
   ".murasaki-wysiwyg-selected": {
+    position: "relative",
     backgroundColor: "var(--md-code-selection, rgba(147, 51, 234, 0.08))",
     outline: "1px solid var(--md-code-selection-outline, rgba(147, 51, 234, 0.30))",
     borderRadius: "4px",
+  },
+  // 自带不透明背景的块级 widget（代码块 Shiki pre / 图表卡片 / 预览卡 / 表格 / frontmatter 卡片）：
+  // 内部不透明背景会盖住 .murasaki-wysiwyg-selected 的选中底色，导致全选时这些块「没有选中效果」。
+  // 用 ::after 半透明紫色覆盖层指示选中态（pointer-events:none 不挡交互），
+  // 同时保持块自身背景与内容不变（对齐 VS Code 深色代码块上的选区样式）。
+  // 覆盖层不设 z-index（默认 0）：表内锚点胶囊（z-index:2）与工具条（z-index:3）仍在上层可交互。
+  ".murasaki-wysiwyg-codeblock-wrapper.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-mermaid.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-diagram-preview.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-table-edit.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-frontmatter.murasaki-wysiwyg-selected::after": {
+    content: '""',
+    position: "absolute",
+    inset: "0",
+    borderRadius: "inherit",
+    backgroundColor: "rgba(147, 51, 234, 0.12)",
+    pointerEvents: "none",
   },
   // 行内代码：与预览 .markdown-body code 一致的视觉样式（背景/圆角/等宽字体）。
   // 覆盖整段（含反引号）；内层高亮 token span 会被后代选择器重置，
