@@ -99,11 +99,11 @@ murasaki/
 **分支模型**：`main` 恒为可发布状态，所有改动经短生命周期分支 + PR 合入（详见 [ADR-0019](docs/adr/0019-trunk-based-development-with-pull-requests.md)）。**不引入 develop / release 分支**。
 
 1. **先有 issue**：任何改动都要有 issue 跟踪（见下「Issue 跟踪约定」），禁止无 issue 开工。
-2. **切分支**：从最新 `main` 切出 `<type>/<issue>-<slug>`，例如 `fix/198-multi-window-deadlock`、`docs/205-dev-workflow`。`<type>` 取 Conventional Commits 类型（feat / fix / docs / refactor / test / chore）；没有对应 issue 时用 `chore/<slug>`。**不要在 main 上直接提交**。
+2. **切分支**：从最新 `main` 切出 `<type>/<issue>-<slug>`，例如 `fix/198-multi-window-deadlock`、`docs/205-dev-workflow`。`<type>` 取 Conventional Commits 类型（feat / fix / docs / refactor / test / chore）。分支名必须带 issue 号，所以**先有 issue 才有分支**。**不要在 main 上直接提交**。
 3. **开 PR**：推送分支后开 PR，标题格式 `<type>(<scope>): <描述> (#<issue>)`，描述按 [.github/pull_request_template.md](.github/pull_request_template.md) 模板填写。
 4. **过门禁**：[.github/workflows/test.yml](.github/workflows/test.yml) 两个 job 必须全绿——
    - `frontend`（ubuntu-latest）：`npm test` + `npm run build`
-   - `rust`（windows-latest）：`npm run build` + `cargo test`（`tauri.conf.json` 的 `frontendDist` 指向 `../dist`，需先产出 dist）
+   - `rust`（windows-latest）：`npm run build` + `npm run test:rust`（`tauri.conf.json` 的 `frontendDist` 指向 `../dist`，需先产出 dist）
 
    e2e 依赖 tauri-driver，保持本地 `npm run test:e2e`，不进 CI。
 5. **自查后再合**：合入前跑 `/code-review` skill，把结论贴在 PR 里；有阻断项先修掉。
@@ -125,7 +125,7 @@ murasaki/
 
 ## 版本发布约定
 
-- **发布流程**：更新版本号（package.json / Cargo.toml / tauri.conf.json）→ 提交推送 → 打 `vX.Y.Z` tag → 推送 tag 触发 `release.yml` → 关闭 milestone → 同步更新 [CHANGELOG.md](CHANGELOG.md) 和本文件变更记录部分
+- **发布流程**：开 `chore(release)` PR 更新版本号（package.json / Cargo.toml / tauri.conf.json）并写好本版 CHANGELOG 条目 → CI 绿后合入 main → 在 main 打 `vX.Y.Z` tag → 推送 tag 触发 `release.yml` → 关闭 milestone → 同步更新本文件变更记录部分
 - **Release 必须包含 CHANGELOG 内容**：`release.yml` 会用 `awk` 从 `CHANGELOG.md` 提取 `## [VERSION]` 段落，拼接到 Release Notes（安装说明 + 变更记录）。因此打 tag 前必须先在 CHANGELOG.md 写好对应版本条目，否则 Release Notes 的"变更记录"章节为空
 - **重新发布同版本**：删除旧 release（`gh release delete vX.Y.Z --yes --cleanup-tag`）→ 删除本地 tag（`git tag -d vX.Y.Z`）→ 提交修复代码并推送 → 重新打 tag 并推送触发构建
 - **构建产物**：Windows / Ubuntu / macOS arm64 / macOS x64 多平台包，构建约需 10 分钟，进度在 GitHub Actions 页面查看

@@ -6,7 +6,7 @@
 
 ## 背景
 
-Murasaki 至今是单人或小规模维护（作者 + AI Agent）：所有改动直接提交 `main`——仓库 171 个提交里有 22 个 merge commit（一次 UI 改造留下 25 个 `feat/tXX-*` 分支，直接 merge 而未走 PR）。CI 只有打 tag 触发的 [release.yml](../../.github/workflows/release.yml)，没有任何测试门禁；main 分支保护未开启；根目录长期堆着 `*.log`、一次性 `harness-*.html` 与截图等调试产物。
+Murasaki 至今是单人或小规模维护（作者 + AI Agent）：所有改动直接提交 `main`——历史里已有 22 个 merge commit（一次 UI 改造留下 25 个 `feat/tXX-*` 分支，直接 merge 而未走 PR）。CI 只有打 tag 触发的 [release.yml](../../.github/workflows/release.yml)，没有任何测试门禁；main 分支保护未开启；根目录长期堆着 `*.log`、一次性 `harness-*.html` 与截图等调试产物。
 
 「直推 main」带来三个具体问题：
 
@@ -23,7 +23,7 @@ Murasaki 至今是单人或小规模维护（作者 + AI Agent）：所有改动
 1. **`main` 恒为可发布状态**，不引入 `develop` 与 `release/x.y` 分支；版本准备单独走一个 `chore(release)` PR。
 2. **分支命名 `<type>/<issue>-<slug>`**，`<type>` 取 Conventional Commits 类型；分支从最新 main 切出，生命周期以「一个 issue 的活干完」为界。
 3. **PR 是进入 main 的唯一通道**：标题 `<type>(<scope>): <描述> (#<issue>)`；描述按 `.github/pull_request_template.md`（变更摘要 / 关联 issue / 验证方式 / 风险与回滚）。
-4. **门禁自动化**：新增 `.github/workflows/test.yml`，PR 与 push main 触发；`frontend`（ubuntu：`npm test` + `npm run build`）与 `rust`（windows：`npm run build` + `cargo test`）两个 job；e2e 依赖 tauri-driver，保持本地跑。
+4. **门禁自动化**：新增 `.github/workflows/test.yml`，PR 与 push main 触发；`frontend`（ubuntu：`npm test` + `npm run build`）与 `rust`（windows：`npm run build` + `npm run test:rust`）两个 job；e2e 依赖 tauri-driver，保持本地跑。
 5. **main 分支保护**：required status checks = 上述两个 job、Require branches to be up to date before merging、`enforce_admins=false`（管理员豁免仅用于紧急修复）、不设 required approving review。
 6. **合入方式为 squash**：一个 PR 压成一个 conventional commit，PR 标题即提交信息。
 7. **审查由 Agent 自查承担**：合入前跑 `/code-review` skill，把结论贴在 PR 里，替代人工 approving review。

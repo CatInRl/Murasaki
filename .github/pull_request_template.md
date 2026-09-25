@@ -4,16 +4,14 @@
 
 ## 关联 issue
 
-<!-- 二选一（删掉不适用的那个）：
+<!-- 填一行，二选一：
 - Closes #N   —— 该 issue 的活在本 PR 完成
 - Part of #N  —— spec issue 的子任务之一
 -->
 
-Closes #
-
 ## 验证方式
 
-<!-- 列出实际跑过的命令与手工验证项。CI 会跑 npm test / npm run build（ubuntu）与 npm run build / cargo test（windows） -->
+<!-- 列出实际跑过的命令与手工验证项。CI 会跑 npm test / npm run build（ubuntu）与 npm run build / npm run test:rust（windows） -->
 
 - [ ] `npm test`
 - [ ] `npm run build`

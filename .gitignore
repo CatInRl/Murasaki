@@ -47,6 +47,7 @@ e2e/scripts/*
 .scratch/
 
 # 根目录一次性调试产物（harness 页面 / 截图）
+# 注意：根目录 PNG 一律忽略；README 等资料图片请放进子目录
 /harness-*.html
 /*.png
 
