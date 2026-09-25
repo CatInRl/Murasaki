@@ -253,22 +253,12 @@ export function useCommands(deps: CommandsDeps) {
         break;
       }
       case "new-folder": {
-        // 在工作区根目录新建文件夹
+        // 有工作区 → 落文件树根目录内联命名（与「新建文件」交互一致）
         if (!workspace.hasWorkspace) {
           dialog.alert({ message: t("editor.commands.needWorkspace"), variant: "warning" });
           break;
         }
-        const name = await dialog.prompt({
-          message: t("editor.commands.newFolderPrompt"),
-          placeholder: t("editor.commands.newFolderPlaceholder"),
-        });
-        if (name && name.trim()) {
-          try {
-            await fileOps.createDirectory(workspace.workspacePath!, name.trim());
-          } catch (err) {
-            dialog.alert({ message: t("common.error.createFolderFailed", { error: err }), variant: "error" });
-          }
-        }
+        fileOps.beginRootCreate("directory");
         break;
       }
       case "find":

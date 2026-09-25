@@ -35,6 +35,12 @@ export interface MenuPosition {
   y: number;
 }
 
+/** 右键菜单锚点：鼠标事件或键盘触发时仅有的坐标 */
+export interface MenuAnchor {
+  clientX: number;
+  clientY: number;
+}
+
 /**
  * 边界检测：将菜单位置限制在视窗内。
  *
@@ -79,14 +85,17 @@ export const useContextMenuStore = defineStore("contextMenu", () => {
    *
    * 调用方应在 `contextmenu` 事件中直接传入 `event`，本方法会 preventDefault +
    * stopPropagation，避免浏览器原生菜单与事件冒泡触发重复关闭。
+   * 键盘触发（Shift+F10 / 菜单键）时传入仅含坐标的锚点，此时不做事件拦截。
    *
    * 栈管理：新 show 自动覆盖旧菜单（visible 一直为 true 时也会刷新 x/y/items）。
    */
-  function show(event: MouseEvent, menuItems: MenuItem[]): void {
-    event.preventDefault();
-    event.stopPropagation();
-    x.value = event.clientX;
-    y.value = event.clientY;
+  function show(anchor: MouseEvent | MenuAnchor, menuItems: MenuItem[]): void {
+    if ("preventDefault" in anchor) {
+      anchor.preventDefault();
+      anchor.stopPropagation();
+    }
+    x.value = anchor.clientX;
+    y.value = anchor.clientY;
     items.value = menuItems;
     visible.value = true;
   }

@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { RotateCw, FolderOpen } from "lucide-vue-next";
-import { NScrollbar, NButton, NDropdown, NInput } from "naive-ui";
-import type { DropdownOption } from "naive-ui";
+import { RotateCw, FolderOpen, FilePlus, FolderPlus, Clipboard } from "lucide-vue-next";
+import { NScrollbar, NButton, NInput } from "naive-ui";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
 import { useDialogStore } from "../stores/useDialogStore";
+import { useContextMenuStore } from "../stores/useContextMenuStore";
+import { provideFileTreeNav } from "../composables/useFileTreeNav";
+import {
+  flattenVisibleTree,
+  indexOfPath,
+  nextTreeIndex,
+  rightArrowAction,
+  leftArrowAction,
+  type FlatTreeItem,
+  type TreeNavKey,
+} from "../utils/treeNavigation";
 import TreeNode from "./TreeNode.vue";
 import EmptyState from "./EmptyState.vue";
 import Skeleton from "./Skeleton.vue";
@@ -14,6 +24,7 @@ import Skeleton from "./Skeleton.vue";
 const workspace = useWorkspaceStore();
 const fileOps = useFileOpsStore();
 const dialog = useDialogStore();
+const contextMenu = useContextMenuStore();
 const { t } = useI18n();
 
 const emit = defineEmits<{
@@ -26,38 +37,120 @@ function onSelectFile(path: string) {
   emit("select-file", path);
 }
 
-// ===== 空白区域右键菜单（在工作区根目录新建文件/文件夹） =====
-const emptyMenuVisible = ref(false);
-const emptyMenuX = ref(0);
-const emptyMenuY = ref(0);
+// ===== 键盘导航（ARIA tree：roving tabindex + 方向键） =====
+const expandedPaths = ref<Set<string>>(new Set());
+const visibleItems = computed(() =>
+  flattenVisibleTree(workspace.fileTree, (path) => expandedPaths.value.has(path))
+);
+const nav = provideFileTreeNav({
+  expandedPaths,
+  visiblePaths: computed(() => visibleItems.value.map((item) => item.path)),
+});
 
-const emptyMenuOptions = computed<DropdownOption[]>(() => [
-  { label: t("common.newFile"), key: "new-file" },
-  { label: t("common.newFolder"), key: "new-folder" },
-]);
-
-function onEmptyContextMenu(e: MouseEvent): void {
-  if (!workspace.hasWorkspace) return;
-  e.preventDefault();
-  emptyMenuX.value = e.clientX;
-  emptyMenuY.value = e.clientY;
-  emptyMenuVisible.value = true;
+/** 移动键盘焦点到指定可见条目 */
+function focusItem(item: FlatTreeItem | undefined): void {
+  if (!item) return;
+  nav.setActive(item.path);
+  nav.getRow(item.path)?.focus();
 }
 
-function closeEmptyMenu(): void {
-  emptyMenuVisible.value = false;
+function onTreeKeydown(e: KeyboardEvent): void {
+  // 内联重命名 / 新建输入框中，按键交给输入框自己处理
+  if ((e.target as HTMLElement | null)?.closest("input, textarea")) return;
+
+  const items = visibleItems.value;
+  if (items.length === 0) return;
+  const current = indexOfPath(items, nav.focusPath.value);
+
+  switch (e.key) {
+    case "ArrowDown":
+    case "ArrowUp":
+    case "Home":
+    case "End":
+      e.preventDefault();
+      focusItem(items[nextTreeIndex(items, current, e.key as TreeNavKey)]);
+      break;
+    case "ArrowRight": {
+      const action = rightArrowAction(items, current);
+      if (!action) return;
+      e.preventDefault();
+      if (action.kind === "focus") focusItem(items[action.index]);
+      else if (action.kind === "expand") nav.setExpanded(action.path, true);
+      break;
+    }
+    case "ArrowLeft": {
+      const action = leftArrowAction(items, current);
+      if (!action) return;
+      e.preventDefault();
+      if (action.kind === "focus") focusItem(items[action.index]);
+      else if (action.kind === "collapse") nav.setExpanded(action.path, false);
+      break;
+    }
+    case "Enter":
+    case " ": {
+      const item = items[current];
+      if (!item) return;
+      e.preventDefault();
+      if (item.type === "directory") {
+        if (!item.hasChildren) return;
+        nav.setExpanded(item.path, !item.expanded);
+      } else {
+        onSelectFile(item.path);
+      }
+      break;
+    }
+  }
 }
 
-// ===== 根目录新建输入框（状态存于 fileOps，供菜单/Ctrl+N 共享触发）=====
+// ===== 空白区域右键菜单（在工作区根目录新建/粘贴/在资源管理器中打开） =====
 const rootCreatingName = ref("");
 
-async function onEmptyMenuSelect(key: string): Promise<void> {
-  closeEmptyMenu();
-  if (!workspace.workspacePath) return;
-  if (key === "new-file" || key === "new-folder") {
-    fileOps.beginRootCreate(key === "new-file" ? "file" : "directory");
-    rootCreatingName.value = "";
-  }
+function onEmptyContextMenu(e: MouseEvent): void {
+  const root = workspace.workspacePath;
+  if (!root) return;
+  contextMenu.show(e, [
+    {
+      label: t("common.newFile"),
+      icon: FilePlus,
+      action: () => {
+        fileOps.beginRootCreate("file");
+        rootCreatingName.value = "";
+      },
+    },
+    {
+      label: t("common.newFolder"),
+      icon: FolderPlus,
+      action: () => {
+        fileOps.beginRootCreate("directory");
+        rootCreatingName.value = "";
+      },
+    },
+    { separator: true },
+    {
+      label: t("common.paste"),
+      icon: Clipboard,
+      disabled: !fileOps.hasClipboard,
+      action: async () => {
+        try {
+          await fileOps.paste(root);
+        } catch (err) {
+          dialog.alert({ message: t("common.error.pasteFailed", { error: err }), variant: "error" });
+        }
+      },
+    },
+    { separator: true },
+    {
+      label: t("common.revealInExplorer"),
+      icon: FolderOpen,
+      action: async () => {
+        try {
+          await fileOps.revealInExplorer(root);
+        } catch (err) {
+          dialog.alert({ message: t("common.error.revealFailed", { error: err }), variant: "error" });
+        }
+      },
+    },
+  ]);
 }
 
 async function submitRootCreating(): Promise<void> {
@@ -153,29 +246,24 @@ async function onOpenWorkspace(): Promise<void> {
             @blur="submitRootCreating"
           />
         </div>
-        <TreeNode
-          v-for="node in workspace.fileTree"
-          :key="node.path"
-          :node="node"
-          :selected-path="workspace.selectedFilePath"
-          :level="0"
-          @select-file="onSelectFile"
-          @preview-image="(p) => emit('preview-image', p)"
-        />
+        <div
+          class="tree-root"
+          role="tree"
+          :aria-label="$t('editor.fileTree.ariaLabel')"
+          @keydown="onTreeKeydown"
+        >
+          <TreeNode
+            v-for="node in workspace.fileTree"
+            :key="node.path"
+            :node="node"
+            :selected-path="workspace.selectedFilePath"
+            :level="0"
+            @select-file="onSelectFile"
+            @preview-image="(p) => emit('preview-image', p)"
+          />
+        </div>
       </div>
     </NScrollbar>
-
-    <!-- 空白区域右键菜单 -->
-    <NDropdown
-      placement="bottom-start"
-      trigger="manual"
-      :x="emptyMenuX"
-      :y="emptyMenuY"
-      :options="emptyMenuOptions"
-      :show="emptyMenuVisible"
-      :on-clickoutside="closeEmptyMenu"
-      @select="onEmptyMenuSelect"
-    />
   </div>
 </template>
 

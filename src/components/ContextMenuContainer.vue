@@ -5,7 +5,9 @@
  * - 全应用仅挂载一处（App.vue），通过 useContextMenuStore 驱动
  * - 边界检测：菜单超出视窗时自动翻向（右侧溢出 → 左侧，底部溢出 → 上方）
  * - 关闭时机：点击菜单项 / 点击外部 / Escape / 任意滚动 / 窗口 resize
- * - 菜单项 hover：实心紫底白字（var(--murasaki-primary) / --murasaki-primary-foreground）
+ * - 菜单项 hover / 键盘高亮：实心紫底白字（var(--murasaki-primary) / --murasaki-primary-foreground）
+ * - 键盘导航：↑↓ 移动高亮（跳过禁用项与分隔符，循环）、Home/End 首尾、Enter/Space 执行、Esc 关闭
+ *   打开时焦点移入菜单，Esc 关闭后归还给打开前的元素（点击关闭不归还，避免抢走用户的点击焦点）
  */
 import { ref, watch, nextTick, onBeforeUnmount, computed } from "vue";
 import {
@@ -21,7 +23,58 @@ const menuEl = ref<HTMLDivElement | null>(null);
 const renderX = ref(0);
 const renderY = ref(0);
 
+/** 键盘高亮项在 menu.items 中的下标；-1 表示无 */
+const activeIndex = ref(-1);
+/** 打开菜单前的焦点元素，仅 Esc 关闭时归还 */
+let triggerEl: HTMLElement | null = null;
+let restoreFocusOnClose = false;
+
 const visible = computed(() => menu.visible);
+const activeId = computed(() =>
+  activeIndex.value >= 0 ? `murasaki-context-menu-item-${activeIndex.value}` : undefined
+);
+
+/** 是否可被高亮 / 执行（非分隔符且未禁用） */
+function isSelectable(item: MenuItem | undefined): boolean {
+  return !!item && !item.separator && !item.disabled;
+}
+
+/** 从 start 起按 step 方向找第一个可选项并高亮 */
+function setActiveFrom(start: number, step: 1 | -1): void {
+  const len = menu.items.length;
+  for (let i = start; i >= 0 && i < len; i += step) {
+    if (isSelectable(menu.items[i])) {
+      activeIndex.value = i;
+      return;
+    }
+  }
+  activeIndex.value = -1;
+}
+
+/** 相对当前高亮项按 step 移动（首尾循环） */
+function moveActive(step: 1 | -1): void {
+  const len = menu.items.length;
+  if (len === 0) return;
+  const from = activeIndex.value < 0 ? (step === 1 ? -1 : 0) : activeIndex.value;
+  for (let k = 1; k <= len; k++) {
+    const i = (((from + step * k) % len) + len) % len;
+    if (isSelectable(menu.items[i])) {
+      activeIndex.value = i;
+      return;
+    }
+  }
+}
+
+/** 执行某项（键盘与鼠标共用） */
+async function activate(index: number): Promise<void> {
+  const item = menu.items[index];
+  if (!isSelectable(item)) return;
+  menu.hide();
+  await nextTick();
+  if (item.action) {
+    await item.action();
+  }
+}
 
 /** 读取菜单尺寸并应用边界检测后的坐标 */
 async function applyPosition(): Promise<void> {
@@ -61,10 +114,24 @@ watch(
   () => menu.visible,
   async (v) => {
     if (v) {
+      triggerEl = (document.activeElement as HTMLElement | null) ?? null;
+      restoreFocusOnClose = false;
+      setActiveFrom(0, 1);
       await applyPosition();
       attachListeners();
+      await nextTick();
+      menuEl.value?.focus();
     } else {
       detachListeners();
+      if (restoreFocusOnClose) {
+        const el = triggerEl;
+        if (el && document.contains(el)) {
+          el.focus({ preventScroll: true });
+        }
+      }
+      triggerEl = null;
+      restoreFocusOnClose = false;
+      activeIndex.value = -1;
     }
   }
 );
@@ -73,16 +140,47 @@ watch(
   () => [menu.x, menu.y, menu.items.length],
   async () => {
     if (menu.visible) {
+      setActiveFrom(0, 1);
       await applyPosition();
     }
   }
 );
 
 function onKeydown(e: KeyboardEvent): void {
-  if (e.key === "Escape" && menu.visible) {
-    e.preventDefault();
-    e.stopPropagation();
-    menu.hide();
+  if (!menu.visible) return;
+  switch (e.key) {
+    case "Escape":
+      e.preventDefault();
+      e.stopPropagation();
+      restoreFocusOnClose = true;
+      menu.hide();
+      break;
+    case "ArrowDown":
+      e.preventDefault();
+      e.stopPropagation();
+      moveActive(1);
+      break;
+    case "ArrowUp":
+      e.preventDefault();
+      e.stopPropagation();
+      moveActive(-1);
+      break;
+    case "Home":
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveFrom(0, 1);
+      break;
+    case "End":
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveFrom(menu.items.length - 1, -1);
+      break;
+    case "Enter":
+    case " ":
+      e.preventDefault();
+      e.stopPropagation();
+      void activate(activeIndex.value);
+      break;
   }
 }
 
@@ -101,12 +199,10 @@ function onMousedown(e: MouseEvent): void {
   }
 }
 
-async function onItemClick(item: MenuItem): Promise<void> {
-  if (item.separator || item.disabled) return;
-  menu.hide();
-  await nextTick();
-  if (item.action) {
-    await item.action();
+/** 鼠标 hover 与键盘高亮保持一致 */
+function onItemHover(index: number): void {
+  if (isSelectable(menu.items[index])) {
+    activeIndex.value = index;
   }
 }
 
@@ -121,6 +217,9 @@ onBeforeUnmount(() => {
       v-if="visible"
       ref="menuEl"
       class="murasaki-context-menu"
+      role="menu"
+      tabindex="-1"
+      :aria-activedescendant="activeId"
       :style="{ left: renderX + 'px', top: renderY + 'px' }"
       @contextmenu.prevent.stop
       @mousedown.stop
@@ -129,15 +228,21 @@ onBeforeUnmount(() => {
         <div
           v-if="item.separator"
           class="murasaki-context-menu-separator"
+          role="separator"
         ></div>
         <div
           v-else
+          :id="`murasaki-context-menu-item-${idx}`"
           class="murasaki-context-menu-item"
+          role="menuitem"
+          :aria-disabled="item.disabled || undefined"
           :class="{
             'is-disabled': item.disabled,
             'is-danger': item.danger,
+            'is-active': idx === activeIndex,
           }"
-          @click.stop="onItemClick(item)"
+          @click.stop="activate(idx)"
+          @mouseenter="onItemHover(idx)"
           @mousedown.stop
         >
           <component
@@ -173,6 +278,7 @@ onBeforeUnmount(() => {
   color: var(--murasaki-ink);
   font-family: var(--murasaki-font-ui);
   user-select: none;
+  outline: none;
   animation: murasaki-context-menu-in var(--murasaki-duration-fast)
     var(--murasaki-ease-out);
   transform-origin: top left;
@@ -200,16 +306,19 @@ onBeforeUnmount(() => {
     color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 
-.murasaki-context-menu-item:hover:not(.is-disabled) {
+.murasaki-context-menu-item:hover:not(.is-disabled),
+.murasaki-context-menu-item.is-active:not(.is-disabled) {
   background: var(--murasaki-primary);
   color: var(--murasaki-primary-foreground);
 }
 
-.murasaki-context-menu-item:hover:not(.is-disabled) .murasaki-context-menu-icon {
+.murasaki-context-menu-item:hover:not(.is-disabled) .murasaki-context-menu-icon,
+.murasaki-context-menu-item.is-active:not(.is-disabled) .murasaki-context-menu-icon {
   color: var(--murasaki-primary-foreground);
 }
 
-.murasaki-context-menu-item:hover:not(.is-disabled) .murasaki-context-menu-shortcut {
+.murasaki-context-menu-item:hover:not(.is-disabled) .murasaki-context-menu-shortcut,
+.murasaki-context-menu-item.is-active:not(.is-disabled) .murasaki-context-menu-shortcut {
   color: var(--murasaki-primary-foreground);
   opacity: 0.85;
 }
@@ -223,7 +332,8 @@ onBeforeUnmount(() => {
   color: var(--murasaki-state-error);
 }
 
-.murasaki-context-menu-item.is-danger:hover:not(.is-disabled) {
+.murasaki-context-menu-item.is-danger:hover:not(.is-disabled),
+.murasaki-context-menu-item.is-danger.is-active:not(.is-disabled) {
   background: var(--murasaki-state-error);
   color: #fff;
 }

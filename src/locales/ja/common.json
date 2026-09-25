@@ -87,7 +87,6 @@
     "copyRichTextFailed": "リッチテキストのコピーに失敗しました: {error}",
     "revealFailed": "エクスプローラーで表示できません: {error}",
     "openSettingsFailed": "設定ウィンドウを開けませんでした: {error}",
-    "createFolderFailed": "新規フォルダーの作成に失敗しました: {error}",
     "quitFailed": "終了に失敗しました: {error}",
     "docsNotPublished": "ドキュメントはまだ公開されていません",
     "saveFailed": "保存に失敗しました: {error}",

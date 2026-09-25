@@ -87,7 +87,6 @@
     "copyRichTextFailed": "复制富文本失败: {error}",
     "revealFailed": "无法在资源管理器中显示: {error}",
     "openSettingsFailed": "打开设置窗口失败: {error}",
-    "createFolderFailed": "新建文件夹失败: {error}",
     "quitFailed": "退出失败: {error}",
     "docsNotPublished": "文档暂未在线发布",
     "saveFailed": "保存失败: {error}",

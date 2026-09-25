@@ -134,7 +134,7 @@ murasaki/
 
 ### 当前版本：0.9.0（2026-09-25）
 
-**易用性提升**：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存与显示模式下拉，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘；并修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。
+**易用性提升**：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存与显示模式下拉，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘，文件树与右键菜单键盘可达；并修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。
 
 - 演示模式（#180/#181）：新增 `presentation` 模式，只挂预览不挂编辑器（铺满、无工具栏与分隔条），只读；内部 `.md` 链接开新 tab、外部链接走系统浏览器、任务列表 checkbox 只读；缩放 50%–200% 步进 10%（`Ctrl+=`/`Ctrl+-`/`Ctrl+0` + 按住 Ctrl 滚轮，`EditorPane` 的 `onWheel` 拦截 WebView2 默认缩放），持久化 `settings.presentationZoom`，缩放逻辑抽为纯函数 `src/utils/presentationZoom.ts`
 - 状态栏（#182/#187）：字数（CJK 逐字 + 拉丁分词）与字符数（不含空白）并存；新增显示模式 chip，点击弹出四项下拉（不再循环切换）、演示模式缩放 chip 可点击复位；统计逻辑抽为纯函数 `src/utils/textStats.ts`
@@ -144,6 +144,9 @@ murasaki/
 - i18n 守卫（#186）：新增 `src/locales/i18nHardcodedGuard.test.ts`，扫描 `dialog.*`/`toast.*` 调用实参中的 CJK 字符，出现即测试失败；同步修 16 处硬编码并补三语 key
 - 显示模式作用域：全局默认 + 按文件类型记忆（markdown 沿用最后一次，source-only 强制源码，不按单文件记忆）
 - P0 修复（#177/#178/#179）：批量关闭只弹一次汇总确认；打开文件三级过滤器；欢迎页/关于运行时读取版本号
+- 文件树键盘可达（#189/#190/#191）：文件树改标准 ARIA tree（`role="tree"`/`treeitem` + roving tabindex + `↑↓←→`/`Home`/`End`/`Enter`/`Space`/`Shift+F10`），扁平化与焦点纯函数在 `src/utils/treeNavigation.ts`；空白区右键统一走 `ContextMenuContainer`（`useFileOpsStore.hasClipboard` 控置灰）；右键菜单补 `↑↓`/`Home`/`End`/`Enter`/`Esc` 与焦点归还，欢迎页最近列表改真 `<button>`
+- 菜单「新建文件夹」（#188）：有工作区时改走文件树根目录内联命名，删除 `newFolderPrompt`/`newFolderPlaceholder`/`createFolderFailed` 三语 key
+- 文档对齐（#192）：CONTEXT.md 主题补 Murasaki 共五套、补键盘导航章节、打开文件无工作区改为「自动以所在目录为工作区」；spec.md Out of Scope 删已上线四项、主题改五套；README 主题列表同步
 
 ### 历史版本
 

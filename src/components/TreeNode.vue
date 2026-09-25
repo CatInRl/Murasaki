@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   Pencil,
@@ -21,6 +21,7 @@ import { useDialogStore } from "../stores/useDialogStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
 import type { MenuItem } from "../stores/useContextMenuStore";
+import { useFileTreeNav } from "../composables/useFileTreeNav";
 import type { TreeNode } from "../types";
 import {
   isMarkdownFile,
@@ -52,12 +53,29 @@ const fileOps = useFileOpsStore();
 const dialog = useDialogStore();
 const contextMenu = useContextMenuStore();
 const persistence = usePersistenceStore();
+const fileTreeNav = useFileTreeNav();
 const { t } = useI18n();
 
 /** 长条目显示方案：wrap=自动换行 / hover=省略号+悬停显示完整 */
 const wrapMode = computed(() => persistence.settings.entryOverflowMode === "wrap");
 
-const expanded = ref(false); // 默认收起所有子文件夹
+/** 目录是否有子节点（决定 aria-expanded 与 → 键是否可用） */
+const hasChildren = computed(
+  () => props.node.type === "directory" && (props.node.children?.length ?? 0) > 0
+);
+
+/** 目录展开状态（统一由 useFileTreeNav 持有，供键盘导航计算可见节点） */
+const expanded = computed(
+  () => props.node.type === "directory" && fileTreeNav.isExpanded(props.node.path)
+);
+
+/** roving tabindex：树内仅一个节点行可被 Tab 进入 */
+const isFocusTarget = computed(() => fileTreeNav.focusPath.value === props.node.path);
+
+/** 节点行 DOM：登记到导航上下文，供方向键移动焦点 */
+const rowEl = ref<HTMLElement | null>(null);
+watch(rowEl, (el) => fileTreeNav.registerRow(props.node.path, el), { flush: "post" });
+onBeforeUnmount(() => fileTreeNav.registerRow(props.node.path, null));
 
 // ===== 重命名状态 =====
 const renaming = ref(false);
@@ -70,12 +88,13 @@ const creatingName = ref("");
 
 function toggle(): void {
   if (props.node.type === "directory") {
-    expanded.value = !expanded.value;
+    fileTreeNav.setExpanded(props.node.path, !expanded.value);
   }
 }
 
 function onClick(): void {
   if (renaming.value || creating.value) return;
+  fileTreeNav.setActive(props.node.path);
   if (props.node.type === "file") {
     if (isMarkdownFile(props.node.name)) {
       emit("select-file", props.node.path);
@@ -180,7 +199,23 @@ function isSelected(): boolean {
 
 // ===== 右键菜单（数据驱动，替换原 NDropdown）=====
 function onContextMenu(e: MouseEvent): void {
+  fileTreeNav.setActive(props.node.path);
   contextMenu.show(e, buildMenuItems());
+}
+
+/** 键盘呼出右键菜单：Shift+F10 / 菜单键，锚点取节点行左下角 */
+function onRowKeydown(e: KeyboardEvent): void {
+  if (!((e.key === "F10" && e.shiftKey) || e.key === "ContextMenu")) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const rect = rowEl.value?.getBoundingClientRect();
+  contextMenu.show(
+    {
+      clientX: rect ? rect.left + 12 : 0,
+      clientY: rect ? rect.bottom - 2 : 0,
+    },
+    buildMenuItems()
+  );
 }
 
 function buildMenuItems(): MenuItem[] {
@@ -247,7 +282,7 @@ function buildMenuItems(): MenuItem[] {
     action: () => fileOps.copy(props.node.path),
   });
 
-  if (isDir && fileOps.hasClipboard()) {
+  if (isDir && fileOps.hasClipboard) {
     items.push({
       label: t("common.paste"),
       icon: Clipboard,
@@ -351,7 +386,7 @@ async function submitCreating(): Promise<void> {
     }
     // 新建后展开当前目录
     if (props.node.type === "directory") {
-      expanded.value = true;
+      fileTreeNav.setExpanded(props.node.path, true);
     }
   } catch (err) {
     dialog.alert({ message: t("common.error.createFailed", { error: err }), variant: "error" });
@@ -372,7 +407,13 @@ function cancelCreating(): void {
     <!-- 节点行：显示名称或重命名输入框 -->
     <div
       v-if="!renaming"
+      ref="rowEl"
       class="node-row"
+      role="treeitem"
+      :aria-level="level + 1"
+      :aria-selected="isSelected()"
+      :aria-expanded="hasChildren ? expanded : undefined"
+      :tabindex="isFocusTarget ? 0 : -1"
       :class="{
         'is-directory': node.type === 'directory',
         'is-file': node.type === 'file',
@@ -384,6 +425,8 @@ function cancelCreating(): void {
       }"
       :style="{ paddingLeft: level * 14 + 8 + 'px' }"
       :draggable="(node.type === 'file') || (node.type === 'directory')"
+      @focus="fileTreeNav.setActive(node.path)"
+      @keydown="onRowKeydown"
       @click="onClick"
       @contextmenu="onContextMenu"
       @dragstart="onDragStart"
@@ -564,6 +607,11 @@ export default { name: "TreeNode" };
 }
 .node-row:hover {
   background: var(--murasaki-muted);
+}
+/* 键盘焦点环（仅键盘导航时出现，鼠标点击不显示） */
+.node-row:focus-visible {
+  outline: 2px solid var(--murasaki-primary);
+  outline-offset: -2px;
 }
 .node-row.is-selected {
   background: rgba(147, 51, 234, 0.1);

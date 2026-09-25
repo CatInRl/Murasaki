@@ -87,7 +87,6 @@
     "copyRichTextFailed": "Failed to copy rich text: {error}",
     "revealFailed": "Unable to reveal in explorer: {error}",
     "openSettingsFailed": "Failed to open settings: {error}",
-    "createFolderFailed": "Failed to create folder: {error}",
     "quitFailed": "Failed to quit: {error}",
     "docsNotPublished": "Documentation is not yet published online",
     "saveFailed": "Save failed: {error}",

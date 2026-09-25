@@ -29,19 +29,19 @@ describe("useFileOpsStore", () => {
   describe("剪贴板操作", () => {
     it("初始状态无剪贴板", () => {
       const store = useFileOpsStore();
-      expect(store.hasClipboard()).toBe(false);
+      expect(store.hasClipboard).toBe(false);
     });
 
     it("cut 后 hasClipboard 返回 true", () => {
       const store = useFileOpsStore();
       store.cut("/test/workspace/a.md");
-      expect(store.hasClipboard()).toBe(true);
+      expect(store.hasClipboard).toBe(true);
     });
 
     it("copy 后 hasClipboard 返回 true", () => {
       const store = useFileOpsStore();
       store.copy("/test/workspace/a.md");
-      expect(store.hasClipboard()).toBe(true);
+      expect(store.hasClipboard).toBe(true);
     });
   });
 
@@ -280,7 +280,7 @@ describe("useFileOpsStore", () => {
         to: "/dst/a.md",
       });
       // 粘贴后剪贴板应清空
-      expect(store.hasClipboard()).toBe(false);
+      expect(store.hasClipboard).toBe(false);
     });
 
     it("源与目标同路径时清空剪贴板不调用 invoke", async () => {
@@ -289,7 +289,7 @@ describe("useFileOpsStore", () => {
       await store.paste("/dst");
 
       expect(mockedInvoke).not.toHaveBeenCalled();
-      expect(store.hasClipboard()).toBe(false);
+      expect(store.hasClipboard).toBe(false);
     });
   });
 
@@ -309,7 +309,7 @@ describe("useFileOpsStore", () => {
         to: "/dst/a.md",
       });
       // copy 模式下剪贴板保留
-      expect(store.hasClipboard()).toBe(true);
+      expect(store.hasClipboard).toBe(true);
     });
   });
 
@@ -333,11 +333,11 @@ describe("useFileOpsStore", () => {
 
       store.setConflictResolver(resolver);
       // 设置后不影响其他方法（仅在冲突时使用）
-      expect(store.hasClipboard()).toBe(false);
+      expect(store.hasClipboard).toBe(false);
 
       store.setConflictResolver(null);
       // 清除后也不影响其他方法
-      expect(store.hasClipboard()).toBe(false);
+      expect(store.hasClipboard).toBe(false);
     });
   });
 });

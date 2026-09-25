@@ -48,6 +48,7 @@
   },
   "fileTree": {
     "refresh": "刷新",
+    "ariaLabel": "文件树",
     "noWorkspace": "未打开工作区",
     "noWorkspaceDesc": "打开一个文件夹开始编辑",
     "openFolder": "打开文件夹",
@@ -177,8 +178,6 @@
   },
   "commands": {
     "needWorkspace": "请先打开一个工作区",
-    "newFolderPrompt": "请输入文件夹名称：",
-    "newFolderPlaceholder": "文件夹名称",
     "openFileFirst": "请先打开一个文件",
     "insertLinkUrlPrompt": "请输入链接地址：",
     "insertLinkTextPrompt": "请输入链接文字：",

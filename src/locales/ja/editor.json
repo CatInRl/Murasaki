@@ -48,6 +48,7 @@
   },
   "fileTree": {
     "refresh": "更新",
+    "ariaLabel": "ファイルツリー",
     "noWorkspace": "ワークスペースが開かれていません",
     "noWorkspaceDesc": "フォルダーを開くと編集を開始できます",
     "openFolder": "フォルダーを開く",
@@ -177,8 +178,6 @@
   },
   "commands": {
     "needWorkspace": "先にワークスペースを開いてください",
-    "newFolderPrompt": "フォルダー名を入力してください：",
-    "newFolderPlaceholder": "フォルダー名",
     "openFileFirst": "先にファイルを開いてください",
     "insertLinkUrlPrompt": "リンク URL を入力してください：",
     "insertLinkTextPrompt": "リンクテキストを入力してください：",

@@ -18,7 +18,7 @@
 - 打开文件夹后，左侧文件树管理所有 Markdown 文件。
 - 分屏模式：左侧源码编辑（CodeMirror 6），右侧实时预览（markdown-it + Shiki）。
 - 段落菜单提供标题、列表、代码块等格式操作的快捷键。
-- 四套 Markdown 主题（GitHub、Newsprint、Night、Academic）影响预览区渲染样式。
+- 五套 Markdown 主题（Murasaki 默认、GitHub、Newsprint、Night、Academic）影响预览区渲染样式。
 - 支持 Mermaid 图表、KaTeX 数学公式、Emoji 短代码、YAML Frontmatter。
 
 ## User Stories
@@ -79,7 +79,7 @@
 
 ### 主题与外观
 
-34. 作为一名写作者，我想在四套 Markdown 主题（GitHub、Newsprint、Night、Academic）之间切换，以便根据不同的内容或心情选择合适的渲染风格。
+34. 作为一名写作者，我想在五套 Markdown 主题（Murasaki、GitHub、Newsprint、Night、Academic）之间切换，以便根据不同的内容或心情选择合适的渲染风格。
 35. 作为一名写作者，我想代码块的语法高亮跟随 Markdown 主题变化（如暗色主题下代码也用暗色配色），以便整套视觉保持一致性。
 36. 作为一名写作者，我想在系统设置中选择应用 UI 的亮色、暗色或跟随系统模式，以便与工作环境协调。
 
@@ -230,7 +230,7 @@ RecentEntry:
 - "最近打开" → 分子菜单（文件夹、文件），各 5 项，从 `recent.json` 读取。
 - "导出 HTML…" → 弹出另存为对话框，输出独立 HTML。
 - "在文件中查找…" → 打开底部搜索面板。
-- "检查更新…" → 占位，点击提示"暂不支持"。
+- "检查更新…" → 通过 Tauri `updater` plugin 检查 GitHub Releases：有新版弹对话框显示版本号与发布说明（"立即更新 / 稍后"），已是最新则提示"已是最新版本"。启动时静默检查（可在设置关闭）。
 
 ### Markdown-it 插件链
 
@@ -328,14 +328,10 @@ markdown-it
 
 以下功能明确不在本版本的交付范围内：
 
-- **WYSIWYG 编辑模式** —— 计划中的后续支持模式，当前只做分屏模式。
 - **插件机制** —— 不提供第三方扩展能力。
 - **双链 / 反向链接 / 知识图谱** —— 不引入 Obsidian 式的笔记网络概念。
-- **PDF 导出** —— 用户可通过导出 HTML 后在浏览器中打印 PDF。真正的 PDF 导出留到后续。
-- **复制为富文本** —— 粘贴到 Word/飞书时保留格式，留到后续。
 - **Git 集成** —— 不内建版本控制功能。
-- **自动更新** —— "检查更新"菜单项为占位，实际更新逻辑后续用 Tauri updater plugin 实现。
-- **自定义 Markdown 主题导入** —— 仅使用预设四套主题。
+- **自定义 Markdown 主题导入** —— 仅使用预设五套主题。
 - **移动端 / Linux 支持** —— Windows 优先，macOS 1.0 后考虑，Linux 暂不承诺。
 - **协作编辑 / 实时同步** —— 纯本地工具，不涉及网络协作。
 - **标签 / 分类系统** —— 不引入额外的分类元数据，以文件系统目录为唯一组织方式。

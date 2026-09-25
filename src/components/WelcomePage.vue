@@ -110,23 +110,24 @@ const shortcutHints = computed(() => [
             {{ $t('editor.welcome.recentFolders') }}
           </h3>
           <ul class="recent-list">
-            <li
-              v-for="entry in recentFolders"
-              :key="entry.path"
-              class="recent-item"
-              :title="entry.path"
-              @click="emit('open-recent', entry.path, 'folder')"
-            >
-              <span class="recent-icon recent-icon-folder" aria-hidden="true">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
-                </svg>
-              </span>
-              <div class="item-text">
-                <div class="item-name">{{ basename(entry.path) }}</div>
-                <div class="item-path">{{ dirname(entry.path) }}</div>
-              </div>
-              <span class="item-arrow" aria-hidden="true">→</span>
+            <li v-for="entry in recentFolders" :key="entry.path" class="recent-item-wrap">
+              <button
+                type="button"
+                class="recent-item"
+                :title="entry.path"
+                @click="emit('open-recent', entry.path, 'folder')"
+              >
+                <span class="recent-icon recent-icon-folder" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+                  </svg>
+                </span>
+                <div class="item-text">
+                  <div class="item-name">{{ basename(entry.path) }}</div>
+                  <div class="item-path">{{ dirname(entry.path) }}</div>
+                </div>
+                <span class="item-arrow" aria-hidden="true">→</span>
+              </button>
             </li>
           </ul>
         </div>
@@ -137,21 +138,22 @@ const shortcutHints = computed(() => [
             {{ $t('editor.welcome.recentFiles') }}
           </h3>
           <ul class="recent-list">
-            <li
-              v-for="entry in recentFiles"
-              :key="entry.path"
-              class="recent-item"
-              :title="entry.path"
-              @click="emit('open-recent', entry.path, 'file')"
-            >
-              <span class="recent-icon recent-icon-file" aria-hidden="true">
-                <FileText :size="16" />
-              </span>
-              <div class="item-text">
-                <div class="item-name">{{ basename(entry.path) }}</div>
-                <div class="item-path">{{ dirname(entry.path) }}</div>
-              </div>
-              <span class="item-arrow" aria-hidden="true">→</span>
+            <li v-for="entry in recentFiles" :key="entry.path" class="recent-item-wrap">
+              <button
+                type="button"
+                class="recent-item"
+                :title="entry.path"
+                @click="emit('open-recent', entry.path, 'file')"
+              >
+                <span class="recent-icon recent-icon-file" aria-hidden="true">
+                  <FileText :size="16" />
+                </span>
+                <div class="item-text">
+                  <div class="item-name">{{ basename(entry.path) }}</div>
+                  <div class="item-path">{{ dirname(entry.path) }}</div>
+                </div>
+                <span class="item-arrow" aria-hidden="true">→</span>
+              </button>
             </li>
           </ul>
         </div>
@@ -438,14 +440,24 @@ const shortcutHints = computed(() => [
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
   padding: 10px 12px;
   border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
   border: 1px solid transparent;
+  background: transparent;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  text-align: left;
   transition:
     background var(--murasaki-duration-fast) var(--murasaki-ease),
     border-color var(--murasaki-duration-fast) var(--murasaki-ease),
     transform var(--murasaki-duration-fast) var(--murasaki-ease);
+}
+.recent-item:focus-visible {
+  outline: 2px solid var(--murasaki-primary);
+  outline-offset: -1px;
 }
 .recent-item:hover {
   background: var(--murasaki-muted);

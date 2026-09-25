@@ -48,6 +48,7 @@
   },
   "fileTree": {
     "refresh": "Refresh",
+    "ariaLabel": "File tree",
     "noWorkspace": "No workspace open",
     "noWorkspaceDesc": "Open a folder to start editing",
     "openFolder": "Open Folder",
@@ -177,8 +178,6 @@
   },
   "commands": {
     "needWorkspace": "Please open a workspace first",
-    "newFolderPrompt": "Enter a folder name:",
-    "newFolderPlaceholder": "Folder name",
     "openFileFirst": "Please open a file first",
     "insertLinkUrlPrompt": "Enter the link URL:",
     "insertLinkTextPrompt": "Enter the link text:",

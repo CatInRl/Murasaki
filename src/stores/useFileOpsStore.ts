@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { fileSystem } from "../services/fileSystem";
 import type { TreeNode } from "../types";
@@ -28,8 +28,8 @@ export interface ConflictResolver {
 export const useFileOpsStore = defineStore("fileOps", () => {
   const workspace = useWorkspaceStore();
 
-  /** 剪贴板：存放已剪切/复制的路径 */
-  let clipboard: { path: string; mode: "cut" | "copy" } | null = null;
+  /** 剪贴板：存放已剪切/复制的路径（用 ref 以便派生响应式的 hasClipboard） */
+  const clipboard = ref<{ path: string; mode: "cut" | "copy" } | null>(null);
 
   /** 文件树根目录"正在内联命名新建"状态（供文件树右键 + 菜单/Ctrl+N 共享触发） */
   const rootCreating = ref(false);
@@ -204,14 +204,14 @@ export const useFileOpsStore = defineStore("fileOps", () => {
    * 剪切：记录路径与模式
    */
   function cut(path: string): void {
-    clipboard = { path, mode: "cut" };
+    clipboard.value = { path, mode: "cut" };
   }
 
   /**
    * 复制：记录路径与模式
    */
   function copy(path: string): void {
-    clipboard = { path, mode: "copy" };
+    clipboard.value = { path, mode: "copy" };
   }
 
   /**
@@ -221,14 +221,14 @@ export const useFileOpsStore = defineStore("fileOps", () => {
    * 处理目标已存在冲突
    */
   async function paste(targetDir: string): Promise<void> {
-    if (!clipboard) return;
-    const { path: src, mode } = clipboard;
+    if (!clipboard.value) return;
+    const { path: src, mode } = clipboard.value;
     const name = basename(src);
     const targetPath = joinPath(targetDir, name);
 
     if (normalize(src) === normalize(targetPath)) {
       // 同路径无需操作
-      clipboard = null;
+      clipboard.value = null;
       return;
     }
 
@@ -248,7 +248,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
           await fileSystem.copyFile(src, newTarget);
         }
         await workspace.refreshTree();
-        if (mode === "cut") clipboard = null;
+        if (mode === "cut") clipboard.value = null;
         return;
       }
       // overwrite：先删除目标
@@ -258,7 +258,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     try {
       if (mode === "cut") {
         await fileSystem.renamePath(src, targetPath);
-        clipboard = null;
+        clipboard.value = null;
       } else {
         await fileSystem.copyFile(src, targetPath);
       }
@@ -406,10 +406,8 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     }
   }
 
-  /** 是否有可粘贴的内容 */
-  function hasClipboard(): boolean {
-    return clipboard !== null;
-  }
+  /** 是否有可粘贴的内容（响应式，供右键菜单项 disabled 状态使用） */
+  const hasClipboard = computed(() => clipboard.value !== null);
 
   return {
     setConflictResolver,
