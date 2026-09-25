@@ -1,14 +1,21 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { EditorView, keymap } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { defaultKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { paragraphKeymap } from "./useEditorCommands";
 
+let view: EditorView | null = null;
+
+afterEach(() => {
+  view?.destroy();
+  view = null;
+});
+
 function makeView(doc: string): EditorView {
   const host = document.createElement("div");
   document.body.appendChild(host);
-  return new EditorView({
+  view = new EditorView({
     state: EditorState.create({
       doc,
       extensions: [
@@ -19,6 +26,7 @@ function makeView(doc: string): EditorView {
     }),
     parent: host,
   });
+  return view;
 }
 
 function getDoc(v: EditorView): string {
