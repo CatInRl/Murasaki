@@ -132,7 +132,8 @@
         "ux-popovers-toolbars",
         "ux-panels",
         "ux-interactions-states",
-        "ux-markdown-structures"
+        "ux-markdown-structures",
+        "ux-wysiwyg-table"
       ],
       "requiredStates": [],
       "requiredInteractions": [],
@@ -167,7 +168,8 @@
       {"nodeId": "page-ux-popovers-toolbars", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-popovers-toolbars.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-popovers-toolbars-page"}},
       {"nodeId": "page-ux-panels", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-panels.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-panels-page"}},
       {"nodeId": "page-ux-interactions-states", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-interactions-states.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-interactions-states-page"}},
-      {"nodeId": "page-ux-markdown-structures", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-markdown-structures.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-markdown-structures-page"}}
+      {"nodeId": "page-ux-markdown-structures", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-markdown-structures.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-markdown-structures-page"}},
+      {"nodeId": "page-ux-wysiwyg-table", "packetType": "ExistingEditPagePacket", "status": "completed", "changedFiles": ["pages/ux-wysiwyg-table.html"], "toolCallLedger": {"todoWriteCalls": 0, "previewCalls": 0, "validationScriptCalls": 0, "helperScriptWrites": 0, "source": "page-sub-agent", "traceDigest": "ux-wysiwyg-table-page"}}
     ],
     "mainAgentPostDispatchMutations": [
       {
@@ -272,6 +274,7 @@
     {"nodeId": "page-ux-popovers-toolbars", "htmlSrc": "pages/ux-popovers-toolbars.html", "title": "UX — Popovers & Toolbars"},
     {"nodeId": "page-ux-panels", "htmlSrc": "pages/ux-panels.html", "title": "UX — Panels"},
     {"nodeId": "page-ux-interactions-states", "htmlSrc": "pages/ux-interactions-states.html", "title": "UX — Interaction States"},
-    {"nodeId": "page-ux-markdown-structures", "htmlSrc": "pages/ux-markdown-structures.html", "title": "UX — Markdown Structures"}
+    {"nodeId": "page-ux-markdown-structures", "htmlSrc": "pages/ux-markdown-structures.html", "title": "UX — Markdown Structures"},
+    {"nodeId": "page-ux-wysiwyg-table", "htmlSrc": "pages/ux-wysiwyg-table.html", "title": "UX — WYSIWYG Table Editing"}
   ]
 }
