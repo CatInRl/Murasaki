@@ -9,14 +9,12 @@ use crate::i18n;
 /// 最近打开菜单状态
 /// - folders/files: 前端推送的最近路径列表
 /// - id_to_path: 菜单项 ID → 完整路径的反查映射（每次重建菜单时刷新）
-/// - current_theme: 当前选中的主题菜单项 ID（如 "theme-murasaki"），
-///   供 build_app_menu 在菜单重建时恢复正确的 checked 状态
 /// - current_language: 当前界面语言（"zh-CN" / "en"），供 build_app_menu
-///   在菜单重建时使用对应语言的文案
-/// - current_mode: 当前编辑模式（"source" / "split" / "wysiwyg" / "presentation"），
-///   供 build_app_menu 在菜单重建时恢复 "视图 / 显示模式" 子菜单正确的勾选状态
-/// - current_sidebar_view: 当前侧栏视图（"files" / "outline"），
-///   供 build_app_menu 在菜单重建时恢复 "视图 / 文件树视图、大纲视图" 的勾选状态
+///   在菜单重建时使用对应语言的文案（全局设置，多窗口共享）
+/// - window_ui: **按窗口**存储的勾选状态（主题 / 显示模式 / 侧栏视图）。
+///   菜单是 `app.set_menu()` 的 app 级单例，多窗口共用一条菜单栏，但每个窗口
+///   期望看到自己的勾选状态；因此把状态按 window label 存下来，并在窗口获得
+///   焦点时重放（见 `apply_checked_for_window`），菜单重建时按焦点窗口读取。
 /// - shortcut_overrides: 快捷键覆盖表（commandId → accelerator），由前端
 ///   update_shortcut_labels 推送。菜单项右侧的快捷键提示据此与设置面板
 ///   中用户自定义的绑定保持一致。值为 None 表示该命令被禁用（不显示快捷键）
@@ -27,11 +25,54 @@ pub struct RecentMenuState {
     pub folders: Mutex<Vec<String>>,
     pub files: Mutex<Vec<String>>,
     pub id_to_path: Mutex<HashMap<String, String>>,
-    pub current_theme: Mutex<String>,
     pub current_language: Mutex<String>,
-    pub current_mode: Mutex<String>,
-    pub current_sidebar_view: Mutex<String>,
+    pub window_ui: Mutex<HashMap<String, WindowUiState>>,
     pub shortcut_overrides: Mutex<HashMap<String, Option<String>>>,
+}
+
+/// 单个窗口的菜单勾选状态（spec #194 / T1.5）
+#[derive(Clone)]
+pub struct WindowUiState {
+    /// 主题菜单项 ID（如 "theme-murasaki"）
+    pub theme: String,
+    /// 编辑模式（"source" / "split" / "wysiwyg" / "presentation"）
+    pub mode: String,
+    /// 侧栏视图（"files" / "outline"）
+    pub sidebar_view: String,
+}
+
+impl Default for WindowUiState {
+    fn default() -> Self {
+        Self {
+            theme: "theme-murasaki".to_string(),
+            mode: "split".to_string(),
+            sidebar_view: "files".to_string(),
+        }
+    }
+}
+
+impl RecentMenuState {
+    /// 读取某窗口的勾选状态（未登记则返回默认值）
+    pub fn ui_of(&self, label: &str) -> WindowUiState {
+        self.window_ui
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(label)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// 更新某窗口的勾选状态
+    fn update_ui<F: FnOnce(&mut WindowUiState)>(&self, label: &str, f: F) {
+        let mut map = self.window_ui.lock().unwrap_or_else(|e| e.into_inner());
+        f(map.entry(label.to_string()).or_default());
+    }
+
+    /// 清除某窗口的勾选状态（窗口销毁时调用）
+    pub fn remove_window_ui(&self, label: &str) {
+        let mut map = self.window_ui.lock().unwrap_or_else(|e| e.into_inner());
+        map.remove(label);
+    }
 }
 
 impl Default for RecentMenuState {
@@ -40,13 +81,73 @@ impl Default for RecentMenuState {
             folders: Mutex::new(Vec::new()),
             files: Mutex::new(Vec::new()),
             id_to_path: Mutex::new(HashMap::new()),
-            current_theme: Mutex::new("theme-murasaki".to_string()),
             current_language: Mutex::new(i18n::DEFAULT_LANG.to_string()),
-            current_mode: Mutex::new("split".to_string()),
-            current_sidebar_view: Mutex::new("files".to_string()),
+            window_ui: Mutex::new(HashMap::new()),
             shortcut_overrides: Mutex::new(HashMap::new()),
         }
     }
+}
+
+/// 解析当前「活动窗口」的 label：优先取获得焦点的窗口，其次回退到 `main`，
+/// 再回退到任意一个窗口。菜单事件的路由与勾选状态读取都以它为准。
+pub fn active_window_label(app: &AppHandle) -> String {
+    let windows = app.webview_windows();
+    if let Some(label) = windows
+        .iter()
+        .find(|(_, w)| w.is_focused().unwrap_or(false))
+        .map(|(label, _)| label.clone())
+    {
+        return label;
+    }
+    if windows.contains_key("main") {
+        return "main".to_string();
+    }
+    windows
+        .keys()
+        .next()
+        .cloned()
+        .unwrap_or_else(|| "main".to_string())
+}
+
+/// 侧栏视图（"files" / "outline"）→ 对应的菜单项 ID。
+///
+/// `WindowUiState.sidebar_view` 存的是视图名（前端 `sidebarView` 的取值），
+/// 而勾选 API 需要菜单项 ID，二者不同，必须统一在一处转换。
+pub fn sidebar_menu_id(view: &str) -> &'static str {
+    if view == "outline" {
+        "toggle-outline"
+    } else {
+        "toggle-sidebar"
+    }
+}
+
+/// 把某窗口的勾选状态重放到 app 级菜单（主题 / 显示模式 / 侧栏视图三组）。
+/// 由 `Focused(true)` 窗口事件调用 —— 切换焦点时菜单跟随当前窗口。
+pub fn apply_checked_for_window(app: &AppHandle, label: &str) -> Result<(), String> {
+    let state = app.state::<RecentMenuState>();
+    let ui = state.ui_of(label);
+    let menu = app.menu().ok_or("菜单未初始化")?;
+    set_checked_by_ids(
+        &menu,
+        &[
+            "theme-murasaki",
+            "theme-github",
+            "theme-newsprint",
+            "theme-night",
+            "theme-academic",
+        ],
+        &ui.theme,
+    )?;
+    set_checked_by_ids(
+        &menu,
+        &["mode-source", "mode-split", "mode-wysiwyg", "mode-presentation"],
+        &format!("mode-{}", ui.mode),
+    )?;
+    set_checked_by_ids(
+        &menu,
+        &["toggle-sidebar", "toggle-outline"],
+        sidebar_menu_id(&ui.sidebar_view),
+    )
 }
 
 /// 构建应用主菜单
@@ -149,13 +250,10 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .build()?;
 
     // === View menu（前移到「主题」之前；含显示模式 / 侧栏视图 / 状态栏 / 全屏）===
-    // 使用 CheckMenuItem 以支持勾选，勾选状态由 current_mode / current_sidebar_view 决定，
-    // 菜单重建（如 update_recent_menu）时据此恢复
-    let current_mode = state
-        .current_mode
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone();
+    // 使用 CheckMenuItem 以支持勾选。菜单是 app 级单例，多窗口共用，
+    // 因此勾选状态取自**当前活动窗口**的 WindowUiState（spec #194 / T1.5）。
+    let ui = state.ui_of(&active_window_label(app));
+    let current_mode = ui.mode.clone();
     let mode_source = CheckMenuItemBuilder::new(mt("view.modeSource"))
         .id("mode-source")
         .checked(current_mode == "source")
@@ -181,11 +279,7 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .build()?;
 
     // 侧栏视图（两项互斥勾选）：ID 与快捷键命令 ID 一致，菜单事件直接复用命令分发
-    let current_sidebar_view = state
-        .current_sidebar_view
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone();
+    let current_sidebar_view = ui.sidebar_view.clone();
     let view_files = CheckMenuItemBuilder::new(i18n::with_accel(
         mt("view.filesView"),
         &accel("toggle-sidebar", "CmdOrCtrl+Shift+E"),
@@ -218,13 +312,9 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .build()?;
 
     // === Theme menu ===
-    // 使用 CheckMenuItem 以支持勾选状态，checked 由 current_theme 决定
+    // 使用 CheckMenuItem 以支持勾选状态，checked 由活动窗口的 theme 决定
     // 菜单重建（如 update_recent_menu）时据此恢复正确的勾选项
-    let current_theme = state
-        .current_theme
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone();
+    let current_theme = ui.theme.clone();
     let theme_murasaki = CheckMenuItemBuilder::new("Murasaki")
         .id("theme-murasaki")
         .checked(current_theme == "theme-murasaki")
@@ -386,18 +476,26 @@ fn set_checked_by_ids(
     Ok(())
 }
 
+/// 该窗口是否就是当前活动窗口（决定是否立即改动共享菜单栏）
+fn is_active_window(app: &AppHandle, label: &str) -> bool {
+    active_window_label(app) == label
+}
+
 /// 前端调用：设置主题菜单的 checked 状态
-/// 同时更新 current_theme，以便后续菜单重建（如 update_recent_menu）时恢复正确勾选
+/// 状态按调用窗口存储，供窗口获得焦点时重放与菜单重建时恢复正确勾选
 #[tauri::command]
 pub fn set_theme_checked(
+    window: tauri::WebviewWindow,
     app: AppHandle,
     state: tauri::State<'_, RecentMenuState>,
     theme_id: String,
 ) -> Result<(), String> {
-    // 先更新存储的主题 ID，供下次 build_app_menu 使用
-    {
-        let mut current = state.current_theme.lock().map_err(|e| e.to_string())?;
-        *current = theme_id.clone();
+    let label = window.label().to_string();
+    state.update_ui(&label, |ui| ui.theme = theme_id.clone());
+
+    // 非活动窗口的初始化同步不应抢走菜单显示（焦点切换时会重放）
+    if !is_active_window(&app, &label) {
+        return Ok(());
     }
 
     let theme_ids = [
@@ -412,22 +510,24 @@ pub fn set_theme_checked(
 }
 
 /// 前端调用：设置 "视图 / 显示模式" 子菜单的互斥勾选状态
-/// 同时更新 current_mode，以便后续菜单重建（如 update_recent_menu）时恢复正确勾选
 #[tauri::command]
 pub fn set_mode_checked(
+    window: tauri::WebviewWindow,
     app: AppHandle,
     state: tauri::State<'_, RecentMenuState>,
     mode_id: String,
 ) -> Result<(), String> {
-    // 从 "mode-source" 解析出 "source"，供 current_mode 存储
+    // 从 "mode-source" 解析出 "source" 存储
     let mode = mode_id
         .strip_prefix("mode-")
         .map(|s| s.to_string())
         .unwrap_or_else(|| mode_id.clone());
 
-    {
-        let mut current = state.current_mode.lock().map_err(|e| e.to_string())?;
-        *current = mode;
+    let label = window.label().to_string();
+    state.update_ui(&label, |ui| ui.mode = mode);
+
+    if !is_active_window(&app, &label) {
+        return Ok(());
     }
 
     let mode_ids = ["mode-source", "mode-split", "mode-wysiwyg", "mode-presentation"];
@@ -436,19 +536,18 @@ pub fn set_mode_checked(
 }
 
 /// 前端调用：设置 "视图 / 文件树视图、大纲视图" 的互斥勾选状态
-/// 同时更新 current_sidebar_view，以便后续菜单重建时恢复正确勾选
 #[tauri::command]
 pub fn set_sidebar_view_checked(
+    window: tauri::WebviewWindow,
     app: AppHandle,
     state: tauri::State<'_, RecentMenuState>,
     view_id: String,
 ) -> Result<(), String> {
-    {
-        let mut current = state
-            .current_sidebar_view
-            .lock()
-            .map_err(|e| e.to_string())?;
-        *current = view_id.clone();
+    let label = window.label().to_string();
+    state.update_ui(&label, |ui| ui.sidebar_view = view_id.clone());
+
+    if !is_active_window(&app, &label) {
+        return Ok(());
     }
 
     let view_ids = ["toggle-sidebar", "toggle-outline"];
@@ -524,4 +623,42 @@ pub fn resolve_recent_entry(app: &AppHandle, menu_id: &str) -> Option<(String, R
         RecentKind::File
     };
     Some((path, kind))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sidebar_menu_id_maps_view_names() {
+        assert_eq!(sidebar_menu_id("files"), "toggle-sidebar");
+        assert_eq!(sidebar_menu_id("outline"), "toggle-outline");
+        // 未登记 / 未知取值回退到文件树，避免两组勾选全空
+        assert_eq!(sidebar_menu_id(""), "toggle-sidebar");
+        assert_eq!(sidebar_menu_id("unknown"), "toggle-sidebar");
+    }
+
+    #[test]
+    fn window_ui_is_scoped_per_window() {
+        let state = RecentMenuState::default();
+        state.update_ui("win-1", |ui| ui.mode = "source".to_string());
+        state.update_ui("win-2", |ui| ui.mode = "wysiwyg".to_string());
+
+        assert_eq!(state.ui_of("win-1").mode, "source");
+        assert_eq!(state.ui_of("win-2").mode, "wysiwyg");
+        // 未登记的窗口返回默认值（不与其他窗口串味）
+        assert_eq!(state.ui_of("win-3").mode, "split");
+    }
+
+    #[test]
+    fn remove_window_ui_only_clears_that_window() {
+        let state = RecentMenuState::default();
+        state.update_ui("win-1", |ui| ui.theme = "theme-night".to_string());
+        state.update_ui("win-2", |ui| ui.theme = "theme-github".to_string());
+
+        state.remove_window_ui("win-1");
+
+        assert_eq!(state.ui_of("win-1").theme, "theme-murasaki");
+        assert_eq!(state.ui_of("win-2").theme, "theme-github");
+    }
 }

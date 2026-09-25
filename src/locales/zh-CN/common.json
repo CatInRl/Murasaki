@@ -41,6 +41,7 @@
   "checkUpdates": "检查更新…",
   "quit": "退出",
   "openFileTitle": "打开文件",
+  "openFolderTitle": "选择工作区文件夹",
   "exportHtmlTitle": "导出 HTML",
   "exportPdfTitle": "导出 PDF",
   "exportPdfSuccess": "已导出 PDF",

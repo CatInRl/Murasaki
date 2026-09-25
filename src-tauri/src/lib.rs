@@ -17,6 +17,7 @@ use commands::pdf;
 use commands::search;
 use commands::settings;
 use commands::watcher::{self, WatcherState};
+use commands::windows::{self, WindowRegistry};
 
 /// E2E 测试模式标志：msedgedriver 启动 murasaki.exe 时会附加 `--remote-debugging-port=PORT`
 /// 检测到该参数即表示运行在 tauri-driver E2E 环境下
@@ -31,19 +32,13 @@ fn is_e2e_mode() -> bool {
             .unwrap_or(false)
 }
 
-/// 通知前端打开命令行传入的文件/文件夹路径（issue #92 / #113）。
-/// - 文件：在 tab 中打开
-/// - 文件夹：设为工作区
-/// 仅用于第二实例（应用已在运行时）场景，通过 `open-from-argv` 事件推送给前端；
-/// 首次启动场景由 [`commands::launch::take_pending_open_path`] 拉取，避免竞态。
-fn emit_open_path(app: &tauri::AppHandle, path: &str) {
-    if let Some(window) = app.get_webview_window("main") {
-        let payload = serde_json::json!({
-            "path": path,
-            "type": launch::classify_path(std::path::Path::new(path)),
-        });
-        let _ = window.emit("open-from-argv", payload);
-    }
+/// 取当前活动窗口（菜单事件与外部入口的路由目标）。
+///
+/// 多窗口后不再固定发往 `main`：菜单栏是 app 级共享的，事件应落在用户正在用的窗口。
+/// 详见 [`commands::menu::active_window_label`]。
+fn active_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
+    let label = menu::active_window_label(app);
+    app.get_webview_window(&label)
 }
 
 /// 解析 `--user-data-dir=PATH` 参数（msedgedriver 会传给 murasaki）
@@ -369,18 +364,22 @@ pub fn run() {
     // single-instance 插件会与 tauri-driver 的启动握手冲突导致进程立即退出
     if !e2e {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            // 单实例回调：第二个实例启动时，聚焦现有窗口
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
-            // 若 argv 携带文件/文件夹路径（非 --flag 参数），通知前端打开
-            // argv[0] 是 exe 路径，argv[1] 可能是用户拖入、命令行传入、或双击 .md 文件关联传入的路径
-            // 文件 → 打开为 tab；文件夹 → 设为工作区（issue #92 / #113）
+            // 单实例回调：第二个实例启动时（双击文件关联 / 拖到任务栏图标 / 命令行传参）
+            // 一律**新开窗口**（决策 ①/②）—— 文件开新窗口且不带工作区，
+            // 文件夹命中已有窗口则聚焦（多工作区 = 多窗口）。
+            // argv[0] 是 exe 路径，argv[1] 可能是用户拖入、命令行传入、或双击 .md 传入的路径
             if let Some(arg) = argv.get(1) {
                 if !arg.starts_with("--") && !arg.is_empty() {
-                    emit_open_path(app, &arg);
+                    match windows::open_path_in_new_window_impl(app, arg) {
+                        Ok(_) => return,
+                        Err(e) => eprintln!("[murasaki] 新窗口打开路径失败: {}", e),
+                    }
                 }
+            }
+            // 无路径参数（用户又点了一次图标）：聚焦现有窗口，不新建
+            if let Some(window) = active_window(app) {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
             }
         }));
     }
@@ -391,6 +390,7 @@ pub fn run() {
         .manage(RecentMenuState::default())
         .manage(PendingOpenState::default())
         .manage(ClosingState::default())
+        .manage(WindowRegistry::default())
         .invoke_handler(tauri::generate_handler![
             files::list_tree,
             files::create_file,
@@ -406,6 +406,10 @@ pub fn run() {
             files::reveal_in_explorer,
             launch::take_pending_open_path,
             lifecycle::exit_app,
+            lifecycle::quit_app,
+            windows::open_path_in_new_window,
+            windows::set_window_workspace,
+            windows::close_window,
             search::search_workspace,
             search::cancel_search,
             outline::parse_outline,
@@ -496,19 +500,36 @@ pub fn run() {
             // 不再用"延时 emit"：前端挂载 + 设置/工作区/tab 恢复耗时不确定，
             // 事件可能在监听器注册前发出而丢失（冷启动只恢复旧 tabs，双击的文件没打开）。
             if let Some(path) = launch::first_non_flag_arg() {
-                app.state::<PendingOpenState>().set(path);
+                app.state::<PendingOpenState>().set_for("main", path);
             }
 
             Ok(())
         })
-        .on_window_event(|window, event| {
-            // 退出拦截（ADR-0017）：主窗口关闭先落盘再真正退出。
-            // 仅拦主窗口 —— 设置窗口关闭不应退出应用。
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        .on_window_event(|window, event| match event {
+            // 退出拦截（ADR-0017 / spec #194）：任何编辑器窗口关闭都先落盘再销毁。
+            // 多窗口后不再有「主窗口」特殊语义 —— 每个窗口各自拦截、各自落盘，
+            // 关掉最后一个窗口时由 windows::exit_if_no_other_windows 退出应用。
+            tauri::WindowEvent::CloseRequested { api, .. } => {
                 if lifecycle::intercept_close_request(window) {
                     api.prevent_close();
                 }
             }
+            // 焦点切换：把该窗口的主题/显示模式/侧栏视图勾选重放到共享菜单栏
+            tauri::WindowEvent::Focused(true) => {
+                let app = window.app_handle();
+                if let Err(e) = menu::apply_checked_for_window(app, window.label()) {
+                    eprintln!("[murasaki] 重放菜单勾选状态失败: {}", e);
+                }
+            }
+            // 窗口销毁：清理该窗口的全局残留；若已无其它窗口则退出（兜底 ——
+            // 前端落盘失败时会直接 destroy() 绕过 close_window）
+            tauri::WindowEvent::Destroyed => {
+                let app = window.app_handle();
+                let label = window.label().to_string();
+                windows::cleanup_window_state(app, &label);
+                windows::exit_if_no_other_windows(app, &label);
+            }
+            _ => {}
         })
         .on_menu_event(|app, event| {
             let menu_id = event.id().as_ref();
@@ -516,27 +537,31 @@ pub fn run() {
             // 优先处理 "最近打开" 子菜单条目
             // 直接携带类型，避免前端反查 recentEntries 时遇到竞态
             if let Some((path, kind)) = menu::resolve_recent_entry(app, menu_id) {
-                if let Some(win) = app.get_webview_window("main") {
+                if let Some(win) = active_window(app) {
                     let payload = serde_json::json!({
                         "path": path,
                         "type": kind.as_str(),
                     });
-                    let _ = win.emit("recent-open", payload);
+                    // 定向到活动窗口：`emit` 是广播，多窗口下会让所有窗口都去打开该路径
+                    let _ = win.emit_to(win.label(), "recent-open", payload);
                 }
                 return;
             }
 
-            // 设置菜单：打开独立的设置窗口（Tauri 多窗口形态，见 ADR-0009）
+            // 设置菜单：在当前活动窗口内路由到设置页（见 ADR-0009）
             if menu_id == "settings" {
                 if let Err(e) = settings::show_settings_window(app) {
-                    eprintln!("[murasaki] 打开设置窗口失败: {}", e);
+                    eprintln!("[murasaki] 打开设置页失败: {}", e);
                 }
                 return;
             }
 
-            // 其他菜单事件：透传给前端
-            if let Some(win) = app.get_webview_window("main") {
-                let _ = win.emit("menu-event", menu_id);
+            // 其他菜单事件：透传给**当前活动窗口**（菜单栏 app 级共享，
+            // 事件必须落在用户正在用的窗口，见 spec #194 / T1.5）。
+            // 必须用 `emit_to` —— `emit` 是广播，多窗口下每个窗口都会执行同一命令
+            // （例如两个窗口各新建一个文件）。
+            if let Some(win) = active_window(app) {
+                let _ = win.emit_to(win.label(), "menu-event", menu_id);
             }
         })
         .run(tauri::generate_context!())

@@ -41,6 +41,7 @@
   "checkUpdates": "Check for Updates…",
   "quit": "Quit",
   "openFileTitle": "Open File",
+  "openFolderTitle": "Select Workspace Folder",
   "exportHtmlTitle": "Export HTML",
   "exportPdfTitle": "Export PDF",
   "exportPdfSuccess": "PDF exported",

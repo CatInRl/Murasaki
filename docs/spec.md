@@ -153,6 +153,20 @@
 **LaTeX/Mermaid 相关**
 - LaTeX 解析和 Mermaid 解析均在前端完成（KaTeX 和 Mermaid.js 是 JS 库），后端不涉及。
 
+### 多窗口（0.10.0）
+
+**一个窗口 = 一个工作区 = 一份独立前端会话**，多工作区靠多窗口并行实现（完整决策见 [ADR-0018](adr/0018-multi-window-multi-workspace.md)）。
+
+- **入口分流**：外部入口（双击 `.md` 文件关联 / 拖到任务栏图标 / 命令行传文件）→ 新开窗口且**不带工作区**、不恢复上次工作区与标签；「打开文件夹」→ 总是新开窗口（同目录已在某窗口打开则聚焦那个窗口）；应用内 `Ctrl+O` 与「最近打开 → 文件」在当前窗口开标签，不清工作区。
+- **不再自动设工作区**：打开单个文件不会把其所在目录设为工作区。
+- **路径传递用拉取模型**：新窗口创建时把路径写入该窗口的待打开槽，前端初始化完成后 `take_pending_open_path` 主动取走（延时 emit 会在监听器注册前丢失，见 issue #113）。
+- **进程级状态按窗口分片**：窗口↔工作区注册表（[commands/windows.rs](../src-tauri/src/commands/windows.rs)）、每窗口一个文件 watcher、每窗口关闭状态、待打开路径按 label 分槽、菜单勾选状态按窗口存储并在焦点切换时重放。
+- **事件必须定向发送**：Tauri 的 `emit` 是广播，`app-close-requested` / `menu-event` / `recent-open` / `navigate` 一律 `emit_to(label)`。
+- **持久化**：`settings.json` / `recent.json` 全局共享；`tabs.json` 主窗口 key `state`、其它窗口 `state:<label>`，仅主窗口在启动时恢复；`lastWorkspacePath` 只由主窗口写回。
+- **关闭语义**：所有窗口各自静默落盘，关掉最后一个窗口才退出应用（菜单「退出」走 `quit_app` 通知所有窗口）。
+
+**Out of Scope**：单窗口内多根工作区（多 root 侧栏）、窗口间拖拽标签、窗口布局持久化、`settings.json` 按窗口隔离。
+
 ### 前端模块（Vue）
 
 **Pinia Store 分工**

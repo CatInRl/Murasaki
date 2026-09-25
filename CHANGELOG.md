@@ -4,6 +4,29 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 未发布
+
+本版本把应用从「单窗口 + 单工作区」改造为「多窗口 = 多工作区」：外部入口（双击文件、命令行传文件、拖到任务栏）一律新开窗口且不恢复上次工作区，「打开文件夹」总是新开窗口（同目录聚焦已有窗口），每个窗口各自落盘、关掉最后一个窗口才退出应用；同时去掉「打开单个文件自动把所在目录设为工作区」的隐式副作用。
+
+### Added
+
+- **多窗口多工作区（#194）**：一个窗口 = 一个工作区 = 一份独立前端会话。新增 `src-tauri/src/commands/windows.rs`（`WindowRegistry` 窗口↔工作区注册表、`open_path_in_new_window` / `set_window_workspace` / `close_window` 命令、`exit_if_no_other_windows`）与 `src/utils/windowContext.ts`（窗口 label 与 tabs key 派生）。Rust 侧四个进程级单例全部按窗口 label 分片：`WatcherState` 每窗口一个 watcher（不再互相顶替）、`PendingOpenState` 路径按目标窗口分槽、`ClosingState` 按窗口各自只进入一次、`RecentMenuState` 勾选状态拆到 `window_ui`。详见 [ADR-0018](docs/adr/0018-multi-window-multi-workspace.md)。
+- **菜单按焦点窗口跟随（#194）**：app 级共享菜单栏的勾选状态改为按窗口存储，窗口获得焦点时用 `apply_checked_for_window` 重放主题 / 显示模式 / 侧栏视图三组勾选；`set_theme_checked` / `set_mode_checked` / `set_sidebar_view_checked` 携带窗口 label 存储，非活动窗口的初始化同步不抢菜单显示。
+- **外部入口新开窗口（#194）**：single-instance 回调与冷启动 argv 路径统一走「新窗口 + `take_pending_open_path` 拉取」；带路径启动的窗口跳过上次工作区与标签恢复（决策 ④）。
+
+### Changed
+
+- **「打开文件夹」总是新开窗口（#194）**：菜单 / 工具栏 / 文件树 / 最近文件夹四个入口统一走 `open_path_in_new_window`；同一文件夹已在某窗口打开时聚焦那个窗口，不重复开窗（避免同目录双 watcher 与文件操作冲突）。
+- **打开单个文件不再自动设工作区（#194）**：删除 `openFile()` 里「无工作区时以文件所在目录为工作区」的隐式行为。应用内 `Ctrl+O` 与最近文件仍在当前窗口开标签，且不清掉当前工作区。
+- **关闭窗口语义去主窗口化（#194）**：所有编辑器窗口都拦截 `CloseRequested` 并各自静默落盘，关闭任一窗口只关该窗口；关掉最后一个窗口才退出应用。菜单「退出」改为 `quit_app`（通知所有窗口各自落盘），`useExitFlush` 改调 `close_window`。
+- **按窗口事件改定向发送**：`app-close-requested` / `menu-event` / `recent-open` / `navigate` 由广播改为 `emit_to(label)`——Tauri 的 `emit` 是广播，多窗口下会让所有窗口一起关窗或重复执行同一命令。
+- **持久化按窗口分 key**：`tabs.json` 主窗口沿用旧 key `state`（老用户零迁移），其它窗口用 `state:<label>`；`settings.json` / `recent.json` 保持全局共享；`lastWorkspacePath` 只由主窗口写回，避免多窗口互相覆盖。
+- **删除推送型启动监听器**：移除 `single-instance-open-workspace` 与 `open-from-argv` 两个前端监听器（新窗口的家还没到，推送事件必然丢失），统一改拉取。
+
+### Fixed
+
+- **侧栏视图菜单勾选在窗口切换后全空（#194）**：`WindowUiState.sidebar_view` 存的是视图名（`files` / `outline`），而勾选 API 需要菜单项 ID（`toggle-sidebar` / `toggle-outline`），焦点重放时比较对象不一致导致两组勾选都不勾。新增 `sidebar_menu_id()` 统一转换并补单测。
+
 ## [0.9.0] - 2026-09-25
 
 本版本为易用性提升：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘，文件树与右键菜单键盘可达、外部结构变更自动刷新；并修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。

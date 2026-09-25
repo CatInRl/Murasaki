@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { setLocale } from "../i18n";
 import { READING_FONT_PRESETS, type ReadingFontPreset, type AppLocale } from "../types";
 import { toMenuAccelerators } from "../shortcuts/shortcutsLogic";
+import { isMainWindow } from "../utils/windowContext";
 
 /** useAppLifecycle 依赖的 store/状态切片 */
 export interface AppLifecycleDeps {
@@ -45,7 +46,6 @@ export interface AppLifecycleDeps {
   settingsVisible: Ref<boolean>;
   handleMenuEvent(menuId: string): Promise<void>;
   onOpenRecent(path: string, type: "file" | "folder"): Promise<void>;
-  onOpenPath(path: string, type: "file" | "folder"): Promise<void>;
 }
 
 /**
@@ -70,7 +70,6 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
     settingsVisible,
     handleMenuEvent,
     onOpenRecent,
-    onOpenPath,
   } = deps;
 
   const initialized = ref(false);
@@ -126,12 +125,21 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
     }
   );
 
-  // 5. 工作区变化时保存 + 清空所有提议（gated）
+  // 5. 工作区变化时上报窗口注册表 + 保存 + 清空所有提议（gated）
   watch(
     () => workspace.workspacePath,
     (p) => {
+      // 上报「窗口 → 工作区」给 Rust（多窗口同目录聚焦 / 窗口销毁清理，spec #194）
+      // 不 gated：窗口恢复工作区时也必须登记，否则重复打开同一文件夹不会聚焦本窗口
+      void invoke("set_window_workspace", { path: p }).catch((err: unknown) =>
+        console.warn("上报窗口工作区失败:", err)
+      );
       if (initialized.value) {
-        void persistence.updateSettings({ lastWorkspacePath: p });
+        // lastWorkspacePath 是「上次会话」的全局记忆，只由主窗口写回 ——
+        // 否则多窗口会互相覆盖（spec #194 决策 ④ / T2.1）
+        if (isMainWindow()) {
+          void persistence.updateSettings({ lastWorkspacePath: p });
+        }
         // 工作区切换时清空所有提议（包括新文件提议）
         // 避免上一个工作区的提议残留导致写入到错误的工作区
         proposalsStore.clearAllForWorkspace();
@@ -158,26 +166,10 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
       void onOpenRecent(path, type);
     });
 
-    const unlistenSingleInstance = await listen<string>(
-      "single-instance-open-workspace",
-      (event) => {
-        const workspacePath = event.payload;
-        if (workspacePath) {
-          void workspace.openWorkspace(workspacePath);
-        }
-      }
-    );
-
-    // 打开文件/文件夹路径（issue #92 / #113）
-    const unlistenOpenFromArgv = await listen<{
-      path: string;
-      type: "file" | "folder";
-    }>("open-from-argv", (event) => {
-      const { path, type } = event.payload;
-      if (path) {
-        void onOpenPath(path, type === "folder" ? "folder" : "file");
-      }
-    });
+    // 注意：不再监听 `single-instance-open-workspace` 与 `open-from-argv`。
+    // 多窗口后外部入口（双击文件 / 拖到任务栏 / 命令行传参）由 Rust 直接**新建窗口**，
+    // 新窗口的路径统一走 `take_pending_open_path` 拉取模型（spec #194 决策 ①/④），
+    // 推送事件在「窗口还没到家」时必然丢失，保留只会留下误导性的单窗口语义。
 
     const unlistenSettingsSaved = await listen<unknown>(
       "settings://saved",
@@ -217,8 +209,6 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
     return () => {
       unlistenMenu();
       unlistenRecentOpen();
-      unlistenSingleInstance();
-      unlistenOpenFromArgv();
       unlistenSettingsSaved();
       unlistenNavigate();
     };

@@ -1,4 +1,5 @@
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import { basename } from "../utils/path";
 import { exportHtml } from "./useHtmlExport";
 import { fileSystem } from "../services/fileSystem";
@@ -19,8 +20,9 @@ export interface FileActionsDeps {
   workspace: {
     workspacePath: string | null;
     selectFile: (path: string) => void;
+    /** 选目录并**在新窗口**打开为工作区（spec #194 决策 ②） */
     openFolderDialog: () => Promise<unknown>;
-    openWorkspace: (path: string) => Promise<unknown>;
+    /** 有工作区时新建文件落文件树根目录（内联命名） */
     hasWorkspace: boolean;
   };
   /** 文件操作 store 切片（含文件树根目录内联新建状态） */
@@ -55,22 +57,18 @@ export function useFileActions(deps: FileActionsDeps) {
   const { tabsStore, workspace, fileOps, persistence, dialog, toast, activeTab, currentTheme } = deps;
   const t = i18n.global.t.bind(i18n.global);
 
+  /**
+   * 在当前窗口打开文件为 tab。
+   *
+   * 注意：**不**自动把文件所在目录设为工作区（多窗口改造，spec #194 决策 ①）。
+   * 旧行为会让「打开单个文件」污染当前窗口的工作区；现在无工作区时文件树保持空，
+   * 需要工作区请走「打开文件夹」（会在新窗口中打开）。
+   */
   async function openFile(path: string): Promise<void> {
     try {
       await tabsStore.openFile(path);
       workspace.selectFile(path);
       await persistence.addRecent(path, "file");
-      // 打开文件时若尚无工作区，自动以文件所在目录为工作区（issue #96/#113）
-      // 这样左侧文件树能显示该文件，且启动时能恢复 lastWorkspacePath
-      if (!workspace.hasWorkspace) {
-        const dir = path.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
-        if (dir) {
-          // 后台打开，不阻塞文件打开（失败仅告警，不影响打开文件）
-          void workspace.openWorkspace(dir).catch((err: unknown) => {
-            console.warn("自动打开文件所在目录为工作区失败:", err);
-          });
-        }
-      }
     } catch (err) {
       console.error("打开文件失败:", err);
       const exists = await fileSystem.exists(path);
@@ -221,7 +219,14 @@ export function useFileActions(deps: FileActionsDeps) {
     }
   }
 
+  /** 把路径交给新窗口打开（目录命中已有窗口时 Rust 侧会聚焦，不重复开窗） */
+  async function openPathInNewWindow(path: string): Promise<void> {
+    await invoke("open_path_in_new_window", { path });
+  }
+
   function onOpenFolder(): void {
+    // 多工作区 = 多窗口（spec #194 决策 ②）：打开文件夹一律新开窗口，
+    // 统一由 workspace store 实现（选目录 + open_path_in_new_window）
     void workspace.openFolderDialog();
   }
 
@@ -231,8 +236,10 @@ export function useFileActions(deps: FileActionsDeps) {
 
   async function onOpenRecent(path: string, type: "file" | "folder"): Promise<void> {
     if (type === "folder") {
+      // 「打开文件夹 = 开工作区 = 新窗口」（spec #194 决策 ②）；
+      // 已在某窗口打开时 Rust 侧会聚焦那个窗口
       try {
-        await workspace.openWorkspace(path);
+        await openPathInNewWindow(path);
       } catch (err) {
         console.error("打开工作区失败:", err);
         const exists = await fileSystem.exists(path);

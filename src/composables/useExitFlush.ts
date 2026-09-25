@@ -1,10 +1,14 @@
 /**
- * 退出前落盘（issue #185 / ADR-0017）
+ * 关闭前落盘（issue #185 / ADR-0017；多窗口见 spec #194）
  *
- * 关闭主窗口时 Rust 侧拦截 CloseRequested 并发来 `app-close-requested`，
- * 前端在此把未保存改动静默落盘（不弹对话框），完成后调用 `exit_app` 真正退出：
+ * 关闭窗口时 Rust 侧拦截 CloseRequested 并向**该窗口**发来 `app-close-requested`，
+ * 前端在此把本窗口的未保存改动静默落盘（不弹对话框），完成后调用 `close_window`
+ * 真正销毁本窗口：
  * - 已命名且 dirty 的 tab → 写草稿（沿用 ADR-0001 草稿恢复机制）
- * - 全部 tab → 刷新 tabs.json（未命名 tab 的内容只能靠这里保留）
+ * - 全部 tab → 刷新本窗口的 tabs.json 槽位（未命名 tab 的内容只能靠这里保留）
+ *
+ * 关掉最后一个窗口时由 Rust 侧 `exit_if_no_other_windows` 退出应用，
+ * 因此「关闭窗口」与「退出应用」不再需要前端区分。
  *
  * 任何一步失败都不能让窗口关不掉：落盘异常只记日志，invoke 失败再兜底销毁窗口。
  */
@@ -81,10 +85,10 @@ export function useExitFlush(tabsStore: ExitFlushStoreSlice) {
       console.error("[Murasaki] 退出前落盘异常:", err);
     } finally {
       try {
-        await invoke("exit_app");
+        await invoke("close_window");
       } catch (err) {
-        // 兜底：Rust 侧未能退出时强制销毁主窗口，保证窗口关得掉
-        console.error("[Murasaki] exit_app 失败，强制销毁窗口:", err);
+        // 兜底：Rust 侧未能关闭时强制销毁本窗口，保证窗口关得掉
+        console.error("[Murasaki] close_window 失败，强制销毁窗口:", err);
         void getCurrentWebviewWindow().destroy().catch(() => {});
       }
     }

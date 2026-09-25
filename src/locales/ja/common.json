@@ -41,6 +41,7 @@
   "checkUpdates": "更新を確認…",
   "quit": "終了",
   "openFileTitle": "ファイルを開く",
+  "openFolderTitle": "ワークスペースフォルダを選択",
   "exportHtmlTitle": "HTML をエクスポート",
   "exportPdfTitle": "PDF をエクスポート",
   "exportPdfSuccess": "PDF をエクスポートしました",

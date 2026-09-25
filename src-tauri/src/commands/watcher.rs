@@ -1,15 +1,35 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use notify::event::ModifyKind;
 use notify::{Watcher, RecursiveMode, EventKind, RecommendedWatcher};
 
-/// 文件监听器状态：保存已激活的 watcher 实例
+/// 某窗口的监听器实例与它监听的路径
+struct WatcherEntry {
+    /// 仅作 RAII 持有：drop 本结构即停止监听，故字段本身不需要读取
+    #[allow(dead_code)]
+    watcher: RecommendedWatcher,
+    path: String,
+}
+
+/// 文件监听器状态：保存各窗口已激活的 watcher 实例（多窗口改造见 spec #194 / T1.2）。
+///
+/// 按 **window label** 隔离：每个窗口最多一个监听器（对应其工作区）。
+/// 旧实现是单实例 + 路径集合，第二个工作区调用 `start_watching` 会把第一个
+/// watcher 顶掉，导致先打开的窗口失去外部变更监听。
+#[derive(Default)]
 pub struct WatcherState {
-    pub watcher: Mutex<Option<RecommendedWatcher>>,
-    pub watched_paths: Mutex<HashSet<String>>,
+    watchers: Mutex<HashMap<String, WatcherEntry>>,
+}
+
+impl WatcherState {
+    /// 移除并销毁某窗口的监听器（窗口销毁 / 关闭工作区时调用）
+    pub fn remove_window(&self, label: &str) {
+        let mut map = self.watchers.lock().unwrap_or_else(|e| e.into_inner());
+        map.remove(label);
+    }
 }
 
 /// `file-changed` 事件负载。
@@ -35,20 +55,15 @@ fn classify_event(kind: &EventKind) -> Option<&'static str> {
     }
 }
 
-impl Default for WatcherState {
-    fn default() -> Self {
-        Self {
-            watcher: Mutex::new(None),
-            watched_paths: Mutex::new(HashSet::new()),
-        }
-    }
-}
-
-/// 启动工作区文件监听
+/// 启动本窗口的工作区文件监听
 /// 当文件被外部修改时，通过 Tauri 事件 `file-changed` 通知前端
 /// 事件 payload 为变更文件的绝对路径
+///
+/// 监听器按 window label 存放，**不会影响其它窗口**。同一窗口重复调用同一路径
+/// 直接返回（幂等）；换路径时旧监听器随 drop 自动停止。
 #[tauri::command]
 pub fn start_watching(
+    window: WebviewWindow,
     app: AppHandle,
     path: String,
 ) -> Result<(), String> {
@@ -58,10 +73,15 @@ pub fn start_watching(
     }
 
     let state = app.state::<WatcherState>();
-    let mut watched = state.watched_paths.lock().map_err(|e| e.to_string())?;
-    // 已在监听该路径：直接返回成功
-    if watched.contains(&path) {
-        return Ok(());
+    let label = window.label().to_string();
+    {
+        let map = state.watchers.lock().map_err(|e| e.to_string())?;
+        if let Some(entry) = map.get(&label) {
+            if entry.path == path {
+                // 已在监听该路径：直接返回成功
+                return Ok(());
+            }
+        }
     }
 
     let app_handle = app.clone();
@@ -97,38 +117,24 @@ pub fn start_watching(
         return Err(format!("添加监听路径失败: {}", e));
     }
 
-    // 保存 watcher
-    let mut guard = state.watcher.lock().map_err(|e| e.to_string())?;
-    *guard = Some(watcher);
-    watched.insert(path);
+    // 保存本窗口的 watcher（顶掉该窗口的旧实例，不影响其它窗口）
+    let mut map = state.watchers.lock().map_err(|e| e.to_string())?;
+    map.insert(label, WatcherEntry { watcher, path });
 
     Ok(())
 }
 
-/// 停止监听指定路径
+/// 停止本窗口的文件监听
 #[tauri::command]
-pub fn stop_watching(app: AppHandle, path: String) -> Result<(), String> {
-    let state = app.state::<WatcherState>();
-    let mut watched = state.watched_paths.lock().map_err(|e| e.to_string())?;
-    watched.remove(&path);
-
-    // 若没有监听路径了，销毁 watcher
-    if watched.is_empty() {
-        let mut guard = state.watcher.lock().map_err(|e| e.to_string())?;
-        *guard = None;
-    }
-
+pub fn stop_watching(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+    app.state::<WatcherState>().remove_window(window.label());
     Ok(())
 }
 
-/// 停止所有监听
+/// 停止本窗口的全部监听（与 [`stop_watching`] 等价，保留给旧调用方）
 #[tauri::command]
-pub fn stop_all_watching(app: AppHandle) -> Result<(), String> {
-    let state = app.state::<WatcherState>();
-    let mut watched = state.watched_paths.lock().map_err(|e| e.to_string())?;
-    watched.clear();
-    let mut guard = state.watcher.lock().map_err(|e| e.to_string())?;
-    *guard = None;
+pub fn stop_all_watching(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+    app.state::<WatcherState>().remove_window(window.label());
     Ok(())
 }
 
@@ -141,21 +147,37 @@ mod tests {
     use notify::event::{CreateKind, DataChange, RemoveKind, RenameMode};
 
     #[test]
-    fn test_watcher_state_default() {
+    fn test_watcher_state_default_is_empty() {
         let state = WatcherState::default();
-        assert!(state.watcher.lock().unwrap().is_none());
-        assert!(state.watched_paths.lock().unwrap().is_empty());
+        assert!(state.watchers.lock().unwrap().is_empty());
     }
 
     #[test]
-    fn test_watcher_state_mutex_works() {
+    fn test_remove_window_is_scoped() {
         let state = WatcherState::default();
+        // 无法在单测里构造真实 RecommendedWatcher，这里直接验证 map 语义：
+        // 两个窗口各占一个槽，删一个不影响另一个
         {
-            let mut watched = state.watched_paths.lock().unwrap();
-            watched.insert("/tmp/test".to_string());
+            let mut map = state.watchers.lock().unwrap();
+            map.insert(
+                "win-1".to_string(),
+                WatcherEntry {
+                    watcher: notify::recommended_watcher(|_| {}).unwrap(),
+                    path: "/tmp/a".to_string(),
+                },
+            );
+            map.insert(
+                "win-2".to_string(),
+                WatcherEntry {
+                    watcher: notify::recommended_watcher(|_| {}).unwrap(),
+                    path: "/tmp/b".to_string(),
+                },
+            );
         }
-        let watched = state.watched_paths.lock().unwrap();
-        assert!(watched.contains("/tmp/test"));
+        state.remove_window("win-1");
+        let map = state.watchers.lock().unwrap();
+        assert!(!map.contains_key("win-1"));
+        assert_eq!(map.get("win-2").map(|e| e.path.as_str()), Some("/tmp/b"));
     }
 
     #[test]

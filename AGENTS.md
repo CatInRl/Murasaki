@@ -132,9 +132,23 @@ murasaki/
 
 完整 changelog 详见 [CHANGELOG.md](CHANGELOG.md)。版本发布时必须同步更新该文件。
 
-### 当前版本：0.9.0（2026-09-25）
+### 当前版本：0.10.0（未发布）
 
-**易用性提升**：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存与显示模式下拉，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘，文件树与右键菜单键盘可达；并修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。
+**多窗口 = 多工作区**：外部入口（双击文件关联 / 命令行传文件 / 拖到任务栏）一律**新开窗口且不恢复上次工作区与标签**；「打开文件夹」总是新开窗口（同一文件夹已在某窗口打开则聚焦那个窗口）；每个窗口各自静默落盘、**关掉最后一个窗口才退出应用**；并去掉「打开单个文件自动把所在目录设为工作区」的隐式副作用。
+
+- 多窗口基础设施（#194/#195）：新增 [commands/windows.rs](src-tauri/src/commands/windows.rs)（`WindowRegistry` 窗口↔工作区注册表 + `next_label`/`set_workspace`/`window_for_workspace`/`begin_exit`，路径归一化比较支撑「同目录聚焦」）与 `src/utils/windowContext.ts`（`currentWindowLabel`/`isMainWindow`/`tabsStoreKey`）；新增命令 `open_path_in_new_window` / `set_window_workspace` / `close_window`；`exit_if_no_other_windows` 由 `close_window` 与 `Destroyed` 双向兜底。详见 [ADR-0018](docs/adr/0018-multi-window-multi-workspace.md)
+- 进程级状态按窗口分片（#194/#196~#199）：`WatcherState` 改 `HashMap<label, WatcherEntry>`（原 `*guard = Some(watcher)` 会顶掉前一个窗口的监听）；`PendingOpenState` 改按 label 分槽；`ClosingState` 改 `HashSet<label>`；`RecentMenuState` 新增 `window_ui: HashMap<label, WindowUiState>` + `active_window_label` / `apply_checked_for_window`，勾选命令 `set_theme_checked`/`set_mode_checked`/`set_sidebar_view_checked` 改带 `window` 参数按窗口存储、非焦点窗口不抢菜单显示
+- 事件改定向发送：`app-close-requested` / `menu-event` / `recent-open` / `navigate` 全部 `emit_to(label)`——Tauri 的 `Emitter::emit` 是**广播到所有 webview**，多窗口下广播会让所有窗口一起关窗或重复执行同一命令
+- 外部入口改建窗（#194/#202）：single-instance 回调改为有路径即 `open_path_in_new_window_impl`（失败才聚焦活动窗口），冷启动 argv 仍写 `PendingOpenState` 的 `main` 槽；前端删除 `single-instance-open-workspace` / `open-from-argv` 两个推送型监听器，`App.vue` 把 `take_pending_open_path` **提前到会话恢复之前**，取到路径即**跳过** `lastWorkspacePath` 恢复与 `tabsStore.restore()`
+- 关闭语义（#194/#198）：`intercept_close_request` 去掉 `label == "main"` 判断（所有编辑器窗口都拦），新增 `quit_app` 通知所有窗口各自落盘后由最后一个窗口退出；`useExitFlush` 的 `exit_app` → `close_window`，`useCommands` 的 `quit` → `quit_app`
+- 打开文件夹/最近文件夹（#194/#201）：`useWorkspaceStore.openFolderDialog` 改为选目录后 `open_path_in_new_window`，不再调 `openWorkspace`（四个入口共用）；`useFileActions.openFile` 删除「无工作区自动以文件所在目录为工作区」；新增三语 `common.openFolderTitle`
+- 持久化分 key（#194/#200）：`tabs.json` 主窗口沿用旧 key `state`（零迁移）、其它窗口 `state:<label>`；`lastWorkspacePath` 只由主窗口写回；`settings.json` / `recent.json` 保持全局共享
+- 修复：`WindowUiState.sidebar_view` 存视图名（`files`/`outline`）而勾选需要菜单项 ID，焦点重放时比较对象不一致导致两组勾选全空；新增 `sidebar_menu_id()` 统一转换
+- 验证：`cargo test` 90 passed（新增 `window_ui` 分片、`sidebar_menu_id`、`WindowRegistry`、pending 分槽、`ClosingState` 按窗口等单测）、`npm test` 1028 passed、`npm run build` 通过
+
+### 历史版本
+
+- 0.9.0（2026-09-25）：**易用性提升**：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存与显示模式下拉，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘，文件树与右键菜单键盘可达；并修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。
 
 - 演示模式（#180/#181）：新增 `presentation` 模式，只挂预览不挂编辑器（铺满、无工具栏与分隔条），只读；内部 `.md` 链接开新 tab、外部链接走系统浏览器、任务列表 checkbox 只读；缩放 50%–200% 步进 10%（`Ctrl+=`/`Ctrl+-`/`Ctrl+0` + 按住 Ctrl 滚轮，`EditorPane` 的 `onWheel` 拦截 WebView2 默认缩放），持久化 `settings.presentationZoom`，缩放逻辑抽为纯函数 `src/utils/presentationZoom.ts`
 - 状态栏（#182/#187）：字数（CJK 逐字 + 拉丁分词）与字符数（不含空白）并存；新增显示模式 chip，点击弹出四项下拉（不再循环切换）、演示模式缩放 chip 可点击复位；统计逻辑抽为纯函数 `src/utils/textStats.ts`

@@ -54,7 +54,6 @@ function makeDeps(overrides: Partial<AppLifecycleDeps> = {}): AppLifecycleDeps {
     settingsVisible: ref(false),
     handleMenuEvent: vi.fn().mockResolvedValue(undefined),
     onOpenRecent: vi.fn().mockResolvedValue(undefined),
-    onOpenPath: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -151,23 +150,25 @@ describe("useAppLifecycle", () => {
   });
 
   describe("setupEventListeners", () => {
-    it("注册 6 个事件监听器并返回 cleanup 函数", async () => {
+    it("注册 4 个事件监听器并返回 cleanup 函数", async () => {
       const deps = makeDeps();
       const scope = effectScope();
       const { setupEventListeners } = scope.run(() => useAppLifecycle(deps))!;
 
       const cleanup = await setupEventListeners();
 
-      expect(mockedListen).toHaveBeenCalledTimes(6);
+      expect(mockedListen).toHaveBeenCalledTimes(4);
       expect(mockedListen).toHaveBeenCalledWith("menu-event", expect.any(Function));
       expect(mockedListen).toHaveBeenCalledWith("recent-open", expect.any(Function));
-      expect(mockedListen).toHaveBeenCalledWith(
+      expect(mockedListen).toHaveBeenCalledWith("settings://saved", expect.any(Function));
+      expect(mockedListen).toHaveBeenCalledWith("navigate", expect.any(Function));
+      // 多窗口后外部入口改走「新窗口 + take_pending_open_path 拉取」，
+      // 不再有推送型监听器（spec #194 决策 ①/④）
+      expect(mockedListen).not.toHaveBeenCalledWith(
         "single-instance-open-workspace",
         expect.any(Function)
       );
-      expect(mockedListen).toHaveBeenCalledWith("open-from-argv", expect.any(Function));
-      expect(mockedListen).toHaveBeenCalledWith("settings://saved", expect.any(Function));
-      expect(mockedListen).toHaveBeenCalledWith("navigate", expect.any(Function));
+      expect(mockedListen).not.toHaveBeenCalledWith("open-from-argv", expect.any(Function));
 
       // cleanup 调用所有 unlisten
       expect(typeof cleanup).toBe("function");

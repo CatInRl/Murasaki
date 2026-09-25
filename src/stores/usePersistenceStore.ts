@@ -8,6 +8,7 @@ import {
   type PersistedTab,
   DEFAULT_SETTINGS,
 } from "../types";
+import { isMainWindow, tabsStoreKey } from "../utils/windowContext";
 
 /**
  * 持久化 Store
@@ -143,10 +144,19 @@ export const usePersistenceStore = defineStore("persistence", () => {
   }
 
   // ===== Tabs =====
+  /**
+   * 读取本窗口的标签页状态（多窗口：按 window label 分 key，spec #194 / T2.1）。
+   *
+   * 只有主窗口参与启动会话恢复：其它窗口是被外部入口（双击文件 / 打开文件夹）
+   * 创建的干净会话，不应继承上次的标签（决策 ④）。
+   */
   async function loadTabs(): Promise<TabsState> {
+    if (!isMainWindow()) {
+      return { tabs: [], activeIndex: 0 };
+    }
     try {
       const store = getTabsStore();
-      const saved = await store.get<TabsState>("state");
+      const saved = await store.get<TabsState>(tabsStoreKey());
       if (saved && Array.isArray(saved.tabs)) {
         persistedTabs.value = saved;
         return saved;
@@ -161,7 +171,7 @@ export const usePersistenceStore = defineStore("persistence", () => {
     persistedTabs.value = { tabs, activeIndex };
     try {
       const store = getTabsStore();
-      await store.set("state", persistedTabs.value);
+      await store.set(tabsStoreKey(), persistedTabs.value);
       await store.save();
     } catch (err) {
       console.error("保存标签页状态失败:", err);
@@ -172,7 +182,7 @@ export const usePersistenceStore = defineStore("persistence", () => {
     persistedTabs.value = { tabs: [], activeIndex: 0 };
     try {
       const store = getTabsStore();
-      await store.set("state", persistedTabs.value);
+      await store.set(tabsStoreKey(), persistedTabs.value);
       await store.save();
     } catch (err) {
       console.error("清除标签页状态失败:", err);

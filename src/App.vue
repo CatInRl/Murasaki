@@ -407,19 +407,38 @@ onMounted(async () => {
     );
   }
   sidebarCollapsed.value = persistence.settings.sidebarCollapsed;
-  // 恢复上次打开的工作区（仅当开启"启动时打开上次工作区"，issue #96）
-  if (persistence.settings.reopenLastWorkspace && persistence.settings.lastWorkspacePath) {
-    try {
-      console.log("[Murasaki] 恢复工作区:", persistence.settings.lastWorkspacePath);
-      await workspace.openWorkspace(persistence.settings.lastWorkspacePath);
-      console.log("[Murasaki] 恢复工作区成功, workspacePath:", workspace.workspacePath);
-    } catch (err) {
-      console.warn("[Murasaki] 恢复工作区失败:", err);
+
+  // 1.5 取走本窗口的待打开路径（多窗口，spec #194 决策 ④）
+  //     有路径 ⇒ 本窗口是被外部入口创建的干净会话（冷启动带参数 / 运行中双击文件 /
+  //     打开文件夹 / 新窗口），此时**不恢复**上次工作区与标签；
+  //     无路径 ⇒ 正常启动，恢复上次会话。
+  //     必须在恢复之前取：`take_pending_open_path` 是 take-and-clear（按窗口 label 分槽）。
+  let pendingOpen: { path: string; type: "file" | "folder" } | null = null;
+  try {
+    const pending = await invoke<{ path: string; type: "file" | "folder" } | null>(
+      "take_pending_open_path"
+    );
+    if (pending?.path) {
+      pendingOpen = { path: pending.path, type: pending.type === "folder" ? "folder" : "file" };
+      console.log("[Murasaki] 本窗口由外部入口创建，跳过上次会话恢复:", pendingOpen.path);
     }
+  } catch (err) {
+    console.warn("[Murasaki] 读取启动参数路径失败:", err);
   }
 
-  // 2. 恢复上次打开的 tabs
-  await tabsStore.restore();
+  // 2. 恢复上次打开的工作区与 tabs（仅正常启动；issue #96）
+  if (!pendingOpen) {
+    if (persistence.settings.reopenLastWorkspace && persistence.settings.lastWorkspacePath) {
+      try {
+        console.log("[Murasaki] 恢复工作区:", persistence.settings.lastWorkspacePath);
+        await workspace.openWorkspace(persistence.settings.lastWorkspacePath);
+        console.log("[Murasaki] 恢复工作区成功, workspacePath:", workspace.workspacePath);
+      } catch (err) {
+        console.warn("[Murasaki] 恢复工作区失败:", err);
+      }
+    }
+    await tabsStore.restore();
+  }
 
   // 3. 注册 5 个 tauri 事件监听器（menu-event / recent-open / single-instance / settings://saved / navigate）
   cleanupListeners = await setupEventListeners();
@@ -466,19 +485,11 @@ onMounted(async () => {
 
   initialized.value = true;
 
-  // 11. 冷启动时的文件关联 / 命令行打开（issue #92 / #113）
-  //     Rust 在 setup 阶段把 argv 中的路径暂存，此处（事件监听器就绪、状态落盘门控已开启、
-  //     文件监听已启动）主动取走。不能用"延时 emit 事件"：前端挂载 + 设置/工作区/tab
-  //     恢复耗时不确定，事件可能早于监听器注册而丢失，表现为启动后只恢复旧 tabs。
-  try {
-    const pending = await invoke<{ path: string; type: "file" | "folder" } | null>(
-      "take_pending_open_path"
-    );
-    if (pending?.path) {
-      void onOpenPath(pending.path, pending.type === "folder" ? "folder" : "file");
-    }
-  } catch (err) {
-    console.warn("[Murasaki] 读取启动参数路径失败:", err);
+  // 11. 打开本窗口的待打开路径（多窗口，spec #194）
+  //     路径已在 1.5 处提前取走（take-and-clear，不能二次 take），此处只消费。
+  //     此时事件监听器已就绪、文件监听已启动，打开动作不会漏事件。
+  if (pendingOpen) {
+    void onOpenPath(pendingOpen.path, pendingOpen.type);
   }
 
   // 12. 启动时静默检查更新（可被设置关闭，ADR-0012）
@@ -676,7 +687,6 @@ const { initialized, setupEventListeners } = useAppLifecycle({
   settingsVisible,
   handleMenuEvent,
   onOpenRecent,
-  onOpenPath,
 });
 
 // ===== 侧栏布局状态持久化（gated：初始化完成后才落盘） =====

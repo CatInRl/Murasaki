@@ -60,7 +60,6 @@ function makeDeps(overrides: Partial<FileActionsDeps> = {}): FileActionsDeps {
       workspacePath: "/test",
       selectFile: vi.fn(),
       openFolderDialog: vi.fn(),
-      openWorkspace: vi.fn(),
       hasWorkspace: true,
     } as never,
     persistence: {

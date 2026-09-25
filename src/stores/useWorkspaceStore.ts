@@ -45,18 +45,27 @@ export const useWorkspaceStore = defineStore("workspace", () => {
 
   // ===== Actions =====
   /**
-   * 弹出系统对话框选择文件夹，并加载文件树
+   * 弹出系统对话框选择文件夹，并在**新窗口**中打开为工作区。
+   *
+   * 多工作区 = 多窗口（spec #194 决策 ②）：同一个文件夹已在某窗口打开时，
+   * Rust 侧会聚焦那个窗口而不是重复开窗（避免同目录双 watcher 与文件操作冲突）。
    */
   async function openFolderDialog(): Promise<boolean> {
     const selected = await openDialog({
       directory: true,
       multiple: false,
-      title: "选择工作区文件夹",
+      title: t("common.openFolderTitle"),
     });
     if (typeof selected !== "string" || !selected) {
       return false;
     }
-    await openWorkspace(selected);
+    try {
+      await invoke("open_path_in_new_window", { path: selected });
+    } catch (err) {
+      console.error("新窗口打开文件夹失败:", err);
+      toast.error(t("common.error.openWorkspaceFailed", { error: err }));
+      return false;
+    }
     return true;
   }
 

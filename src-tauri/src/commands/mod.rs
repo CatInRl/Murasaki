@@ -13,3 +13,4 @@ pub mod pdf;
 pub mod search;
 pub mod settings;
 pub mod watcher;
+pub mod windows;

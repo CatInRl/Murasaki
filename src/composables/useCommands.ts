@@ -1,6 +1,6 @@
 import type { Ref } from "vue";
 import type { EditorView } from "@codemirror/view";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { invoke } from "@tauri-apps/api/core";
 import { i18n } from "../i18n";
 import { getAppVersion } from "../utils/appVersion";
 import {
@@ -272,8 +272,10 @@ export function useCommands(deps: CommandsDeps) {
         break;
       }
       case "quit": {
+        // 「退出应用」= 通知所有窗口各自落盘后关闭，关掉最后一个窗口才退出
+        // （spec #194 决策 ③）。只关本窗口应走标题栏关闭按钮。
         try {
-          await getCurrentWebviewWindow().close();
+          await invoke("quit_app");
         } catch (err) {
           console.error("退出失败:", err);
         }
