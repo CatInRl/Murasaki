@@ -714,7 +714,7 @@ issue #104 范围：性能修复 + UX 导航。
 
 0.4.0 起支持多语言 UI。基础框架见 [ADR-0013](docs/adr/0013-i18n-via-vue-i18n-with-zh-cn-and-en-bilingual.md)，多语言落地（日语 + 单源化 + 语言探测）详见 [ADR-0016](docs/adr/0016-multilang-single-source-and-locale-detection.md)。
 
-- **框架**：vue-i18n 9.x（前端）+ Rust 菜单文案单源化（[build.rs](src-tauri/build.rs) 构建时从 locale JSON 生成常量，经 include 引入，无第二份手写翻译表）。
+- **框架**：vue-i18n 11.x（前端）+ Rust 菜单文案单源化（[build.rs](src-tauri/build.rs) 构建时从 locale JSON 生成常量，经 include 引入，无第二份手写翻译表）。
 - **单一事实来源**：语言元数据与 message 收敛到 `src/locales/registry.ts`（`LOCALE_DEFS` / `AppLocale` / `SUPPORTED_LOCALES` / `DEFAULT_LOCALE` / `localeMessages`）；新增语言只需加一个 `LOCALE_DEFS` 条目 + 对应 `src/locales/{lang}` 目录。
 - **支持语言**：`zh-CN`（中文，默认）/ `en`（英文）/ `ja`（日本語）。回退语言为 `en`（新语言缺 key 显示英文）。
 - **首次启动探测**：全新安装（`settings.json` 的 `language` 从未写入）首次启动探测系统语言作为默认（zh→zh-CN、ja→ja、其余→en）；已持久化语言的既有用户跳过探测。
