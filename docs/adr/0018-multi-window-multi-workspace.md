@@ -6,9 +6,9 @@
 
 ## 背景
 
-0.10.0 之前，Murasaki 是**单窗口 + 单工作区**模型，且「打开单个文件」有一条隐式副作用：
+0.9.0 之前，Murasaki 是**单窗口 + 单工作区**模型，且「打开单个文件」有一条隐式副作用：
 
-- `useFileActions.openFile()` 在无工作区时**自动把文件所在目录设为工作区**（0.9.0 引入，issue #96/#113）；
+- `useFileActions.openFile()` 在无工作区时**自动把文件所在目录设为工作区**（早期版本引入，issue #96/#113）；
 - Rust 侧四个全局单例都假设「只有一个窗口」：
   - `WatcherState` 用单槽 `*guard = Some(watcher)`，第二个工作区直接**顶掉**第一个的监听；
   - `ClosingState` 是单 `AtomicBool`，且只认 `window.label() == "main"`；

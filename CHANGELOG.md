@@ -4,32 +4,9 @@
 
 ## [Unreleased]
 
-## [0.10.0] - 未发布
-
-本版本把应用从「单窗口 + 单工作区」改造为「多窗口 = 多工作区」：外部入口（双击文件、命令行传文件、拖到任务栏）一律新开窗口且不恢复上次工作区，「打开文件夹」总是新开窗口（同目录聚焦已有窗口），每个窗口各自落盘、关掉最后一个窗口才退出应用；同时去掉「打开单个文件自动把所在目录设为工作区」的隐式副作用。
-
-### Added
-
-- **多窗口多工作区（#194）**：一个窗口 = 一个工作区 = 一份独立前端会话。新增 `src-tauri/src/commands/windows.rs`（`WindowRegistry` 窗口↔工作区注册表、`open_path_in_new_window` / `set_window_workspace` / `close_window` 命令、`exit_if_no_other_windows`）与 `src/utils/windowContext.ts`（窗口 label 与 tabs key 派生）。Rust 侧四个进程级单例全部按窗口 label 分片：`WatcherState` 每窗口一个 watcher（不再互相顶替）、`PendingOpenState` 路径按目标窗口分槽、`ClosingState` 按窗口各自只进入一次、`RecentMenuState` 勾选状态拆到 `window_ui`。详见 [ADR-0018](docs/adr/0018-multi-window-multi-workspace.md)。
-- **菜单按焦点窗口跟随（#194）**：app 级共享菜单栏的勾选状态改为按窗口存储，窗口获得焦点时用 `apply_checked_for_window` 重放主题 / 显示模式 / 侧栏视图三组勾选；`set_theme_checked` / `set_mode_checked` / `set_sidebar_view_checked` 携带窗口 label 存储，非活动窗口的初始化同步不抢菜单显示。
-- **外部入口新开窗口（#194）**：single-instance 回调与冷启动 argv 路径统一走「新窗口 + `take_pending_open_path` 拉取」；带路径启动的窗口跳过上次工作区与标签恢复（决策 ④）。
-
-### Changed
-
-- **「打开文件夹」总是新开窗口（#194）**：菜单 / 工具栏 / 文件树 / 最近文件夹四个入口统一走 `open_path_in_new_window`；同一文件夹已在某窗口打开时聚焦那个窗口，不重复开窗（避免同目录双 watcher 与文件操作冲突）。
-- **打开单个文件不再自动设工作区（#194）**：删除 `openFile()` 里「无工作区时以文件所在目录为工作区」的隐式行为。应用内 `Ctrl+O` 与最近文件仍在当前窗口开标签，且不清掉当前工作区。
-- **关闭窗口语义去主窗口化（#194）**：所有编辑器窗口都拦截 `CloseRequested` 并各自静默落盘，关闭任一窗口只关该窗口；关掉最后一个窗口才退出应用。菜单「退出」改为 `quit_app`（通知所有窗口各自落盘），`useExitFlush` 改调 `close_window`。
-- **按窗口事件改定向发送**：`app-close-requested` / `menu-event` / `recent-open` / `navigate` 由广播改为 `emit_to(label)`——Tauri 的 `emit` 是广播，多窗口下会让所有窗口一起关窗或重复执行同一命令。
-- **持久化按窗口分 key**：`tabs.json` 主窗口沿用旧 key `state`（老用户零迁移），其它窗口用 `state:<label>`；`settings.json` / `recent.json` 保持全局共享；`lastWorkspacePath` 只由主窗口写回，避免多窗口互相覆盖。
-- **删除推送型启动监听器**：移除 `single-instance-open-workspace` 与 `open-from-argv` 两个前端监听器（新窗口的家还没到，推送事件必然丢失），统一改拉取。
-
-### Fixed
-
-- **侧栏视图菜单勾选在窗口切换后全空（#194）**：`WindowUiState.sidebar_view` 存的是视图名（`files` / `outline`），而勾选 API 需要菜单项 ID（`toggle-sidebar` / `toggle-outline`），焦点重放时比较对象不一致导致两组勾选都不勾。新增 `sidebar_menu_id()` 统一转换并补单测。
-
 ## [0.9.0] - 2026-09-25
 
-本版本为易用性提升：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘，文件树与右键菜单键盘可达、外部结构变更自动刷新；并修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。
+本版本为易用性提升 + 多窗口改造：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘，文件树与右键菜单键盘可达、外部结构变更自动刷新；并把应用从「单窗口 + 单工作区」改造为「多窗口 = 多工作区」（外部入口一律新开窗口且不恢复上次工作区，「打开文件夹」总是新开窗口，关掉最后一个窗口才退出）；同时修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。
 
 ### Added
 
@@ -45,9 +22,18 @@
 - **右键菜单键盘导航（#191）**：右键菜单支持 `↑`/`↓` 移动高亮（跳过分隔线与禁用项）、`Home`/`End` 跳首尾、`Enter`/`Space` 触发、`Esc` 关闭；打开时焦点进入菜单，`Esc` 关闭后归还给触发元素。键盘触发的右键菜单以触发行位置为锚点。欢迎页「最近打开」列表项由 `li @click` 改为真正的 `<button>`，可 `Tab` 聚焦并回车打开。
 - **文件树空白区右键统一（#189）**：空白区域右键菜单改用全局 `ContextMenuContainer`（与节点右键共用组件与样式），项为 新建文件 / 新建文件夹 / ─── / 粘贴（应用内剪贴板为空时置灰不可点）/ ─── / 在文件资源管理器中打开；`useFileOpsStore` 暴露响应式 `hasClipboard` 供菜单项禁用态使用。
 - **文件树自动刷新（#193）**：`file-changed` 事件负载由裸路径改为 `{ path, kind }`，Rust 侧把 notify 的 `Modify(Name(..))` 单独归类为 `rename`（此前会被当成内容修改而漏刷）。前端除「已打开 tab 的外部修改」外，另起一路处理工作区内的 `create` / `remove` / `rename`：按 500ms 窗口合并后调用 `refreshTree()`，一次爆发（如 git 切换分支）只重扫一次；`modify` 不刷树，避免应用内保存触发全量重扫。窗口重新获得焦点时（2s 节流）兜底刷新一次，覆盖冷启动期间 watcher 未就绪或事件丢失。新增自保存抑制：磁盘 mtime 与 `tab.lastMtime` 相同时直接跳过，不弹窗不重载。
+- **多窗口多工作区（#194）**：一个窗口 = 一个工作区 = 一份独立前端会话。新增 `src-tauri/src/commands/windows.rs`（`WindowRegistry` 窗口↔工作区注册表、`open_path_in_new_window` / `set_window_workspace` / `close_window` 命令、`exit_if_no_other_windows`）与 `src/utils/windowContext.ts`（窗口 label 与 tabs key 派生）。Rust 侧四个进程级单例全部按窗口 label 分片：`WatcherState` 每窗口一个 watcher（不再互相顶替）、`PendingOpenState` 路径按目标窗口分槽、`ClosingState` 按窗口各自只进入一次、`RecentMenuState` 勾选状态拆到 `window_ui`。详见 [ADR-0018](docs/adr/0018-multi-window-multi-workspace.md)。
+- **菜单按焦点窗口跟随（#194）**：app 级共享菜单栏的勾选状态改为按窗口存储，窗口获得焦点时用 `apply_checked_for_window` 重放主题 / 显示模式 / 侧栏视图三组勾选；`set_theme_checked` / `set_mode_checked` / `set_sidebar_view_checked` 携带窗口 label 存储，非活动窗口的初始化同步不抢菜单显示。
+- **外部入口新开窗口（#194）**：single-instance 回调与冷启动 argv 路径统一走「新窗口 + `take_pending_open_path` 拉取」；带路径启动的窗口跳过上次工作区与标签恢复。
 
 ### Changed
 
+- **「打开文件夹」总是新开窗口（#194）**：菜单 / 工具栏 / 文件树 / 最近文件夹四个入口统一走 `open_path_in_new_window`；同一文件夹已在某窗口打开时聚焦那个窗口，不重复开窗（避免同目录双 watcher 与文件操作冲突）。
+- **打开单个文件不再自动设工作区（#194）**：删除 `openFile()` 里「无工作区时以文件所在目录为工作区」的隐式行为。应用内 `Ctrl+O` 与最近文件仍在当前窗口开标签，且不清掉当前工作区。
+- **关闭窗口语义去主窗口化（#194）**：所有编辑器窗口都拦截 `CloseRequested` 并各自静默落盘，关闭任一窗口只关该窗口；关掉最后一个窗口才退出应用。菜单「退出」改为 `quit_app`（通知所有窗口各自落盘），`useExitFlush` 改调 `close_window`。
+- **按窗口事件改定向发送**：`app-close-requested` / `menu-event` / `recent-open` / `navigate` / `file-changed` 由广播改为 `emit_to(label)`，前端监听器同步改为 `getCurrentWebviewWindow().listen`——Tauri 的 `emit` 是广播，而裸 `listen` 的 `Any` target 又会匹配一切 emit（定向发送在任一端退化都会让所有窗口一起关窗或重复执行同一命令）。
+- **持久化按窗口分 key**：`tabs.json` 主窗口沿用旧 key `state`（老用户零迁移），其它窗口用 `state:<label>`；`settings.json` / `recent.json` 保持全局共享；`lastWorkspacePath` 只由主窗口写回，避免多窗口互相覆盖。
+- **删除推送型启动监听器**：移除 `single-instance-open-workspace` 与 `open-from-argv` 两个前端监听器（新窗口的家还没到，推送事件必然丢失），统一改拉取。
 - **显示模式作用域**：改为全局默认 + 按文件类型记忆——markdown 文件沿用最后一次选择的模式，source-only 文件始终为源码模式，不按单文件记忆。
 - **视图菜单前移**：菜单栏顺序调整为 文件 / 编辑 / 段落 / 视图 / 主题 / 帮助。
 - **快捷键作用域**：全局与编辑器两个作用域各自独立做冲突检测；修复 `Ctrl+Shift+1` 等上档组合在真实键盘下匹配失败的问题（新增 `SHIFT_BASE_KEYS` 反查归一化）。
@@ -59,6 +45,11 @@
 - **批量关闭标签丢失未保存内容（#177）**：关闭其他/左侧/右侧/全部时改为只弹一次汇总确认，取消则整批中止；未命名标签无草稿兜底，文案显式提示内容不可恢复。
 - **打开文件对话框类型受限（#178）**：「打开文件」过滤器改为 Markdown 文档 / 文本与代码文件 / 所有文件三级；另存为同步放开 markdown 扩展名并去掉硬编码过滤器名。
 - **欢迎页版本号过期（#179）**：欢迎页与「关于」统一改为运行时读取打包版本，删除硬编码的 `0.1.0`。
+- **侧栏视图菜单勾选在窗口切换后全空（#194）**：`WindowUiState.sidebar_view` 存的是视图名（`files` / `outline`），而勾选 API 需要菜单项 ID（`toggle-sidebar` / `toggle-outline`），焦点重放时比较对象不一致导致两组勾选都不勾。新增 `sidebar_menu_id()` 统一转换并补单测。
+- **运行时新窗口完全没有插件权限（#194）**：capability 的 `windows` 由 `["main", "settings"]` 改为 `["*"]`。多窗口后 `win-N` 是运行时动态创建的，不在白名单里就**一条插件命令都不许调**（含 `plugin:event|listen`）：前端挂在注册监听器那一步抛错 → 既收不到 `app-close-requested`（窗口关不掉），也走不到消费待打开路径（传入的文件/文件夹不打开、不落盘）。
+- **「打开文件夹」会卡死整个窗口（#194）**：`open_path_in_new_window` 由同步命令改为 `async`。Tauri 的同步命令在主线程执行，而建窗要投递 `Message::CreateWindow`，`send_user_message` 发现已在主线程就**内联执行**——等于在 WebView2 的 IPC 回调里同步创建新的 WebView2 环境，实测死锁（命令永不返回、窗口也建不出来）。改 `async` 后命令跑在 tokio 工作线程，建窗消息正常投递给事件循环。
+- **关闭一个窗口会连带关掉所有窗口（#194）**：Rust 侧虽用 `emit_to(label)` 定向发送，但前端监听器用裸 `listen`（target 为 `Any`），而 Tauri 的 `match_any_or_filter` 让 `Any` 监听器匹配**一切** emit——于是「关闭我」被广播给全部窗口，关新窗口会把主窗口一起落盘关掉、整个应用退出。涉及 `app-close-requested` / `menu-event` / `recent-open` / `navigate` / `file-changed`，前端统一改用 `getCurrentWebviewWindow().listen` 带上窗口级 target。
+- **退出落盘失败时窗口关不掉（#194）**：capability 缺 `core:window:allow-destroy`，`useExitFlush` 里「`close_window` 失败就强制销毁窗口」的兜底会被 ACL 拒绝（`Command plugin:window|close not allowed by ACL` 同理）。补齐 `allow-close` / `allow-destroy`，保证任何情况下窗口都关得掉。
 
 ## [0.8.5] - 2026-09-24
 

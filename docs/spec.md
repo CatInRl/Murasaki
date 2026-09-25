@@ -153,7 +153,7 @@
 **LaTeX/Mermaid 相关**
 - LaTeX 解析和 Mermaid 解析均在前端完成（KaTeX 和 Mermaid.js 是 JS 库），后端不涉及。
 
-### 多窗口（0.10.0）
+### 多窗口（0.9.0）
 
 **一个窗口 = 一个工作区 = 一份独立前端会话**，多工作区靠多窗口并行实现（完整决策见 [ADR-0018](adr/0018-multi-window-multi-workspace.md)）。
 
