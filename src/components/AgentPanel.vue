@@ -56,7 +56,6 @@ const { t } = useI18n();
 
 // ===== 输入框 =====
 const inputText = ref("");
-const inputRef = ref<HTMLTextAreaElement | null>(null);
 
 // ===== 工具调用折叠卡片展开状态（按消息 ID 跟踪） =====
 const expandedToolCalls = ref<Set<string>>(new Set());
@@ -665,7 +664,6 @@ onMounted(() => {
       <div class="agent-input-area">
         <div class="agent-input-wrapper">
           <textarea
-            ref="inputRef"
             v-model="inputText"
             class="agent-input"
             :placeholder="$t('agent.inputPlaceholder')"
