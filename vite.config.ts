@@ -11,7 +11,9 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     host: host || false,
-    hmr: host
+    // Vite 8 起 server.hmr 的 protocol / host / port 已弃用（类型里标 @deprecated），
+    // 官方给的替代项是 server.ws.*，此处按该映射迁移
+    ws: host
       ? {
           protocol: "ws",
           host,
