@@ -100,9 +100,9 @@ murasaki/
 
 1. **先有 issue**：任何改动都要有 issue 跟踪（见下「Issue 跟踪约定」），禁止无 issue 开工。
 2. **切分支**：从最新 `main` 切出 `<type>/<issue>-<slug>`，例如 `fix/198-multi-window-deadlock`、`docs/205-dev-workflow`。`<type>` 取 Conventional Commits 类型（feat / fix / docs / refactor / test / chore）。分支名必须带 issue 号，所以**先有 issue 才有分支**。**不要在 main 上直接提交**。
-3. **开 PR**：推送分支后开 PR，标题格式 `<type>(<scope>): <描述> (#<issue>)`，描述按 [.github/pull_request_template.md](.github/pull_request_template.md) 模板填写。
+3. **开 PR**：推送分支后开 PR，标题格式 `<type>(<scope>): <描述> (#<issue>)`，描述按 [.github/pull_request_template.md](.github/pull_request_template.md) 模板填写（dependabot 等机器人开的 PR 不受此标题格式约束）。
 4. **过门禁**：[.github/workflows/test.yml](.github/workflows/test.yml) 两个 job 必须全绿——
-   - `frontend`（ubuntu-latest）：`npm test` + `npm run build`
+   - `frontend`（ubuntu-24.04）：`npm test` + `npm run build`
    - `rust`（windows-latest）：`npm run build` + `npm run test:rust`（`tauri.conf.json` 的 `frontendDist` 指向 `../dist`，需先产出 dist）
 
    e2e 依赖 tauri-driver，保持本地 `npm run test:e2e`，不进 CI。
@@ -110,9 +110,11 @@ murasaki/
 6. **合入**：**squash merge**（一个 PR = 一个 conventional commit），合入后自动删除头分支。Agent 可自主切分支 / 提交 / 推送 / 开 PR，但**squash 合入 main 前必须得到用户确认**。
 7. **main 受保护**：禁止直推、必须 CI 全绿、必须与 main 同步（Require branches to be up to date）；管理员豁免**仅用于紧急修复**；不设 required approving review（单人仓库无法自批自己的 PR）。
 
-**管理员豁免的边界（实测补充）**：豁免只覆盖 *required status checks* —— 用管理员凭据直推 main 会成功，但远端日志里会带 `Bypassed rule violations` 警告；而 `allow_force_pushes=false` **对管理员同样生效**，`git push --force-with-lease origin main` 会被 `GH006: Cannot force-push to this branch` 拒掉。
+**管理员豁免的边界（实测补充）**：实测所见是——豁免会让 *required status checks* 被绕过（用管理员凭据直推 main 会成功，但远端日志里带 `Bypassed rule violations` 警告），而 `allow_force_pushes=false` **不被绕过**：`git push --force-with-lease origin main` 会被 `GH006: Cannot force-push to this branch` 拒掉。其他开关（`allow_deletions` 等）是否被豁免**未实测**，不要假设。
 
-确需改写 main 历史时（例如删掉误提交的空提交），按三步走：① 临时放开 `allow_force_pushes` → ② `git push --force-with-lease origin main` → ③ 立刻收回。①③ 是同一条 PUT，把 `allow_force_pushes` 在 `true` / `false` 间切换；这条 PUT **必须带上完整的检查项与开关**（只传要改的那一项会 422），且这些字段是**布尔值**，写成 `{"enabled": true}` 同样 422：
+**改写 main 历史是破坏性例外，不是常规手段**（会重写提交哈希，任何引用旧哈希的地方都会失效），仅用于确实要抹掉误提交的情况；动手前先建本地备份分支（`git branch backup/main-<日期> <sha>`）。步骤：① 临时放开 `allow_force_pushes` → ② `git push --force-with-lease origin main` → ③ **无论 ② 成功与否都要**把开关收回。
+
+①③ 是同一条 PUT，把 `allow_force_pushes` 在 `true` / `false` 间切换。照抄下面这条完整命令（别只挑要改的那一项——本次成功的调用是带全 `required_status_checks` / `enforce_admins` / `required_pull_request_reviews` / `restrictions` 与全部开关的）；字段格式有个实测的坑：开关类字段要传**布尔值**，写成 `{"enabled": true}` 会被 422 拒（报错原文 `{"enabled" => true} is not a boolean`）：
 
 ```powershell
 gh api -X PUT repos/CatInRl/Murasaki/branches/main/protection -F "required_status_checks[strict]=true" -F "required_status_checks[contexts][]=frontend" -F "required_status_checks[contexts][]=rust" -F enforce_admins=false -F required_pull_request_reviews=null -F restrictions=null -F allow_force_pushes=true -F allow_deletions=false -F required_linear_history=false -F required_conversation_resolution=false -F block_creations=false -F lock_branch=false -F allow_fork_syncing=false
