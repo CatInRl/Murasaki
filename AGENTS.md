@@ -142,6 +142,8 @@ gh api -X PUT repos/CatInRl/Murasaki/branches/main/protection -F "required_statu
 3. **此时不动版本号**：`main` 上的三处版本号停留在**最近一次发布的版本**，只在 release PR 里改（清单见下「发版本」）。提前 bump 会让每个功能 PR 都变成「要不要改版本号」的无谓冲突源，也让「main 现在是哪个版本」含糊。
 4. **功能 PR 照常进 `main`**：CHANGELOG 先累积在 `## [Unreleased]` 段下，发布时再切成 `## [X.Y.Z] - YYYY-MM-DD`。
 
+**依赖升级是否写 CHANGELOG**：**运行期依赖**（`dependencies`，如 `mermaid` / `vue-i18n` / `sha1`）要记入 `## [Unreleased]`，修安全漏洞的记到 `### Security` 段；**构建期 `devDependencies`**（`vite` / `vitest` / `vue-tsc` / `@vitejs/plugin-vue` 等）**不记** —— 它们不改用户可见行为，记进发布说明只会变成噪音。
+
 ### 发版本
 
 - **发布流程**：开 `chore(release)` PR 更新三处版本号（package.json / src-tauri/Cargo.toml / src-tauri/tauri.conf.json），并把 `## [Unreleased]` 段落切成 `## [X.Y.Z] - YYYY-MM-DD` → CI 绿后合入 main → 在 main 打 `vX.Y.Z` tag → 推送 tag 触发 `release.yml` → 关闭 milestone → 同步更新本文件变更记录部分
