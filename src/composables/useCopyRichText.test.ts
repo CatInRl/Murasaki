@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ref } from "vue";
 import {
   useCopyRichText,
@@ -17,6 +17,13 @@ import { exportHtml } from "./useHtmlExport";
 const mockedExportHtml = exportHtml as unknown as ReturnType<typeof vi.fn>;
 
 // mock ClipboardItem / navigator.clipboard / Blob
+
+/**
+ * 原生 Blob 必须在替换之前只捕获一次。
+ * 若在 beforeEach 里取，第二个用例起拿到的会是上一轮的 spy，形成「mock 里再 new 上一个 mock」；
+ * vitest 5 的 mock 用箭头函数实现，不能被 new（TypeError: ... is not a constructor）。
+ */
+const NativeBlob = globalThis.Blob;
 const mockWrite = vi.fn();
 /** 捕获 Blob 构造的文本内容，供断言读取（jsdom Blob 无 text()/arrayBuffer()） */
 const blobTexts: Blob[] = [];
@@ -25,8 +32,9 @@ beforeEach(() => {
   mockWrite.mockReset();
   blobTexts.length = 0;
   // 用 spy 包装原生 Blob，捕获构造参数便于断言
-  const NativeBlob = globalThis.Blob;
-  const BlobSpy = vi.fn((parts: BlobPart[], options?: BlobPropertyBag) => {
+  // 注意：实现必须是 function（不能是箭头函数）—— 生产代码里是 `new Blob(...)`，
+  // 而 vitest 5 的 vi.fn 用箭头函数实现时不可被 new（TypeError: ... is not a constructor）
+  const BlobSpy = vi.fn(function (parts: BlobPart[], options?: BlobPropertyBag) {
     const blob = new NativeBlob(parts, options);
     // 在 blob 上挂载 parts 快照，供测试读取
     Object.defineProperty(blob, "__parts", { value: parts });
@@ -46,6 +54,11 @@ beforeEach(() => {
     value: { write: mockWrite },
     configurable: true,
   });
+});
+
+afterEach(() => {
+  // 还原全局 Blob，避免 spy 泄漏到本文件之外
+  globalThis.Blob = NativeBlob;
 });
 
 /** 读取 Blob 的文本内容（通过 spy 捕获的 parts） */
