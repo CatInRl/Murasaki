@@ -110,6 +110,14 @@ murasaki/
 6. **合入**：**squash merge**（一个 PR = 一个 conventional commit），合入后自动删除头分支。Agent 可自主切分支 / 提交 / 推送 / 开 PR，但**squash 合入 main 前必须得到用户确认**。
 7. **main 受保护**：禁止直推、必须 CI 全绿、必须与 main 同步（Require branches to be up to date）；管理员豁免**仅用于紧急修复**；不设 required approving review（单人仓库无法自批自己的 PR）。
 
+**管理员豁免的边界（实测补充）**：豁免只覆盖 *required status checks* —— 用管理员凭据直推 main 会成功，但远端日志里会带 `Bypassed rule violations` 警告；而 `allow_force_pushes=false` **对管理员同样生效**，`git push --force-with-lease origin main` 会被 `GH006: Cannot force-push to this branch` 拒掉。
+
+确需改写 main 历史时（例如删掉误提交的空提交），按三步走：① 临时放开 `allow_force_pushes` → ② `git push --force-with-lease origin main` → ③ 立刻收回。①③ 是同一条 PUT，把 `allow_force_pushes` 在 `true` / `false` 间切换；这条 PUT **必须带上完整的检查项与开关**（只传要改的那一项会 422），且这些字段是**布尔值**，写成 `{"enabled": true}` 同样 422：
+
+```powershell
+gh api -X PUT repos/CatInRl/Murasaki/branches/main/protection -F "required_status_checks[strict]=true" -F "required_status_checks[contexts][]=frontend" -F "required_status_checks[contexts][]=rust" -F enforce_admins=false -F required_pull_request_reviews=null -F restrictions=null -F allow_force_pushes=true -F allow_deletions=false -F required_linear_history=false -F required_conversation_resolution=false -F block_creations=false -F lock_branch=false -F allow_fork_syncing=false
+```
+
 **与发布衔接**：版本准备单独开一个 `chore(release)` PR（bump `package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` + 写 CHANGELOG），合入 main 后再打 `vX.Y.Z` tag，详见下节「版本节奏与发布约定」。
 
 ## Git 提交约定
