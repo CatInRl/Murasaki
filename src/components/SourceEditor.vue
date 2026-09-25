@@ -40,6 +40,7 @@ import { useProposalsStore } from "../stores/useProposalsStore";
 import { wysiwygExtensions, recomputeWysiwygEffect } from "../editor/wysiwyg/wysiwygPlugin";
 import { setCurrentFilePath } from "../composables/useMarkdownRenderer";
 import { fullwidthToMarkdownExtension } from "../editor/fullwidthToMarkdown";
+import type { EditorMode } from "../types";
 
 /**
  * Murasaki syntax theme — purple-tinted, writing-first (ADR-0006).
@@ -224,8 +225,8 @@ interface Props {
   softWrap?: boolean;
   /** 是否只读 */
   readOnly?: boolean;
-  /** 编辑模式：source/split/wysiwyg（wysiwyg 叠加 WYSIWYG ViewPlugin，其他模式移除） */
-  editorMode?: "source" | "split" | "wysiwyg";
+  /** 显示模式：wysiwyg 叠加 WYSIWYG ViewPlugin，其他模式（含演示模式）移除 */
+  editorMode?: EditorMode;
   /** 编辑器字体大小（px） */
   fontSize?: number;
   /** 编辑器行高 */
@@ -294,6 +295,12 @@ const shortcutComp = new Compartment();
 // 快捷键覆盖表（响应式：设置保存后自动更新）
 const { overrides } = useShortcuts();
 
+// markdownOnly 快捷键（Ctrl+B 加粗 / Ctrl+I 斜体）的实时文件类型判定。
+// 未命名新文件默认按 markdown 处理（与 App.vue 约定一致）；实时读 props，切换文件无需重建扩展。
+function isMarkdownDoc(): boolean {
+  return props.currentFilePath ? isMarkdownFile(props.currentFilePath) : true;
+}
+
 function buildExtensions() {
   return [
     history(),
@@ -317,7 +324,7 @@ function buildExtensions() {
     ]),
     // 快捷键扩展（高优先级，避免被 defaultKeymap 拦截；含 Enter 引用块换行处理）
     // 由设置中的快捷键覆盖动态生成，settings://saved 后通过 shortcutComp 重建
-    shortcutComp.of(buildEditorShortcutExtension(overrides.value)),
+    shortcutComp.of(buildEditorShortcutExtension(overrides.value, { isMarkdown: isMarkdownDoc })),
     // 语言高亮：markdown 走 GFM，其他文本/代码文件走解析出的 CodeMirror 语言
     languageComp.of(buildLanguageExtension()),
     lineNumbersComp.of(props.showLineNumbers ? lineNumbers() : []),
@@ -562,7 +569,9 @@ watch(
         effects: [
           wysiwygComp.reconfigure(props.editorMode === "wysiwyg" ? wysiwygExtensions : []),
           fontComp.reconfigure(buildFontTheme()),
-          shortcutComp.reconfigure(buildEditorShortcutExtension(overrides.value)),
+          shortcutComp.reconfigure(
+            buildEditorShortcutExtension(overrides.value, { isMarkdown: isMarkdownDoc })
+          ),
         ],
       });
     } else {
@@ -647,7 +656,9 @@ watch(
   () => overrides.value,
   () => {
     viewRef.value?.dispatch({
-      effects: shortcutComp.reconfigure(buildEditorShortcutExtension(overrides.value)),
+      effects: shortcutComp.reconfigure(
+        buildEditorShortcutExtension(overrides.value, { isMarkdown: isMarkdownDoc })
+      ),
     });
   }
 );

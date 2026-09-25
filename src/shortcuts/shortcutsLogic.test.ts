@@ -148,6 +148,17 @@ describe("shortcutsLogic - shortcutMatchesEvent", () => {
     expect(shortcutMatchesEvent("Alt+Shift+S", keyEvent({ altKey: true, shiftKey: true, key: "S" }))).toBe(true);
   });
 
+  it("Shift 组合：e.key 为上档字符时回退基础键匹配（Ctrl+Shift+1 ← \"!\"）", () => {
+    expect(
+      shortcutMatchesEvent("Ctrl+Shift+1", keyEvent({ ctrlKey: true, shiftKey: true, key: "!" }))
+    ).toBe(true);
+    expect(
+      shortcutMatchesEvent("Ctrl+Shift+]", keyEvent({ ctrlKey: true, shiftKey: true, key: "}" }))
+    ).toBe(true);
+    // 未按 Shift 时不回退：单独 "!" 不应匹配 "Ctrl+Shift+1"
+    expect(shortcutMatchesEvent("Ctrl+Shift+1", keyEvent({ ctrlKey: true, key: "!" }))).toBe(false);
+  });
+
   it("无效快捷键恒 false", () => {
     expect(shortcutMatchesEvent(null, keyEvent({ ctrlKey: true, key: "s" }))).toBe(false);
     expect(shortcutMatchesEvent("Ctrl", keyEvent({ ctrlKey: true, key: "s" }))).toBe(false);
@@ -157,6 +168,10 @@ describe("shortcutsLogic - shortcutMatchesEvent", () => {
 describe("shortcutsLogic - eventToShortcut", () => {
   it("录制 Ctrl+Shift+K", () => {
     expect(eventToShortcut(keyEvent({ ctrlKey: true, shiftKey: true, key: "k" }))).toBe("Ctrl+Shift+K");
+  });
+
+  it("Shift 组合的上档字符录制为基础键（\"!\" → Ctrl+Shift+1）", () => {
+    expect(eventToShortcut(keyEvent({ ctrlKey: true, shiftKey: true, key: "!" }))).toBe("Ctrl+Shift+1");
   });
 
   it("metaKey 折叠为主修饰键 Ctrl", () => {
@@ -307,6 +322,19 @@ describe("shortcutsLogic - detectConflicts", () => {
     expect(conflicts).toHaveLength(1);
     expect(conflicts[0].commands.map((c) => c.id).sort()).toEqual(["open-file", "save"]);
   });
+
+  it("跨作用域同键不算冲突（global 与 editor 由不同处理链消费）", () => {
+    // zoom-reset 为 global、heading-1 为 editor，Ctrl+1 同键互不干扰
+    expect(detectConflicts({ "zoom-reset": "Ctrl+1" })).toEqual([]);
+    // 同作用域内改绑同一键 → 冲突
+    expect(detectConflicts({ "zoom-in": "Ctrl+1", "zoom-reset": "Ctrl+1" })).toHaveLength(1);
+  });
+
+  it("Ctrl+- 可规范化（缩小默认绑定）", () => {
+    expect(normalizeShortcut("Ctrl+-")).toBe("Ctrl+-");
+    expect(normalizeShortcut("Ctrl+Minus")).toBe("Ctrl+-");
+    expect(canonicalizeShortcut("Ctrl+-")).toBe("Ctrl+-");
+  });
 });
 
 describe("shortcutsLogic - isUsableShortcut", () => {
@@ -425,12 +453,13 @@ describe("全部注册命令 - 默认设置生效", () => {
     }
   });
 
-  it("默认设置下无任何冲突（每个全局绑定唯一，保证事件能确定性命中）", () => {
+  it("默认设置下无任何冲突（作用域内每个绑定唯一，保证事件能确定性命中）", () => {
     const bindingToCmds = new Map<string, string[]>();
     for (const c of SHORTCUT_COMMANDS) {
       const binding = resolveShortcut({}, c.id);
       if (!binding) continue;
-      const key = canonicalizeShortcut(binding)!;
+      // 作用域前缀：global 与 editor 由不同处理链消费，跨域同键不算冲突
+      const key = `${c.scope}::${canonicalizeShortcut(binding)!}`;
       bindingToCmds.set(key, [...(bindingToCmds.get(key) ?? []), c.id]);
     }
     const dups = [...bindingToCmds.entries()].filter(([, ids]) => ids.length > 1);

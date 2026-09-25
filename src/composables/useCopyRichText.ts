@@ -1,4 +1,5 @@
 import { exportHtml } from "./useHtmlExport";
+import { i18n } from "../i18n";
 import type { Ref } from "vue";
 import type { Tab } from "../types";
 
@@ -52,10 +53,12 @@ export function extractRichTextFragment(fullHtml: string): string {
  */
 export function useCopyRichText(deps: CopyRichTextDeps) {
   const { activeTab, currentTheme, workspace, toast } = deps;
+  /** 文案翻译（用户可见文本必须走 i18n，禁止硬编码） */
+  const t = i18n.global.t.bind(i18n.global);
 
   async function copyRichText(): Promise<void> {
     if (!activeTab.value) {
-      toast.error("请先打开一个文件");
+      toast.error(t("editor.commands.openFileFirst"));
       return;
     }
     const tab = activeTab.value;
@@ -74,10 +77,10 @@ export function useCopyRichText(deps: CopyRichTextDeps) {
         "text/plain": new Blob([tab.content], { type: "text/plain" }),
       });
       await navigator.clipboard.write([clipboardItem]);
-      toast.success("已复制富文本到剪贴板");
+      toast.success(t("common.copyRichTextSuccess"));
     } catch (err) {
       console.error("复制富文本失败:", err);
-      toast.error(`复制富文本失败: ${err}`);
+      toast.error(t("common.error.copyRichTextFailed", { error: err }));
     }
   }
 

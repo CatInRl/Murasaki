@@ -29,9 +29,20 @@ murasaki/
 - 草稿通过 `fs` plugin 直接操作文件，内容为 markdown 文本。
 - 路径用 SHA-1 哈希作为草稿文件名，避免路径中非法字符问题。
 
+### 退出落盘 (Flush on Exit)
+
+0.9.0 起。用户点击窗口关闭（或 `Ctrl+Q`）时**静默落盘、不弹对话框**：
+
+- Rust 侧 `Builder::on_window_event` 拦截 `WindowEvent::CloseRequested`，调用 `api.prevent_close()` 阻止默认关闭，并向主窗口推送 `app-close-requested` 事件；`ClosingState(AtomicBool)` 保证重复请求仍被拦截。
+- 前端收到事件后：所有脏且已命名的 tab 落盘草稿 → 持久化 settings / tabs，随后调用 `exit_app` 命令真正退出（`AppHandle::exit(0)`）。
+- 落盘有 3 秒超时兜底（`Promise.race`），超时也强制退出，避免关不掉窗口。
+- 未命名 tab（`path === null`）无磁盘位置，不落盘、不提示；下次启动不恢复。
+
+详见 [ADR-0017](docs/adr/0017-close-interception-with-draft-flush-on-exit.md)。
+
 ## 菜单结构 (Menu Structure)
 
-应用顶部菜单栏包含五项。各项及其子项、快捷键如下：
+应用顶部菜单栏包含六项（顺序：文件 / 编辑 / 段落 / 视图 / 主题 / 帮助）。各项及其子项、快捷键如下：
 
 ### 文件 (File)
 
@@ -85,6 +96,19 @@ markdown 格式操作菜单：
 - 水平分隔线
 - 插入表格… —— 弹对话框输入行列数，插入空表格模板
 
+### 视图 (View)
+
+0.9.0 起从原「视图」位置前移到「主题」之前。包含：
+
+- **显示模式 ▸** —— 二级子菜单，四态互斥勾选（使用 `CheckMenuItemBuilder`）：源码 / 分屏 / 所见即所得 / 演示。对应快捷键 `Ctrl+Shift+1/2/3/4`。
+- **文件树视图**（`Ctrl+Shift+E`）—— 互斥勾选项，切换到侧栏文件树视图。
+- **大纲视图**（`Ctrl+Shift+M`）—— 互斥勾选项，切换到侧栏大纲视图。
+- ---
+- **状态栏**（`Alt+Shift+S`）—— 切换状态栏显隐。
+- **全屏**（`F11`）—— 全屏切换。
+
+菜单勾选同步由 Rust 命令 `set_mode_checked` / `set_sidebar_view_checked` 负责；因显示模式项位于二级子菜单，勾选遍历使用递归 `set_checked_by_ids` helper（按菜单项 ID 定位，ID 与快捷键命令 ID 统一命名，菜单事件直接复用 `handleMenuEvent` 分发）。
+
 ### 主题 (Theme)
 
 预设四套 markdown 渲染样式：
@@ -102,18 +126,23 @@ markdown 格式操作菜单：
 
 ## 编辑模式 (Edit Mode)
 
-用户与 markdown 内容交互的方式。本项目支持三种（0.3.0 起）：
+用户与 markdown 内容交互的方式。本项目支持四种（0.9.0 起增加演示模式）：
 
 - **源码模式 (Source Mode)** —— 纯 markdown 源码编辑，CodeMirror 6 占满编辑区，无预览区。
 - **分屏模式 (Split Mode)** —— 界面分为源码编辑区与渲染预览区，输入时预览实时更新。默认模式。
 - **所见即所得 (WYSIWYG Mode)** —— 用户直接在渲染结果上编辑，所见即所得。通过 CodeMirror 6 ViewPlugin + Decoration 隐藏 markdown 语法标记实现（Typora 路线），源文件始终是纯 markdown 文本，不引入第二套文档模型。Agent 提案在所有模式原生兼容。
+- **演示模式 (Presentation Mode)** —— 只挂预览、不挂编辑器：编辑区仅渲染预览内容（铺满、无工具栏与分隔条），用于纯阅读与演示。内容不可编辑；内部 `.md` 链接仍开新 tab、外部链接走系统浏览器、任务列表 checkbox 只读不写回；大纲点击滚动预览到对应标题。支持整体等比缩放（50%–200%，步进 10%，`Ctrl+=` / `Ctrl+-` / `Ctrl+0` / 按住 Ctrl 滚轮，持久化 `settings.presentationZoom`）。菜单栏与状态栏不自动隐藏。
 
-三种模式共用同一 CodeMirror 6 实例，**全部支持运行时切换**（无需重启）：
+前三种模式共用同一 CodeMirror 6 实例，**全部支持运行时切换**（无需重启）；演示模式不挂载编辑器实例，切换即卸载/重挂编辑器：
 
 - `source` ↔ `split`：运行时切换（仅显隐预览区 + 调整布局）
 - `wysiwyg` ↔ 其他：运行时切换（叠加/移除 WYSIWYG ViewPlugin）
 
-切换入口：通过系统设置窗口的"编辑器"分类切换。详见 [ADR-0008](docs/adr/0008-wysiwyg-via-codemirror6-typora-approach.md)。
+切换入口：菜单栏「视图 → 显示模式」（四态互斥勾选）、快捷键（`Ctrl+Shift+1/2/3/4`）、状态栏模式下拉（点击弹出四项，不做循环切换）。0.8.4 起从设置窗口移出。
+
+**显示模式作用域 (Display Mode Scope)** —— 显示模式是**全局默认 + 按文件类型记忆**：markdown 文件沿用用户最后一次选择的模式；仅源码模式的文件（非 md / 非 html）不受影响，始终为源码模式。不按单个文件记忆。
+
+实现路线详见 [ADR-0008](docs/adr/0008-wysiwyg-via-codemirror6-typora-approach.md)。
 
 ### WYSIWYG 功能优先级（0.3.0）
 
@@ -323,6 +352,7 @@ Rust 端使用 `lexical-sort` crate 或调用 Windows `StrCmpLogicalW` API。应
 两种视图不能同时显示。切换入口：
 - 侧栏顶部两个图标按钮（发现性入口，新用户可见）。
 - 快捷键（效率入口，老用户偏好）。
+- 菜单栏「视图 → 文件树视图 / 大纲视图」（互斥勾选，0.9.0 起）。
 
 ## 大纲 (Outline)
 
@@ -359,9 +389,17 @@ tab 栏 UI 细节：
 主窗口底部的窄条（约 20-24px 高），始终位于最底部。跨文件搜索结果面板展开时位于状态栏之上，不覆盖状态栏。
 
 - **左侧** —— 当前文件路径（相对工作区根目录，如 `notes/2024/01.md`）。
-- **右侧** —— 光标位置（`行:列`）、字符数、字数。
+- **右侧** —— 光标位置（`行:列`）、字数、字符数。
 
-字数统计口径：按 Unicode 字符计数，不含空格。中英文统一计数，显示如 `1234 字`。
+- **字数 (Word Count)** —— 与 Word / WPS 同口径：中日韩字符逐字计数，拉丁字母与数字按空白分隔的"词"计数。显示如 `1234 字`。
+- **字符数 (Character Count)** —— 不含空白字符的 Unicode 字符总数。显示如 `5678 字符`。
+
+两项独立计数值相近但语义不同（如纯英文文本字符数远大于字数），不可互相替代。
+
+0.9.0 起状态栏还包含：
+
+- **显示模式 chip** —— 显示当前模式，**点击弹出四项下拉**（源码/分栏/所见即所得/演示）直接选择；不做循环轮换（模式增至四种后逐个轮换低效）。
+- **演示模式缩放 chip** —— 仅在演示模式显示当前缩放比例（如 `130%`），点击复位到 100%。
 
 全屏模式下（`F11`）状态栏自动隐藏，退出全屏恢复。也可通过快捷键 `Alt+Shift+S` 手动切换显隐。
 
@@ -386,6 +424,8 @@ tab 栏 UI 细节：
 - `Ctrl+C` —— 复制
 - `Ctrl+V` —— 粘贴
 - `Ctrl+A` —— 全选
+- `Ctrl+B` —— 加粗（仅 markdown 文件生效，编辑器作用域）
+- `Ctrl+I` —— 斜体（仅 markdown 文件生效，编辑器作用域）
 - `Ctrl+F` —— 当前文件查找
 - `Ctrl+H` —— 当前文件替换
 - `Ctrl+Shift+F` —— 跨文件搜索
@@ -400,12 +440,24 @@ tab 栏 UI 细节：
 - `Ctrl+Shift+X` —— 任务列表
 
 ### 视图 (View)
+- `Ctrl+Shift+1` —— 源码模式
+- `Ctrl+Shift+2` —— 分屏模式
+- `Ctrl+Shift+3` —— 所见即所得模式
+- `Ctrl+Shift+4` —— 演示模式
+- `Ctrl+=` —— 演示模式放大（步进 10%，上限 200%）
+- `Ctrl+-` —— 演示模式缩小（步进 10%，下限 50%）
+- `Ctrl+0` —— 演示模式缩放复位到 100%
+- `Ctrl+滚轮` —— 演示模式缩放（等价于 `Ctrl+=` / `Ctrl+-`）
 - `Ctrl+Shift+E` —— 切换到文件树视图
 - `Ctrl+Shift+M` —— 切换到大纲视图
 - `Ctrl+Tab` —— 切换到下一个 tab（按显示顺序）
 - `Ctrl+Shift+Tab` —— 切换到上一个 tab（按显示顺序）
 - `F11` —— 全屏切换
 - `Alt+Shift+S` —— 切换状态栏显隐
+
+演示模式缩放值持久化到 `settings.presentationZoom`（50%–200%，步进 10%）；状态栏显示当前缩放比例，点击复位到 100%。
+
+快捷键分为两个作用域：`global`（主窗口 keydown → `matchGlobalKeydown`）与 `editor`（CodeMirror keymap）。冲突检测按作用域隔离，同一组合在两个作用域中各绑一次不算冲突。上档字符场景（如 `Ctrl+Shift+1` 实际 `e.key === "!"`）通过 `SHIFT_BASE_KEYS` 反查表归一化后匹配。注册表 `SHORTCUT_COMMANDS` 为单一事实源，可在「设置 → 快捷键」中自定义。
 
 ## 滚动同步 (Scroll Sync)
 
@@ -613,6 +665,7 @@ issue #104 范围：性能修复 + UX 导航。
 - **支持语言**：`zh-CN`（中文，默认）/ `en`（英文）/ `ja`（日本語）。回退语言为 `en`（新语言缺 key 显示英文）。
 - **首次启动探测**：全新安装（`settings.json` 的 `language` 从未写入）首次启动探测系统语言作为默认（zh→zh-CN、ja→ja、其余→en）；已持久化语言的既有用户跳过探测。
 - **key 同步校验**：`src/locales/locales.test.ts` 强制所有语言各模块与 zh-CN 的 key 树完全一致，防 key 漂移。
+- **硬编码守卫**：`src/locales/i18nHardcodedGuard.test.ts` 扫描 `composables` / `components` / `stores` / `settings` 下的 `dialog.*` / `toast.*` 调用，实参含 CJK 字符即测试失败，禁止用户可见文案绕过 i18n。
 - **切换入口**：系统设置 → 常规 → 语言。切换即时生效（前端 vue-i18n 运行时切换 + Rust 菜单重建），无需重启。
 - **持久化**：`settings.json` 的 `language` 字段。
 - **不翻译的内容**：markdown 主题名（GitHub/Newsprint 等）、代码块语言标签、Agent 工具名、markdown 语法。

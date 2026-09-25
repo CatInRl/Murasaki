@@ -1,6 +1,7 @@
 import { ref } from "vue";
 import { check as checkForUpdate, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { i18n } from "../i18n";
 
 /**
  * 可序列化的更新信息（从 plugin 的 Update 对象提取，供 UI 使用）。
@@ -50,6 +51,8 @@ export interface UpdaterDeps {
  */
 export function useUpdater(deps: UpdaterDeps) {
   const { toast, onUpdateAvailable } = deps;
+  /** 文案翻译（用户可见文本必须走 i18n，禁止硬编码） */
+  const t = i18n.global.t.bind(i18n.global);
 
   const checking = ref(false);
   const downloading = ref(false);
@@ -86,12 +89,12 @@ export function useUpdater(deps: UpdaterDeps) {
       pendingUpdate = null;
       availableUpdate.value = null;
       if (!silent) {
-        toast.success("已是最新版本");
+        toast.success(t("editor.update.upToDate"));
       }
       return null;
     } catch (err) {
       if (!silent) {
-        toast.error(`检查更新失败: ${err}`);
+        toast.error(t("editor.update.checkFailed", { error: err }));
       }
       return null;
     } finally {
@@ -107,17 +110,17 @@ export function useUpdater(deps: UpdaterDeps) {
   async function downloadAndInstall(update: UpdateInfo): Promise<void> {
     if (downloading.value) return;
     if (!pendingUpdate) {
-      toast.error("无可安装的更新，请重新检查");
+      toast.error(t("editor.update.noInstallable"));
       return;
     }
     // 一致性校验：调用方传入的版本应与缓存的一致
     if (update.version !== pendingUpdate.version) {
-      toast.error("更新信息已过期，请重新检查");
+      toast.error(t("editor.update.staleInfo"));
       return;
     }
     downloading.value = true;
     // 先显示无进度的 toast（indeterminate）：duration=0 不自动消失，无 progress 值
-    const toastId = toast.progress("正在下载更新…", { duration: 0 });
+    const toastId = toast.progress(t("editor.update.downloading"), { duration: 0 });
     // 累计已下载字节与总字节，用于把真实进度写回 toast
     let downloaded = 0;
     let total: number | undefined;
@@ -131,17 +134,19 @@ export function useUpdater(deps: UpdaterDeps) {
             ? Math.min(100, Math.round((downloaded / total) * 100))
             : 0;
           toast.update(toastId, {
-            title: total ? `正在下载更新… ${pct}%` : "正在下载更新…",
+            title: total
+              ? t("editor.update.downloadingProgress", { percent: pct })
+              : t("editor.update.downloading"),
             progress: total ? pct : undefined,
           });
         }
       });
       toast.dismiss(toastId);
-      toast.success("更新已安装，即将重启…");
+      toast.success(t("editor.update.installed"));
       await relaunch();
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error(`下载更新失败: ${err}`);
+      toast.error(t("editor.update.downloadFailed", { error: err }));
     } finally {
       downloading.value = false;
     }
@@ -152,7 +157,7 @@ export function useUpdater(deps: UpdaterDeps) {
     try {
       await relaunch();
     } catch (err) {
-      toast.error(`重启失败: ${err}`);
+      toast.error(t("editor.update.restartFailed", { error: err }));
     }
   }
 

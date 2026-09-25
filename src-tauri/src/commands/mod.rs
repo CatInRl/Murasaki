@@ -5,6 +5,7 @@ pub mod chats;
 pub mod drafts;
 pub mod files;
 pub mod launch;
+pub mod lifecycle;
 pub mod locale;
 pub mod menu;
 pub mod outline;

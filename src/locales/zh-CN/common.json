@@ -37,12 +37,14 @@
   "settings": "设置",
   "docs": "文档",
   "about": "关于 Murasaki",
+  "aboutMessage": "Murasaki v{version}\n轻量级本地 Markdown 文件管理编辑器\n基于 Tauri 2.x + Vue 3 + CodeMirror 6",
   "checkUpdates": "检查更新…",
   "quit": "退出",
   "openFileTitle": "打开文件",
   "exportHtmlTitle": "导出 HTML",
   "exportPdfTitle": "导出 PDF",
   "exportPdfSuccess": "已导出 PDF",
+  "copyRichTextSuccess": "已复制富文本到剪贴板",
   "fileFilter": {
     "markdown": "Markdown 文档",
     "textCode": "文本与代码文件",
@@ -82,6 +84,7 @@
   },
   "error": {
     "copyPathFailed": "复制路径失败: {error}",
+    "copyRichTextFailed": "复制富文本失败: {error}",
     "revealFailed": "无法在资源管理器中显示: {error}",
     "openSettingsFailed": "打开设置窗口失败: {error}",
     "createFolderFailed": "新建文件夹失败: {error}",

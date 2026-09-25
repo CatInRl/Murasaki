@@ -1,5 +1,6 @@
 import type { Ref } from "vue";
 import { insertTable } from "./useEditorCommands";
+import { i18n } from "../i18n";
 
 /** EditorPane 暴露的接口切片 */
 export interface EditorViewLike {
@@ -37,6 +38,8 @@ export interface EditorNavDeps {
  */
 export function useEditorNavigation(deps: EditorNavDeps) {
   const { editorRef, imagePaste, tableDialogVisible, dialog } = deps;
+  /** 文案翻译（用户可见文本必须走 i18n，禁止硬编码） */
+  const t = i18n.global.t.bind(i18n.global);
 
   function onJumpToLine(line: number): void {
     editorRef.value?.scrollToLine(line);
@@ -78,30 +81,30 @@ export function useEditorNavigation(deps: EditorNavDeps) {
     }
     if (action === "insert-link") {
       const url = await dialog.prompt({
-        title: "插入链接",
-        message: "请输入链接地址：",
+        title: t("editor.toolbar.insertLink"),
+        message: t("editor.commands.insertLinkUrlPrompt"),
         placeholder: "https://example.com",
       });
       if (!url) return;
       const text = await dialog.prompt({
-        title: "插入链接",
-        message: "请输入链接文字：",
-        placeholder: "链接文字",
+        title: t("editor.toolbar.insertLink"),
+        message: t("editor.commands.insertLinkTextPrompt"),
+        placeholder: t("editor.toolbar.linkText"),
       });
       insertMarkdownAtCursor(`[${text ?? ""}](${url})`);
       return;
     }
     if (action === "insert-image") {
       const url = await dialog.prompt({
-        title: "插入图片",
-        message: "请输入图片地址：",
+        title: t("editor.toolbar.insertImage"),
+        message: t("editor.commands.insertImageUrlPrompt"),
         placeholder: "https://example.com/image.png",
       });
       if (!url) return;
       const alt = await dialog.prompt({
-        title: "插入图片",
-        message: "请输入替代文字（可选）：",
-        placeholder: "替代文字",
+        title: t("editor.toolbar.insertImage"),
+        message: t("editor.commands.insertImageAltPrompt"),
+        placeholder: t("editor.toolbar.imageAlt"),
       });
       insertMarkdownAtCursor(`![${alt ?? ""}](${url})`);
       return;

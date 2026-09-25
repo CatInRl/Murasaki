@@ -37,12 +37,14 @@
   "settings": "Settings",
   "docs": "Docs",
   "about": "About Murasaki",
+  "aboutMessage": "Murasaki v{version}\nA lightweight local Markdown file manager and editor\nBuilt with Tauri 2.x + Vue 3 + CodeMirror 6",
   "checkUpdates": "Check for Updates…",
   "quit": "Quit",
   "openFileTitle": "Open File",
   "exportHtmlTitle": "Export HTML",
   "exportPdfTitle": "Export PDF",
   "exportPdfSuccess": "PDF exported",
+  "copyRichTextSuccess": "Rich text copied to clipboard",
   "fileFilter": {
     "markdown": "Markdown Documents",
     "textCode": "Text and Code Files",
@@ -82,6 +84,7 @@
   },
   "error": {
     "copyPathFailed": "Failed to copy path: {error}",
+    "copyRichTextFailed": "Failed to copy rich text: {error}",
     "revealFailed": "Unable to reveal in explorer: {error}",
     "openSettingsFailed": "Failed to open settings: {error}",
     "createFolderFailed": "Failed to create folder: {error}",

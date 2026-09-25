@@ -18,11 +18,15 @@
   },
   "statusBar": {
     "lineCol": "Ln {line}, Col {col}",
+    "wordCount": "{count} words",
     "charCount": "{count} chars",
     "agentRunning": "Agent running",
     "orphanCount": "{count} orphan chats",
     "orphanTooltip": "Click to clean up {count} orphan chats",
-    "providerTooltip": "Current AI Provider: {name}"
+    "providerTooltip": "Current AI Provider: {name}",
+    "modeTooltip": "Click to switch display mode",
+    "zoomLabel": "{percent}%",
+    "zoomTooltip": "Presentation zoom: Ctrl+wheel / Ctrl+= / Ctrl+-, click to reset to 100%"
   },
   "tabBar": {
     "newTab": "New File",
@@ -49,7 +53,9 @@
     "openFolder": "Open Folder",
     "newFilePlaceholder": "new-file.md",
     "newFolderPlaceholder": "new-folder",
-    "createFailed": "Failed to create: {error}"
+    "createFailed": "Failed to create: {error}",
+    "refreshTimeout": "Refresh timed out",
+    "refreshTimeoutDesc": "The workspace may be too large or a network drive is slow"
   },
   "outline": {
     "title": "Outline",
@@ -158,13 +164,26 @@
     "releaseNotes": "Release Notes",
     "noNotes": "(No release notes)",
     "later": "Later",
-    "updateNow": "Update Now"
+    "updateNow": "Update Now",
+    "upToDate": "You're on the latest version",
+    "checkFailed": "Failed to check for updates: {error}",
+    "noInstallable": "No installable update. Please check again",
+    "staleInfo": "Update information is stale. Please check again",
+    "downloading": "Downloading update…",
+    "downloadingProgress": "Downloading update… {percent}%",
+    "installed": "Update installed, restarting…",
+    "downloadFailed": "Failed to download update: {error}",
+    "restartFailed": "Failed to restart: {error}"
   },
   "commands": {
     "needWorkspace": "Please open a workspace first",
     "newFolderPrompt": "Enter a folder name:",
     "newFolderPlaceholder": "Folder name",
-    "openFileFirst": "Please open a file first"
+    "openFileFirst": "Please open a file first",
+    "insertLinkUrlPrompt": "Enter the link URL:",
+    "insertLinkTextPrompt": "Enter the link text:",
+    "insertImageUrlPrompt": "Enter the image URL:",
+    "insertImageAltPrompt": "Enter the alt text (optional):"
   },
   "imagePreview": {
     "title": "Image Preview",

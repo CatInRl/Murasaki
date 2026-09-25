@@ -29,6 +29,7 @@ import {
   setHeading,
   toggleBlockquote,
   toggleCodeBlock,
+  toggleInline,
   toggleList,
 } from "../composables/useEditorCommands";
 
@@ -44,6 +45,16 @@ function editorCommandFor(cmd: ShortcutCommand): EditorCommandRunner | null {
       return redo;
     case "select-all":
       return selectAll;
+    case "bold":
+      return (v) => {
+        toggleInline(v, "**");
+        return true;
+      };
+    case "italic":
+      return (v) => {
+        toggleInline(v, "*");
+        return true;
+      };
     case "find":
     case "replace":
       return (v) => {
@@ -102,9 +113,12 @@ function editorCommandFor(cmd: ShortcutCommand): EditorCommandRunner | null {
  * - 不可自定义：Enter 引用块换行处理（始终存在，高优先级）
  * - 可自定义：编辑器作用域命令按有效绑定生成 keymap 项（Prec.highest，
  *   覆盖 defaultKeymap 的同键绑定）；绑定为 null 的命令不生成项（即禁用）
+ * - options.isMarkdown：供 markdownOnly 命令实时判定当前文件类型，
+ *   非 markdown 时返回 false（按键落空、不 preventDefault、不报错）
  */
 export function buildEditorShortcutExtension(
-  overrides: ShortcutOverrides
+  overrides: ShortcutOverrides,
+  options: { isMarkdown?: () => boolean } = {}
 ): Extension {
   const bindings: KeyBinding[] = [
     { key: "Enter", run: (v) => handleEnterInBlockquote(v) },
@@ -114,8 +128,11 @@ export function buildEditorShortcutExtension(
     const binding = resolveShortcut(overrides, cmd.id);
     if (!binding) continue;
     const cmKey = toCmKey(binding);
-    const run = editorCommandFor(cmd);
-    if (!cmKey || !run) continue;
+    const runner = editorCommandFor(cmd);
+    if (!cmKey || !runner) continue;
+    const run: EditorCommandRunner = cmd.markdownOnly
+      ? (v) => (options.isMarkdown?.() ?? true) && runner(v)
+      : runner;
     bindings.push({ key: cmKey, preventDefault: true, run });
   }
   return Prec.highest(keymap.of(bindings));

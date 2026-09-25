@@ -6,6 +6,7 @@ import PreviewPane from "./PreviewPane.vue";
 import HtmlPreview from "./HtmlPreview.vue";
 import { useScrollSync } from "../composables/useScrollSync";
 import { isHtmlFile } from "../utils/fileKind";
+import type { EditorMode } from "../types";
 
 interface Props {
   modelValue: string;
@@ -23,8 +24,14 @@ interface Props {
   currentFilePath?: string | null;
   /** 工作区根路径（用于解析相对 .md 链接） */
   workspacePath?: string | null;
-  /** 编辑模式：source（纯源码）/ split（分屏，默认）/ wysiwyg（所见即所得，预览区隐藏） */
-  editorMode?: "source" | "split" | "wysiwyg";
+  /**
+   * 显示模式：
+   * - source：纯源码
+   * - split：分屏（默认）
+   * - wysiwyg：所见即所得
+   * - presentation：仅预览（只读演示，不挂编辑器）
+   */
+  editorMode?: EditorMode;
   /** 编辑器字体大小（px） */
   fontSize?: number;
   /** 编辑器行高 */
@@ -33,6 +40,8 @@ interface Props {
   fontFamily?: string;
   /** 中文符号转 Markdown 记号（行首输入 + 空格自动转换，0.8.0） */
   fullwidthToMarkdown?: boolean;
+  /** 演示模式缩放百分比（50–200，默认 100，仅演示模式生效） */
+  zoom?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -48,6 +57,7 @@ const props = withDefaults(defineProps<Props>(), {
   lineHeight: 1.6,
   fontFamily: "JetBrains Mono",
   fullwidthToMarkdown: false,
+  zoom: 100,
 });
 
 const emit = defineEmits<{
@@ -59,6 +69,8 @@ const emit = defineEmits<{
   (e: "drop-image-path", path: string): void;
   /** 编辑器右键菜单高级操作（插入表格/链接/图片） */
   (e: "context-action", action: "insert-table" | "insert-link" | "insert-image"): void;
+  /** 演示模式 Ctrl+滚轮缩放：1=放大，-1=缩小（由父组件夹取边界并持久化） */
+  (e: "zoom-step", direction: 1 | -1): void;
 }>();
 
 const editorRef = ref<InstanceType<typeof SourceEditor> | null>(null);
@@ -66,6 +78,24 @@ const previewRef = ref<
   InstanceType<typeof PreviewPane> | InstanceType<typeof HtmlPreview> | null
 >(null);
 const cursorKey = ref(0);
+
+/** 是否演示模式（仅预览、只读） */
+const isPresentation = computed(() => props.editorMode === "presentation");
+
+/** 演示模式缩放样式：zoom 会把布局尺寸一并放大，故宽高反向除缩放比 */
+const zoomStyle = computed<Record<string, string> | undefined>(() => {
+  if (!isPresentation.value) return undefined;
+  const z = props.zoom / 100;
+  if (!Number.isFinite(z) || z === 1) return undefined;
+  return { zoom: String(z), width: `calc(100% / ${z})`, height: `calc(100% / ${z})` };
+});
+
+/** Ctrl+滚轮缩放（仅演示模式接管，preventDefault 拦截 WebView2 浏览器缩放） */
+function onWheel(e: WheelEvent): void {
+  if (!isPresentation.value || !e.ctrlKey) return;
+  e.preventDefault();
+  emit("zoom-step", e.deltaY < 0 ? 1 : -1);
+}
 
 /** 当前文件是否为 html（决定右侧预览用 HtmlPreview 渲染原始 HTML） */
 const isHtml = computed(() =>
@@ -225,8 +255,16 @@ function onEditorDrop(e: DragEvent): void {
 }
 
 // 暴露给父组件：滚动到指定行（供大纲跳转使用）
+// 演示模式下没有编辑器实例，改为滚动预览容器到对应块级元素
 defineExpose({
   scrollToLine: (line: number) => {
+    if (isPresentation.value) {
+      const preview = previewRef.value as
+        | { scrollToSourceLine?: (l: number) => void }
+        | null;
+      preview?.scrollToSourceLine?.(line);
+      return;
+    }
     editorRef.value?.scrollToLine(line);
   },
   focus: () => {
@@ -239,64 +277,70 @@ defineExpose({
 <template>
   <div class="editor-pane" :class="`mode-${editorMode}`">
     <EditorToolbar
+      v-if="!isPresentation"
       :get-view="() => editorRef?.getView() ?? null"
       :cursor-key="cursorKey"
     />
     <div class="editor-split">
       <div
+        v-if="!isPresentation"
         class="pane-left"
-      :style="{ width: editorMode === 'split' ? leftWidthPct + '%' : '100%' }"
-      @dragover="onEditorDragOver"
-      @drop="onEditorDrop"
-    >
-      <SourceEditor
-        ref="editorRef"
-        :model-value="modelValue"
-        :tab-id="tabId"
-        :show-line-numbers="showLineNumbers"
-        :soft-wrap="softWrap"
-        :editor-mode="editorMode"
-        :font-size="fontSize"
-        :line-height="lineHeight"
-        :font-family="fontFamily"
-        :markdown-theme="previewTheme"
-        :current-file-path="currentFilePath"
-        :fullwidth-to-markdown="fullwidthToMarkdown"
-        @update:model-value="onInput"
-        @cursor-change="onCursorChange"
-        @context-action="(a) => emit('context-action', a)"
-        @open-internal="(p) => emit('open-internal', p)"
-      />
-    </div>
-    <div
-      v-if="editorMode === 'split'"
-      class="splitter"
-      :class="{ dragging }"
-      @pointerdown="onPointerDown"
-    >
-      <div class="splitter-handle"></div>
-    </div>
-    <div
-      v-if="editorMode === 'split'"
-      class="pane-right"
-      :style="{ width: `calc(${100 - leftWidthPct}% - 6px)` }"
-    >
-      <PreviewPane
-        v-if="!isHtml"
-        ref="previewRef"
-        :source="modelValue"
-        :theme="previewTheme"
-        :current-file-path="currentFilePath"
-        :workspace-path="workspacePath"
-        @task-toggle="onTaskToggle"
-        @open-internal="(p) => emit('open-internal', p)"
-      />
-      <HtmlPreview
-        v-else
-        ref="previewRef"
-        :source="modelValue"
-      />
-    </div>
+        :style="{ width: editorMode === 'split' ? leftWidthPct + '%' : '100%' }"
+        @dragover="onEditorDragOver"
+        @drop="onEditorDrop"
+      >
+        <SourceEditor
+          ref="editorRef"
+          :model-value="modelValue"
+          :tab-id="tabId"
+          :show-line-numbers="showLineNumbers"
+          :soft-wrap="softWrap"
+          :editor-mode="editorMode"
+          :font-size="fontSize"
+          :line-height="lineHeight"
+          :font-family="fontFamily"
+          :markdown-theme="previewTheme"
+          :current-file-path="currentFilePath"
+          :fullwidth-to-markdown="fullwidthToMarkdown"
+          @update:model-value="onInput"
+          @cursor-change="onCursorChange"
+          @context-action="(a) => emit('context-action', a)"
+          @open-internal="(p) => emit('open-internal', p)"
+        />
+      </div>
+      <div
+        v-if="editorMode === 'split'"
+        class="splitter"
+        :class="{ dragging }"
+        @pointerdown="onPointerDown"
+      >
+        <div class="splitter-handle"></div>
+      </div>
+      <div
+        v-if="editorMode === 'split' || isPresentation"
+        class="pane-right"
+        :style="{ width: editorMode === 'split' ? `calc(${100 - leftWidthPct}% - 6px)` : '100%' }"
+      >
+        <!-- 演示模式：缩放包裹层（Ctrl+滚轮 / 快捷键） -->
+        <div class="preview-zoom" :style="zoomStyle" @wheel="onWheel">
+          <PreviewPane
+            v-if="!isHtml"
+            ref="previewRef"
+            :source="modelValue"
+            :theme="previewTheme"
+            :current-file-path="currentFilePath"
+            :workspace-path="workspacePath"
+            :readonly="isPresentation"
+            @task-toggle="onTaskToggle"
+            @open-internal="(p) => emit('open-internal', p)"
+          />
+          <HtmlPreview
+            v-else
+            ref="previewRef"
+            :source="modelValue"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -332,6 +376,12 @@ defineExpose({
   overflow: hidden;
   min-width: 100px;
   min-height: 0;
+}
+/* 演示模式缩放包裹层（默认占满；缩放时 inline style 反向除宽高消除 zoom 放大） */
+.preview-zoom {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 .splitter {
   width: 1px;

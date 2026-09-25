@@ -57,9 +57,15 @@
     "checkUpdates": "更新を確認…"
   },
   "view": {
+    "modeSubmenu": "表示モード",
     "modeSource": "ソース",
     "modeSplit": "分割",
-    "modeWysiwyg": "WYSIWYG"
+    "modeWysiwyg": "WYSIWYG",
+    "modePresentation": "プレゼンテーション",
+    "filesView": "ファイルツリー",
+    "outlineView": "アウトライン",
+    "statusBar": "ステータスバー",
+    "fullscreen": "全画面表示"
   },
   "aboutText": "Murasaki v{version}\n軽量なローカル Markdown ファイル管理エディター\nTauri 2.x + Vue 3 + CodeMirror 6 採用"
 }

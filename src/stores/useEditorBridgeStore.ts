@@ -7,9 +7,10 @@
 import { defineStore } from "pinia";
 import { ref, shallowRef } from "vue";
 import type { EditorView } from "@codemirror/view";
+import type { EditorMode } from "../types";
 
-/** 编辑模式（运行时可切换，无需重启） */
-export type EditorMode = "source" | "split" | "wysiwyg";
+/** 显示模式（定义在 types.ts，此处转出便于既有引用） */
+export type { EditorMode };
 
 export const useEditorBridgeStore = defineStore("editorBridge", () => {
   /** 当前活跃 EditorView（shallowRef，不深度响应式） */

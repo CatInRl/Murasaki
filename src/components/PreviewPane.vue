@@ -14,12 +14,15 @@ interface Props {
   currentFilePath?: string | null;
   /** 工作区根路径（用于解析相对 .md 链接） */
   workspacePath?: string | null;
+  /** 只读（演示模式）：任务列表 checkbox 点击不写回源码，其余交互（链接）保留 */
+  readonly?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   theme: "murasaki",
   currentFilePath: null,
   workspacePath: null,
+  readonly: false,
 });
 
 const containerRef = ref<HTMLDivElement | null>(null);
@@ -298,6 +301,11 @@ function onPreviewClick(e: MouseEvent): void {
   // 任务列表 checkbox 优先
   const target = e.target as HTMLElement;
   if (target.tagName === "INPUT" && target.getAttribute("type") === "checkbox") {
+    // 只读（演示模式）：取消激活行为（preventDefault 会回退复选框状态），不写回源码
+    if (props.readonly) {
+      e.preventDefault();
+      return;
+    }
     handleTaskToggle(e);
     return;
   }
@@ -305,11 +313,32 @@ function onPreviewClick(e: MouseEvent): void {
   void handleLinkClick(e);
 }
 
+/**
+ * 滚动预览到指定源码行（演示模式下大纲跳转使用）。
+ * 取 data-source-line <= 目标行号的最后一个块级元素，回退到内容容器首个元素。
+ */
+function scrollToSourceLine(line: number): void {
+  const container = containerRef.value;
+  if (!container) return;
+  const nodes = container.querySelectorAll<HTMLElement>("[data-source-line]");
+  let target: HTMLElement | null = null;
+  for (const el of Array.from(nodes)) {
+    const n = parseInt(el.getAttribute("data-source-line") || "0", 10);
+    if (Number.isNaN(n)) continue;
+    if (n <= line) target = el;
+    else break;
+  }
+  const fallback = container.firstElementChild as HTMLElement | null;
+  (target ?? fallback)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 defineExpose({
   /** 返回预览区的滚动容器，供滚动同步使用 */
   getScrollDom: (): HTMLElement | null => scrollRef.value,
   /** 返回渲染内容的容器（含 data-source-line 元素） */
   getContentContainer: (): HTMLElement | null => containerRef.value,
+  /** 滚动到指定源码行对应的块级元素（演示模式大纲跳转） */
+  scrollToSourceLine,
 });</script>
 
 <template>

@@ -37,12 +37,14 @@
   "settings": "設定",
   "docs": "ドキュメント",
   "about": "Murasaki について",
+  "aboutMessage": "Murasaki v{version}\n軽量なローカル Markdown ファイル管理エディター\nTauri 2.x + Vue 3 + CodeMirror 6 採用",
   "checkUpdates": "更新を確認…",
   "quit": "終了",
   "openFileTitle": "ファイルを開く",
   "exportHtmlTitle": "HTML をエクスポート",
   "exportPdfTitle": "PDF をエクスポート",
   "exportPdfSuccess": "PDF をエクスポートしました",
+  "copyRichTextSuccess": "リッチテキストをクリップボードにコピーしました",
   "fileFilter": {
     "markdown": "Markdown ドキュメント",
     "textCode": "テキストとコードファイル",
@@ -82,6 +84,7 @@
   },
   "error": {
     "copyPathFailed": "パスのコピーに失敗しました: {error}",
+    "copyRichTextFailed": "リッチテキストのコピーに失敗しました: {error}",
     "revealFailed": "エクスプローラーで表示できません: {error}",
     "openSettingsFailed": "設定ウィンドウを開けませんでした: {error}",
     "createFolderFailed": "新規フォルダーの作成に失敗しました: {error}",

@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { TreeNode } from "../types";
+import { i18n } from "../i18n";
 import { usePersistenceStore } from "./usePersistenceStore";
 import { useToastStore } from "./useToastStore";
 
@@ -21,6 +22,8 @@ const REFRESH_TIMEOUT_MS = 30000;
 export const useWorkspaceStore = defineStore("workspace", () => {
   const persistence = usePersistenceStore();
   const toast = useToastStore();
+  /** 文案翻译（用户可见文本必须走 i18n，禁止硬编码） */
+  const t = i18n.global.t.bind(i18n.global);
 
   // ===== State =====
   /** 当前工作区根路径（null = 未打开工作区） */
@@ -104,8 +107,8 @@ export const useWorkspaceStore = defineStore("workspace", () => {
       } catch (err) {
         if (err instanceof Error && err.message === "timeout") {
           console.error(`刷新文件树超时（${REFRESH_TIMEOUT_MS / 1000}s）`);
-          toast.warning("刷新超时", {
-            description: "可能是工作区过大或网络盘响应慢",
+          toast.warning(t("editor.fileTree.refreshTimeout"), {
+            description: t("editor.fileTree.refreshTimeoutDesc"),
           });
         } else {
           console.error("刷新文件树失败:", err);

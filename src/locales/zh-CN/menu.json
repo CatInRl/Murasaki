@@ -57,9 +57,15 @@
     "checkUpdates": "检查更新…"
   },
   "view": {
+    "modeSubmenu": "显示模式",
     "modeSource": "源码",
     "modeSplit": "分屏",
-    "modeWysiwyg": "所见即所得"
+    "modeWysiwyg": "所见即所得",
+    "modePresentation": "演示模式",
+    "filesView": "文件树视图",
+    "outlineView": "大纲视图",
+    "statusBar": "状态栏",
+    "fullscreen": "全屏"
   },
   "aboutText": "Murasaki v{version}\n轻量级本地 Markdown 文件管理编辑器\n基于 Tauri 2.x + Vue 3 + CodeMirror 6"
 }

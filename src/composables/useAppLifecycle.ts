@@ -106,11 +106,14 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
     void invoke("set_theme_checked", { themeId: "theme-" + newTheme });
   });
 
-  // 3. 侧栏视图变化时保存（gated）
+  // 3. 侧栏视图变化时保存（gated）+ 同步原生「视图 / 文件树视图、大纲视图」勾选
   watch(sidebarView, (v) => {
     if (initialized.value) {
       void persistence.updateSettings({ sidebarView: v });
     }
+    void invoke("set_sidebar_view_checked", { viewId: v }).catch((err: unknown) =>
+      console.warn("同步侧栏视图菜单勾选失败:", err)
+    );
   });
 
   // 4. 编辑模式设置变更 -> 运行时同步到当前编辑器（不 gated，初始化时也需应用）

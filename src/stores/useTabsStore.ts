@@ -368,19 +368,6 @@ export const useTabsStore = defineStore("tabs", () => {
   }
 
   /**
-   * 关闭所有 tab（应用退出时调用）
-   * 为有未保存修改的 tab 写入草稿
-   */
-  async function closeAll(): Promise<void> {
-    for (const tab of tabs.value) {
-      if (tab.isDirty && tab.path) {
-        await fileSystem.saveDraft(tab.path, tab.content, tab.lastMtime ?? 0)
-          .catch((err) => console.error("保存草稿失败:", err));
-      }
-    }
-  }
-
-  /**
    * 持久化当前 tabs 状态（用于启动恢复）
    */
   async function persist(): Promise<void> {
@@ -507,7 +494,6 @@ export const useTabsStore = defineStore("tabs", () => {
     updateActiveContent,
     saveTab,
     saveTabAs,
-    closeAll,
     persist,
     restore,
     clearAll,

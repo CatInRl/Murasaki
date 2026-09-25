@@ -1,6 +1,7 @@
 import type { Ref } from "vue";
 import type { EditorView } from "@codemirror/view";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { i18n } from "../i18n";
 import { getAppVersion } from "../utils/appVersion";
 import {
   setHeading,
@@ -10,7 +11,7 @@ import {
   insertHorizontalRule,
 } from "./useEditorCommands";
 import type { AlertVariant } from "../stores/useDialogStore";
-import type { SidebarView } from "../types";
+import type { EditorMode, SidebarView } from "../types";
 import type { UpdateInfo } from "./useUpdater";
 
 // ===== 编辑器实例最小切片 =====
@@ -55,10 +56,8 @@ export interface CommandsDeps {
     visible: boolean;
   };
 
-  // settings 持久化切片（显示模式菜单切换时写回设置）
-  persistence: {
-    updateSettings(patch: Record<string, unknown>): Promise<unknown>;
-  };
+  // settings 持久化切片（显示模式菜单/快捷键切换时写回设置）
+  setEditorMode: (mode: EditorMode) => Promise<void>;
 
   // file ops store 切片
   fileOps: {
@@ -95,6 +94,11 @@ export interface CommandsDeps {
   openSettings: () => Promise<void>;
   toggleFullscreen: () => Promise<void>;
 
+  // 演示模式缩放（非演示模式下自身 no-op，见 App.vue）
+  zoomIn: () => Promise<void>;
+  zoomOut: () => Promise<void>;
+  zoomReset: () => Promise<void>;
+
   // 快捷键系统：匹配全局快捷键，命中返回命令 ID（未命中返回 null）
   matchGlobalKeydown: (e: KeyboardEvent) => string | null;
 }
@@ -106,6 +110,9 @@ export interface CommandsDeps {
  * 依赖通过 CommandsDeps 注入，便于后续测试与维护。
  */
 export function useCommands(deps: CommandsDeps) {
+  /** 文案翻译（用户可见文本必须走 i18n，禁止硬编码） */
+  const t = i18n.global.t.bind(i18n.global);
+
   const {
     onNewTab, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
     reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, copyRichText,
@@ -114,8 +121,9 @@ export function useCommands(deps: CommandsDeps) {
     editorRef, currentTheme, sidebarView, statusBarVisible,
     tableDialogVisible,
     openSettings, toggleFullscreen, updater,
+    zoomIn, zoomOut, zoomReset,
     matchGlobalKeydown,
-    persistence,
+    setEditorMode,
   } = deps;
 
   /** 由原生菜单触发的命令分发 */
@@ -169,13 +177,14 @@ export function useCommands(deps: CommandsDeps) {
       case "settings":
         await openSettings();
         break;
-      // 显示模式（视图 / 显示模式菜单）：写回设置，经 useAppLifecycle watcher
-      // 同步到 editorBridge（运行时可切换），同时触发原生菜单勾选同步
+      // 显示模式（视图 / 显示模式菜单 + 模式快捷键）：写回设置，经 useAppLifecycle
+      // watcher 同步到 editorBridge（运行时可切换）与原生菜单勾选态；
+      // source-only 文件的忽略规则统一由 App.vue 的 setEditorMode 兜底
       case "mode-source":
       case "mode-split":
-      case "mode-wysiwyg": {
-        const mode = menuId.replace("mode-", "");
-        await persistence.updateSettings({ editorMode: mode });
+      case "mode-wysiwyg":
+      case "mode-presentation": {
+        await setEditorMode(menuId.replace("mode-", "") as EditorMode);
         break;
       }
       case "theme-murasaki":
@@ -246,15 +255,18 @@ export function useCommands(deps: CommandsDeps) {
       case "new-folder": {
         // 在工作区根目录新建文件夹
         if (!workspace.hasWorkspace) {
-          dialog.alert({ message: "请先打开一个工作区", variant: "warning" });
+          dialog.alert({ message: t("editor.commands.needWorkspace"), variant: "warning" });
           break;
         }
-        const name = await dialog.prompt({ message: "请输入文件夹名称：", placeholder: "文件夹名称" });
+        const name = await dialog.prompt({
+          message: t("editor.commands.newFolderPrompt"),
+          placeholder: t("editor.commands.newFolderPlaceholder"),
+        });
         if (name && name.trim()) {
           try {
             await fileOps.createDirectory(workspace.workspacePath!, name.trim());
           } catch (err) {
-            dialog.alert({ message: `新建文件夹失败: ${err}`, variant: "error" });
+            dialog.alert({ message: t("common.error.createFolderFailed", { error: err }), variant: "error" });
           }
         }
         break;
@@ -282,14 +294,17 @@ export function useCommands(deps: CommandsDeps) {
           const { open } = await import("@tauri-apps/plugin-shell");
           await open("https://github.com/CatInRl/Murasaki");
         } catch {
-          dialog.alert({ message: "文档暂未在线发布" });
+          dialog.alert({ message: t("common.error.docsNotPublished") });
         }
         break;
       }
       case "about": {
         // 动态读取打包版本号（tauri.conf.json 的 version），避免硬编码过期
         const version = await getAppVersion();
-        dialog.alert({ title: "关于 Murasaki", message: `Murasaki v${version}\n轻量级本地 Markdown 文件管理编辑器\n基于 Tauri 2.x + Vue 3 + CodeMirror 6` });
+        dialog.alert({
+          title: t("common.about"),
+          message: t("common.aboutMessage", { version }),
+        });
         break;
       }
       case "check-updates": {
@@ -297,10 +312,9 @@ export function useCommands(deps: CommandsDeps) {
         await updater.check(false);
         break;
       }
-      // 视图命令（由快捷键系统分发；保留菜单兼容入口）
+      // 视图菜单 / 快捷键共用：文件树视图、大纲视图、状态栏、全屏
       case "toggle-sidebar": {
-        // 有工作区 → 文件树；无工作区 → 大纲
-        sidebarView.value = workspace.hasWorkspace ? "files" : "outline";
+        sidebarView.value = "files";
         break;
       }
       case "toggle-outline": {
@@ -321,6 +335,19 @@ export function useCommands(deps: CommandsDeps) {
       }
       case "toggle-statusbar": {
         statusBarVisible.value = !statusBarVisible.value;
+        break;
+      }
+      // 演示模式缩放（非演示模式下为 no-op）
+      case "zoom-in": {
+        await zoomIn();
+        break;
+      }
+      case "zoom-out": {
+        await zoomOut();
+        break;
+      }
+      case "zoom-reset": {
+        await zoomReset();
         break;
       }
       default:

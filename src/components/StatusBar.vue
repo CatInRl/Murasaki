@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, h, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { NDropdown } from "naive-ui";
 import {
   FileText,
   AlignLeft,
   Type,
+  Hash,
   Check,
+  ChevronDown,
+  ZoomIn,
   PencilLine,
   MessageSquare,
   Sparkles,
@@ -16,6 +20,7 @@ import { useAiProvidersStore } from "../stores/useAiProvidersStore";
 import { useAgentStore } from "../stores/useAgentStore";
 import { basename, dirname } from "../utils/path";
 import { AGENT_ENABLED } from "../features";
+import type { EditorMode } from "../types";
 
 interface Props {
   filePath: string | null;
@@ -25,6 +30,10 @@ interface Props {
   wordCount: number;
   /** Agent 是否运行中 */
   agentRunning?: boolean;
+  /** 当前生效的显示模式（受文件类型降级后的值） */
+  editorMode?: EditorMode;
+  /** 演示模式缩放百分比 */
+  zoom?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -34,7 +43,16 @@ const props = withDefaults(defineProps<Props>(), {
   charCount: 0,
   wordCount: 0,
   agentRunning: false,
+  editorMode: "source",
+  zoom: 100,
 });
+
+const emit = defineEmits<{
+  /** 下拉选中某一显示模式 */
+  "select-mode": [mode: EditorMode];
+  /** 点击缩放 chip 复位到 100% */
+  "zoom-reset": [];
+}>();
 
 const workspace = useWorkspaceStore();
 const tabs = useTabsStore();
@@ -88,6 +106,37 @@ const providerName = computed<string | null>(
   () => aiProviders.activeProvider?.name ?? null
 );
 
+/** 显示模式顺序 + 文案 key（下拉项按此顺序渲染，复用菜单文案） */
+const MODE_LABEL_KEYS: Record<EditorMode, string> = {
+  source: "menu.view.modeSource",
+  split: "menu.view.modeSplit",
+  wysiwyg: "menu.view.modeWysiwyg",
+  presentation: "menu.view.modePresentation",
+};
+
+/** 当前模式显示名 */
+const modeLabel = computed(() => t(MODE_LABEL_KEYS[props.editorMode]));
+
+/**
+ * 模式下拉项：点击 chip 弹出四选一（当前项打勾），不做循环切换。
+ * 文件类型降级（source-only / html）仍以 props.editorMode 为准。
+ */
+const modeOptions = computed(() =>
+  (Object.keys(MODE_LABEL_KEYS) as EditorMode[]).map((mode) => ({
+    key: mode,
+    label: t(MODE_LABEL_KEYS[mode]),
+    icon: mode === props.editorMode ? () => h(Check, { size: 14 }) : undefined,
+  }))
+);
+
+/** 演示模式：显示缩放 chip */
+const isPresentation = computed(() => props.editorMode === "presentation");
+
+function onModeSelect(key: string): void {
+  if (key === props.editorMode) return;
+  emit("select-mode", key as EditorMode);
+}
+
 async function refreshOrphans(): Promise<void> {
   try {
     orphanCount.value = await agentStore.checkOrphanChats();
@@ -131,9 +180,15 @@ onMounted(() => {
       <span>{{ $t('editor.statusBar.lineCol', { line: cursorLine, col: cursorCol }) }}</span>
     </div>
 
-    <!-- 字符数 -->
+    <!-- 字数（CJK 逐字 + 拉丁逐词） -->
     <div class="status-group">
       <Type class="status-icon" :size="14" />
+      <span>{{ $t('editor.statusBar.wordCount', { count: wordCount }) }}</span>
+    </div>
+
+    <!-- 字符数（不含空白字符） -->
+    <div class="status-group">
+      <Hash class="status-icon" :size="14" />
       <span>{{ $t('editor.statusBar.charCount', { count: charCount }) }}</span>
     </div>
 
@@ -161,8 +216,37 @@ onMounted(() => {
       {{ $t('editor.statusBar.agentRunning') }}
     </div>
 
-    <!-- 右侧：孤立会话清理 + provider chip -->
+    <!-- 右侧：显示模式下拉 + 缩放 + 孤立会话清理 + provider chip -->
     <div class="status-right">
+      <!-- 显示模式：点击弹出四选一下拉（不循环切换） -->
+      <NDropdown
+        trigger="click"
+        placement="top-start"
+        :options="modeOptions"
+        @select="onModeSelect"
+      >
+        <button
+          type="button"
+          class="status-chip status-mode-chip"
+          :title="$t('editor.statusBar.modeTooltip')"
+        >
+          <span>{{ modeLabel }}</span>
+          <ChevronDown :size="12" />
+        </button>
+      </NDropdown>
+
+      <!-- 演示模式：缩放百分比（点击复位 100%） -->
+      <button
+        v-if="isPresentation"
+        type="button"
+        class="status-chip status-zoom-chip"
+        :title="$t('editor.statusBar.zoomTooltip')"
+        @click="emit('zoom-reset')"
+      >
+        <ZoomIn :size="14" />
+        <span>{{ $t('editor.statusBar.zoomLabel', { percent: zoom }) }}</span>
+      </button>
+
       <button
         v-if="AGENT_ENABLED && orphanCount > 0"
         type="button"
@@ -284,6 +368,28 @@ onMounted(() => {
 .status-orphan:disabled {
   cursor: progress;
   opacity: 0.6;
+}
+
+/* 显示模式 / 缩放 chip：透明底，hover 变主色 */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 1px 6px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--murasaki-ink-3);
+  border-radius: var(--murasaki-radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--murasaki-transition-fast),
+              background var(--murasaki-transition-fast);
+}
+.status-chip:hover {
+  color: var(--murasaki-primary);
+  background: rgba(147, 51, 234, 0.1);
 }
 
 /* Provider chip: bg-primary/10 + text-primary + rounded */

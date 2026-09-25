@@ -9,6 +9,7 @@ use commands::chats;
 use commands::drafts;
 use commands::files;
 use commands::launch::{self, PendingOpenState};
+use commands::lifecycle::{self, ClosingState};
 use commands::locale;
 use commands::menu::{self, RecentMenuState};
 use commands::outline;
@@ -389,6 +390,7 @@ pub fn run() {
         .manage(search::SearchState::default())
         .manage(RecentMenuState::default())
         .manage(PendingOpenState::default())
+        .manage(ClosingState::default())
         .invoke_handler(tauri::generate_handler![
             files::list_tree,
             files::create_file,
@@ -403,6 +405,7 @@ pub fn run() {
             files::path_type,
             files::reveal_in_explorer,
             launch::take_pending_open_path,
+            lifecycle::exit_app,
             search::search_workspace,
             search::cancel_search,
             outline::parse_outline,
@@ -423,6 +426,7 @@ pub fn run() {
             menu::update_recent_menu,
             menu::set_theme_checked,
             menu::set_mode_checked,
+            menu::set_sidebar_view_checked,
             menu::reload_menu,
             menu::update_shortcut_labels,
             settings::open_settings,
@@ -496,6 +500,15 @@ pub fn run() {
             }
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // 退出拦截（ADR-0017）：主窗口关闭先落盘再真正退出。
+            // 仅拦主窗口 —— 设置窗口关闭不应退出应用。
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if lifecycle::intercept_close_request(window) {
+                    api.prevent_close();
+                }
+            }
         })
         .on_menu_event(|app, event| {
             let menu_id = event.id().as_ref();

@@ -18,7 +18,10 @@ import { usePersistenceStore } from "../stores/usePersistenceStore";
 
 // ===== buildEditorShortcutExtension =====
 
-function makeView(overrides: ShortcutOverrides): EditorView {
+function makeView(
+  overrides: ShortcutOverrides,
+  options?: { isMarkdown?: () => boolean }
+): EditorView {
   const host = document.createElement("div");
   document.body.appendChild(host);
   return new EditorView({
@@ -27,7 +30,7 @@ function makeView(overrides: ShortcutOverrides): EditorView {
       extensions: [
         markdown({ base: markdownLanguage }),
         keymap.of(defaultKeymap),
-        buildEditorShortcutExtension(overrides),
+        buildEditorShortcutExtension(overrides, options),
       ],
     }),
     parent: host,
@@ -123,6 +126,49 @@ describe("buildEditorShortcutExtension - 禁用（null）", () => {
     const v = makeView({ "heading-1": null });
     press(v, "1", { ctrl: true });
     expect(getDoc(v)).toBe("hello");
+  });
+});
+
+describe("buildEditorShortcutExtension - 加粗 / 斜体（markdownOnly）", () => {
+  it("Ctrl+B 加粗、Ctrl+I 斜体（与工具栏 toggleInline 行为一致）", () => {
+    const v = makeView({});
+    v.dispatch({ selection: { anchor: 0, head: 5 } });
+    press(v, "B", { ctrl: true });
+    expect(getDoc(v)).toBe("**hello**");
+
+    const v2 = makeView({});
+    v2.dispatch({ selection: { anchor: 0, head: 5 } });
+    press(v2, "I", { ctrl: true });
+    expect(getDoc(v2)).toBe("*hello*");
+  });
+
+  it("再次按下可取消标记（切换语义）", () => {
+    const v = makeView({});
+    v.dispatch({ selection: { anchor: 0, head: 5 } });
+    press(v, "B", { ctrl: true });
+    v.dispatch({ selection: { anchor: 0, head: 9 } });
+    press(v, "B", { ctrl: true });
+    expect(getDoc(v)).toBe("hello");
+  });
+
+  it("非 markdown 文件：按键落空且不改动文档", () => {
+    const v = makeView({}, { isMarkdown: () => false });
+    v.dispatch({ selection: { anchor: 0, head: 5 } });
+    press(v, "B", { ctrl: true });
+    press(v, "I", { ctrl: true });
+    expect(getDoc(v)).toBe("hello");
+  });
+
+  it("可自定义：改绑 Ctrl+Alt+B 后新键生效、旧键失效", () => {
+    const v = makeView({ bold: "Ctrl+Alt+B" });
+    v.dispatch({ selection: { anchor: 0, head: 5 } });
+    press(v, "B", { ctrl: true, alt: true });
+    expect(getDoc(v)).toBe("**hello**");
+
+    const v2 = makeView({ bold: "Ctrl+Alt+B" });
+    v2.dispatch({ selection: { anchor: 0, head: 5 } });
+    press(v2, "B", { ctrl: true });
+    expect(getDoc(v2)).toBe("hello");
   });
 });
 

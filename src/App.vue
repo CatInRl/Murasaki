@@ -5,6 +5,7 @@ import {
   NConfigProvider,
 } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import EditorPane from "./components/EditorPane.vue";
 import Sidebar from "./components/Sidebar.vue";
@@ -45,6 +46,7 @@ import { useCommands } from "./composables/useCommands";
 import { useShortcuts } from "./shortcuts/useShortcuts";
 import { toMenuAccelerators } from "./shortcuts/shortcutsLogic";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
+import { useExitFlush } from "./composables/useExitFlush";
 import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
 import { setLocale } from "./i18n";
 import { mapSystemLocale } from "./utils/systemLocale";
@@ -61,9 +63,14 @@ import { DEFAULT_THEME } from "./composables/useTheme";
 import { useNaiveTheme } from "./composables/useNaiveTheme";
 import { AGENT_ENABLED } from "./features";
 import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
-import type { SidebarView, SettingsState } from "./types";
+import type { SidebarView, SettingsState, EditorMode } from "./types";
 import type { SearchEntry } from "./search/searchLogic";
 import { READING_FONT_PRESETS } from "./types";
+import {
+  PRESENTATION_ZOOM_DEFAULT,
+  stepPresentationZoom,
+} from "./utils/presentationZoom";
+import { countChars, countWords } from "./utils/textStats";
 
 const workspace = useWorkspaceStore();
 const tabsStore = useTabsStore();
@@ -109,12 +116,52 @@ const currentIsSourceOnly = computed(() =>
   currentFilePath.value ? isSourceOnlyFile(currentFilePath.value) : false
 );
 /** 传给编辑器的有效模式：源码-only 强制 source；html 禁用所见即所得（降到 split）；其余遵循用户设置 */
-const effectiveEditorMode = computed<"source" | "split" | "wysiwyg">(() => {
+const effectiveEditorMode = computed<EditorMode>(() => {
   if (currentIsSourceOnly.value) return "source";
   // html 不走 WYSIWYG markdown 渲染 → 若有 wysiwyg 请求则退化为分屏（源码+预览）
   if (editorBridge.editorMode === "wysiwyg" && !currentIsMarkdown.value) return "split";
   return editorBridge.editorMode;
 });
+
+/** 演示模式缩放百分比（持久化于 settings.presentationZoom） */
+const presentationZoom = computed(() => persistence.settings.presentationZoom);
+
+/** 缩放仅在演示模式生效（避免与编辑器 Ctrl+0「普通」等命令互相干扰） */
+function zoomEnabled(): boolean {
+  return effectiveEditorMode.value === "presentation";
+}
+
+async function onZoomStep(direction: 1 | -1): Promise<void> {
+  if (!zoomEnabled()) return;
+  await persistence.updateSettings({
+    presentationZoom: stepPresentationZoom(presentationZoom.value, direction),
+  });
+}
+
+async function zoomIn(): Promise<void> {
+  await onZoomStep(1);
+}
+
+async function zoomOut(): Promise<void> {
+  await onZoomStep(-1);
+}
+
+async function zoomReset(): Promise<void> {
+  if (!zoomEnabled()) return;
+  await persistence.updateSettings({ presentationZoom: PRESENTATION_ZOOM_DEFAULT });
+}
+
+/**
+ * 切换显示模式（菜单 / 状态栏下拉 / 模式快捷键统一入口）。
+ * 写入 settings.editorMode，经 useAppLifecycle watcher 同步 editorBridge 与原生菜单勾选。
+ * source-only 文件（yaml/txt/json…）永远只读源码，其上的切换不写回设置 ——
+ * 这样该字段始终保存「markdown 文件的最后一次模式」，切回 .md 时自然恢复。
+ */
+async function onSelectMode(mode: EditorMode): Promise<void> {
+  if (currentIsSourceOnly.value) return;
+  if (persistence.settings.editorMode === mode) return;
+  await persistence.updateSettings({ editorMode: mode });
+}
 
 // 切 tab 时更新 editor bridge 的文档路径（供 agent 工具使用）
 // 用 flush: 'post' 确保在 SourceEditor.onMounted（registerView(view, null)）之后触发，
@@ -213,18 +260,10 @@ const isFullscreen = ref(false);
 // ===== 光标位置与字数统计 =====
 const cursorLine = ref(1);
 const cursorCol = ref(0);
-/** 字符数（不含空格的 Unicode 字符数，与 spec 一致） */
-const charCount = computed(() => {
-  const text = activeContent.value;
-  let count = 0;
-  for (const ch of text) {
-    // 跳过空白字符（空格、tab、换行等）
-    if (!/\s/.test(ch)) count++;
-  }
-  return count;
-});
-/** 字数（按 Unicode 字符统计，与 spec 中"字数统计按 Unicode 字符（不含空格）"一致） */
-const wordCount = computed(() => charCount.value);
+/** 字符数（不含空白字符的字符总数，口径见 CONTEXT.md） */
+const charCount = computed(() => countChars(activeContent.value));
+/** 字数（CJK 逐字 + 拉丁逐词） */
+const wordCount = computed(() => countWords(activeContent.value));
 
 function onCursorChange(payload: { line: number; ch: number }) {
   cursorLine.value = payload.line;
@@ -307,6 +346,11 @@ function onUpdateCancel(): void {
 // ===== 启动初始化 =====
 // 事件监听器 cleanup（由 setupEventListeners 在 onMounted 中赋值）
 let cleanupListeners: (() => void) | null = null;
+// 退出拦截监听 cleanup（Rust 拦截主窗口关闭 → 前端落盘 → exit_app，ADR-0017）
+let cleanupExitListener: (() => void) | null = null;
+
+// 退出前落盘：未保存改动写草稿 + 刷新 tabs.json，完成后再真正退出
+const { onExitRequested } = useExitFlush(tabsStore);
 
 onMounted(async () => {
   // 1. 加载持久化状态
@@ -379,6 +423,11 @@ onMounted(async () => {
 
   // 3. 注册 5 个 tauri 事件监听器（menu-event / recent-open / single-instance / settings://saved / navigate）
   cleanupListeners = await setupEventListeners();
+
+  // 3.5 退出拦截：主窗口关闭被 Rust 拦下后，落盘完成才放行（ADR-0017）
+  cleanupExitListener = await listen("app-close-requested", () => {
+    void onExitRequested();
+  });
 
   // 4. 同步最近打开菜单到原生菜单
   await syncRecentMenu();
@@ -476,6 +525,8 @@ onBeforeUnmount(() => {
   // 清理 5 个 tauri 事件监听器
   cleanupListeners?.();
   cleanupListeners = null;
+  cleanupExitListener?.();
+  cleanupExitListener = null;
   window.removeEventListener("keydown", onKeyDown);
   fileWatcher.stop();
   imagePaste.teardown();
@@ -546,7 +597,8 @@ const { handleMenuEvent, onKeyDown } = useCommands({
   openSettings, toggleFullscreen,
   updater: { check: checkForUpdate },
   matchGlobalKeydown,
-  persistence: { updateSettings: (patch) => persistence.updateSettings(patch) },
+  setEditorMode: onSelectMode,
+  zoomIn, zoomOut, zoomReset,
 });
 
 // ===== 拖拽/命令行打开文件或文件夹（issue #92 / #113）=====
@@ -751,6 +803,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :current-file-path="currentFilePath"
             :workspace-path="workspace.workspacePath"
             :editor-mode="effectiveEditorMode"
+            :zoom="presentationZoom"
             :font-size="persistence.settings.editorFontSize"
             :line-height="persistence.settings.editorLineHeight"
             :font-family="persistence.settings.editorFontFamily"
@@ -759,6 +812,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             @open-internal="openFile"
             @drop-image-path="onDropImagePath"
             @context-action="onEditorContextAction"
+            @zoom-step="onZoomStep"
           />
 
           <!-- 统一搜索条：Ctrl+P / Ctrl+Shift+F（取代旧 find-in-files 底部面板） -->
@@ -777,7 +831,11 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
           :cursor-col="cursorCol"
           :char-count="charCount"
           :word-count="wordCount"
+          :editor-mode="effectiveEditorMode"
+          :zoom="presentationZoom"
           :agent-running="agentStore.isThinking"
+          @select-mode="onSelectMode"
+          @zoom-reset="zoomReset"
         />
       </div>
 

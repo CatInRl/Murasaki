@@ -1,5 +1,6 @@
 import { DEFAULT_LOCALE } from "./locales/registry";
 import type { AppLocale } from "./locales/registry";
+import { PRESENTATION_ZOOM_DEFAULT } from "./utils/presentationZoom";
 
 export type { AppLocale } from "./locales/registry";
 
@@ -170,10 +171,19 @@ export const READING_FONT_PRESET_LABELS: Record<ReadingFontPreset, string> = {
  */
 export type SidebarEntryOverflow = "hover" | "wrap";
 
+/**
+ * 显示模式（0.9.0 新增第 4 种「演示模式」）
+ * - source：纯源码
+ * - split：源码 + 预览分屏
+ * - wysiwyg：所见即所得
+ * - presentation：仅预览（只读演示，不挂编辑器）
+ */
+export type EditorMode = "source" | "split" | "wysiwyg" | "presentation";
+
 export interface SettingsState {
   /** UI 模式已固定为浅色（0.5.0 移除深色模式，issue #114） */
   uiMode: "light";
-  editorMode: "source" | "split" | "wysiwyg";
+  editorMode: EditorMode;
   showLineNumbers: boolean;
   softWrap: boolean;
   /** 是否显示隐藏文件（以 . 开头的文件/目录） */
@@ -225,6 +235,11 @@ export interface SettingsState {
    * 只存与默认绑定不同的条目；未覆盖的命令回退到注册表默认绑定（resolveShortcut）。
    */
   shortcuts: Record<string, string | null>;
+  /**
+   * 演示模式缩放百分比（默认 100，范围 50–200，0.9.0）。
+   * 仅演示模式生效，属视图状态，不参与设置面板的 draft 比较。
+   */
+  presentationZoom: number;
 }
 
 /**
@@ -257,6 +272,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   entryOverflowMode: "hover",
   fullwidthToMarkdown: true,
   shortcuts: {},
+  presentationZoom: PRESENTATION_ZOOM_DEFAULT,
 };
 
 /**

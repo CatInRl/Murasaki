@@ -131,7 +131,8 @@ export function normalizeShortcut(input: string | null | undefined): string | nu
     }
   }
   if (key === null) return null; // 纯修饰键
-  if (key.includes("+") || key.includes("-")) return null; // 残留分隔符 → 无效
+  // 残留分隔符 → 无效；"-" 自身即减号键（演示模式缩小的默认绑定 Ctrl+-），放行
+  if (key.includes("+") || (key.includes("-") && key !== "-")) return null;
 
   const normalizedKey = normalizeKeyName(key);
   return [...mods, normalizedKey].join("+");
@@ -179,6 +180,23 @@ export function parseShortcut(shortcut: string | null | undefined): ParsedShortc
 
 // ===== 事件匹配 / 录制 =====
 
+/**
+ * US 布局下 Shift 组合产生的上档字符 → 基础键。
+ * 浏览器在按住 Shift 时把 e.key 变成上档字符（Ctrl+Shift+1 收到 "!"），
+ * 若不回退到基础键，数字/标点类的 Shift 组合永远匹配不上、录制也会存成 "!"。
+ */
+const SHIFT_BASE_KEYS: Record<string, string> = {
+  "~": "`", "!": "1", "@": "2", "#": "3", "$": "4", "%": "5", "^": "6",
+  "&": "7", "*": "8", "(": "9", ")": "0", "_": "-", "+": "=",
+  "{": "[", "}": "]", "|": "\\", ":": ";", "\"": "'", "<": ",",
+  ">": ".", "?": "/",
+};
+
+/** 按住 Shift 时把上档字符还原为基础键；否则原样返回 */
+function baseKeyOf(key: string, shiftKey: boolean): string {
+  return shiftKey ? (SHIFT_BASE_KEYS[key] ?? key) : key;
+}
+
 /** 判断键盘事件是否匹配某快捷键。Ctrl 视为主修饰键：匹配 ctrlKey 或 metaKey */
 export function shortcutMatchesEvent(
   shortcut: string | null | undefined,
@@ -190,7 +208,10 @@ export function shortcutMatchesEvent(
   if (parsed.ctrl !== primary) return false;
   if (parsed.shift !== e.shiftKey) return false;
   if (parsed.alt !== e.altKey) return false;
-  return normalizeKeyName(parsed.key) === normalizeKeyName(e.key);
+  const target = normalizeKeyName(parsed.key);
+  if (target === normalizeKeyName(e.key)) return true;
+  // Shift 组合：e.key 是上档字符（"!"）时回退比较基础键（"1"）
+  return target === normalizeKeyName(baseKeyOf(e.key, e.shiftKey));
 }
 
 /** 把 keydown 事件转换为规范快捷键字符串（用于录制）；纯修饰键/无按键返回 null */
@@ -201,7 +222,7 @@ export function eventToShortcut(e: KeyboardEvent): string | null {
   if (primary) parts.push("Ctrl");
   if (e.shiftKey) parts.push("Shift");
   if (e.altKey) parts.push("Alt");
-  const key = normalizeKeyName(e.key);
+  const key = normalizeKeyName(baseKeyOf(e.key, e.shiftKey));
   if (!key) return null;
   parts.push(key);
   return parts.join("+");
@@ -326,22 +347,29 @@ export interface ShortcutConflict {
   commands: ShortcutCommand[];
 }
 
-/** 检测绑定冲突：返回共享同一有效快捷键的命令组（按命令登记顺序） */
+/**
+ * 检测绑定冲突：返回共享同一有效快捷键的命令组（按命令登记顺序）。
+ *
+ * 冲突按「作用域内」判定：global 由窗口 keydown 匹配、editor 由 CodeMirror keymap
+ * 匹配，二者的同键绑定在运行时互不干扰（如编辑器 Ctrl+0「普通」与演示模式
+ * Ctrl+0「重置缩放」——演示模式下无编辑器实例）。跨作用域同键不算冲突。
+ */
 export function detectConflicts(overrides: ShortcutOverrides): ShortcutConflict[] {
   const map = new Map<string, ShortcutCommand[]>();
   for (const cmd of SHORTCUT_COMMANDS) {
     const binding = resolveShortcut(overrides, cmd.id);
     if (!binding) continue;
-    // 用规范等价形式做 key：修饰键顺序不同的同一组合视为冲突
-    const key = canonicalizeShortcut(binding);
-    if (!key) continue;
+    // 用规范等价形式做 key：修饰键顺序不同的同一组合视为冲突；作用域前缀隔离跨域同键
+    const canonical = canonicalizeShortcut(binding);
+    if (!canonical) continue;
+    const key = `${cmd.scope}::${canonical}`;
     const list = map.get(key);
     if (list) list.push(cmd);
     else map.set(key, [cmd]);
   }
   return [...map.entries()]
     .filter(([, cmds]) => cmds.length > 1)
-    .map(([shortcut, commands]) => ({ shortcut, commands }));
+    .map(([key, commands]) => ({ shortcut: key.slice(key.indexOf("::") + 2), commands }));
 }
 
 /** 展示用：快捷键字符串（规范格式），无绑定返回 null（面板显示"未设置"） */

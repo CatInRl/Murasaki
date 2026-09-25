@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
-use tauri::menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::menu::{
+    CheckMenuItemBuilder, MenuBuilder, MenuItemKind, MenuItemBuilder, SubmenuBuilder,
+};
 use crate::i18n;
 
 /// 最近打开菜单状态
@@ -11,8 +13,10 @@ use crate::i18n;
 ///   供 build_app_menu 在菜单重建时恢复正确的 checked 状态
 /// - current_language: 当前界面语言（"zh-CN" / "en"），供 build_app_menu
 ///   在菜单重建时使用对应语言的文案
-/// - current_mode: 当前编辑模式（"source" / "split" / "wysiwyg"），供 build_app_menu
-///   在菜单重建时恢复 "视图 / 显示模式" 子菜单正确的勾选状态
+/// - current_mode: 当前编辑模式（"source" / "split" / "wysiwyg" / "presentation"），
+///   供 build_app_menu 在菜单重建时恢复 "视图 / 显示模式" 子菜单正确的勾选状态
+/// - current_sidebar_view: 当前侧栏视图（"files" / "outline"），
+///   供 build_app_menu 在菜单重建时恢复 "视图 / 文件树视图、大纲视图" 的勾选状态
 /// - shortcut_overrides: 快捷键覆盖表（commandId → accelerator），由前端
 ///   update_shortcut_labels 推送。菜单项右侧的快捷键提示据此与设置面板
 ///   中用户自定义的绑定保持一致。值为 None 表示该命令被禁用（不显示快捷键）
@@ -26,6 +30,7 @@ pub struct RecentMenuState {
     pub current_theme: Mutex<String>,
     pub current_language: Mutex<String>,
     pub current_mode: Mutex<String>,
+    pub current_sidebar_view: Mutex<String>,
     pub shortcut_overrides: Mutex<HashMap<String, Option<String>>>,
 }
 
@@ -38,6 +43,7 @@ impl Default for RecentMenuState {
             current_theme: Mutex::new("theme-murasaki".to_string()),
             current_language: Mutex::new(i18n::DEFAULT_LANG.to_string()),
             current_mode: Mutex::new("split".to_string()),
+            current_sidebar_view: Mutex::new("files".to_string()),
             shortcut_overrides: Mutex::new(HashMap::new()),
         }
     }
@@ -142,6 +148,75 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .text("insert-table", mt("paragraph.insertTable"))
         .build()?;
 
+    // === View menu（前移到「主题」之前；含显示模式 / 侧栏视图 / 状态栏 / 全屏）===
+    // 使用 CheckMenuItem 以支持勾选，勾选状态由 current_mode / current_sidebar_view 决定，
+    // 菜单重建（如 update_recent_menu）时据此恢复
+    let current_mode = state
+        .current_mode
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
+    let mode_source = CheckMenuItemBuilder::new(mt("view.modeSource"))
+        .id("mode-source")
+        .checked(current_mode == "source")
+        .build(app)?;
+    let mode_split = CheckMenuItemBuilder::new(mt("view.modeSplit"))
+        .id("mode-split")
+        .checked(current_mode == "split")
+        .build(app)?;
+    let mode_wysiwyg = CheckMenuItemBuilder::new(mt("view.modeWysiwyg"))
+        .id("mode-wysiwyg")
+        .checked(current_mode == "wysiwyg")
+        .build(app)?;
+    let mode_presentation = CheckMenuItemBuilder::new(mt("view.modePresentation"))
+        .id("mode-presentation")
+        .checked(current_mode == "presentation")
+        .build(app)?;
+    // 显示模式子菜单（4 项互斥勾选）
+    let mode_submenu = SubmenuBuilder::new(app, mt("view.modeSubmenu"))
+        .item(&mode_source)
+        .item(&mode_split)
+        .item(&mode_wysiwyg)
+        .item(&mode_presentation)
+        .build()?;
+
+    // 侧栏视图（两项互斥勾选）：ID 与快捷键命令 ID 一致，菜单事件直接复用命令分发
+    let current_sidebar_view = state
+        .current_sidebar_view
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
+    let view_files = CheckMenuItemBuilder::new(i18n::with_accel(
+        mt("view.filesView"),
+        &accel("toggle-sidebar", "CmdOrCtrl+Shift+E"),
+    ))
+    .id("toggle-sidebar")
+    .checked(current_sidebar_view == "files")
+    .build(app)?;
+    let view_outline = CheckMenuItemBuilder::new(i18n::with_accel(
+        mt("view.outlineView"),
+        &accel("toggle-outline", "CmdOrCtrl+Shift+M"),
+    ))
+    .id("toggle-outline")
+    .checked(current_sidebar_view == "outline")
+    .build(app)?;
+
+    let view_menu = SubmenuBuilder::new(app, mt("viewMenu"))
+        .item(&mode_submenu)
+        .separator()
+        .item(&view_files)
+        .item(&view_outline)
+        .separator()
+        .text(
+            "toggle-statusbar",
+            i18n::with_accel(mt("view.statusBar"), &accel("toggle-statusbar", "Alt+Shift+S")),
+        )
+        .text(
+            "fullscreen",
+            i18n::with_accel(mt("view.fullscreen"), &accel("fullscreen", "F11")),
+        )
+        .build()?;
+
     // === Theme menu ===
     // 使用 CheckMenuItem 以支持勾选状态，checked 由 current_theme 决定
     // 菜单重建（如 update_recent_menu）时据此恢复正确的勾选项
@@ -179,31 +254,6 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .item(&theme_academic)
         .build()?;
 
-    // === View / 显示模式 menu ===
-    // 使用 CheckMenuItem 以支持互斥勾选，checked 由 current_mode 决定
-    let current_mode = state
-        .current_mode
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone();
-    let mode_source = CheckMenuItemBuilder::new(mt("view.modeSource"))
-        .id("mode-source")
-        .checked(current_mode == "source")
-        .build(app)?;
-    let mode_split = CheckMenuItemBuilder::new(mt("view.modeSplit"))
-        .id("mode-split")
-        .checked(current_mode == "split")
-        .build(app)?;
-    let mode_wysiwyg = CheckMenuItemBuilder::new(mt("view.modeWysiwyg"))
-        .id("mode-wysiwyg")
-        .checked(current_mode == "wysiwyg")
-        .build(app)?;
-    let view_menu = SubmenuBuilder::new(app, mt("viewMenu"))
-        .item(&mode_source)
-        .item(&mode_split)
-        .item(&mode_wysiwyg)
-        .build()?;
-
     // === Help menu ===
     let help_menu = SubmenuBuilder::new(app, mt("helpMenu"))
         .text("docs", mt("help.docs"))
@@ -211,12 +261,13 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .text("check-updates", mt("help.checkUpdates"))
         .build()?;
 
+    // 顺序：文件 / 编辑 / 段落 / 视图 / 主题 / 帮助（视图前移到主题之前）
     let menu = MenuBuilder::new(app)
         .item(&file_menu)
         .item(&edit_menu)
         .item(&paragraph_menu)
-        .item(&theme_menu)
         .item(&view_menu)
+        .item(&theme_menu)
         .item(&help_menu)
         .build()?;
 
@@ -300,6 +351,41 @@ pub fn update_recent_menu(
     Ok(())
 }
 
+/// 递归遍历菜单树，把 `ids` 中的 CheckMenuItem 设为「仅 active_id 勾选」。
+/// 显示模式项位于 "视图 → 显示模式" 二级子菜单内，浅层遍历找不到，必须递归。
+fn set_checked_by_ids(
+    menu: &tauri::menu::Menu<tauri::Wry>,
+    ids: &[&str],
+    active_id: &str,
+) -> Result<(), String> {
+    fn walk(
+        item: &MenuItemKind<tauri::Wry>,
+        ids: &[&str],
+        active_id: &str,
+    ) -> Result<(), String> {
+        if let Some(submenu) = item.as_submenu() {
+            for sub in submenu.items().map_err(|e| e.to_string())? {
+                walk(&sub, ids, active_id)?;
+            }
+        } else {
+            let id = item.id().as_ref();
+            if ids.contains(&id) {
+                if let Some(check_item) = item.as_check_menuitem() {
+                    check_item
+                        .set_checked(id == active_id)
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    for item in menu.items().map_err(|e| e.to_string())? {
+        walk(&item, ids, active_id)?;
+    }
+    Ok(())
+}
+
 /// 前端调用：设置主题菜单的 checked 状态
 /// 同时更新 current_theme，以便后续菜单重建（如 update_recent_menu）时恢复正确勾选
 #[tauri::command]
@@ -314,7 +400,6 @@ pub fn set_theme_checked(
         *current = theme_id.clone();
     }
 
-    // 遍历顶层菜单找到 "主题" 子菜单，更新其中各 CheckMenuItem 的勾选状态
     let theme_ids = [
         "theme-murasaki",
         "theme-github",
@@ -323,21 +408,7 @@ pub fn set_theme_checked(
         "theme-academic",
     ];
     let menu = app.menu().ok_or("菜单未初始化")?;
-    for item in menu.items().map_err(|e| e.to_string())? {
-        if let Some(submenu) = item.as_submenu() {
-            for sub_item in submenu.items().map_err(|e| e.to_string())? {
-                let id = sub_item.id().as_ref();
-                if theme_ids.contains(&id) {
-                    if let Some(check_item) = sub_item.as_check_menuitem() {
-                        check_item
-                            .set_checked(id == theme_id)
-                            .map_err(|e| e.to_string())?;
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
+    set_checked_by_ids(&menu, &theme_ids, &theme_id)
 }
 
 /// 前端调用：设置 "视图 / 显示模式" 子菜单的互斥勾选状态
@@ -359,24 +430,30 @@ pub fn set_mode_checked(
         *current = mode;
     }
 
-    // 更新 "视图 / 显示模式" 子菜单中三个 CheckMenuItem 的互斥勾选
-    let mode_ids = ["mode-source", "mode-split", "mode-wysiwyg"];
+    let mode_ids = ["mode-source", "mode-split", "mode-wysiwyg", "mode-presentation"];
     let menu = app.menu().ok_or("菜单未初始化")?;
-    for item in menu.items().map_err(|e| e.to_string())? {
-        if let Some(submenu) = item.as_submenu() {
-            for sub_item in submenu.items().map_err(|e| e.to_string())? {
-                let id = sub_item.id().as_ref();
-                if mode_ids.contains(&id) {
-                    if let Some(check_item) = sub_item.as_check_menuitem() {
-                        check_item
-                            .set_checked(id == mode_id)
-                            .map_err(|e| e.to_string())?;
-                    }
-                }
-            }
-        }
+    set_checked_by_ids(&menu, &mode_ids, &mode_id)
+}
+
+/// 前端调用：设置 "视图 / 文件树视图、大纲视图" 的互斥勾选状态
+/// 同时更新 current_sidebar_view，以便后续菜单重建时恢复正确勾选
+#[tauri::command]
+pub fn set_sidebar_view_checked(
+    app: AppHandle,
+    state: tauri::State<'_, RecentMenuState>,
+    view_id: String,
+) -> Result<(), String> {
+    {
+        let mut current = state
+            .current_sidebar_view
+            .lock()
+            .map_err(|e| e.to_string())?;
+        *current = view_id.clone();
     }
-    Ok(())
+
+    let view_ids = ["toggle-sidebar", "toggle-outline"];
+    let menu = app.menu().ok_or("菜单未初始化")?;
+    set_checked_by_ids(&menu, &view_ids, &view_id)
 }
 
 /// 前端调用：切换界面语言后重建原生菜单

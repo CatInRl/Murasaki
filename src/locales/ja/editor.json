@@ -18,11 +18,15 @@
   },
   "statusBar": {
     "lineCol": "行 {line}, 列 {col}",
+    "wordCount": "{count} 語",
     "charCount": "{count} 文字",
     "agentRunning": "Agent 実行中",
     "orphanCount": "{count} 個の孤立セッション",
     "orphanTooltip": "クリックして {count} 個の孤立セッションをクリーンアップ",
-    "providerTooltip": "現在の AI Provider：{name}"
+    "providerTooltip": "現在の AI Provider：{name}",
+    "modeTooltip": "クリックして表示モードを切り替え",
+    "zoomLabel": "{percent}%",
+    "zoomTooltip": "プレゼンテーションのズーム：Ctrl+ホイール / Ctrl+= / Ctrl+-、クリックで 100% に戻す"
   },
   "tabBar": {
     "newTab": "新規ファイル",
@@ -49,7 +53,9 @@
     "openFolder": "フォルダーを開く",
     "newFilePlaceholder": "新規ファイル名.md",
     "newFolderPlaceholder": "新規フォルダー名",
-    "createFailed": "作成に失敗しました: {error}"
+    "createFailed": "作成に失敗しました: {error}",
+    "refreshTimeout": "更新がタイムアウトしました",
+    "refreshTimeoutDesc": "ワークスペースが大きすぎるか、ネットワークドライブの応答が遅い可能性があります"
   },
   "outline": {
     "title": "アウトライン",
@@ -158,13 +164,26 @@
     "releaseNotes": "リリースノート",
     "noNotes": "（リリースノートなし）",
     "later": "後で",
-    "updateNow": "今すぐ更新"
+    "updateNow": "今すぐ更新",
+    "upToDate": "最新バージョンです",
+    "checkFailed": "更新の確認に失敗しました: {error}",
+    "noInstallable": "インストール可能な更新がありません。再確認してください",
+    "staleInfo": "更新情報が古くなっています。再確認してください",
+    "downloading": "更新をダウンロード中…",
+    "downloadingProgress": "更新をダウンロード中… {percent}%",
+    "installed": "更新をインストールしました。再起動します…",
+    "downloadFailed": "更新のダウンロードに失敗しました: {error}",
+    "restartFailed": "再起動に失敗しました: {error}"
   },
   "commands": {
     "needWorkspace": "先にワークスペースを開いてください",
     "newFolderPrompt": "フォルダー名を入力してください：",
     "newFolderPlaceholder": "フォルダー名",
-    "openFileFirst": "先にファイルを開いてください"
+    "openFileFirst": "先にファイルを開いてください",
+    "insertLinkUrlPrompt": "リンク URL を入力してください：",
+    "insertLinkTextPrompt": "リンクテキストを入力してください：",
+    "insertImageUrlPrompt": "画像 URL を入力してください：",
+    "insertImageAltPrompt": "代替テキストを入力してください（任意）："
   },
   "imagePreview": {
     "title": "画像プレビュー",

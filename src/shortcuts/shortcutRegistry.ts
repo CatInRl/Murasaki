@@ -29,6 +29,8 @@ export interface ShortcutCommand {
   defaultShortcut: string | null;
   /** 作用域 */
   scope: ShortcutScope;
+  /** 仅 markdown 文件生效（非 md / source-only 文件按键落空且不报错） */
+  markdownOnly?: boolean;
 }
 
 export const SHORTCUT_COMMANDS: ShortcutCommand[] = [
@@ -54,6 +56,9 @@ export const SHORTCUT_COMMANDS: ShortcutCommand[] = [
   { id: "undo", labelKey: "settings.shortcuts.undo", category: "edit", defaultShortcut: "Ctrl+Z", scope: "editor" },
   { id: "redo", labelKey: "settings.shortcuts.redo", category: "edit", defaultShortcut: "Ctrl+Y", scope: "editor" },
   { id: "select-all", labelKey: "settings.shortcuts.selectAll", category: "edit", defaultShortcut: "Ctrl+A", scope: "editor" },
+  // 加粗 / 斜体：内联格式，仅 markdown 文件生效（复用工具栏同款 toggleInline）
+  { id: "bold", labelKey: "settings.shortcuts.bold", category: "edit", defaultShortcut: "Ctrl+B", scope: "editor", markdownOnly: true },
+  { id: "italic", labelKey: "settings.shortcuts.italic", category: "edit", defaultShortcut: "Ctrl+I", scope: "editor", markdownOnly: true },
   { id: "find", labelKey: "settings.shortcuts.find", category: "edit", defaultShortcut: "Ctrl+F", scope: "editor" },
   { id: "replace", labelKey: "settings.shortcuts.replace", category: "edit", defaultShortcut: "Ctrl+H", scope: "editor" },
   { id: "find-in-files", labelKey: "settings.shortcuts.findInFiles", category: "edit", defaultShortcut: "Ctrl+Shift+F", scope: "global" },
@@ -73,12 +78,22 @@ export const SHORTCUT_COMMANDS: ShortcutCommand[] = [
   { id: "task-list", labelKey: "settings.shortcuts.taskList", category: "paragraph", defaultShortcut: "Ctrl+Shift+X", scope: "editor" },
 
   // ===== 视图（global）=====
+  // 显示模式直切（4 态，与原生菜单「视图 → 显示模式」ID 一致）
+  { id: "mode-source", labelKey: "settings.shortcuts.modeSource", category: "view", defaultShortcut: "Ctrl+Shift+1", scope: "global" },
+  { id: "mode-split", labelKey: "settings.shortcuts.modeSplit", category: "view", defaultShortcut: "Ctrl+Shift+2", scope: "global" },
+  { id: "mode-wysiwyg", labelKey: "settings.shortcuts.modeWysiwyg", category: "view", defaultShortcut: "Ctrl+Shift+3", scope: "global" },
+  { id: "mode-presentation", labelKey: "settings.shortcuts.modePresentation", category: "view", defaultShortcut: "Ctrl+Shift+4", scope: "global" },
   { id: "toggle-sidebar", labelKey: "settings.shortcuts.toggleSidebar", category: "view", defaultShortcut: "Ctrl+Shift+E", scope: "global" },
   { id: "toggle-outline", labelKey: "settings.shortcuts.toggleOutline", category: "view", defaultShortcut: "Ctrl+Shift+M", scope: "global" },
   { id: "switch-tab-next", labelKey: "settings.shortcuts.switchTabNext", category: "view", defaultShortcut: "Ctrl+Tab", scope: "global" },
   { id: "switch-tab-prev", labelKey: "settings.shortcuts.switchTabPrev", category: "view", defaultShortcut: "Ctrl+Shift+Tab", scope: "global" },
   { id: "fullscreen", labelKey: "settings.shortcuts.fullscreen", category: "view", defaultShortcut: "F11", scope: "global" },
   { id: "toggle-statusbar", labelKey: "settings.shortcuts.toggleStatusbar", category: "view", defaultShortcut: "Alt+Shift+S", scope: "global" },
+  // 演示模式缩放（global；非演示模式调用无副作用，见 App.vue zoomEnabled）。
+  // Ctrl+0 与编辑器作用域的「普通」同键：跨作用域互斥，detectConflicts 按作用域隔离。
+  { id: "zoom-in", labelKey: "settings.shortcuts.zoomIn", category: "view", defaultShortcut: "Ctrl+=", scope: "global" },
+  { id: "zoom-out", labelKey: "settings.shortcuts.zoomOut", category: "view", defaultShortcut: "Ctrl+-", scope: "global" },
+  { id: "zoom-reset", labelKey: "settings.shortcuts.zoomReset", category: "view", defaultShortcut: "Ctrl+0", scope: "global" },
 ];
 
 /** 默认绑定映射（commandId → 规范快捷键或 null），供注册表使用者快速读取 */

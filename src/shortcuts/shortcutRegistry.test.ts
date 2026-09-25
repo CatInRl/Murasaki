@@ -48,13 +48,15 @@ describe("shortcutRegistry - 完整性", () => {
     }
   });
 
-  it("默认绑定内部无冲突", () => {
+  it("默认绑定在作用域内无冲突", () => {
+    // 作用域内唯一：global 与 editor 由不同处理链消费（如 Ctrl+0 的「普通」与「重置缩放」）
     const seen = new Map<string, string>();
     for (const c of SHORTCUT_COMMANDS) {
       if (c.defaultShortcut === null) continue;
-      const prev = seen.get(c.defaultShortcut);
+      const key = `${c.scope}::${c.defaultShortcut}`;
+      const prev = seen.get(key);
       expect(prev, `命令 ${prev} 与 ${c.id} 共享默认绑定 ${c.defaultShortcut}`).toBeUndefined();
-      seen.set(c.defaultShortcut, c.id);
+      seen.set(key, c.id);
     }
   });
 
