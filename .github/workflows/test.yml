@@ -58,9 +58,14 @@ jobs:
       - name: 安装 npm 依赖
         run: npm ci
 
-      # tauri.conf.json 的 frontendDist 指向 ../dist，build.rs 需要该目录已存在
+      # tauri.conf.json 的 frontendDist 指向 ../dist，build.rs 需要该目录已存在。
+      # 这里显式给出 TAURI_ENV_PLATFORM=windows，使本 job 走与 Windows 生产构建
+      # （tauri build）相同的 build.target 分支（chrome105）；否则默认落 safari13，
+      # 那条 Windows 专属分支将没有任何 CI 覆盖。
       - name: 构建前端
         run: npm run build
+        env:
+          TAURI_ENV_PLATFORM: windows
 
       - name: Rust 测试
         run: npm run test:rust
