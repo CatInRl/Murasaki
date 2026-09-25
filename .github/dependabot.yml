@@ -14,9 +14,13 @@ updates:
     commit-message:
       prefix: "chore(ci)"
     labels:
-      - "enhancement"
+      - "dependencies"
     groups:
       actions:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
         patterns:
           - "*"
 
@@ -28,7 +32,7 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     labels:
-      - "enhancement"
+      - "dependencies"
     groups:
       npm-minor-patch:
         applies-to: version-updates
@@ -46,7 +50,7 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     labels:
-      - "enhancement"
+      - "dependencies"
     groups:
       cargo-minor-patch:
         applies-to: version-updates
