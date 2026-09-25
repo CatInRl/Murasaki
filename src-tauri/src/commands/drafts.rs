@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use sha1::{Digest, Sha1};
+use super::sha1_hex;
 use serde::{Deserialize, Serialize};
 
 /// 草稿元数据（与前端 DraftMeta 对齐）
@@ -45,11 +45,8 @@ fn drafts_dir() -> Result<PathBuf, String> {
 /// 根据原文件路径计算草稿文件路径：drafts/<sha1(path)>
 /// SHA1 避免路径中的特殊字符问题，且固定长度
 fn draft_path_for(original_path: &str) -> Result<PathBuf, String> {
-    let mut hasher = Sha1::new();
-    hasher.update(original_path.as_bytes());
     // 转为十六进制字符串（40 字符）
-    let hash = hasher.finalize();
-    let hash_str: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+    let hash_str = sha1_hex(original_path.as_bytes());
     Ok(drafts_dir()?.join(hash_str))
 }
 

@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use sha1::{Digest, Sha1};
+use super::sha1_hex;
 use serde::Serialize;
 
 /// 图片保存结果
@@ -58,10 +58,7 @@ fn days_to_ymd(days: i64) -> (i64, u32, u32) {
 
 /// 计算字节序列的 SHA1 前 6 位（6 个十六进制字符）
 fn short_hash(bytes: &[u8]) -> String {
-    let mut hasher = Sha1::new();
-    hasher.update(bytes);
-    let hash = hasher.finalize();
-    let full: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+    let full = sha1_hex(bytes);
     full.chars().take(6).collect()
 }
 

@@ -13,7 +13,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use serde::Serialize;
-use sha1::{Digest, Sha1};
+use super::sha1_hex;
 use walkdir::WalkDir;
 
 /// 读取文件最大字符数（4K 阈值）
@@ -150,9 +150,7 @@ pub fn agent_read_file(workspace: String, path: String) -> Result<AgentReadFileR
         content.clone()
     };
 
-    let mut hasher = Sha1::new();
-    hasher.update(content.as_bytes());
-    let content_hash: String = hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect();
+    let content_hash = sha1_hex(content.as_bytes());
 
     Ok(AgentReadFileResult {
         doc_path: path.replace('\\', "/"),

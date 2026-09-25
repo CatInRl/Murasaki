@@ -18,7 +18,7 @@
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use sha1::{Digest, Sha1};
+use super::sha1_hex;
 use serde::{Deserialize, Serialize};
 use flate2::write::GzEncoder;
 use flate2::read::GzDecoder;
@@ -50,10 +50,7 @@ fn chats_dir() -> Result<PathBuf, String> {
 
 /// 计算工作区路径的 SHA1 哈希（40 字符 hex）
 fn hash_workspace_path(workspace: &str) -> String {
-    let mut hasher = Sha1::new();
-    hasher.update(workspace.as_bytes());
-    let hash = hasher.finalize();
-    hash.iter().map(|b| format!("{:02x}", b)).collect()
+    sha1_hex(workspace.as_bytes())
 }
 
 /// 对话文件路径：chats/{sha1(workspace)}.json.gz
