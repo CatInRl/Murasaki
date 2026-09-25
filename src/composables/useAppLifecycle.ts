@@ -1,5 +1,6 @@
 import { ref, watch, type Ref } from "vue";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { invoke } from "@tauri-apps/api/core";
 import { setLocale } from "../i18n";
 import { READING_FONT_PRESETS, type ReadingFontPreset, type AppLocale } from "../types";
@@ -154,11 +155,17 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
    * 在 onMounted 中调用，onBeforeUnmount 调用返回的 cleanup。
    */
   async function setupEventListeners(): Promise<() => void> {
-    const unlistenMenu = await listen<string>("menu-event", (event) => {
+    // 前三个事件在 Rust 侧是**定向**发送（`emit_to(label)`），必须用
+    // `getCurrentWebviewWindow().listen` 带上 `target: { kind: 'WebviewWindow', label }`。
+    // 裸 `listen` 的 target 是 `Any`，Tauri 的 `match_any_or_filter` 让 Any 监听器
+    // 匹配一切 emit —— 多窗口下 `emit_to(win-1)` 会被所有窗口收到，于是「保存」
+    // 等菜单命令会在每个窗口各执行一次。
+    // `settings://saved` 例外：由设置窗口 `emit` 广播，所有窗口都需重载设置，保持裸 listen。
+    const unlistenMenu = await getCurrentWebviewWindow().listen<string>("menu-event", (event) => {
       void handleMenuEvent(event.payload);
     });
 
-    const unlistenRecentOpen = await listen<{
+    const unlistenRecentOpen = await getCurrentWebviewWindow().listen<{
       path: string;
       type: "file" | "folder";
     }>("recent-open", (event) => {
@@ -202,7 +209,7 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
       }
     );
 
-    const unlistenNavigate = await listen<string>("navigate", (event) => {
+    const unlistenNavigate = await getCurrentWebviewWindow().listen<string>("navigate", (event) => {
       settingsVisible.value = event.payload === "settings";
     });
 

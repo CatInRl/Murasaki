@@ -1,6 +1,7 @@
 import { watch, onBeforeUnmount } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useTabsStore } from "../stores/useTabsStore";
 import { isPathUnder } from "../utils/path";
@@ -120,7 +121,9 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcher {
   async function start(): Promise<void> {
     // 监听 file-changed 事件
     if (!unlistenFileChanged) {
-      unlistenFileChanged = await listen<FileChangePayload>("file-changed", (event) => {
+      // 窗口级 target：Rust 侧用 `emit_to(label)` 定向发送，裸 `listen` 的
+      // `Any` target 会匹配一切 emit，导致本窗口收到其它窗口工作区的变更。
+      unlistenFileChanged = await getCurrentWebviewWindow().listen<FileChangePayload>("file-changed", (event) => {
         const change = event.payload;
         if (change?.path) {
           mergeChange(change);

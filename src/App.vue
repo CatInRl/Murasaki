@@ -5,7 +5,6 @@ import {
   NConfigProvider,
 } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import EditorPane from "./components/EditorPane.vue";
 import Sidebar from "./components/Sidebar.vue";
@@ -443,8 +442,13 @@ onMounted(async () => {
   // 3. 注册 5 个 tauri 事件监听器（menu-event / recent-open / single-instance / settings://saved / navigate）
   cleanupListeners = await setupEventListeners();
 
-  // 3.5 退出拦截：主窗口关闭被 Rust 拦下后，落盘完成才放行（ADR-0017）
-  cleanupExitListener = await listen("app-close-requested", () => {
+  // 3.5 退出拦截：窗口关闭被 Rust 拦下后，落盘完成才放行（ADR-0017）
+  //
+  // 必须用 `getCurrentWebviewWindow().listen` 而不是裸 `listen`：裸 listen 的
+  // target 是 `Any`，而 Tauri 的 `match_any_or_filter` 让 Any 监听器匹配**一切**
+  // emit（含 `emit_to(label)`）。多窗口下 Rust 定向发给我这个 label 的
+  // `app-close-requested` 会被所有窗口收到，导致关一个窗口→全部窗口一起落盘关闭。
+  cleanupExitListener = await getCurrentWebviewWindow().listen("app-close-requested", () => {
     void onExitRequested();
   });
 

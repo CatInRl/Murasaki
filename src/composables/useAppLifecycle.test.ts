@@ -8,6 +8,15 @@ vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(),
 }));
 
+// ===== Mock @tauri-apps/api/webviewWindow =====
+// 生产代码用 `getCurrentWebviewWindow().listen` 给监听器带上窗口级 target
+// （裸 `listen` 的 `Any` target 在多窗口下会匹配一切 emit）。
+// 这里让实例方法复用同一个 listen mock，断言与触发逻辑保持一致。
+vi.mock("@tauri-apps/api/webviewWindow", async () => {
+  const { listen } = await import("@tauri-apps/api/event");
+  return { getCurrentWebviewWindow: () => ({ listen }) };
+});
+
 // ===== Mock @tauri-apps/api/core =====
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),

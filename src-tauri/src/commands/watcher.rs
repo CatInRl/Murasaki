@@ -85,6 +85,10 @@ pub fn start_watching(
     }
 
     let app_handle = app.clone();
+    // 事件只发给本窗口：裸 `emit` 是广播，多窗口下所有窗口都会收到
+    // 别的窗口工作区的变更通知（前端虽按 workspacePath 过滤，但仍是无谓的
+    // 跨窗口噪音，且同目录多窗口时会互相触发重载）。
+    let emit_label = label.clone();
     let mut watcher = match notify::recommended_watcher(move |res: Result<notify::Event, _>| {
         if let Ok(event) = res {
             // 只关心内容修改 / 新建 / 删除 / 重命名
@@ -93,7 +97,8 @@ pub fn start_watching(
             };
             // 对每个受影响的路径，发送事件到前端
             for p in &event.paths {
-                let _ = app_handle.emit(
+                let _ = app_handle.emit_to(
+                    emit_label.as_str(),
                     "file-changed",
                     FileChangedPayload {
                         path: p.to_string_lossy().to_string(),

@@ -153,7 +153,7 @@ fn rewrite_env_debug_port(port: u16) {
 /// 关键 workaround：msedgedriver 默认传 `--remote-debugging-port=0`（让系统选端口），
 /// 但 WebView2 不会创建 DevToolsActivePort 文件告知 msedgedriver 实际端口。
 /// 因此 murasaki 用一个固定端口替代 port=0，并启动后台线程创建该文件。
-fn detect_remote_debugging_args() -> Option<(String, u16)> {
+pub(crate) fn detect_remote_debugging_args() -> Option<(String, u16)> {
     let port_str = find_remote_debugging_port_str()?;
 
     let port: u16 = if port_str == "0" {

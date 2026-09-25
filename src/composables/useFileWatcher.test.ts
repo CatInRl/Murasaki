@@ -10,6 +10,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(),
 }));
+// 生产代码用 `getCurrentWebviewWindow().listen` 给监听器带上窗口级 target，
+// 这里让实例方法复用同一个 listen mock（断言与触发逻辑不变）。
+vi.mock("@tauri-apps/api/webviewWindow", async () => {
+  const { listen } = await import("@tauri-apps/api/event");
+  return { getCurrentWebviewWindow: () => ({ listen }) };
+});
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));

@@ -30,8 +30,10 @@ impl ClosingState {
 /// 重复请求（用户在落盘期间再点关闭）保持拦截并忽略 —— 前端有落盘超时兜底，
 /// 一定会走到 `close_window`；若此时放行会让未落盘的改动直接丢失。
 ///
-/// 注意用 `emit_to` 而非 `emit`：Tauri 的 `emit` 是**广播**（发给所有 webview），
-/// 多窗口下会把「关闭我」通知给全部窗口，导致所有窗口一起关掉。
+/// 注意用 `emit_to` 而非 `emit`，并且前端必须用 `getCurrentWebviewWindow().listen`
+/// 注册监听器 —— 两边的 target 都必须是窗口级：裸 `emit` 会发给所有 webview，
+/// 而裸 `listen` 的 `Any` target 会匹配一切 emit（含定向 emit_to），
+/// 任一环节退化都会让「关闭我」的通知落到全部窗口，导致所有窗口一起关掉。
 pub fn intercept_close_request(window: &tauri::Window) -> bool {
     let state = window.app_handle().state::<ClosingState>();
     if !state.begin(window.label()) {

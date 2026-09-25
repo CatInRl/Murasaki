@@ -117,12 +117,21 @@ pub fn create_editor_window(app: &AppHandle, path: Option<String>) -> Result<Str
     }
 
     let label = registry.next_label();
-    WebviewWindowBuilder::new(app, &label, WebviewUrl::default())
+    let mut builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::default())
         .title("Murasaki")
         .inner_size(1200.0, 800.0)
         .min_inner_size(800.0, 600.0)
         .resizable(true)
-        .fullscreen(false)
+        .fullscreen(false);
+
+    // E2E：主窗口在 `lib.rs` setup 里按 `--remote-debugging-port` 注入 WebView2 参数，
+    // 动态创建的窗口必须注入完全相同的参数 —— 否则 WebView2 因环境选项不同另起一个
+    // 浏览器进程，调试端点（msedgedriver / CDP）上看不到新窗口，多窗口 E2E 无从驱动。
+    if let Some((extra_args, _port)) = crate::detect_remote_debugging_args() {
+        builder = builder.additional_browser_args(&extra_args);
+    }
+
+    builder
         .build()
         .map_err(|e| format!("创建窗口失败: {}", e))?;
 
@@ -155,8 +164,14 @@ pub fn open_path_in_new_window_impl(app: &AppHandle, path: &str) -> Result<Strin
 }
 
 /// 前端调用：在新窗口中打开文件/文件夹路径
+///
+/// 必须是 `async`：同步命令在**主线程**执行，而 `create_editor_window` 内部的
+/// `WebviewWindowBuilder::build()` 需要投递窗口创建消息（`send_user_message`）。
+/// 主线程上该消息会被内联执行 —— 即在 WebView2 的 IPC 回调里同步创建新的
+/// WebView2 环境，实测直接卡死（命令永不返回、窗口也建不出来）。
+/// 改成 `async` 后命令在 tokio 工作线程上运行，建窗消息正常投递给主线程事件循环。
 #[tauri::command]
-pub fn open_path_in_new_window(app: AppHandle, path: String) -> Result<String, String> {
+pub async fn open_path_in_new_window(app: AppHandle, path: String) -> Result<String, String> {
     open_path_in_new_window_impl(&app, &path)
 }
 
@@ -187,11 +202,8 @@ pub fn close_window(window: WebviewWindow, app: AppHandle) -> Result<(), String>
 /// 前端落盘失败时会直接 `destroy()` 绕过 `close_window`）。
 /// `WindowRegistry::begin_exit` 保证只退出一次。
 pub fn exit_if_no_other_windows(app: &AppHandle, closed_label: &str) {
-    let remaining = app
-        .webview_windows()
-        .keys()
-        .filter(|l| l.as_str() != closed_label)
-        .count();
+    let labels: Vec<String> = app.webview_windows().keys().cloned().collect();
+    let remaining = labels.iter().filter(|l| l.as_str() != closed_label).count();
     if remaining > 0 {
         return;
     }
