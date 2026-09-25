@@ -32,7 +32,9 @@ export default defineConfig(async () => ({
     // 分支 —— 更保守，符合预期；只有 `tauri build` 才会让 Windows 用 chrome105。
     target:
       process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
-    rollupOptions: {
+    // Vite 8 起打包器换成 Rolldown，配置项随之更名（旧名 rollupOptions 经兼容层
+    // 仍可用但已废弃）
+    rolldownOptions: {
       input: {
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
       },
