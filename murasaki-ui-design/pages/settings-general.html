@@ -200,10 +200,6 @@ body {
             <span>AI</span>
           </a>
           <a href="#" class="category-item">
-            <i data-lucide="palette" style="width:16px;height:16px"></i>
-            <span>主题</span>
-          </a>
-          <a href="#" class="category-item">
             <i data-lucide="keyboard" style="width:16px;height:16px"></i>
             <span>快捷键</span>
           </a>
@@ -215,50 +211,23 @@ body {
         <div class="settings-content-inner">
           <h1 class="settings-page-title">常规</h1>
 
-          <!-- 启动与行为 -->
+          <!-- 外观 -->
           <section class="settings-section">
-            <h2 class="settings-section-title">启动与行为</h2>
+            <h2 class="settings-section-title">外观</h2>
             <div class="settings-section-body">
               <div class="setting-row">
                 <div class="setting-label-column">
-                  <label for="setting-open-last-workspace" class="setting-label">启动时打开上次工作区</label>
-                  <span class="setting-description">打开 Murasaki 时自动恢复上一次使用的工作区</span>
-                </div>
-                <div class="setting-control-column">
-                  <label class="toggle-switch">
-                    <input id="setting-open-last-workspace" type="checkbox" checked>
-                    <span class="toggle-track" aria-hidden="true"></span>
-                  </label>
-                </div>
-              </div>
-
-              <div class="setting-row" id="setting-autosave">
-                <div class="setting-label-column">
-                  <label for="setting-autosave-interval" class="setting-label">自动保存间隔</label>
-                  <span class="setting-description">编辑器将在设定间隔后自动保存未保存的更改</span>
+                  <label for="setting-language" class="setting-label">界面语言</label>
+                  <span class="setting-description">更改用户界面显示的语言</span>
                 </div>
                 <div class="setting-control-column">
                   <div class="select-wrapper">
-                    <select id="setting-autosave-interval">
-                      <option value="120">2分钟</option>
-                      <option value="300" selected>5分钟</option>
-                      <option value="600">10分钟</option>
+                    <select id="setting-language">
+                      <option value="zh-CN" selected>简体中文</option>
+                      <option value="en">English</option>
                     </select>
                     <i data-lucide="chevron-right" style="width:14px;height:14px" class="select-chevron"></i>
                   </div>
-                </div>
-              </div>
-
-              <div class="setting-row">
-                <div class="setting-label-column">
-                  <label for="setting-minimize-to-tray" class="setting-label">最小化到托盘</label>
-                  <span class="setting-description">关闭窗口时保留后台运行，可从系统托盘恢复</span>
-                </div>
-                <div class="setting-control-column">
-                  <label class="toggle-switch">
-                    <input id="setting-minimize-to-tray" type="checkbox">
-                    <span class="toggle-track" aria-hidden="true"></span>
-                  </label>
                 </div>
               </div>
             </div>
@@ -270,12 +239,25 @@ body {
             <div class="settings-section-body">
               <div class="setting-row">
                 <div class="setting-label-column">
+                  <label for="setting-show-hidden" class="setting-label">显示隐藏文件</label>
+                  <span class="setting-description">在文件树中显示以 . 开头的文件和目录</span>
+                </div>
+                <div class="setting-control-column">
+                  <label class="toggle-switch">
+                    <input id="setting-show-hidden" type="checkbox" checked>
+                    <span class="toggle-track" aria-hidden="true"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-label-column">
                   <label for="setting-image-dir" class="setting-label">默认图片目录</label>
                   <span class="setting-description">粘贴图片时默认保存到的相对目录</span>
                 </div>
                 <div class="setting-control-column">
                   <div class="input-with-button">
-                    <input id="setting-image-dir" type="text" value="assets/images" placeholder="例如：assets/images">
+                    <input id="setting-image-dir" type="text" value="assets" placeholder="例如：assets">
                     <button class="secondary-button" type="button">浏览</button>
                   </div>
                 </div>
@@ -283,12 +265,12 @@ body {
 
               <div class="setting-row">
                 <div class="setting-label-column">
-                  <label for="setting-delete-confirm" class="setting-label">删除确认</label>
-                  <span class="setting-description">删除文件或文件夹前弹出确认对话框</span>
+                  <label for="setting-open-last-workspace" class="setting-label">启动时打开上次工作区</label>
+                  <span class="setting-description">打开 Murasaki 时自动恢复上一次使用的工作区</span>
                 </div>
                 <div class="setting-control-column">
                   <label class="toggle-switch">
-                    <input id="setting-delete-confirm" type="checkbox" checked>
+                    <input id="setting-open-last-workspace" type="checkbox">
                     <span class="toggle-track" aria-hidden="true"></span>
                   </label>
                 </div>
@@ -296,39 +278,39 @@ body {
             </div>
           </section>
 
-          <!-- 外观 -->
+          <!-- Agent -->
           <section class="settings-section">
-            <h2 class="settings-section-title">外观</h2>
+            <h2 class="settings-section-title">Agent</h2>
             <div class="settings-section-body">
-              <div class="setting-row" id="setting-theme">
-                <div class="setting-label-column">
-                  <span class="setting-label">主题选择</span>
-                  <span class="setting-description">选择 Murasaki 的界面显示模式</span>
-                </div>
-                <div class="setting-control-column">
-                  <div class="segmented-control" role="group" aria-label="主题选择">
-                    <button class="segmented-item" type="button">浅色</button>
-                    <button class="segmented-item active" type="button">深色</button>
-                    <button class="segmented-item" type="button">跟随系统</button>
-                  </div>
-                </div>
-              </div>
-
               <div class="setting-row">
                 <div class="setting-label-column">
-                  <label for="setting-language" class="setting-label">界面语言</label>
-                  <span class="setting-description">更改用户界面显示的语言</span>
+                  <label for="setting-show-agent-panel" class="setting-label">显示 Agent 面板</label>
+                  <span class="setting-description">在编辑器右侧显示 AI 助手面板</span>
                 </div>
                 <div class="setting-control-column">
-                  <div class="select-wrapper">
-                    <select id="setting-language">
-                      <option value="zh-CN" selected>简体中文</option>
-                      <option value="zh-TW">繁體中文</option>
-                      <option value="en">English</option>
-                      <option value="ja">日本語</option>
-                    </select>
-                    <i data-lucide="chevron-right" style="width:14px;height:14px" class="select-chevron"></i>
-                  </div>
+                  <label class="toggle-switch">
+                    <input id="setting-show-agent-panel" type="checkbox" checked>
+                    <span class="toggle-track" aria-hidden="true"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 更新 -->
+          <section class="settings-section">
+            <h2 class="settings-section-title">更新</h2>
+            <div class="settings-section-body">
+              <div class="setting-row">
+                <div class="setting-label-column">
+                  <label for="setting-check-update" class="setting-label">启动时检查更新</label>
+                  <span class="setting-description">应用启动时自动检查是否有新版本</span>
+                </div>
+                <div class="setting-control-column">
+                  <label class="toggle-switch">
+                    <input id="setting-check-update" type="checkbox" checked>
+                    <span class="toggle-track" aria-hidden="true"></span>
+                  </label>
                 </div>
               </div>
             </div>

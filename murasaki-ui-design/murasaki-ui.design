@@ -12,10 +12,10 @@
         "group": 0,
         "layoutSnapshot": {
           "version": 1,
-          "contentHeight": 900,
+          "contentHeight": 1600,
           "viewportWidth": 1440,
-          "sourceHash": "fnv1a-eb4c72f3",
-          "measuredAt": 1785334907303
+          "sourceHash": "fnv1a-52500698",
+          "measuredAt": 1787581768390
         }
       },
       "devMetadata": {
@@ -83,8 +83,8 @@
           "version": 1,
           "contentHeight": 900,
           "viewportWidth": 1440,
-          "sourceHash": "fnv1a-c35bb7f7",
-          "measuredAt": 1785334907303
+          "sourceHash": "fnv1a-81384605",
+          "measuredAt": 1787581768390
         }
       },
       "devMetadata": {
@@ -104,10 +104,10 @@
         "group": 0,
         "layoutSnapshot": {
           "version": 1,
-          "contentHeight": 906,
+          "contentHeight": 900,
           "viewportWidth": 1440,
           "sourceHash": "fnv1a-8584e518",
-          "measuredAt": 1785351369898
+          "measuredAt": 1787500197731
         }
       },
       "devMetadata": {
@@ -127,10 +127,10 @@
         "group": 0,
         "layoutSnapshot": {
           "version": 1,
-          "contentHeight": 1068,
+          "contentHeight": 900,
           "viewportWidth": 1440,
           "sourceHash": "fnv1a-9eacb6c7",
-          "measuredAt": 1785351369898
+          "measuredAt": 1787500197731
         }
       },
       "devMetadata": {
@@ -150,10 +150,10 @@
         "group": 0,
         "layoutSnapshot": {
           "version": 1,
-          "contentHeight": 924,
+          "contentHeight": 900,
           "viewportWidth": 1440,
           "sourceHash": "fnv1a-d09544fa",
-          "measuredAt": 1785351369898
+          "measuredAt": 1787500197731
         }
       },
       "devMetadata": {
@@ -196,10 +196,10 @@
         "group": 0,
         "layoutSnapshot": {
           "version": 1,
-          "contentHeight": 1106,
+          "contentHeight": 1398,
           "viewportWidth": 1440,
-          "sourceHash": "fnv1a-f44cc553",
-          "measuredAt": 1785351369898
+          "sourceHash": "fnv1a-5c656764",
+          "measuredAt": 1787581768390
         }
       },
       "devMetadata": {
@@ -357,14 +357,37 @@
         "group": 0,
         "layoutSnapshot": {
           "version": 1,
-          "contentHeight": 2358,
+          "contentHeight": 2381,
           "viewportWidth": 1440,
-          "sourceHash": "fnv1a-b5869cd9",
-          "measuredAt": 1785351369898
+          "sourceHash": "fnv1a-c969a521",
+          "measuredAt": 1787500197731
         }
       },
       "devMetadata": {
         "htmlSrc": "pages/ux-markdown-structures.html",
+        "interactions": []
+      }
+    },
+    {
+      "id": "page-ux-wysiwyg-table",
+      "title": "UX — WYSIWYG Table Editing",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1753992000000,
+      "canvasData": {
+        "x": 2064,
+        "y": -1056,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 1124,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-43cbdf13",
+          "measuredAt": 1788018805437
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/ux-wysiwyg-table.html",
         "interactions": []
       }
     }

@@ -191,6 +191,10 @@ body {
 
       <!-- Sidebar -->
       <div id="sidebar">
+        <button class="murasaki-sidebar-collapse" title="收起侧栏">
+          <i data-lucide="chevron-left" style="width:14px;height:14px"></i>
+        </button>
+        <div class="murasaki-sidebar-resizer"></div>
         <div class="sidebar-header">
           <div class="sidebar-tab active" id="sidebar-tab-tree" title="文件树">
             <i data-lucide="folder-tree" style="width:16px;height:16px"></i>
@@ -409,6 +413,120 @@ body {
       </div>
 
     </div>
+
+    <!-- Sidebar Collapsed State -->
+    <div style="margin-top: 32px; padding: 16px; background: var(--murasaki-surface); border-radius: var(--murasaki-radius-lg);">
+      <div style="margin-bottom: 12px;">
+        <span style="font-size: 13px; font-weight: 600; color: var(--murasaki-ink-2);">侧栏折叠态</span>
+        <span style="font-size: 12px; color: var(--murasaki-ink-3); margin-left: 8px;">点击收起按钮后，侧栏缩为 36px 细条图标栏</span>
+      </div>
+
+      <!-- Collapsed Sidebar App Shell -->
+      <div data-viewport-mode="app-shell" style="grid-template-columns: 36px 1fr; height: 600px; width: 100%; border: 1px solid var(--murasaki-line); border-radius: var(--murasaki-radius-md);">
+
+        <!-- Menu Bar -->
+        <div id="menu-bar">
+          <div class="menu-brand">
+            <i data-lucide="feather" style="width:15px;height:15px;color:var(--murasaki-primary)"></i>
+            Murasaki
+          </div>
+          <div class="menu-item">文件(F)</div>
+          <div class="menu-item">编辑(E)</div>
+          <div class="menu-item">段落(P)</div>
+          <div class="menu-item">主题(T)</div>
+          <div class="menu-item">帮助(H)</div>
+        </div>
+
+        <!-- Collapsed Sidebar -->
+        <div id="sidebar">
+          <div class="sidebar-collapsed-rail">
+            <button class="sidebar-rail-btn" title="展开文件树">
+              <i data-lucide="folder-tree" style="width:16px;height:16px"></i>
+            </button>
+            <button class="sidebar-rail-btn" title="展开大纲">
+              <i data-lucide="list" style="width:16px;height:16px"></i>
+            </button>
+            <div class="sidebar-rail-spacer"></div>
+            <button class="sidebar-rail-btn" title="展开侧栏">
+              <i data-lucide="chevron-right" style="width:16px;height:16px"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div id="tab-bar">
+          <div class="tab-list">
+            <div class="tab-item active">
+              <i data-lucide="file-text" class="tab-icon"></i>
+              <span>快速入门.md</span>
+              <span class="dirty-dot"></span>
+              <span class="close-btn"><i data-lucide="x"></i></span>
+            </div>
+            <div class="tab-item">
+              <i data-lucide="file-text" class="tab-icon"></i>
+              <span>README.md</span>
+              <span class="close-btn"><i data-lucide="x"></i></span>
+            </div>
+          </div>
+          <div class="tab-add-btn" title="新建标签页">
+            <i data-lucide="plus"></i>
+          </div>
+        </div>
+
+        <!-- Main Editor Area (Simplified) -->
+        <div id="main-area">
+          <div id="source-editor">
+            <div class="line-numbers">
+              <div class="ln active-line">1</div>
+              <div class="ln">2</div>
+              <div class="ln">3</div>
+              <div class="ln">4</div>
+              <div class="ln">5</div>
+              <div class="ln">6</div>
+              <div class="ln">7</div>
+              <div class="ln">8</div>
+            </div>
+            <div class="editor-content" data-scroll-region="primary">
+              <div class="editor-line active"><span class="tok-hash"># </span><span class="tok-heading">Murasaki 快速入门</span></div>
+              <div class="editor-line"></div>
+              <div class="editor-line">欢迎使用 Murasaki，一款轻量级的</div>
+              <div class="editor-line">本地 Markdown 编辑器。</div>
+              <div class="editor-line"></div>
+              <div class="editor-line"><span class="tok-hash">## </span><span class="tok-heading">核心特性</span></div>
+              <div class="editor-line"></div>
+              <div class="editor-line"><span class="tok-list-marker">- </span>分屏编辑与实时预览</div>
+            </div>
+          </div>
+
+          <div class="split-divider"></div>
+
+          <div id="preview-pane" data-scroll-region="primary">
+            <div class="preview">
+              <h1>Murasaki 快速入门</h1>
+              <p>欢迎使用 Murasaki，一款轻量级的本地 Markdown 编辑器。</p>
+              <h2>核心特性</h2>
+              <ul>
+                <li>分屏编辑与实时预览</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div id="status-bar">
+          <div class="status-left">
+            <span>快速入门.md</span>
+            <span style="color:var(--murasaki-ink-3)">notes/</span>
+          </div>
+          <div class="status-right">
+            <span>行 1, 列 1</span>
+            <span>字符 286</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <script>lucide.createIcons();</script>
 
     <style id="critical-layout">
@@ -474,6 +592,7 @@ body {
         background: var(--murasaki-surface);
         border-right: 1px solid var(--murasaki-line);
         overflow: hidden;
+        position: relative;
       }
       .sidebar-header {
         display: flex;
@@ -970,6 +1089,76 @@ body {
         display: flex;
         align-items: center;
         gap: 4px;
+      }
+
+      /* === Sidebar Collapse Button === */
+      .murasaki-sidebar-collapse {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        z-index: 21;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border: none;
+        background: transparent;
+        color: var(--murasaki-ink-3);
+        border-radius: var(--murasaki-radius-sm);
+        cursor: pointer;
+        padding: 0;
+        transition: background 120ms, color 120ms;
+      }
+      .murasaki-sidebar-collapse:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-ink-2);
+      }
+
+      /* === Sidebar Resizer === */
+      .murasaki-sidebar-resizer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 5px;
+        z-index: 20;
+        cursor: col-resize;
+      }
+      .murasaki-sidebar-resizer:hover {
+        background: var(--murasaki-primary);
+        opacity: 0.25;
+      }
+
+      /* === Collapsed Sidebar Rail === */
+      .sidebar-collapsed-rail {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 0;
+      }
+      .sidebar-rail-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border: none;
+        background: transparent;
+        color: var(--murasaki-ink-3);
+        border-radius: var(--murasaki-radius-sm);
+        cursor: pointer;
+        padding: 0;
+        transition: background 120ms, color 120ms;
+      }
+      .sidebar-rail-btn:hover {
+        background: var(--murasaki-neutral-200);
+        color: var(--murasaki-primary);
+      }
+      .sidebar-rail-spacer {
+        flex: 1;
       }
     </style>
 </body>

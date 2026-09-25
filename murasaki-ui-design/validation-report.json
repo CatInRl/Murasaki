@@ -10,7 +10,7 @@
     "version_source": "skill-release-manifest.json",
     "runtime_skill_dir": null,
     "recorded_at": null,
-    "expected_version": "2026.07.22.00.00.00",
+    "expected_version": "2026.08.06.19.15.08",
     "status": "mismatch",
     "read_status": "ok"
   },
@@ -167,7 +167,7 @@
       "version_source": "skill-release-manifest.json",
       "runtime_skill_dir": null,
       "recorded_at": null,
-      "expected_version": "2026.07.22.00.00.00",
+      "expected_version": "2026.08.06.19.15.08",
       "status": "mismatch",
       "read_status": "ok"
     },
@@ -189,15 +189,15 @@
     ]
   },
   "projectFileHashes": {
-    "murasaki-ui.design": "043ad28cb75da93c6246ab0de13e99663b67096c4a024deb3e5e36c8b44db264",
+    "murasaki-ui.design": "fb63d21a9569d5c49b862f16ff0070c5c5cc64014aac3d03fe0deecadbf60d96",
     "colors_and_type.css": "31dc730322bf6ac7ec2b7d0439f167297066287ef9b8ab77899564d4a8b0e56c",
-    "runtime-orchestration-summary.json": "5df588a3806a2f4d2784372a8daa6617c361db3a487e60ba57bbdd08ebaa0331",
+    "runtime-orchestration-summary.json": "92dc086d3266ddd47e64ea3ab3db1cde0652515954696d2dc458acef784289b5",
     "pages/editor-with-agent.html": "3842fc47a131f136e2bae689c3b68e5f8d179aeff3c099a151915a5928e26f5c",
-    "pages/main-editor.html": "b4894271d53bef93645e6579b1b201770c4f868436aab69c23fb9133e1ad317e",
+    "pages/main-editor.html": "a4a787cfbdcbcb67b7ff691f7e68b87e068b841489bc3cbdb9e6d9ab6370669d",
     "pages/settings-ai.html": "fb4281bb8d6109b9b3dcf4bb46af37bc91697d477d230eb7ace0634625fe160e",
     "pages/settings-editor.html": "6a4038fcf8f290974ece65aaa2b8401222204c4765629dd60388875d1edeb7cf",
-    "pages/settings-general.html": "2cfc11b40ed709df3a6bfc85dab670d7a49aac0b4e3f100bdec8ed8264a45c9c",
-    "pages/ux-dialogs.html": "cda6852f5098ed88da4dc4f4c25650a503cb6f266d2e3cee07901b4ecefc6480",
+    "pages/settings-general.html": "c9231b453cb161ec34ab11ee5fa22fad3ec38539fbb5f0594f2c898120e6c9ad",
+    "pages/ux-dialogs.html": "0b3dfcd1ce11d4d6c1662b44fe684d8450a155d1efc1d3c815273415cd56707a",
     "pages/ux-empty-error-states.html": "c027ad6dac0422460eaa63d2fd2ec8d40ea899303be4b8a492a8100a3e8788f1",
     "pages/ux-interactions-states.html": "3a8a64877fa8974451f252b88eb029242f72eedb860ecf1ead2ec91ad01ad403",
     "pages/ux-markdown-structures.html": "29b9cfc48c17f609f0e755bb9f91a61173dcccca40604d86a56eef50f89d2044",
@@ -205,6 +205,7 @@
     "pages/ux-panels.html": "8d251929a4430f98c9c6926177f0aaaf45aa1ccae65064451599e24fd23fbc74",
     "pages/ux-popovers-toolbars.html": "2d2f5df7d68437dd943e5690ec77a1f1f9ca05a0720ed537aad86664152f5b7a",
     "pages/ux-toasts-notifications.html": "1434d661d32e8391c5f0aba142bd1d84dbf9ad5caf936858f6faa5eb3e0ebf55",
+    "pages/ux-wysiwyg-table.html": "a3fceffa65d87d681fc7a4c3c238d0d5aa90d3882d728091c827bf9c04b58130",
     "pages/welcome-page.html": "257840fdef0c677a4772c129d91f6909870f4acd94aa9b670cc6e111163302b1",
     "pages/wysiwyg-editor.html": "698a47948eec87819c0ff014c2d5462f0024a6758677ac4d77af454e9016c88e",
     "pages/wysiwyg-with-agent.html": "58a1b09029320e49e12ae860b8b42a9049497e83223768c700a9db13dbaaa142"
@@ -212,5 +213,5 @@
   "designDir": "c:\\workspace\\markdown\\murasaki-ui-design",
   "expectedPages": null,
   "requireInteractions": null,
-  "checkedAt": "2026-07-29T19:04:19.361Z"
+  "checkedAt": "2026-08-29T15:53:03.482Z"
 }

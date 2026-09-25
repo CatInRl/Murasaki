@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UX - WYSIWYG 表格编辑（WYSIWYG Table Editing）</title>
+    <style id="theme-vars">
+/* Murasaki Design System - Purple-themed Desktop Markdown Editor */
+/* Brand: Murasaki (紫式部) - Light, focused, writing-first */
+
+:root {
+  /* Brand Palette - Single primary hue (purple) */
+  --murasaki-purple-50: #faf5ff;
+  --murasaki-purple-100: #f3e8ff;
+  --murasaki-purple-200: #e9d5ff;
+  --murasaki-purple-300: #d8b4fe;
+  --murasaki-purple-400: #c084fc;
+  --murasaki-purple-500: #a855f7;
+  --murasaki-purple-600: #9333ea;
+  --murasaki-purple-700: #7e22ce;
+  --murasaki-purple-800: #6b21a8;
+  --murasaki-purple-900: #581c87;
+
+  /* Neutral Palette - Warm gray for editor comfort */
+  --murasaki-neutral-50: #fafafa;
+  --murasaki-neutral-100: #f5f5f5;
+  --murasaki-neutral-200: #e5e5e5;
+  --murasaki-neutral-300: #d4d4d4;
+  --murasaki-neutral-400: #a3a3a3;
+  --murasaki-neutral-500: #737373;
+  --murasaki-neutral-600: #525252;
+  --murasaki-neutral-700: #404040;
+  --murasaki-neutral-800: #262626;
+  --murasaki-neutral-900: #171717;
+  --murasaki-neutral-950: #0a0a0a;
+
+  /* Semantic Tokens */
+  --murasaki-background: #ffffff;
+  --murasaki-foreground: #171717;
+  --murasaki-card: #fafafa;
+  --murasaki-card-foreground: #171717;
+  --murasaki-popover: #ffffff;
+  --murasaki-popover-foreground: #171717;
+  --murasaki-primary: #9333ea;
+  --murasaki-primary-foreground: #ffffff;
+  --murasaki-muted: #f5f5f5;
+  --murasaki-muted-foreground: #737373;
+  --murasaki-border: #e5e5e5;
+  --murasaki-input: #e5e5e5;
+  --murasaki-ring: #c084fc;
+  --murasaki-radius-sm: 4px;
+  --murasaki-radius-md: 8px;
+  --murasaki-radius-lg: 16px;
+
+  /* Surface System */
+  --murasaki-surface: #f9fafb;
+  --murasaki-surface-2: #f3f4f6;
+  --murasaki-ink: #171717;
+  --murasaki-ink-2: #525252;
+  --murasaki-ink-3: #a3a3a3;
+  --murasaki-line: #e5e5e5;
+
+  /* State Colors */
+  --murasaki-state-success: #16a34a;
+  --murasaki-state-warning: #d97706;
+  --murasaki-state-error: #dc2626;
+  --murasaki-state-info: #2563eb;
+}
+
+/* Typography */
+body {
+  font-family: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--murasaki-background);
+    --color-foreground: var(--murasaki-foreground);
+    --color-card: var(--murasaki-card);
+    --color-card-foreground: var(--murasaki-card-foreground);
+    --color-popover: var(--murasaki-popover);
+    --color-popover-foreground: var(--murasaki-popover-foreground);
+    --color-primary: var(--murasaki-primary);
+    --color-primary-foreground: var(--murasaki-primary-foreground);
+    --color-muted: var(--murasaki-muted);
+    --color-muted-foreground: var(--murasaki-muted-foreground);
+    --color-border: var(--murasaki-border);
+    --color-input: var(--murasaki-input);
+    --color-ring: var(--murasaki-ring);
+    --radius-sm: var(--murasaki-radius-sm);
+    --radius-md: var(--murasaki-radius-md);
+    --radius-lg: var(--murasaki-radius-lg);
+  }
+  @layer base {
+    body { background: var(--murasaki-background); color: var(--murasaki-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--murasaki-background); }
+      .text-background { color: var(--murasaki-background); }
+      .border-background { border-color: var(--murasaki-background); }
+      .ring-background { --tw-ring-color: var(--murasaki-background); }
+      .bg-foreground { background-color: var(--murasaki-foreground); }
+      .text-foreground { color: var(--murasaki-foreground); }
+      .border-foreground { border-color: var(--murasaki-foreground); }
+      .ring-foreground { --tw-ring-color: var(--murasaki-foreground); }
+      .bg-card { background-color: var(--murasaki-card); }
+      .text-card { color: var(--murasaki-card); }
+      .border-card { border-color: var(--murasaki-card); }
+      .ring-card { --tw-ring-color: var(--murasaki-card); }
+      .bg-card-foreground { background-color: var(--murasaki-card-foreground); }
+      .text-card-foreground { color: var(--murasaki-card-foreground); }
+      .border-card-foreground { border-color: var(--murasaki-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--murasaki-card-foreground); }
+      .bg-popover { background-color: var(--murasaki-popover); }
+      .text-popover { color: var(--murasaki-popover); }
+      .border-popover { border-color: var(--murasaki-popover); }
+      .ring-popover { --tw-ring-color: var(--murasaki-popover); }
+      .bg-popover-foreground { background-color: var(--murasaki-popover-foreground); }
+      .text-popover-foreground { color: var(--murasaki-popover-foreground); }
+      .border-popover-foreground { border-color: var(--murasaki-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--murasaki-popover-foreground); }
+      .bg-primary { background-color: var(--murasaki-primary); }
+      .text-primary { color: var(--murasaki-primary); }
+      .border-primary { border-color: var(--murasaki-primary); }
+      .ring-primary { --tw-ring-color: var(--murasaki-primary); }
+      .bg-primary-foreground { background-color: var(--murasaki-primary-foreground); }
+      .text-primary-foreground { color: var(--murasaki-primary-foreground); }
+      .border-primary-foreground { border-color: var(--murasaki-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--murasaki-primary-foreground); }
+      .bg-muted { background-color: var(--murasaki-muted); }
+      .text-muted { color: var(--murasaki-muted); }
+      .border-muted { border-color: var(--murasaki-muted); }
+      .ring-muted { --tw-ring-color: var(--murasaki-muted); }
+      .bg-muted-foreground { background-color: var(--murasaki-muted-foreground); }
+      .text-muted-foreground { color: var(--murasaki-muted-foreground); }
+      .border-muted-foreground { border-color: var(--murasaki-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--murasaki-muted-foreground); }
+      .bg-border { background-color: var(--murasaki-border); }
+      .text-border { color: var(--murasaki-border); }
+      .border-border { border-color: var(--murasaki-border); }
+      .ring-border { --tw-ring-color: var(--murasaki-border); }
+      .bg-input { background-color: var(--murasaki-input); }
+      .text-input { color: var(--murasaki-input); }
+      .border-input { border-color: var(--murasaki-input); }
+      .ring-input { --tw-ring-color: var(--murasaki-input); }
+      .bg-ring { background-color: var(--murasaki-ring); }
+      .text-ring { color: var(--murasaki-ring); }
+      .border-ring { border-color: var(--murasaki-ring); }
+      .ring-ring { --tw-ring-color: var(--murasaki-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+  <main class="bg-background text-foreground min-h-screen p-8">
+    <!-- Header -->
+    <header class="mb-10">
+      <h1 class="text-3xl font-semibold text-foreground">WYSIWYG Table Editing</h1>
+      <p class="mt-2 text-muted-foreground">WYSIWYG 模式下的表格就地编辑交互与工具条</p>
+    </header>
+
+    <!-- Main Demo Area -->
+    <section class="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-8 mb-12">
+      <!-- Left: Table Widget Mockup -->
+      <div class="space-y-6">
+        <!-- Floating Toolbar -->
+        <div class="inline-flex items-center gap-1.5 bg-card border border-border rounded-lg px-2 py-1.5 shadow-sm">
+          <span class="text-[11px] text-muted-foreground px-1 font-medium">表格</span>
+          <div class="w-px h-4 bg-border mx-1"></div>
+          <button class="tb-btn" title="上一列"><i data-lucide="chevron-left" class="w-3.5 h-3.5"></i></button>
+          <button class="tb-btn" title="下一列"><i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></button>
+          <div class="w-px h-4 bg-border mx-1"></div>
+          <button class="tb-btn" title="插入行"><i data-lucide="rows-3" class="w-3.5 h-3.5"></i><span class="text-[11px]">行</span></button>
+          <button class="tb-btn" title="插入列"><i data-lucide="columns-3" class="w-3.5 h-3.5"></i><span class="text-[11px]">列</span></button>
+          <div class="w-px h-4 bg-border mx-1"></div>
+          <button class="tb-btn" title="删除行"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+          <button class="tb-btn" title="删除列"><i data-lucide="trash-2" class="w-3.5 h-3.5" style="transform:rotate(90deg)"></i></button>
+          <div class="w-px h-4 bg-border mx-1"></div>
+          <button class="tb-btn active" title="左对齐"><i data-lucide="align-left" class="w-3.5 h-3.5"></i></button>
+          <button class="tb-btn" title="居中对齐"><i data-lucide="align-center" class="w-3.5 h-3.5"></i></button>
+          <button class="tb-btn" title="右对齐"><i data-lucide="align-right" class="w-3.5 h-3.5"></i></button>
+        </div>
+
+        <!-- Editable Table Mockup -->
+        <div class="bg-card border border-border rounded-lg p-4 relative">
+          <table class="w-full border-collapse text-sm">
+            <thead>
+              <tr>
+                <th class="w-table-cell active" contenteditable="true">功能</th>
+                <th class="w-table-cell" contenteditable="true">状态</th>
+                <th class="w-table-cell" contenteditable="true">负责人</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="w-table-cell" contenteditable="true">就地编辑</td>
+                <td class="w-table-cell" contenteditable="true">进行中</td>
+                <td class="w-table-cell" contenteditable="true">UI 组</td>
+              </tr>
+              <tr>
+                <td class="w-table-cell" contenteditable="true">行列增删</td>
+                <td class="w-table-cell" contenteditable="true">待办</td>
+                <td class="w-table-cell" contenteditable="true">引擎组</td>
+              </tr>
+            </tbody>
+          </table>
+          <!-- Hover insert markers (right/bottom of active column/row) -->
+          <div class="insert-pill right" style="top: 58px; right: -12px;">+</div>
+          <div class="insert-pill bottom" style="bottom: -11px; left: 42px;">+</div>
+        </div>
+
+        <p class="text-xs text-muted-foreground">当前锚点：第 1 行第 1 列；按 Tab 向右移动，Enter 格内换行，Esc 提交并留在表格。</p>
+      </div>
+
+      <!-- Right: Interaction Spec -->
+      <div class="bg-card border border-border rounded-lg p-5">
+        <h2 class="text-sm font-semibold text-foreground mb-4">键盘交互</h2>
+        <div class="space-y-3 text-sm">
+          <div class="flex items-start gap-3">
+            <kbd class="shrink-0 min-w-[72px] text-center text-[11px] font-mono bg-muted border border-border rounded px-2 py-0.5">Enter</kbd>
+            <span class="text-muted-foreground">单元格内换行，写回为 &lt;br&gt;</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <kbd class="shrink-0 min-w-[72px] text-center text-[11px] font-mono bg-muted border border-border rounded px-2 py-0.5">Tab</kbd>
+            <span class="text-muted-foreground">移动到下一格</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <kbd class="shrink-0 min-w-[72px] text-center text-[11px] font-mono bg-muted border border-border rounded px-2 py-0.5">Shift+Tab</kbd>
+            <span class="text-muted-foreground">移动到上一格</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <kbd class="shrink-0 min-w-[72px] text-center text-[11px] font-mono bg-muted border border-border rounded px-2 py-0.5">Esc</kbd>
+            <span class="text-muted-foreground">提交当前格并停留在表格</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <kbd class="shrink-0 min-w-[72px] text-center text-[11px] font-mono bg-muted border border-border rounded px-2 py-0.5">方向键</kbd>
+            <span class="text-muted-foreground">在格间移动</span>
+          </div>
+          <div class="flex items-start gap-3">
+            <kbd class="shrink-0 min-w-[72px] text-center text-[11px] font-mono bg-muted border border-border rounded px-2 py-0.5">Ctrl+Z</kbd>
+            <span class="text-muted-foreground">撤销整表替换操作</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- States Grid -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+      <!-- State 1: Read-only when cursor away -->
+      <div class="bg-card border border-border rounded-lg p-4">
+        <div class="text-xs text-muted-foreground mb-2">光标离开表格段</div>
+        <div class="text-sm font-medium text-foreground mb-3">只读渲染态</div>
+        <table class="w-full border-collapse text-sm opacity-90">
+          <thead><tr><th class="w-table-cell">A</th><th class="w-table-cell">B</th></tr></thead>
+          <tbody><tr><td class="w-table-cell">1</td><td class="w-table-cell">2</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- State 2: Active cell -->
+      <div class="bg-card border border-border rounded-lg p-4">
+        <div class="text-xs text-muted-foreground mb-2">点击单元格</div>
+        <div class="text-sm font-medium text-foreground mb-3">激活编辑态</div>
+        <table class="w-full border-collapse text-sm">
+          <thead><tr><th class="w-table-cell active" contenteditable="true">A</th><th class="w-table-cell">B</th></tr></thead>
+          <tbody><tr><td class="w-table-cell">1</td><td class="w-table-cell">2</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- State 3: Multi-line cell -->
+      <div class="bg-card border border-border rounded-lg p-4">
+        <div class="text-xs text-muted-foreground mb-2">单元格内 Enter</div>
+        <div class="text-sm font-medium text-foreground mb-3">格内换行</div>
+        <table class="w-full border-collapse text-sm">
+          <thead><tr><th class="w-table-cell">A</th><th class="w-table-cell">B</th></tr></thead>
+          <tbody><tr><td class="w-table-cell active" contenteditable="true">第 1 行<br>第 2 行</td><td class="w-table-cell">2</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Markdown write-back preview -->
+    <section class="bg-card border border-border rounded-lg p-5">
+      <h2 class="text-sm font-semibold text-foreground mb-3">实时写回 Markdown</h2>
+      <p class="text-xs text-muted-foreground mb-3">表格任何改动提交后，整表按最长单元格补空格对齐，写回源码管道符区域。</p>
+      <pre class="bg-surface-2 border border-border rounded-md p-3 text-[12px] font-mono leading-relaxed text-muted-foreground overflow-x-auto">| 功能       | 状态   | 负责人   |
+|------------|--------|----------|
+| 就地编辑   | 进行中 | UI 组    |
+| 行列增删   | 待办   | 引擎组   |</pre>
+    </section>
+
+    <!-- Legend / Constraints -->
+    <section class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-card border border-border rounded-lg p-4">
+        <h3 class="text-sm font-semibold text-foreground mb-3">边界保护</h3>
+        <ul class="text-sm text-muted-foreground space-y-1.5 list-disc pl-4">
+          <li>删除行需保留 ≥2 行</li>
+          <li>删除列需保留 ≥1 列</li>
+          <li>不满足时工具条按钮置灰</li>
+        </ul>
+      </div>
+      <div class="bg-card border border-border rounded-lg p-4">
+        <h3 class="text-sm font-semibold text-foreground mb-3">不在范围内</h3>
+        <ul class="text-sm text-muted-foreground space-y-1.5 list-disc pl-4">
+          <li>列宽拖拽 / 固定列宽</li>
+          <li>源码模式表格化外壳</li>
+          <li>分栏预览的就地编辑</li>
+          <li>Excel/CSV 批量粘贴</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <script>lucide.createIcons();</script>
+  <style id="critical-layout">
+    .tb-btn {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 4px 7px; border-radius: 5px; border: none;
+      background: transparent; color: var(--murasaki-ink-2);
+      font-size: 12px; cursor: pointer; transition: background 120ms, color 120ms;
+    }
+    .tb-btn:hover { background: var(--murasaki-muted); color: var(--murasaki-primary); }
+    .tb-btn.active { background: var(--murasaki-purple-100); color: var(--murasaki-primary); }
+    .tb-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .w-table-cell {
+      border: 1px solid var(--murasaki-border);
+      padding: 8px 12px;
+      min-width: 80px;
+      outline: none;
+      transition: background 120ms, box-shadow 120ms;
+    }
+    .w-table-cell.active {
+      background: var(--murasaki-background);
+      box-shadow: inset 0 0 0 2px var(--murasaki-primary);
+    }
+    .w-table-cell[contenteditable="true"]:hover {
+      background: var(--murasaki-purple-50);
+    }
+    thead .w-table-cell {
+      background: var(--murasaki-surface-2);
+      font-weight: 600;
+    }
+
+    .insert-pill {
+      position: absolute;
+      width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      background: var(--murasaki-primary);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(147, 51, 234, 0.25);
+      z-index: 10;
+    }
+    .insert-pill:hover { background: var(--murasaki-purple-700); }
+    .bg-surface-2 { background-color: var(--murasaki-surface-2); }
+  </style>
+</body>
+</html>
