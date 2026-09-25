@@ -129,12 +129,12 @@ murasaki/
 
 1. **建 milestone**：在 GitHub 建一个以目标版本号为标题的 milestone（如 `1.0.0`）。
 2. **拆 issue 挂进去**：用 `/to-spec` skill 生成 spec issue 并拆子 issue（见「Issue 跟踪约定」），让它们全部关联到该 milestone。
-3. **此时不动版本号**：`main` 上的三处版本号（package.json / Cargo.toml / tauri.conf.json）停留在**最近一次发布的版本**，只在 release PR 里改。提前 bump 会让每个功能 PR 都变成「要不要改版本号」的无谓冲突源，也让「main 现在是哪个版本」含糊。
+3. **此时不动版本号**：`main` 上的三处版本号停留在**最近一次发布的版本**，只在 release PR 里改（清单见下「发版本」）。提前 bump 会让每个功能 PR 都变成「要不要改版本号」的无谓冲突源，也让「main 现在是哪个版本」含糊。
 4. **功能 PR 照常进 `main`**：CHANGELOG 先累积在 `## [Unreleased]` 段下，发布时再切成 `## [X.Y.Z] - YYYY-MM-DD`。
 
 ### 发版本
 
-- **发布流程**：开 `chore(release)` PR 更新版本号（package.json / Cargo.toml / tauri.conf.json）并写好本版 CHANGELOG 条目 → CI 绿后合入 main → 在 main 打 `vX.Y.Z` tag → 推送 tag 触发 `release.yml` → 关闭 milestone → 同步更新本文件变更记录部分
+- **发布流程**：开 `chore(release)` PR 更新三处版本号（package.json / src-tauri/Cargo.toml / src-tauri/tauri.conf.json），并把 `## [Unreleased]` 段落切成 `## [X.Y.Z] - YYYY-MM-DD` → CI 绿后合入 main → 在 main 打 `vX.Y.Z` tag → 推送 tag 触发 `release.yml` → 关闭 milestone → 同步更新本文件变更记录部分
 - **Release 必须包含 CHANGELOG 内容**：`release.yml` 会用 `awk` 从 `CHANGELOG.md` 提取 `## [VERSION]` 段落，拼接到 Release Notes（安装说明 + 变更记录）。因此打 tag 前必须先在 CHANGELOG.md 写好对应版本条目，否则 Release Notes 的"变更记录"章节为空
 - **重新发布同版本**：删除旧 release（`gh release delete vX.Y.Z --yes --cleanup-tag`）→ 删除本地 tag（`git tag -d vX.Y.Z`）→ 提交修复代码并推送 → 重新打 tag 并推送触发构建
 - **构建产物**：Windows / Ubuntu / macOS arm64 / macOS x64 多平台包，构建约需 10 分钟，进度在 GitHub Actions 页面查看
@@ -154,6 +154,7 @@ milestone 可以并存（例如 `0.9.5` 与 `1.0.0` 各挂各的 issue），但*
 - **子 issue body 必含**：实施步骤 / 验收标准 / 依赖关系（引用依赖的 issue 编号）
 - **子 issue 关联 spec issue**：在子 issue body 末尾用 `Part of #N` 引用 spec issue，让 GitHub 自动关联
 - **spec issue 维护任务清单**：用 GitHub 的 task list 语法 `- [ ] T1 任务名 #N` 列出全部子 issue（不要塞在一条 comment 里）
+- **子 issue 挂到版本 milestone**：`gh issue create --milestone <目标版本号>` 挂进该版本的 milestone（开版本的第一个动作，见「版本节奏与发布约定」），发布后由这个 milestone 收口
 - **PR 与 issue 关联**：PR body 用 `Closes #N`（该 issue 的活干完）或 `Part of #N`（spec 子任务之一）
 - **禁止**：把多个任务塞在一条 comment 里 / 不创建 issue 直接开干 / 用本地 md 文件跟踪任务
 
