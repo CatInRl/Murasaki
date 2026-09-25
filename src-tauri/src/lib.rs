@@ -29,10 +29,17 @@ use commands::windows::{self, WindowRegistry};
 /// 环境变量来源要求 `--remote-debugging-port=` 与 `--test-type=webdriver` 同时出现：
 /// 只认前者会把「用户自己恰好设了调试端口环境变量」误判成 E2E，从而错误地禁用单实例锁。
 fn is_e2e_mode() -> bool {
-    if std::env::args().any(|a| a.starts_with("--remote-debugging-port=")) {
+    let argv: Vec<String> = std::env::args().collect();
+    let env_additional_args = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").ok();
+    is_e2e_mode_from(&argv, env_additional_args.as_deref())
+}
+
+/// [`is_e2e_mode`] 的纯函数版本，便于单测
+fn is_e2e_mode_from(argv: &[String], env_additional_args: Option<&str>) -> bool {
+    if argv.iter().any(|a| a.starts_with("--remote-debugging-port=")) {
         return true;
     }
-    std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
+    env_additional_args
         .map(|v| v.contains("--remote-debugging-port=") && v.contains("--test-type=webdriver"))
         .unwrap_or(false)
 }
@@ -332,12 +339,7 @@ fn spawn_devtools_active_port_writer(port: u16, user_data_dir: std::path::PathBu
                     // msedgedriver 轮询的路径在不同版本间有过差异：可能查
                     // `<dir>/DevToolsActivePort`，也可能查 WebView2 profile 所在的
                     // `<dir>/EBWebView/`。两处都写，多出来的那份只是临时目录里的冗余文件。
-                    for sub in ["", "EBWebView"] {
-                        let dir = if sub.is_empty() {
-                            user_data_dir.clone()
-                        } else {
-                            user_data_dir.join(sub)
-                        };
+                    for dir in [user_data_dir.clone(), user_data_dir.join("EBWebView")] {
                         let _ = std::fs::create_dir_all(&dir);
                         let file_path = dir.join("DevToolsActivePort");
                         match std::fs::write(&file_path, &content) {
@@ -615,7 +617,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_user_data_dir;
+    use super::{is_e2e_mode_from, resolve_user_data_dir};
     use std::path::PathBuf;
 
     fn argv(args: &[&str]) -> Vec<String> {
@@ -678,5 +680,38 @@ mod tests {
     #[test]
     fn none_when_no_source_present() {
         assert_eq!(resolve_user_data_dir(&argv(&[]), None, None), None);
+    }
+
+    /// 旧通道：msedgedriver 直接把调试参数放在命令行里
+    #[test]
+    fn e2e_mode_detects_debug_port_in_argv() {
+        assert!(is_e2e_mode_from(&argv(&["--remote-debugging-port=9222"]), None));
+    }
+
+    /// 新通道：Runtime 150+ 的 msedgedriver 通过环境变量注入，
+    /// 实测同时带 `--remote-debugging-port=0` 与 `--test-type=webdriver`
+    #[test]
+    fn e2e_mode_detects_env_injection() {
+        let env = "--enable-automation --remote-debugging-port=0 --test-type=webdriver";
+        assert!(is_e2e_mode_from(&argv(&[]), Some(env)));
+    }
+
+    /// 只含调试端口、缺 `--test-type=webdriver` 时不判 E2E，
+    /// 避免用户自己的环境变量把产品误带进 E2E 分支（禁用单实例锁）
+    #[test]
+    fn e2e_mode_ignores_env_without_webdriver_test_type() {
+        assert!(!is_e2e_mode_from(
+            &argv(&[]),
+            Some("--remote-debugging-port=9222")
+        ));
+    }
+
+    #[test]
+    fn e2e_mode_false_for_plain_launch() {
+        assert!(!is_e2e_mode_from(&argv(&[]), None));
+        assert!(!is_e2e_mode_from(
+            &argv(&["--user-data-dir=C:\\tmp\\x"]),
+            None
+        ));
     }
 }
