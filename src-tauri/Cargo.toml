@@ -39,7 +39,7 @@ base64 = "0.22"
 sys-locale = "0.3.2"
 
 [target.'cfg(windows)'.dependencies]
-webview2-com = "0.38"
+webview2-com = "0.39"
 windows = "0.61"
 
 [dev-dependencies]
