@@ -94,6 +94,24 @@ murasaki/
 | `npm run test:rust` | Rust 测试 |
 | `npm run build` | 仅构建前端（vue-tsc + vite build） |
 
+## 开发流程
+
+**分支模型**：`main` 恒为可发布状态，所有改动经短生命周期分支 + PR 合入（详见 [ADR-0019](docs/adr/0019-trunk-based-development-with-pull-requests.md)）。**不引入 develop / release 分支**。
+
+1. **先有 issue**：任何改动都要有 issue 跟踪（见下「Issue 跟踪约定」），禁止无 issue 开工。
+2. **切分支**：从最新 `main` 切出 `<type>/<issue>-<slug>`，例如 `fix/198-multi-window-deadlock`、`docs/205-dev-workflow`。`<type>` 取 Conventional Commits 类型（feat / fix / docs / refactor / test / chore）；没有对应 issue 时用 `chore/<slug>`。**不要在 main 上直接提交**。
+3. **开 PR**：推送分支后开 PR，标题格式 `<type>(<scope>): <描述> (#<issue>)`，描述按 [.github/pull_request_template.md](.github/pull_request_template.md) 模板填写。
+4. **过门禁**：[.github/workflows/test.yml](.github/workflows/test.yml) 两个 job 必须全绿——
+   - `frontend`（ubuntu-latest）：`npm test` + `npm run build`
+   - `rust`（windows-latest）：`npm run build` + `cargo test`（`tauri.conf.json` 的 `frontendDist` 指向 `../dist`，需先产出 dist）
+
+   e2e 依赖 tauri-driver，保持本地 `npm run test:e2e`，不进 CI。
+5. **自查后再合**：合入前跑 `/code-review` skill，把结论贴在 PR 里；有阻断项先修掉。
+6. **合入**：**squash merge**（一个 PR = 一个 conventional commit），合入后自动删除头分支。Agent 可自主切分支 / 提交 / 推送 / 开 PR，但**squash 合入 main 前必须得到用户确认**。
+7. **main 受保护**：禁止直推、必须 CI 全绿、必须与 main 同步（Require branches to be up to date）；管理员豁免**仅用于紧急修复**；不设 required approving review（单人仓库无法自批自己的 PR）。
+
+**与发布衔接**：版本准备单独开一个 `chore(release)` PR（bump `package.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json` + 写 CHANGELOG），合入 main 后再打 `vX.Y.Z` tag，详见下节「版本发布约定」。
+
 ## Git 提交约定
 
 - 使用 Conventional Commits（中文描述可接受）
@@ -116,10 +134,12 @@ murasaki/
 ## Issue 跟踪约定
 
 - **所有功能/spec 必须有 GitHub issue 跟踪**：用 `/to-spec` skill 生成 spec 并发布到 issue tracker，应用 `ready-for-agent` label
-- **任务拆分必须用子 issue 跟踪**：spec issue 创建后，立即用 `gh issue create` 为每个任务创建独立子 issue，标题用 `T{簇号}.{序号} {任务名}` 格式
+- **任务拆分必须用子 issue 跟踪**：spec issue 创建后，立即用 `gh issue create` 为每个任务创建独立子 issue，标题用 `T{序号} {任务名}` 格式
+- **`T{序号}` 只是 spec 内的执行顺序标签**：每个 spec 从 `T1` 重新编号，不跨版本累积；分支名与 PR 标题一律用**真实 issue 号**（如 `docs/205-dev-workflow`），不要用 `T` 编号
 - **子 issue body 必含**：实施步骤 / 验收标准 / 依赖关系（引用依赖的 issue 编号）
 - **子 issue 关联 spec issue**：在子 issue body 末尾用 `Part of #N` 引用 spec issue，让 GitHub 自动关联
-- **spec issue 更新任务清单**：在 spec issue 添加 comment 列出所有子 issue 链接（或用 GitHub 的 task list 语法 `- [ ] T0.1 #N`）
+- **spec issue 维护任务清单**：用 GitHub 的 task list 语法 `- [ ] T1 任务名 #N` 列出全部子 issue（不要塞在一条 comment 里）
+- **PR 与 issue 关联**：PR body 用 `Closes #N`（该 issue 的活干完）或 `Part of #N`（spec 子任务之一）
 - **禁止**：把多个任务塞在一条 comment 里 / 不创建 issue 直接开干 / 用本地 md 文件跟踪任务
 
 ## 架构决策

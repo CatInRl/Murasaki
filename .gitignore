@@ -46,6 +46,10 @@ e2e/scripts/*
 .sscratch/
 .scratch/
 
+# 根目录一次性调试产物（harness 页面 / 截图）
+/harness-*.html
+/*.png
+
 # Local environment setup scripts (user-specific)
 install_gnu.ps1
 run_dev.ps1

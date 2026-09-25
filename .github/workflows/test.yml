@@ -1,0 +1,67 @@
+name: Test
+
+# 门禁：PR 与 main 推送时跑单测 / 类型检查 / Rust 测试
+# e2e 依赖 tauri-driver（Windows 专属），保持本地跑，不进 CI
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: 安装 npm 依赖
+        run: npm ci
+
+      - name: 单元测试
+        run: npm test
+
+      - name: 类型检查与构建
+        run: npm run build
+
+  rust:
+    name: rust
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: 安装 Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Rust 构建
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 安装 npm 依赖
+        run: npm ci
+
+      # tauri.conf.json 的 frontendDist 指向 ../dist，build.rs 需要该目录已存在
+      - name: 构建前端
+        run: npm run build
+
+      - name: Rust 测试
+        run: cargo test
+        working-directory: src-tauri
