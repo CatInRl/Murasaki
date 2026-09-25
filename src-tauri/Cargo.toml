@@ -1,6 +1,6 @@
 [package]
 name = "murasaki"
-version = "0.8.5"
+version = "0.9.0"
 description = "A local Markdown file manager and editor"
 authors = ["CatInRl"]
 edition = "2021"

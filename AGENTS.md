@@ -132,9 +132,22 @@ murasaki/
 
 完整 changelog 详见 [CHANGELOG.md](CHANGELOG.md)。版本发布时必须同步更新该文件。
 
-### 当前版本：0.8.5（2026-09-24）
+### 当前版本：0.9.0（2026-09-25）
 
-**修复冷启动打开文件、启动恢复体验与 WYSIWYG 编辑态**：应用未运行时双击 `.md` 文件现在能正确打开目标文件；启动恢复上次 tabs 时不再逐个文件切换；所见即所得模式下编辑态范围收窄到光标所在行/块，全选时自带背景的块级部件也有选中反馈。
+**易用性提升**：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存与显示模式下拉，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘；并修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。
+
+- 演示模式（#180/#181）：新增 `presentation` 模式，只挂预览不挂编辑器（铺满、无工具栏与分隔条），只读；内部 `.md` 链接开新 tab、外部链接走系统浏览器、任务列表 checkbox 只读；缩放 50%–200% 步进 10%（`Ctrl+=`/`Ctrl+-`/`Ctrl+0` + 按住 Ctrl 滚轮，`EditorPane` 的 `onWheel` 拦截 WebView2 默认缩放），持久化 `settings.presentationZoom`，缩放逻辑抽为纯函数 `src/utils/presentationZoom.ts`
+- 状态栏（#182/#187）：字数（CJK 逐字 + 拉丁分词）与字符数（不含空白）并存；新增显示模式 chip，点击弹出四项下拉（不再循环切换）、演示模式缩放 chip 可点击复位；统计逻辑抽为纯函数 `src/utils/textStats.ts`
+- 快捷键（#183/#187）：`Ctrl+Shift+1/2/3/4` 切换 源码/分屏/所见即所得/演示；`Ctrl+B`/`Ctrl+I` 加粗/斜体（仅 markdown，编辑器作用域）；冲突检测按 `global`/`editor` 作用域隔离；新增 `SHIFT_BASE_KEYS` 反查表修上档组合（`Ctrl+Shift+1` 实际 `e.key === "!"`）匹配
+- 视图菜单重构（#184）：视图前移到「主题」之前，含「显示模式 ▸」二级子菜单（四态 CheckMenuItem 互斥）+ 文件树视图/大纲视图（互斥勾选）+ 状态栏 + 全屏；勾选遍历改为递归 `set_checked_by_ids`，新增 `set_sidebar_view_checked` 命令
+- 退出静默落盘（#185）：Rust `on_window_event(CloseRequested)` + `prevent_close()` 拦截（`ClosingState` 防重入），前端落盘脏 tab 草稿与状态后调 `exit_app`，含 3s 超时兜底；未命名 tab 不落盘不提示。详见 [ADR-0017](docs/adr/0017-close-interception-with-draft-flush-on-exit.md)
+- i18n 守卫（#186）：新增 `src/locales/i18nHardcodedGuard.test.ts`，扫描 `dialog.*`/`toast.*` 调用实参中的 CJK 字符，出现即测试失败；同步修 16 处硬编码并补三语 key
+- 显示模式作用域：全局默认 + 按文件类型记忆（markdown 沿用最后一次，source-only 强制源码，不按单文件记忆）
+- P0 修复（#177/#178/#179）：批量关闭只弹一次汇总确认；打开文件三级过滤器；欢迎页/关于运行时读取版本号
+
+### 历史版本
+
+- 0.8.5（2026-09-24）：**修复冷启动打开文件、启动恢复体验与 WYSIWYG 编辑态**：应用未运行时双击 `.md` 文件现在能正确打开目标文件；启动恢复上次 tabs 时不再逐个文件切换；所见即所得模式下编辑态范围收窄到光标所在行/块，全选时自带背景的块级部件也有选中反馈。
 
 - 冷启动文件关联（#92/#113）：废弃 Rust 侧"延时 800ms 推 `open-from-argv` 事件"（前端注册监听器晚于该延时会丢事件，表现为只恢复旧 tabs），改为拉取模型——`setup` 把 argv 路径暂存到新增的 `PendingOpenState`（[commands/launch.rs](src-tauri/src/commands/launch.rs)），前端初始化完成后调用 `take_pending_open_path` 取走并复用 `onOpenPath`；`classify_path` / `first_non_flag_arg` 一并收敛到 launch.rs，单实例（应用已运行）仍走事件推送
 - 启动 tabs 恢复：`openFile` / `newTab` 新增 `activate` 选项，`restore()` 全部以 `activate: false` 装载、最后一次性激活目标 tab，避免编辑器随 `tabId` 变化反复整体替换 EditorState
