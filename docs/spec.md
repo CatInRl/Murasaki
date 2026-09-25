@@ -190,7 +190,7 @@ App.vue
 
 - `useMarkdownRenderer` —— markdown-it 实例 + 插件链 + Shiki 集成。接受源码 string，返回 HTML string。纯函数，不依赖 Vue 响应式。
 - `useScrollSync` —— 监听 source/pane 滚动事件，基于 `data-source-line` 映射计算目标滚动位置，节流 50ms，防循环触发。
-- `useFileWatcher` —— 订阅 Rust 端 `file-changed` 事件，管理外部修改通知队列，焦点事件触发处理。
+- `useFileWatcher` —— 订阅 Rust 端 `file-changed` 事件（负载 `{ path, kind }`），管理外部修改通知队列（节流 300ms）；工作区内 `create`/`remove`/`rename` 结构变化另走一路，按 500ms 窗口合并后刷新文件树。
 - `useEditorCommands` —— 封装 CodeMirror 编辑操作的通用函数（插入/替换/选区操作），供段落菜单和快捷键消费。
 - `useConflictDialog` —— 统一文件冲突对话框逻辑。
 

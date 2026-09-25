@@ -1,13 +1,38 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::collections::HashSet;
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
+use notify::event::ModifyKind;
 use notify::{Watcher, RecursiveMode, EventKind, RecommendedWatcher};
 
 /// 文件监听器状态：保存已激活的 watcher 实例
 pub struct WatcherState {
     pub watcher: Mutex<Option<RecommendedWatcher>>,
     pub watched_paths: Mutex<HashSet<String>>,
+}
+
+/// `file-changed` 事件负载。
+/// `kind` 用于区分「内容修改」与「结构变化（新建/删除/重命名）」：
+/// 前端只对结构变化刷新文件树，避免编辑器每次保存都触发全量重扫。
+#[derive(Clone, Serialize)]
+pub struct FileChangedPayload {
+    pub path: String,
+    pub kind: &'static str,
+}
+
+/// 把 notify 事件类别归类为前端可用的 kind。
+/// 返回 None 表示不关心的事件（访问、只读打开等）。
+fn classify_event(kind: &EventKind) -> Option<&'static str> {
+    match kind {
+        EventKind::Create(_) => Some("create"),
+        EventKind::Remove(_) => Some("remove"),
+        // 重命名在 notify 中属于 Modify(Name(..))，对文件树而言是结构变化，
+        // 必须单独归类，否则外部重命名会被当成内容修改而漏刷新。
+        EventKind::Modify(ModifyKind::Name(_)) => Some("rename"),
+        EventKind::Modify(_) => Some("modify"),
+        _ => None,
+    }
 }
 
 impl Default for WatcherState {
@@ -42,18 +67,19 @@ pub fn start_watching(
     let app_handle = app.clone();
     let mut watcher = match notify::recommended_watcher(move |res: Result<notify::Event, _>| {
         if let Ok(event) = res {
-            // 只关心文件修改/创建/删除事件
-            let relevant = matches!(
-                event.kind,
-                EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
-            );
-            if !relevant {
+            // 只关心内容修改 / 新建 / 删除 / 重命名
+            let Some(kind) = classify_event(&event.kind) else {
                 return;
-            }
+            };
             // 对每个受影响的路径，发送事件到前端
             for p in &event.paths {
-                let path_str = p.to_string_lossy().to_string();
-                let _ = app_handle.emit("file-changed", path_str);
+                let _ = app_handle.emit(
+                    "file-changed",
+                    FileChangedPayload {
+                        path: p.to_string_lossy().to_string(),
+                        kind,
+                    },
+                );
             }
         }
     }) {
@@ -108,10 +134,11 @@ pub fn stop_all_watching(app: AppHandle) -> Result<(), String> {
 
 // ===== 单元测试 =====
 // 注意：notify 的 watcher 涉及真实文件系统监听，难以在单元测试中验证事件推送。
-// 这里仅测试 state 默认值与基本锁机制。
+// 这里测试 state 默认值、锁机制，以及事件类别归类（纯函数，决定前端是否刷文件树）。
 #[cfg(test)]
 mod tests {
     use super::*;
+    use notify::event::{CreateKind, DataChange, RemoveKind, RenameMode};
 
     #[test]
     fn test_watcher_state_default() {
@@ -129,5 +156,40 @@ mod tests {
         }
         let watched = state.watched_paths.lock().unwrap();
         assert!(watched.contains("/tmp/test"));
+    }
+
+    #[test]
+    fn test_classify_structural_events() {
+        assert_eq!(
+            classify_event(&EventKind::Create(CreateKind::File)),
+            Some("create")
+        );
+        assert_eq!(
+            classify_event(&EventKind::Remove(RemoveKind::File)),
+            Some("remove")
+        );
+        // 重命名是结构变化，不能被归类为 modify
+        assert_eq!(
+            classify_event(&EventKind::Modify(ModifyKind::Name(RenameMode::Both))),
+            Some("rename")
+        );
+    }
+
+    #[test]
+    fn test_classify_content_modify() {
+        assert_eq!(
+            classify_event(&EventKind::Modify(ModifyKind::Data(DataChange::Content))),
+            Some("modify")
+        );
+        assert_eq!(
+            classify_event(&EventKind::Modify(ModifyKind::Any)),
+            Some("modify")
+        );
+    }
+
+    #[test]
+    fn test_classify_ignored_events() {
+        assert_eq!(classify_event(&EventKind::Access(notify::event::AccessKind::Read)), None);
+        assert_eq!(classify_event(&EventKind::Other), None);
     }
 }

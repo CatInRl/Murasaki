@@ -30,18 +30,25 @@ import { resolve } from "node:path";
 let browser: Browser;
 let wsPath: string;
 
-/** 模拟 Rust notify 推送 file-changed 事件 */
-async function emitFileChangedEvent(browser: Browser, path: string): Promise<void> {
-  await browser.executeAsync((p: string, done: (res: unknown) => void) => {
-    // @ts-ignore
-    window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-      event: "file-changed",
-      payload: p,
-    }).then(
-      () => done(null),
-      (err: unknown) => done(err ? String(err) : null)
-    );
-  }, path);
+/** 模拟 Rust notify 推送 file-changed 事件（负载为 { path, kind } 对象） */
+async function emitFileChangedEvent(
+  browser: Browser,
+  path: string,
+  kind: "create" | "modify" | "rename" | "remove" = "modify"
+): Promise<void> {
+  await browser.executeAsync(
+    (payload: { path: string; kind: string }, done: (res: unknown) => void) => {
+      // @ts-ignore
+      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
+        event: "file-changed",
+        payload,
+      }).then(
+        () => done(null),
+        (err: unknown) => done(err ? String(err) : null)
+      );
+    },
+    { path, kind }
+  );
 }
 
 /** 获取 active tab 的 hasExternalChange 状态 */
@@ -298,7 +305,7 @@ describe("外部修改检测", () => {
     rmSync(filePath, { force: true });
 
     // 触发 file-changed 事件（Rust notify 也会推送删除事件）
-    await emitFileChangedEvent(browser, path);
+    await emitFileChangedEvent(browser, path, "remove");
 
     // 等待 alert 对话框出现
     await browser.pause(1500);

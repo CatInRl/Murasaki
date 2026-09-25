@@ -437,6 +437,9 @@ onMounted(async () => {
 
   // 6. 启动文件监听（外部修改检测）
   fileWatcher.start();
+  // 兜底：窗口重新获得焦点时刷新文件树（覆盖冷启动期间 watcher 未就绪、
+  // 或 notify 事件丢失导致的结构变化漏刷）
+  window.addEventListener("focus", onWindowFocus);
 
   // 7. 注册图片粘贴处理（监听编辑器宿主元素的 paste 事件）
   imagePaste.setup();
@@ -528,6 +531,7 @@ onBeforeUnmount(() => {
   cleanupExitListener?.();
   cleanupExitListener = null;
   window.removeEventListener("keydown", onKeyDown);
+  window.removeEventListener("focus", onWindowFocus);
   fileWatcher.stop();
   imagePaste.teardown();
   fileOps.setConflictResolver(null);
@@ -548,7 +552,24 @@ const fileWatcher = useFileWatcher({
       .catch((err) => console.error("处理外部修改失败:", err));
     return externalChangeChain;
   },
+  // 工作区内结构变化（外部新建/删除/重命名）→ 刷新文件树
+  onTreeChange: () => {
+    void workspace.refreshTree();
+  },
 });
+
+/** 焦点兜底刷新节流窗口（毫秒）：避免窗口频繁获得焦点时反复全量重扫 */
+const FOCUS_TREE_REFRESH_THROTTLE_MS = 2000;
+let lastFocusTreeRefreshAt = 0;
+
+/** 窗口重新获得焦点 → 兜底刷新文件树（watcher 事件缺失时的保底） */
+function onWindowFocus(): void {
+  if (!workspace.workspacePath) return;
+  const now = Date.now();
+  if (now - lastFocusTreeRefreshAt < FOCUS_TREE_REFRESH_THROTTLE_MS) return;
+  lastFocusTreeRefreshAt = now;
+  void workspace.refreshTree();
+}
 
 // ===== 图片粘贴/拖入处理 =====
 const imagePaste = useImagePaste({

@@ -5,7 +5,13 @@ import { i18n } from "../i18n";
 
 /** useTabsStore 的接口切片 */
 export interface TabsStoreLike {
-  getTabByPath: (path: string) => { id: string; path: string | null; content: string; isDirty: boolean } | null;
+  getTabByPath: (path: string) => {
+    id: string;
+    path: string | null;
+    content: string;
+    isDirty: boolean;
+    lastMtime: number | null;
+  } | null;
   reloadFromDisk: (path: string) => Promise<unknown>;
   applyExternalResolution: (path: string, mode: "load-disk" | "keep-local", content?: string) => Promise<unknown>;
   markExternalChange: (path: string, marked: boolean) => void;
@@ -67,6 +73,9 @@ export function useCompareWindow(deps: CompareWindowDeps) {
       }
       return;
     }
+    // 自保存抑制：应用内保存同样会产生文件系统事件，此时磁盘 mtime
+    // 与 tab.lastMtime 相同，说明变更来自本应用，无需弹窗或重载。
+    if (tab.lastMtime !== null && mtime === tab.lastMtime) return;
     if (!tab.isDirty) {
       await tabsStore.reloadFromDisk(path);
       return;
