@@ -152,7 +152,7 @@ pub fn agent_read_file(workspace: String, path: String) -> Result<AgentReadFileR
 
     let mut hasher = Sha1::new();
     hasher.update(content.as_bytes());
-    let content_hash = format!("{:x}", hasher.finalize());
+    let content_hash: String = hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect();
 
     Ok(AgentReadFileResult {
         doc_path: path.replace('\\', "/"),
