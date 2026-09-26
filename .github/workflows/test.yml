@@ -81,8 +81,6 @@ jobs:
     name: e2e
     runs-on: windows-latest
     timeout-minutes: 60
-    env:
-      TAURI_ENV_PLATFORM: windows
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -118,10 +116,16 @@ jobs:
       - name: 构建应用
         run: npx tauri build --no-bundle
 
+      # 把 TMP/TEMP 指到 runner.temp：应用侧 e2e_trace 用 std::env::temp_dir()
+      # （Windows 下取 TMP/TEMP），默认是 C:\Users\<user>\AppData\Local\Temp，
+      # 与下面的 artifact 路径（runner.temp = D:\a\_temp）不一致会导致日志永远收集不到。
       - name: 运行 E2E
         run: npm run test:e2e
+        env:
+          TMP: ${{ runner.temp }}
+          TEMP: ${{ runner.temp }}
 
-      # 失败时留诊断日志：应用侧在 E2E 模式会写 %TEMP%\murasaki-devtools.log
+      # 失败时留诊断日志：应用侧在 E2E 模式会写 <TEMP>\murasaki-devtools.log
       # （Windows 更新通道 / DevToolsActivePort 写入等排查线索）
       - name: 上传失败诊断日志
         if: failure()
