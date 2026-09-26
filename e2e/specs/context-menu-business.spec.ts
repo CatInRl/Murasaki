@@ -22,7 +22,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { waitForRendered, waitForPresent } from "../helpers/wait";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -84,9 +84,8 @@ describe("TabBar / Editor 右键菜单具体项", () => {
       );
     });
 
-    // 用 waitForRendered 替代 waitForDisplayed：后者在 tauri-driver 下与菜单入场动画
-    // （opacity 0 → 1）阶段交互不稳定，会直接超时报「still not displayed」。
-    await waitForRendered(browser, ".murasaki-context-menu", 5000);
+    // 菜单是淡入浮层：等存在即可，别用 waitForRendered（opacity/几何在动画期不可靠，#273）
+    await waitForPresent(browser, ".murasaki-context-menu", 10000);
 
     // 应有 7 个菜单项 + 1 个分隔符
     const items = await browser.$$(".murasaki-context-menu-item");
@@ -178,8 +177,8 @@ describe("TabBar / Editor 右键菜单具体项", () => {
       );
     });
 
-    // 同 TabBar 用例：改用 waitForRendered，避免 waitForDisplayed 在入场动画期间误报超时。
-    await waitForRendered(browser, ".murasaki-context-menu", 5000);
+    // 同上：淡入浮层等存在即可（#273）
+    await waitForPresent(browser, ".murasaki-context-menu", 10000);
 
     // 应有 9 个菜单项 + 1 个分隔符
     const items = await browser.$$(".murasaki-context-menu-item");

@@ -24,36 +24,73 @@ import {
 } from "../helpers/store";
 import { existsSync, statSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { waitForPresent, waitForRendered } from "../helpers/wait";
+import { waitForInBrowser, waitForPresent, waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
 
 /**
- * 在文件树里对指定名字的节点派发一次合成 `contextmenu` 事件。
+ * 等文件树「安静下来」：节点已渲染 + 没有进行中的刷新 + 让由此产生的滚动/重排落定。
  *
- * TreeNode 的事件监听器挂在 `.node-row` 上；节点没渲染出来时会**显式失败**，
- * 而不是静默不派发 —— 否则错误表象会变成「菜单没出现」，离真因很远（#270）。
+ * 为什么需要：`ContextMenuContainer` 在 window 上以 **capture 阶段**注册了
+ * `scroll` / `resize` 关闭（见 src/components/ContextMenuContainer.vue 的 attachListeners），
+ * 而工作区刚打开时「文件监听触发的刷新」与「树/标签栏把目标滚入视区」都可能紧跟着发生 ——
+ * 菜单弹出后立刻被收掉，等菜单的断言就会失败。`context-menu.spec.ts` 的 beforeEach 里
+ * 「不调用 closeWorkspace，避免干扰 Teleport 渲染时机」是同一现象的另一种表述（#273）。
  */
-async function dispatchContextMenu(b: Browser, nodeName: string): Promise<void> {
-  const dispatched = await b.execute((name: string) => {
-    // @ts-ignore
-    const menu = window.__pinia__._s.get("contextMenu");
-    menu.hide();
-    const evt = new MouseEvent("contextmenu", {
-      bubbles: true,
-      clientX: 100,
-      clientY: 100,
-    });
-    const nodes = document.querySelectorAll('.file-tree .tree-node .node-name');
-    const node = Array.from(nodes).find((n) => n.textContent?.trim() === name);
-    if (!node) return false;
-    const row = node.closest(".node-row");
-    if (!row) return false;
-    row.dispatchEvent(evt);
-    return true;
-  }, nodeName);
-  expect(dispatched).toBe(true);
+async function waitForTreeSettled(b: Browser): Promise<void> {
+  await waitForRendered(b, ".file-tree .node-name", 10000);
+  await waitForInBrowser(
+    b,
+    () => {
+      // @ts-ignore
+      const ws = window.__pinia__._s.get("workspace");
+      return ws.loading === false;
+    },
+    [],
+    { timeout: 10000, interval: 200, message: "文件树刷新结束" }
+  );
+  // 再留一段安静期：刷新带来的滚动/重排通常在几十毫秒内落定
+  await b.pause(600);
+}
+
+/**
+ * 在文件树里对指定名字的节点派发一次合成 `contextmenu` 事件，并等菜单出现。
+ *
+ * - 节点没渲染出来时**显式失败**（而不是静默不派发，错误表象会跑成「菜单没出现」）；
+ * - 菜单若刚弹出就被 scroll/resize 收起（见 `waitForTreeSettled` 的说明），**重派发**若干次 ——
+ *   这是应用既有行为，测试侧只能「重试用户动作」，而不是放宽断言。
+ */
+async function openTreeNodeContextMenu(b: Browser, nodeName: string): Promise<void> {
+  const attempts = 3;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const dispatched = await b.execute((name: string) => {
+      // @ts-ignore
+      const menu = window.__pinia__._s.get("contextMenu");
+      menu.hide();
+      const evt = new MouseEvent("contextmenu", {
+        bubbles: true,
+        clientX: 100,
+        clientY: 100,
+      });
+      const nodes = document.querySelectorAll('.file-tree .tree-node .node-name');
+      const node = Array.from(nodes).find((n) => n.textContent?.trim() === name);
+      if (!node) return false;
+      const row = node.closest(".node-row");
+      if (!row) return false;
+      row.dispatchEvent(evt);
+      return true;
+    }, nodeName);
+    expect(dispatched).toBe(true);
+
+    try {
+      await waitForPresent(b, ".murasaki-context-menu", 3000);
+      return;
+    } catch (err) {
+      if (attempt === attempts) throw err;
+      await b.pause(300);
+    }
+  }
 }
 
 describe("文件树右键菜单 + 文件操作安全", () => {
@@ -82,10 +119,9 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     await browser.pause(200); // 等待 file watcher 释放句柄
     wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
-    // 等文件树「节点」渲染出来，而不是只等容器 .file-tree —— 容器先挂载、节点由
-    // 异步 list_tree 结果渲染，只等容器会留下「容器在但节点还没出来」的窗口，
-    // 下面的合成 contextmenu 事件就会静默落空（#270，CI 上偶发）
-    await waitForRendered(browser, ".file-tree .node-name", 10000);
+    // 等文件树安静下来再开菜单：见 waitForTreeSettled 的说明
+    // （只等容器 .file-tree 会留下「容器在但节点还没出来」的窗口，#270）
+    await waitForTreeSettled(browser);
     await dismissAllDialogs(browser);
   });
 
@@ -95,11 +131,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // 通过 contextMenu store 模拟右键点击 intro.md 节点
     // TreeNode.vue 的 onContextMenu 会调用 contextMenu.show(e, buildMenuItems())
     // 这里派发合成 contextmenu 事件并验证菜单项结构
-    await dispatchContextMenu(browser, "intro.md");
-
-    // 用 waitForRendered 判定菜单已渲染：元素可见性等待与菜单入场动画
-    // （opacity 0 → 1）阶段交互不稳定，会误报「still not displayed」
-    await waitForRendered(browser, ".murasaki-context-menu", 5000);
+    await openTreeNodeContextMenu(browser, "intro.md");
 
     const items = await browser.$$(".murasaki-context-menu-item");
     const labels: string[] = [];
@@ -115,10 +147,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
   });
 
   it("右键目录节点显示目录专属菜单项（新建文件/新建文件夹/粘贴）", async () => {
-    await dispatchContextMenu(browser, "sub");
-
-    // 同本文件上一处：改用 waitForRendered，避免入场动画期间误报
-    await waitForRendered(browser, ".murasaki-context-menu", 5000);
+    await openTreeNodeContextMenu(browser, "sub");
 
     const items = await browser.$$(".murasaki-context-menu-item");
     const labels: string[] = [];
