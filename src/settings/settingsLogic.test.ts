@@ -26,6 +26,7 @@ describe("settingsLogic - fieldsForCategory", () => {
     expect(fieldsForCategory("general")).toEqual(GENERAL_FIELDS);
     expect(GENERAL_FIELDS).toContain("showHiddenFiles");
     expect(GENERAL_FIELDS).toContain("defaultImageDir");
+    expect(GENERAL_FIELDS).toContain("imageInsertMode");
     expect(GENERAL_FIELDS).toContain("language");
     // uiMode 已从字段列表中移除（issue #114）
     expect(GENERAL_FIELDS).not.toContain("uiMode");
@@ -191,6 +192,7 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
       ...DEFAULT_SETTINGS,
       showHiddenFiles: true,
       defaultImageDir: "custom/dir",
+      imageInsertMode: "base64",
       editorFontSize: 20,
       editorMode: "source",
       markdownTheme: "custom-theme",
@@ -198,6 +200,7 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
     const result = restoreCategoryDefaults(draft, "general");
     expect(result.showHiddenFiles).toBe(DEFAULT_SETTINGS.showHiddenFiles);
     expect(result.defaultImageDir).toBe(DEFAULT_SETTINGS.defaultImageDir);
+    expect(result.imageInsertMode).toBe(DEFAULT_SETTINGS.imageInsertMode);
     // editor 字段保持改动
     expect(result.editorFontSize).toBe(20);
     expect(result.editorMode).toBe("source");

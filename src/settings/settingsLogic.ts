@@ -5,7 +5,7 @@
  * 便于单元测试（参考项目测试哲学：优先测纯逻辑，不测组件实现细节）。
  *
  * 分类与字段映射来自 spec 议题簇 8：
- * - 常规：showHiddenFiles / defaultImageDir / checkUpdatesOnStartup / language
+ * - 常规：showHiddenFiles / defaultImageDir / imageInsertMode / checkUpdatesOnStartup / language
  * - 编辑器：editorMode / editorFontSize / editorLineHeight / editorFontFamily / showLineNumbers / softWrap
  */
 import type { SettingsState } from "../types";
@@ -18,6 +18,7 @@ export const GENERAL_FIELDS: (keyof SettingsState)[] = [
   "showHiddenFiles",
   "reopenLastWorkspace",
   "defaultImageDir",
+  "imageInsertMode",
   "checkUpdatesOnStartup",
   "language",
 ];
@@ -116,6 +117,7 @@ export function restoreCategoryDefaults(
         showHiddenFiles: DEFAULT_SETTINGS.showHiddenFiles,
         reopenLastWorkspace: DEFAULT_SETTINGS.reopenLastWorkspace,
         defaultImageDir: DEFAULT_SETTINGS.defaultImageDir,
+        imageInsertMode: DEFAULT_SETTINGS.imageInsertMode,
         checkUpdatesOnStartup: DEFAULT_SETTINGS.checkUpdatesOnStartup,
         language: DEFAULT_SETTINGS.language,
       };

@@ -185,5 +185,8 @@
     "noImage": "No image to preview",
     "readFailed": "Failed to load: {error}",
     "emptyOrFailed": "Image is empty or failed to load"
+  },
+  "imageDrop": {
+    "hint": "Release to insert image"
   }
 }

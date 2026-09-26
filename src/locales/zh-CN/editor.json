@@ -185,5 +185,8 @@
     "noImage": "无图片可预览",
     "readFailed": "读取失败: {error}",
     "emptyOrFailed": "图片为空或读取失败"
+  },
+  "imageDrop": {
+    "hint": "松开以插入图片"
   }
 }

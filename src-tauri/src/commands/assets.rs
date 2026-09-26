@@ -68,22 +68,51 @@ fn normalize_ext(ext: &str) -> String {
     e
 }
 
-/// 保存图片到工作区 assets/ 目录
+/// 规范化图片存放目录（相对工作区根）：拒绝绝对路径、根前缀、`.` 与 `..`。
+///
+/// 空值/仅空白回退到 `assets`（保持历史行为）；逐段拼接后统一用 `/` 分隔，
+/// 顺带把 `assets//images` 这类写法规整掉（issue #151）。
+///
+/// 注意：**不能**在判断前先 trim 掉前导分隔符 —— 那样 Windows 的 `/abs` 与 Unix 的
+/// `/abs` 都会被削成相对路径而放行，而 `PathBuf::join` 遇到带根前缀的路径会丢弃
+/// 工作区前缀，直接落到盘根。
+fn normalize_asset_dir(dir: Option<&str>) -> Result<String, String> {
+    let raw = dir.unwrap_or("").trim();
+    if raw.is_empty() {
+        return Ok("assets".to_string());
+    }
+    let mut parts: Vec<String> = Vec::new();
+    for comp in Path::new(raw).components() {
+        match comp {
+            std::path::Component::Normal(seg) => parts.push(seg.to_string_lossy().to_string()),
+            _ => return Err(format!("图片目录必须是工作区内的相对路径: {}", raw)),
+        }
+    }
+    if parts.is_empty() {
+        return Ok("assets".to_string());
+    }
+    Ok(parts.join("/"))
+}
+
+/// 保存图片到工作区的指定子目录（默认 `assets/`）
 /// - workspace: 工作区根路径
 /// - bytes: 图片字节
 /// - ext: 扩展名（如 "png" / ".jpg"）
+/// - dir: 相对工作区根的子目录（如 "assets/images"），空则用 "assets"；必须是相对路径
 /// - 返回相对路径如 assets/20260726-153045-a1b2c3.png
 #[tauri::command]
 pub fn save_image_asset(
     workspace: String,
     bytes: Vec<u8>,
     ext: String,
+    dir: Option<String>,
 ) -> Result<SaveImageResult, String> {
     let ws = PathBuf::from(&workspace);
     if !ws.exists() {
         return Err(format!("工作区不存在: {}", workspace));
     }
-    let assets_dir = ws.join("assets");
+    let rel_dir = normalize_asset_dir(dir.as_deref())?;
+    let assets_dir = ws.join(&rel_dir);
     if !assets_dir.exists() {
         fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
     }
@@ -95,7 +124,7 @@ pub fn save_image_asset(
     let abs_path = assets_dir.join(&filename);
     fs::write(&abs_path, &bytes).map_err(|e| e.to_string())?;
 
-    let relative_path = format!("assets/{}", filename);
+    let relative_path = format!("{}/{}", rel_dir, filename);
     Ok(SaveImageResult {
         absolute_path: abs_path.to_string_lossy().to_string(),
         relative_path,
@@ -121,7 +150,7 @@ pub fn copy_image_to_assets(
         .and_then(|e| e.to_str())
         .unwrap_or("png")
         .to_string();
-    save_image_asset(workspace, bytes, ext)
+    save_image_asset(workspace, bytes, ext, None)
 }
 
 // ===== 单元测试 =====
@@ -159,7 +188,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let ws = dir.path().to_string_lossy().to_string();
         let bytes = b"\x89PNG\r\n\x1a\nfakepngbytes";
-        let result = save_image_asset(ws.clone(), bytes.to_vec(), "png".to_string()).unwrap();
+        let result = save_image_asset(ws.clone(), bytes.to_vec(), "png".to_string(), None).unwrap();
         // assets 目录应自动创建
         assert!(dir.path().join("assets").exists());
         // 文件存在
@@ -177,7 +206,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let ws = dir.path().to_string_lossy().to_string();
         let bytes = b"test";
-        let result = save_image_asset(ws, bytes.to_vec(), "jpg".to_string()).unwrap();
+        let result = save_image_asset(ws, bytes.to_vec(), "jpg".to_string(), None).unwrap();
         // 文件名格式：YYYYMMDD-HHmmss-<6hex>.jpg
         let parts: Vec<&str> = result.filename.split('-').collect();
         assert_eq!(parts.len(), 3);
@@ -219,7 +248,62 @@ mod tests {
             "/nonexistent/path/xyz".to_string(),
             vec![1, 2, 3],
             "png".to_string(),
+            None,
         );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_normalize_asset_dir() {
+        // 空值回退 assets
+        assert_eq!(normalize_asset_dir(None).unwrap(), "assets");
+        assert_eq!(normalize_asset_dir(Some("")).unwrap(), "assets");
+        assert_eq!(normalize_asset_dir(Some("  ")).unwrap(), "assets");
+        // 自定义目录：统一用 /，并规整重复分隔符
+        assert_eq!(normalize_asset_dir(Some("assets/images")).unwrap(), "assets/images");
+        assert_eq!(normalize_asset_dir(Some("assets//images")).unwrap(), "assets/images");
+        #[cfg(windows)]
+        assert_eq!(normalize_asset_dir(Some("assets\\images")).unwrap(), "assets/images");
+        // 越权 / 不可用路径一律拒绝（含前导分隔符：join 出去会落到盘根）
+        for bad in ["../outside", "assets/../outside", ".", "..", "/assets/images", "/"] {
+            assert!(
+                normalize_asset_dir(Some(bad)).is_err(),
+                "应拒绝的目录被放行了: {}",
+                bad
+            );
+        }
+        #[cfg(windows)]
+        for bad in ["\\assets", "C:\\abs\\dir"] {
+            assert!(
+                normalize_asset_dir(Some(bad)).is_err(),
+                "应拒绝的目录被放行了: {}",
+                bad
+            );
+        }
+    }
+
+    #[test]
+    fn test_save_image_asset_custom_dir() {
+        let dir = TempDir::new().unwrap();
+        let ws = dir.path().to_string_lossy().to_string();
+        let bytes = b"\x89PNG\r\n\x1a\nfakepngbytes";
+        let result =
+            save_image_asset(ws, bytes.to_vec(), "png".to_string(), Some("assets/images".into()))
+                .unwrap();
+        // 目录按设置创建
+        assert!(dir.path().join("assets").join("images").exists());
+        assert!(Path::new(&result.absolute_path).exists());
+        // 相对路径带上自定义目录（issue #151）
+        assert!(result.relative_path.starts_with("assets/images/"));
+        assert!(result.relative_path.ends_with(".png"));
+    }
+
+    #[test]
+    fn test_save_image_asset_rejects_escaping_dir() {
+        let dir = TempDir::new().unwrap();
+        let ws = dir.path().to_string_lossy().to_string();
+        let result =
+            save_image_asset(ws, vec![1, 2, 3], "png".to_string(), Some("../outside".into()));
         assert!(result.is_err());
     }
 

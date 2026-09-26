@@ -16,7 +16,7 @@ import katex from "katex";
 import { codeToHtml, type ThemeRegistration } from "shiki";
 import { getCurrentTheme } from "./useTheme";
 import { sanitizeInlineHtml } from "../editor/wysiwyg/htmlSanitizer";
-import { resolveImageSrc } from "../utils/imagePath";
+import { resolveImageSrc, allowInlineImageDataUris } from "../utils/imagePath";
 
 /**
  * 当前 Shiki 主题（与 Markdown 主题联动）。
@@ -284,6 +284,10 @@ function createMarkdownIt(): MarkdownIt {
     typographer: true,
     breaks: false,
   });
+
+  // 放行应用生成的「内嵌图片」data URI（issue #151）：markdown-it 默认只认
+  // gif/png/jpeg/webp，bmp 与 svg+xml 会被清空 src、预览里显示成字面文本
+  allowInlineImageDataUris(md);
 
   md.use(markdownItEmoji);
   // front-matter 插件要求传入回调，回调会在解析到 front-matter 时被调用
