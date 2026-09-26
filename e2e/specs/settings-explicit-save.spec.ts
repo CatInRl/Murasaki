@@ -113,6 +113,25 @@ describe("设置显式 Save 模型", () => {
     await navigateToEditor(browser);
   });
 
+  // ===== issue #151: 常规分类的「图片插入方式」 =====
+
+  it("常规分类含「图片插入方式」两档下拉", async () => {
+    await navigateToSettings(browser);
+    await waitForPresent(browser, ".settings-shell", 5000);
+
+    // 常规分类下有两个下拉：界面语言 + 图片插入方式（后者为本 issue 新增）
+    const optionValues = await browser.execute(() => {
+      // @ts-ignore
+      const all = Array.from(document.querySelectorAll(".settings-shell select")) as HTMLSelectElement[];
+      const target = all[1];
+      return { count: all.length, values: target ? Array.from(target.options).map((o) => o.value) : [] };
+    });
+    expect((optionValues as any).count).toBeGreaterThanOrEqual(2);
+    expect((optionValues as any).values).toEqual(["file", "base64"]);
+
+    await navigateToEditor(browser);
+  });
+
   // ===== H15b/c: settingsLogic 纯函数验证 =====
   // 注意：原测试通过 import("/src/settings/settingsLogic.ts") 动态导入源码验证纯函数，
   // 但 /src/ 路径在生产构建（tauri:build）中不存在，导致 import 失败。

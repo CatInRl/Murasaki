@@ -11,6 +11,7 @@
  * 4. Base64（`data:image/...;base64,...`）→ 原样保留
  */
 import { convertFileSrc } from "@tauri-apps/api/core";
+import type MarkdownIt from "markdown-it";
 import { dirname, resolveRelative, normalizePath } from "./path";
 
 /**
@@ -26,6 +27,33 @@ export function isExternalUrl(src: string): boolean {
  */
 export function isDataUrl(src: string): boolean {
   return src.startsWith("data:");
+}
+
+/**
+ * 本应用会生成的「内嵌图片」data URI 接受范围（issue #151 的 Base64 插入方式）。
+ *
+ * markdown-it 默认的 `validateLink` 只放行 `data:image/(gif|png|jpeg|webp)`：
+ * 其它图片 data URI（如 bmp / svg+xml）会被判为非法并把 `src` 清空，预览里直接
+ * 显示成字面文本。这里显式放行本应用会产出的图片 MIME。
+ */
+export const INLINE_IMAGE_DATA_URI_RE =
+  /^data:image\/(?:png|jpe?g|gif|webp|bmp|svg\+xml)(?:;charset=[^;,]+)?;base64,/i;
+
+/** 是否为应用生成的本地内嵌图片 data URI */
+export function isInlineImageDataUri(url: string): boolean {
+  return INLINE_IMAGE_DATA_URI_RE.test(url);
+}
+
+/**
+ * 让 markdown-it 接受上述内嵌图片 data URI（其余 URL 仍走默认校验）。
+ *
+ * 注意 `validateLink` 同时用于「图片 src」与「链接 href」，因此放行后 href 也会接受
+ * 这些 data URI —— 预览里点击链接会交给系统浏览器打开，而浏览器本身禁止顶层
+ * `data:` 导航；相比之下「内嵌图片显示不出来」是确定会发生的功能缺陷，故取此权衡。
+ */
+export function allowInlineImageDataUris(md: MarkdownIt): void {
+  const defaultValidate = md.validateLink.bind(md);
+  md.validateLink = (url: string) => defaultValidate(url) || isInlineImageDataUri(url);
 }
 
 /**

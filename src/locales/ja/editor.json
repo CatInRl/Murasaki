@@ -185,5 +185,8 @@
     "noImage": "プレビューできる画像がありません",
     "readFailed": "読み込みに失敗しました: {error}",
     "emptyOrFailed": "画像が空か、読み込みに失敗しました"
+  },
+  "imageDrop": {
+    "hint": "離して画像を挿入"
   }
 }

@@ -5,7 +5,7 @@ import EditorToolbar from "./EditorToolbar.vue";
 import PreviewPane from "./PreviewPane.vue";
 import HtmlPreview from "./HtmlPreview.vue";
 import { useScrollSync } from "../composables/useScrollSync";
-import { isHtmlFile } from "../utils/fileKind";
+import { isHtmlFile, isImageFile } from "../utils/fileKind";
 import type { EditorMode } from "../types";
 
 interface Props {
@@ -236,19 +236,43 @@ function onTaskToggle(payload: { li: HTMLElement; checked: boolean }) {
 // 与粘贴/外部拖入不同：不复制，直接以相对路径引用
 const FILE_TREE_DRAG_MIME = "application/x-murasaki-file-path";
 
+/** 编辑区拖拽悬停态（落点反馈，issue #151） */
+const dropActive = ref(false);
+
 function onEditorDragOver(e: DragEvent): void {
   if (!e.dataTransfer) return;
-  // 仅当携带文件树自定义 MIME 时允许 drop
   const types = e.dataTransfer.types;
-  if (types.includes(FILE_TREE_DRAG_MIME)) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
+  const isTreeDrag = types.includes(FILE_TREE_DRAG_MIME);
+  // 外部文件拖入：dragover 不 preventDefault 就可能收不到 drop（WebView2/Chromium 行为），
+  // 因此图片文件也要放行；dragover 阶段拿不到 files 时先放行，交给 drop 端按扩展名再校验
+  // （否则会在驱动不填 files 时静默收不到 drop，issue #151）
+  const files = e.dataTransfer.files;
+  const looksLikeImage = files.length === 0 || isImageFile(files[0].name);
+  const isExternalImage = types.includes("Files") && looksLikeImage;
+  if (!isTreeDrag && !isExternalImage) {
+    dropActive.value = false;
+    return;
   }
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";
+  dropActive.value = true;
+}
+
+/** 离开编辑区或放下后清除落点反馈 */
+function onEditorDragLeave(e: DragEvent): void {
+  // 掠过编辑区内的子元素也会触发 dragleave：只在真正离开编辑区时才清除
+  const next = e.relatedTarget as Node | null;
+  const host = e.currentTarget as Node | null;
+  if (next && host && host.contains(next)) return;
+  dropActive.value = false;
 }
 
 function onEditorDrop(e: DragEvent): void {
+  dropActive.value = false;
   if (!e.dataTransfer) return;
   const path = e.dataTransfer.getData(FILE_TREE_DRAG_MIME);
+  // 外部图片文件不在这里处理：window 级监听器（useImagePaste.handleDrop）负责按
+  // 插入方式落图，它还会用落点坐标决定插入位置
   if (!path) return;
   e.preventDefault();
   emit("drop-image-path", path);
@@ -285,10 +309,16 @@ defineExpose({
       <div
         v-if="!isPresentation"
         class="pane-left"
+        :class="{ 'drop-active': dropActive }"
         :style="{ width: editorMode === 'split' ? leftWidthPct + '%' : '100%' }"
         @dragover="onEditorDragOver"
+        @dragleave="onEditorDragLeave"
         @drop="onEditorDrop"
       >
+        <!-- 落点反馈：拖拽图片经过编辑区时提示可放下（issue #151） -->
+        <div v-if="dropActive" class="drop-hint">
+          <span>{{ $t('editor.imageDrop.hint') }}</span>
+        </div>
         <SourceEditor
           ref="editorRef"
           :model-value="modelValue"
@@ -366,10 +396,26 @@ defineExpose({
 }
 
 .pane-left {
+  position: relative;
   height: 100%;
   overflow: hidden;
   min-width: 100px;
   min-height: 0;
+}
+/* 拖拽落点反馈（issue #151）：覆盖编辑区的虚线提示，不拦截鼠标事件 */
+.drop-hint {
+  position: absolute;
+  inset: 6px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--murasaki-primary);
+  border-radius: var(--murasaki-radius-md);
+  background: color-mix(in srgb, var(--murasaki-primary) 8%, transparent);
+  color: var(--murasaki-primary);
+  font-size: 13px;
+  pointer-events: none;
 }
 .pane-right {
   height: 100%;

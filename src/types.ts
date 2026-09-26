@@ -172,6 +172,13 @@ export const READING_FONT_PRESET_LABELS: Record<ReadingFontPreset, string> = {
 export type SidebarEntryOverflow = "hover" | "wrap";
 
 /**
+ * 图片插入方式（issue #151）
+ * - `file`：复制到默认图片目录并插入相对路径（文档与图片解耦，便于版本管理）
+ * - `base64`：插入 `data:` URI，单文件便携但不依赖外部资源
+ */
+export type ImageInsertMode = "file" | "base64";
+
+/**
  * 显示模式（0.9.0 新增第 4 种「演示模式」）
  * - source：纯源码
  * - split：源码 + 预览分屏
@@ -206,8 +213,10 @@ export interface SettingsState {
   editorFontFamily: string;
   /** 阅读字体 4 档预设（默认 d：等宽，issue 0.x） */
   editorFontPreset: ReadingFontPreset;
-  /** 粘贴图片时默认保存的相对目录 */
+  /** 粘贴图片时默认保存的相对目录（仅 imageInsertMode = "file" 时生效） */
   defaultImageDir: string;
+  /** 图片插入方式（默认 file，issue #151） */
+  imageInsertMode: ImageInsertMode;
   /** 启动时静默检查更新（默认开，ADR-0012） */
   checkUpdatesOnStartup: boolean;
   /** 界面语言（默认 zh-CN，ADR-0013） */
@@ -252,6 +261,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   editorFontFamily: "JetBrains Mono",
   editorFontPreset: "d",
   defaultImageDir: "assets/images",
+  imageInsertMode: "file",
   checkUpdatesOnStartup: true,
   language: DEFAULT_LOCALE,
   entryOverflowMode: "hover",

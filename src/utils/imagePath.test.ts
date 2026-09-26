@@ -16,7 +16,54 @@ import {
   isAbsolutePath,
   isAssetUrl,
   assetUrlToPath,
+  isInlineImageDataUri,
+  allowInlineImageDataUris,
 } from "./imagePath";
+import MarkdownIt from "markdown-it";
+
+describe("内嵌图片 data URI（issue #151：base64 插入方式）", () => {
+  it("识别应用会生成的图片 MIME", () => {
+    expect(isInlineImageDataUri("data:image/png;base64,AAAA")).toBe(true);
+    expect(isInlineImageDataUri("data:image/jpeg;base64,AAAA")).toBe(true);
+    expect(isInlineImageDataUri("data:image/gif;base64,AAAA")).toBe(true);
+    expect(isInlineImageDataUri("data:image/webp;base64,AAAA")).toBe(true);
+    // 这两类是 markdown-it 默认不放行的（base64 插入 bmp/svg 会显示成字面文本）
+    expect(isInlineImageDataUri("data:image/bmp;base64,AAAA")).toBe(true);
+    expect(isInlineImageDataUri("data:image/svg+xml;base64,PHN2Zy8+")).toBe(true);
+    // 非图片 data URI 与普通路径不放行
+    expect(isInlineImageDataUri("data:text/html;base64,AAAA")).toBe(false);
+    expect(isInlineImageDataUri("assets/a.png")).toBe(false);
+    expect(isInlineImageDataUri("data:image/png,AAAA")).toBe(false); // 非 base64
+  });
+
+  it("默认 markdown-it 会清空 bmp 内嵌图片的 src（复现问题）", () => {
+    const md = new MarkdownIt();
+    // 被 validateLink 拒掉时 markdown-it 会把 `![](...)` 原样当文本输出（所以不能
+    // 断言「输出里没有 data:image/bmp」），要断言的是**没有渲染出 src 属性**
+    expect(md.render("![](data:image/bmp;base64,AAAA)")).not.toContain('src="data:');
+  });
+
+  it("放行后 bmp / svg / png 内嵌图片都能渲染出 src", () => {
+    const md = new MarkdownIt();
+    allowInlineImageDataUris(md);
+    expect(md.render("![](data:image/bmp;base64,AAAA)")).toContain(
+      'src="data:image/bmp;base64,AAAA"'
+    );
+    expect(md.render("![](data:image/svg+xml;base64,PHN2Zy8+)")).toContain(
+      'src="data:image/svg+xml;base64,PHN2Zy8+"'
+    );
+    expect(md.render("![](data:image/png;base64,AAAA)")).toContain(
+      'src="data:image/png;base64,AAAA"'
+    );
+  });
+
+  it("放行内嵌图片不影响脚本类 URL 的拦截", () => {
+    const md = new MarkdownIt();
+    allowInlineImageDataUris(md);
+    // 被拒的链接会被当成普通文本渲染，断言点是**没有 href 属性**
+    expect(md.render("[x](javascript:alert(1))")).not.toContain('href="javascript:');
+  });
+});
 
 describe("utils/imagePath", () => {
   describe("isExternalUrl", () => {
