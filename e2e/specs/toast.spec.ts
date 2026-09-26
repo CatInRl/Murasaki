@@ -14,6 +14,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { closeWorkspace, waitForPinia } from "../helpers/store";
+import { isRendered, waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -55,7 +56,14 @@ describe("吐司系统", () => {
     expect(await item.isDisplayed()).toBe(true);
 
     const title = await browser.$(".toast-success .toast-title");
-    expect((await title.getText()).trim()).toBe("操作成功");
+    await title.waitForExist({ timeout: 5000 });
+    // tauri-driver 下 getText() 对小文本节点会返回空串，改读 textContent
+    expect(
+      await browser.execute(
+        () =>
+          (document.querySelector(".toast-success .toast-title")?.textContent ?? "").trim()
+      )
+    ).toBe("操作成功");
   });
 
   it("error 变体渲染", async () => {
@@ -66,20 +74,11 @@ describe("吐司系统", () => {
       toast.error("操作失败", { duration: 0 });
     });
 
-    const item = await browser.$(".toast-item.toast-error");
-    await item.waitForExist({ timeout: 5000 });
     // 该环境下 isDisplayed() 对 toast 不可靠：实测元素 display:flex、visibility:visible、
     // rect 138x42 且 store 中确实存在时，isDisplayed() 仍返回 false（enter transition 期间
-    // opacity 未到 1，且复用旧元素句柄会失效）。故改为 execute 断言「已渲染且有非零尺寸」。
-    const isRendered = () =>
-      browser.execute(() => {
-        const el = document.querySelector(".toast-item.toast-error") as HTMLElement | null;
-        if (!el) return false;
-        const r = el.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      });
-    await browser.waitUntil(async () => await isRendered(), { timeout: 5000 });
-    expect(await isRendered()).toBe(true);
+    // opacity 未到 1）。故改用 helper 的几何断言轮询。
+    await waitForRendered(browser, ".toast-item.toast-error", 5000);
+    expect(await isRendered(browser, ".toast-item.toast-error")).toBe(true);
   });
 
   it("progress 变体显示进度条", async () => {
@@ -129,20 +128,9 @@ describe("吐司系统", () => {
       toast.warning("警告", { duration: 0 });
     });
 
-    const item = await browser.$(".toast-item.toast-warning");
-    await item.waitForExist({ timeout: 5000 });
-    // 同「error 变体渲染」：该环境下 isDisplayed() 对 toast 不可靠，改用几何断言
-    const isRendered = () =>
-      browser.execute(() => {
-        const el = document.querySelector(
-          ".toast-item.toast-warning"
-        ) as HTMLElement | null;
-        if (!el) return false;
-        const r = el.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      });
-    await browser.waitUntil(async () => await isRendered(), { timeout: 5000 });
-    expect(await isRendered()).toBe(true);
+    // 同「error 变体渲染」：该环境下 isDisplayed() 对 toast 不可靠，改用 helper 几何断言
+    await waitForRendered(browser, ".toast-item.toast-warning", 5000);
+    expect(await isRendered(browser, ".toast-item.toast-warning")).toBe(true);
 
     const closeBtn = await browser.$(".toast-warning .toast-close-btn");
     await closeBtn.click();
@@ -177,7 +165,15 @@ describe("吐司系统", () => {
 
     const actionBtn = await browser.$(".toast-success .toast-action-btn");
     await actionBtn.waitForExist({ timeout: 5000 });
-    expect((await actionBtn.getText()).trim()).toBe("撤销");
+    // 同上：getText() 不可靠，改读 textContent 并轮询到文案渲染出来
+    const readActionLabel = () =>
+      browser.execute(() =>
+        (document.querySelector(".toast-success .toast-action-btn")?.textContent ?? "").trim()
+      );
+    await browser.waitUntil(async () => (await readActionLabel()) === "撤销", {
+      timeout: 5000,
+    });
+    expect(await readActionLabel()).toBe("撤销");
 
     await actionBtn.click();
 
@@ -243,7 +239,8 @@ describe("吐司系统", () => {
     await item.waitForExist({ timeout: 5000 });
     // 等待 enter transition 完成
     await browser.pause(300);
-    expect(await item.isDisplayed()).toBe(true);
+    // 该环境下 isDisplayed() 对 toast 不可靠，改用 wait.ts 的「已渲染」判定
+    expect(await isRendered(browser, ".toast-item.toast-success")).toBe(true);
 
     // 等待自动消失（3s 默认 + 余量）
     // 使用手动轮询替代 browser.waitUntil（后者在 tauri-driver 下与

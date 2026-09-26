@@ -15,6 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { waitForPinia, dismissAllDialogs } from "../helpers/store";
+import { waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -94,12 +95,8 @@ describe("右键菜单", () => {
     });
 
     const item = await browser.$(".murasaki-context-menu-item");
-    // 改用 waitForExist + waitUntil(isDisplayed)：waitForDisplayed 与菜单/项入场动画
-    // （opacity 0 → 1）阶段交互不稳定
-    await item.waitForExist({ timeout: 5000 });
-    await browser.waitUntil(async () => {
-      return await item.isDisplayed().catch(() => false);
-    }, { timeout: 5000 });
+    // 改用 waitForRendered：waitForDisplayed 与菜单/项入场动画（opacity 0 → 1）阶段交互不稳定
+    await waitForRendered(browser, ".murasaki-context-menu-item", 5000);
     await item.click();
 
     // 菜单应关闭
@@ -312,11 +309,7 @@ describe("Agent 消息右键菜单（H14）", () => {
       );
     });
 
-    const menuEl = await browser2.$(".murasaki-context-menu");
-    await menuEl.waitForExist({ timeout: 5000 });
-    await browser2.waitUntil(async () => {
-      return await menuEl.isDisplayed().catch(() => false);
-    }, { timeout: 5000 });
+    await waitForRendered(browser2, ".murasaki-context-menu", 5000);
 
     const items = await browser2.$$(".murasaki-context-menu-item");
     expect(items.length).toBe(4);
@@ -383,10 +376,7 @@ describe("Agent 消息右键菜单（H14）", () => {
     });
 
     const firstItem = await browser2.$(".murasaki-context-menu-item");
-    await firstItem.waitForExist({ timeout: 5000 });
-    await browser2.waitUntil(async () => {
-      return await firstItem.isDisplayed().catch(() => false);
-    }, { timeout: 5000 });
+    await waitForRendered(browser2, ".murasaki-context-menu-item", 5000);
     await firstItem.click();
 
     // 菜单应关闭

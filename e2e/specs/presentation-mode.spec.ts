@@ -3,7 +3,7 @@
  *
  * 验证：
  * - Ctrl+Shift+4 切到演示模式：只挂预览、无编辑器/工具栏/分隔条
- * - 内容只读（无 CodeMirror 实例、任务列表 checkbox 禁用）
+ * - 内容只读（无 CodeMirror 实例、任务列表 checkbox 点击后状态不变）
  * - 状态栏显示「演示」模式 chip 与缩放 chip（默认 100%）
  * - Ctrl+= / Ctrl+- / Ctrl+0 缩放 50%–200%、步进 10%
  * - 缩放值持久化到 settings.presentationZoom
@@ -131,7 +131,7 @@ describe("演示模式", () => {
     expect(await (await browser.$(".preview-pane")).isExisting()).toBe(true);
   });
 
-  it("演示模式只读：无 CodeMirror 实例，任务列表 checkbox 禁用", async () => {
+  it("演示模式只读：无 CodeMirror 实例，任务列表 checkbox 点击不改变状态", async () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
     await pressShortcut(browser, "$", { ctrl: true, shift: true });

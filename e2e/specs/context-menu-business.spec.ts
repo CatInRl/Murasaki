@@ -22,6 +22,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
+import { waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -83,14 +84,9 @@ describe("TabBar / Editor 右键菜单具体项", () => {
       );
     });
 
-    const menuEl = await browser.$(".murasaki-context-menu");
-    // 用 waitForExist + waitUntil(isDisplayed) 替代 waitForDisplayed：
-    // 后者在 tauri-driver 下与菜单入场动画（opacity 0 → 1）阶段交互不稳定，
-    // 会直接超时报「still not displayed」。
-    await menuEl.waitForExist({ timeout: 5000 });
-    await browser.waitUntil(async () => {
-      return await menuEl.isDisplayed().catch(() => false);
-    }, { timeout: 5000 });
+    // 用 waitForRendered 替代 waitForDisplayed：后者在 tauri-driver 下与菜单入场动画
+    // （opacity 0 → 1）阶段交互不稳定，会直接超时报「still not displayed」。
+    await waitForRendered(browser, ".murasaki-context-menu", 5000);
 
     // 应有 7 个菜单项 + 1 个分隔符
     const items = await browser.$$(".murasaki-context-menu-item");
@@ -182,13 +178,8 @@ describe("TabBar / Editor 右键菜单具体项", () => {
       );
     });
 
-    const menuEl = await browser.$(".murasaki-context-menu");
-    // 同 TabBar 用例：改用 waitForExist + waitUntil(isDisplayed)，
-    // 避免 waitForDisplayed 在入场动画期间误报超时。
-    await menuEl.waitForExist({ timeout: 5000 });
-    await browser.waitUntil(async () => {
-      return await menuEl.isDisplayed().catch(() => false);
-    }, { timeout: 5000 });
+    // 同 TabBar 用例：改用 waitForRendered，避免 waitForDisplayed 在入场动画期间误报超时。
+    await waitForRendered(browser, ".murasaki-context-menu", 5000);
 
     // 应有 9 个菜单项 + 1 个分隔符
     const items = await browser.$$(".murasaki-context-menu-item");
