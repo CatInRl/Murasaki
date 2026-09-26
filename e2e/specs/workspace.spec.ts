@@ -11,7 +11,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { waitForInBrowser } from "../helpers/wait";
+import { waitForInBrowser, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -43,7 +43,7 @@ describe("工作区 + 文件树", () => {
     await openWorkspace(browser, wsPath);
 
     const tree = await browser.$(".file-tree");
-    await tree.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     expect(await tree.isDisplayed()).toBe(true);
   });
 
@@ -52,7 +52,7 @@ describe("工作区 + 文件树", () => {
     await openWorkspace(browser, wsPath);
 
     const title = await browser.$(".file-tree .toolbar-title");
-    await title.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree .toolbar-title", 10000);
     const text = (await title.getText()).trim();
     expect(text.length).toBeGreaterThan(0);
     // 工作区目录名应出现在标题中（fixture 目录名 .workspace 被 UI 大写显示为 .WORKSPACE）
@@ -84,7 +84,11 @@ describe("工作区 + 文件树", () => {
     const node = await browser.$(
       '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="intro.md"]'
     );
-    await node.waitForExist({ timeout: 10000 });
+    await waitForPresent(
+      browser,
+      '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="intro.md"]',
+      10000
+    );
     await node.click();
 
     // 等 tab 栏出现名为 intro.md 且真正渲染出来的标签。
@@ -110,7 +114,7 @@ describe("工作区 + 文件树", () => {
     const wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
     const tree = await browser.$(".file-tree");
-    await tree.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     expect(await tree.isDisplayed()).toBe(true);
 
     await closeWorkspace(browser);
@@ -127,12 +131,11 @@ describe("工作区 + 文件树", () => {
     await openWorkspace(browser, wsPath);
 
     // 等待文件树渲染（刷新按钮在 .file-tree 的 toolbar 内）
-    const tree = await browser.$(".file-tree");
-    await tree.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
 
     // 点击刷新按钮（FileTree.vue 中 title="刷新" 的 NButton）
     const refreshBtn = await browser.$(".file-tree button[title='刷新']");
-    await refreshBtn.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".file-tree button[title='刷新']", 5000);
     await refreshBtn.click();
 
     // 等待 loading 归位。预算 45s **必须大于** refreshTree 自身的 30s 兜底

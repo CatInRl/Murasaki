@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { waitForPinia, dismissAllDialogs } from "../helpers/store";
-import { waitForRendered } from "../helpers/wait";
+import { waitForRendered, waitForPresent, waitForAbsent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -58,8 +58,7 @@ describe("右键菜单", () => {
       );
     });
 
-    const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-context-menu", 5000);
 
     const items = await browser.$$(".murasaki-context-menu-item");
     expect(items.length).toBe(2);
@@ -100,8 +99,7 @@ describe("右键菜单", () => {
     await item.click();
 
     // 菜单应关闭
-    const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForExist({ timeout: 5000, reverse: true });
+    await waitForAbsent(browser, ".murasaki-context-menu", 5000);
 
     const called = await browser.execute(() => {
       // @ts-ignore
@@ -132,7 +130,7 @@ describe("右键菜单", () => {
     });
 
     const item = await browser.$(".murasaki-context-menu-item");
-    await item.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-context-menu-item", 5000);
     expect(await item.getAttribute("class")).toContain("is-disabled");
 
     // 点击禁用项（不应触发 action，也不应关闭菜单）
@@ -163,8 +161,7 @@ describe("右键菜单", () => {
       );
     });
 
-    const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-context-menu", 5000);
 
     const separators = await browser.$$(".murasaki-context-menu-separator");
     expect(separators.length).toBe(1);
@@ -183,12 +180,11 @@ describe("右键菜单", () => {
       );
     });
 
-    const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-context-menu", 5000);
 
     await browser.keys(["Escape"]);
 
-    await menuEl.waitForExist({ timeout: 5000, reverse: true });
+    await waitForAbsent(browser, ".murasaki-context-menu", 5000);
   });
 
   it("点击外部关闭菜单", async () => {
@@ -201,13 +197,12 @@ describe("右键菜单", () => {
       );
     });
 
-    const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-context-menu", 5000);
 
     // 点击 body（菜单外部）
     await browser.$("body").click();
 
-    await menuEl.waitForExist({ timeout: 5000, reverse: true });
+    await waitForAbsent(browser, ".murasaki-context-menu", 5000);
   });
 
   it("shortcut 提示渲染", async () => {

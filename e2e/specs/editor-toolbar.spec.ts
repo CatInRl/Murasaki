@@ -16,6 +16,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -41,8 +42,7 @@ describe("编辑器工具栏", () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\test.md`);
 
-    const toolbar = await browser.$(".editor-toolbar");
-    await toolbar.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".editor-toolbar", 10000);
 
     // 应有多个 .tb-btn 按钮
     const buttons = await browser.$$(".tb-btn");
@@ -72,7 +72,7 @@ describe("编辑器工具栏", () => {
 
     // 点击 Bold 按钮
     const boldBtn = await browser.$('.tb-btn[title="加粗"]');
-    await boldBtn.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, '.tb-btn[title="加粗"]', 5000);
     await boldBtn.click();
     await browser.pause(300);
 
@@ -106,7 +106,7 @@ describe("编辑器工具栏", () => {
     await browser.pause(200);
 
     const italicBtn = await browser.$('.tb-btn[title="斜体"]');
-    await italicBtn.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, '.tb-btn[title="斜体"]', 5000);
     await italicBtn.click();
     await browser.pause(300);
 
@@ -142,7 +142,7 @@ describe("编辑器工具栏", () => {
 
     // 点击 H1 按钮
     const h1Btn = await browser.$('.tb-btn[title="标题 1"]');
-    await h1Btn.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, '.tb-btn[title="标题 1"]', 5000);
     await h1Btn.click();
     await browser.pause(300);
 
@@ -175,7 +175,7 @@ describe("编辑器工具栏", () => {
     await browser.pause(200);
 
     const listBtn = await browser.$('.tb-btn[title="无序列表"]');
-    await listBtn.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, '.tb-btn[title="无序列表"]', 5000);
     await listBtn.click();
     await browser.pause(300);
 
@@ -194,8 +194,7 @@ describe("编辑器工具栏", () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\titles.md`);
 
-    const toolbar = await browser.$(".editor-toolbar");
-    await toolbar.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".editor-toolbar", 10000);
 
     // 收集所有按钮的 title
     const titles = await browser.execute(() => {

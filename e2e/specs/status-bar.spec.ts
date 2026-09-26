@@ -15,6 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, dismissAllDialogs } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -43,7 +44,7 @@ describe("状态栏", () => {
     }, { timeout: 10000 });
 
     const fileName = await browser.$(".status-filename");
-    await fileName.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".status-filename", 10000);
     // 前序 spec 可能持久化了 tabs，closeAllTabs 后 Vue 异步渲染需要时间更新状态栏
     await browser.waitUntil(async () => {
       const text = (await fileName.getText()).trim();
@@ -58,7 +59,7 @@ describe("状态栏", () => {
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
     const fileName = await browser.$(".status-filename");
-    await fileName.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".status-filename", 10000);
     const nameText = (await fileName.getText()).trim();
     expect(nameText).toBe("intro.md");
   });
@@ -69,8 +70,7 @@ describe("状态栏", () => {
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
     // 等待状态栏渲染光标位置
-    const cursorGroup = await browser.$(".status-group");
-    await cursorGroup.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".status-group", 10000);
 
     // 获取所有 status-group 文本，找包含"行"的
     const groups = await browser.$$(".status-group");
@@ -131,7 +131,7 @@ describe("状态栏", () => {
 
     // 等待未保存指示出现
     const unsaved = await browser.$(".status-unsaved");
-    await unsaved.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".status-unsaved", 5000);
     expect(await unsaved.isDisplayed()).toBe(true);
     expect((await unsaved.getText()).trim()).toBe("未保存");
   });
@@ -143,7 +143,7 @@ describe("状态栏", () => {
 
     // 文件刚打开，isDirty 应为 false → 显示"已保存"
     const saved = await browser.$(".status-saved");
-    await saved.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".status-saved", 10000);
     expect(await saved.isDisplayed()).toBe(true);
     expect((await saved.getText()).trim()).toBe("已保存");
   });

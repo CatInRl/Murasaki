@@ -14,6 +14,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
 import { openWorkspace, openFileInTab, waitForPinia } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 describe("WYSIWYG 模式真实用户路径验证", () => {
   let browser: Browser;
@@ -61,7 +62,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
 
     // 设置页 DOM 应在主窗口内渲染（非空白）
     const settingsShell = await browser.$(".settings-shell");
-    await settingsShell.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".settings-shell", 5000);
     expect(await settingsShell.isExisting()).toBe(true);
 
     // 单入口路由：不应创建新窗口
@@ -129,7 +130,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
 
     // 等待编辑器渲染
     const editorPane = await browser.$(".editor-pane");
-    await editorPane.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".editor-pane", 10000);
 
     // 验证 editorBridge.editorMode === "wysiwyg"
     const mode = await browser.execute(() =>

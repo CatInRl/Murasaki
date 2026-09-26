@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { closeWorkspace, waitForPinia } from "../helpers/store";
-import { isRendered, waitForRendered } from "../helpers/wait";
+import { isRendered, waitForPresent, waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -47,16 +47,15 @@ describe("吐司系统", () => {
       toast.success("操作成功", { duration: 0 });
     });
 
-    // 使用 waitForExist + pause 替代 waitForDisplayed（后者在 tauri-driver 下
+    // 使用轮询等待 + pause 替代元素可见性等待（后者在 tauri-driver 下
     // 与 transition-group 的 enter-from opacity:0 阶段交互不稳定）
     const item = await browser.$(".toast-item.toast-success");
-    await item.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".toast-item.toast-success", 5000);
     // 等待 enter transition 完成（200ms + 余量）
     await browser.pause(400);
     expect(await item.isDisplayed()).toBe(true);
 
-    const title = await browser.$(".toast-success .toast-title");
-    await title.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".toast-success .toast-title", 5000);
     // tauri-driver 下 getText() 对小文本节点会返回空串，改读 textContent
     expect(
       await browser.execute(
@@ -88,11 +87,10 @@ describe("吐司系统", () => {
       toast.progress("加载中", { progress: 50 });
     });
 
-    const item = await browser.$(".toast-item.toast-progress");
-    await item.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".toast-item.toast-progress", 5000);
 
     const bar = await browser.$(".toast-progress .toast-progress-bar");
-    await bar.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".toast-progress .toast-progress-bar", 5000);
     // 进度条 style 应包含 width: 50%
     const style = await bar.getAttribute("style");
     expect(style).toContain("50%");
@@ -106,8 +104,7 @@ describe("吐司系统", () => {
       toast.info("提示", { description: "详细说明文字", duration: 0 });
     });
 
-    const desc = await browser.$(".toast-info .toast-desc");
-    await desc.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".toast-info .toast-desc", 5000);
     // enter transition 期间 getText 可能读到空串（且 tauri-driver 下 getText 对小文本节点
     // 本身不稳定），故用 execute 读 textContent 并轮询到文案渲染出来
     const readDesc = () =>
@@ -164,7 +161,7 @@ describe("吐司系统", () => {
     });
 
     const actionBtn = await browser.$(".toast-success .toast-action-btn");
-    await actionBtn.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".toast-success .toast-action-btn", 5000);
     // 同上：getText() 不可靠，改读 textContent 并轮询到文案渲染出来
     const readActionLabel = () =>
       browser.execute(() =>
@@ -235,8 +232,7 @@ describe("吐司系统", () => {
       toast.success("自动消失");
     });
 
-    const item = await browser.$(".toast-item.toast-success");
-    await item.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".toast-item.toast-success", 5000);
     // 等待 enter transition 完成
     await browser.pause(300);
     // 该环境下 isDisplayed() 对 toast 不可靠，改用 wait.ts 的「已渲染」判定

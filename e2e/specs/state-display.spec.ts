@@ -29,6 +29,7 @@ import {
   resetPersistenceSettings,
 } from "../helpers/store";
 import { resolve } from "node:path";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -76,8 +77,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     // 此时 App.vue 渲染 WelcomePage，不渲染 FileTree。
     // 验证 WelcomePage 的 EmptyState（"暂无最近文件"）作为替代
     // 等待欢迎页渲染
-    const welcome = await browser.$(".welcome-page, [class*='welcome']");
-    await welcome.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".welcome-page, [class*='welcome']", 10000);
 
     // WelcomePage EmptyState 在无最近文件时显示
     const empty = await browser.$(".empty-state");
@@ -93,7 +93,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
   it("统一搜索条搜索无结果显示 EmptyState", async () => {
     // 准备一个不含目标关键词的工作区
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await ensureSplitMode(browser);
 
     // 触发搜索：查询一个不存在的内容
@@ -115,7 +115,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
 
     // 等待搜索完成 + 空态渲染
     const empty = await browser.$(".gsb__empty");
-    await empty.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".gsb__empty", 10000);
 
     const titleText = (await empty.getText()).trim();
     // GlobalSearchBar.vue 空态标题 = "未找到匹配项"
@@ -131,7 +131,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
       },
     ]);
     await openWorkspace(browser, plainWs);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await ensureSplitMode(browser);
 
     // 打开无标题文件
@@ -151,7 +151,11 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     const empty = await browser.$(
       ".outline-pane .empty-state, [class*='outline'] .empty-state"
     );
-    await empty.waitForExist({ timeout: 5000 });
+    await waitForPresent(
+      browser,
+      ".outline-pane .empty-state, [class*='outline'] .empty-state",
+      5000
+    );
 
     const title = await empty.$(".empty-title");
     expect(await title.isExisting()).toBe(true);
@@ -205,7 +209,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
 
   it("统一搜索条搜索中显示 Loading", async () => {
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await ensureSplitMode(browser);
 
     // 先 visible=true 挂载统一搜索条（挂载会 clear 旧查询），再模拟加载中
@@ -243,7 +247,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
   it("OutlinePanel 加载中显示 Skeleton", async () => {
     // 准备工作区并打开有标题的文件
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await ensureSplitMode(browser);
 
     const mdPath = resolve(wsPath, "intro.md").replace(/\\/g, "/");
@@ -286,8 +290,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
   it("EmptyState 根容器有 role=status 和 aria-live=polite", async () => {
     // 触发 WelcomePage 的 EmptyState（无工作区 + 无最近文件）
     // beforeEach 已 closeWorkspace，且 recentFiles/recentFolders 默认为空
-    const welcome = await browser.$(".welcome-page, [class*='welcome']");
-    await welcome.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".welcome-page, [class*='welcome']", 10000);
 
     const empty = await browser.$(".empty-state");
     expect(await empty.isExisting()).toBe(true);
@@ -298,7 +301,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
   it("统一搜索条加载态有 role=status 和 aria-busy=true", async () => {
     // 通过统一搜索条触发加载态
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await ensureSplitMode(browser);
 
     await browser.execute(() => {

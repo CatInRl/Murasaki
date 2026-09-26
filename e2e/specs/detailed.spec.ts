@@ -16,6 +16,7 @@ import {
   resetPersistenceSettings,
   dismissAllDialogs,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -198,7 +199,7 @@ async function waitForTabCount(browser: Browser, count: number, timeout = 5000):
 describe("1. 关闭确认对话框", () => {
   beforeEach(async () => {
     await openWorkspace(browser, WS1);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
   });
 
   it("1.1 无修改直接关闭：不弹对话框，直接关闭", async () => {
@@ -341,7 +342,7 @@ describe("1. 关闭确认对话框", () => {
 describe("2. 撤销/重做（Ctrl+Z/Y）单文件", () => {
   beforeEach(async () => {
     await openWorkspace(browser, WS1);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await openFileInTab(browser, `${WS1}\\intro.md`);
     await waitForTabCount(browser, 1);
   });
@@ -427,7 +428,7 @@ describe("2. 撤销/重做（Ctrl+Z/Y）单文件", () => {
 describe("3. 多 Tab 切换时撤销栈独立性", () => {
   beforeEach(async () => {
     await openWorkspace(browser, WS1);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
   });
 
   it("3.1 Tab A 编辑 → 切到 Tab B 编辑 → 回 Tab A：A 撤销栈保留", async () => {
@@ -569,7 +570,7 @@ describe("3. 多 Tab 切换时撤销栈独立性", () => {
 describe("4. 多 Tab 关闭/切换/新建场景", () => {
   beforeEach(async () => {
     await openWorkspace(browser, WS1);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
   });
 
   it("4.1 关闭当前激活 tab：激活移到相邻 tab", async () => {
@@ -685,7 +686,7 @@ describe("4. 多 Tab 关闭/切换/新建场景", () => {
 describe("5. 交叉场景", () => {
   beforeEach(async () => {
     await openWorkspace(browser, WS1);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
   });
 
   it("5.1 Tab A 有未保存修改 + 撤销后变干净 → 关闭不弹对话框", async () => {

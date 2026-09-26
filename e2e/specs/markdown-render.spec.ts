@@ -21,6 +21,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { openWorkspace, closeWorkspace, openFileInTab, getTabsState, waitForPinia, ensureSplitMode } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -333,7 +334,7 @@ beforeEach(async () => {
     // ignore
   }
   await openWorkspace(browser, WS1);
-  await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+  await waitForPresent(browser, ".file-tree", 10000);
 });
 
 // ===== 辅助 =====

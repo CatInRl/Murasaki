@@ -26,6 +26,7 @@ import {
   dismissAllDialogs,
   resetPersistenceSettings,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -163,11 +164,11 @@ describe("演示模式", () => {
     await pressShortcut(browser, "$", { ctrl: true, shift: true });
 
     const modeChip = await browser.$(".status-mode-chip");
-    await modeChip.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".status-mode-chip", 10000);
     expect((await modeChip.getText()).trim()).toBe("演示模式");
 
     const zoomChip = await browser.$(".status-zoom-chip");
-    await zoomChip.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".status-zoom-chip", 5000);
     expect((await zoomChip.getText()).trim()).toContain("100%");
   });
 
@@ -177,7 +178,7 @@ describe("演示模式", () => {
     await pressShortcut(browser, "$", { ctrl: true, shift: true });
 
     const zoomChip = await browser.$(".status-zoom-chip");
-    await zoomChip.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".status-zoom-chip", 10000);
 
     await pressShortcut(browser, "=", { ctrl: true });
     expect(await getZoom(browser)).toBe(110);

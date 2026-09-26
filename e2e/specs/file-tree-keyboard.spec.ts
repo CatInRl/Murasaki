@@ -22,6 +22,7 @@ import {
   resetPersistenceSettings,
   getTabsState,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -215,7 +216,7 @@ describe("文件树键盘导航", () => {
     await pressTreeKey(browser, "F10", { shift: true });
 
     const menu = await browser.$(".murasaki-context-menu");
-    await menu.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-context-menu", 5000);
     expect(await menu.isDisplayed()).toBe(true);
 
     // 菜单项应可键盘操作：↓ 移动高亮

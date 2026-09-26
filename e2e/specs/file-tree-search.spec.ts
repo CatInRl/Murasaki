@@ -15,6 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -118,8 +119,7 @@ describe("文件树选中态 & 搜索高亮", () => {
     console.log("[diag_search] " + JSON.stringify(searchResult));
 
     // 等待搜索结果渲染
-    const highlight = await browser.$(".gsb-hl");
-    await highlight.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".gsb-hl", 10000);
 
     // 检查高亮颜色
     const bgColor = await browser.execute(() => {

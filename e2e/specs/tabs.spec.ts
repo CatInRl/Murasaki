@@ -18,6 +18,7 @@ import {
   waitForPinia,
   resetPersistenceSettings
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -41,14 +42,14 @@ describe("多 Tab 管理", () => {
     }
     await openWorkspace(browser, wsPath);
     // 等待侧栏就绪
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
   });
 
   it("点击 + 按钮新建未命名 Tab", async () => {
     // TabBar 仅在 hasTabs 时渲染，先打开一个文件让 TabBar 出现
     const ws = resetWorkspace(defaultFixtureFiles());
     await openFileInTab(browser, `${ws}/intro.md`);
-    await (await browser.$(".new-tab-btn")).waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".new-tab-btn", 5000);
 
     const initial = await getTabsState(browser);
     const initialCount = initial.tabs.length;
@@ -148,7 +149,7 @@ describe("多 Tab 管理", () => {
 
     // 等待 dirty-dot 出现（TabBar.vue 用 .dirty-dot 不是 .dirty-mark）
     const dirtyMark = await browser.$(".tab-bar-container .tab-item.active .dirty-dot");
-    await dirtyMark.waitForExist({ timeout: 3000 });
+    await waitForPresent(browser, ".tab-bar-container .tab-item.active .dirty-dot", 3000);
     expect(await dirtyMark.isDisplayed()).toBe(true);
 
     // store 中 isDirty 应为 true
@@ -164,8 +165,7 @@ describe("多 Tab 管理", () => {
     await openFileInTab(browser, `${wsPath}\\undo-test.md`);
 
     // 等待编辑器加载（CodeMirror 6 的 .cm-content）
-    const cmContent = await browser.$(".cm-content");
-    await cmContent.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".cm-content", 5000);
 
     // 通过 CodeMirror view 在光标处插入文本（模拟真实输入）
     await browser.executeAsync((done: (res: unknown) => void) => {

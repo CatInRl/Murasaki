@@ -19,6 +19,7 @@ import {
   dismissAllDialogs,
   resetPersistenceSettings,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 import { resolve } from "node:path";
 
 let browser: Browser;
@@ -61,7 +62,7 @@ describe("跨文件搜索结果跳转", () => {
       /* ignore */
     }
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await dismissAllDialogs(browser);
   });
 
@@ -118,7 +119,7 @@ describe("跨文件搜索结果跳转", () => {
 
     // 等待内容命中结果渲染
     const firstResult = await browser.$(".gsb__item");
-    await firstResult.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".gsb__item", 10000);
 
     // 点击结果项打开文件
     await firstResult.click();

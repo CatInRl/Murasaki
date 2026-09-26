@@ -22,6 +22,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 import { resolve } from "node:path";
 
 let browser: Browser;
@@ -81,7 +82,7 @@ describe("编辑器预览双向滚动同步", () => {
       /* ignore */
     }
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await dismissAllDialogs(browser);
     await ensureSplitMode(browser);
   });
@@ -90,8 +91,11 @@ describe("编辑器预览双向滚动同步", () => {
     const mdPath = resolve(wsPath, "long-doc.md").replace(/\\/g, "/");
     await openFileInTab(browser, mdPath);
 
-    const preview = await browser.$(".pane-right .markdown-body, .preview-pane .markdown-body");
-    await preview.waitForExist({ timeout: 10000 });
+    await waitForPresent(
+      browser,
+      ".pane-right .markdown-body, .preview-pane .markdown-body",
+      10000
+    );
 
     // 验证预览中有带 data-source-line 的元素
     const lineElements = await browser.execute(() => {
@@ -118,8 +122,7 @@ describe("编辑器预览双向滚动同步", () => {
     const mdPath = resolve(wsPath, "long-doc.md").replace(/\\/g, "/");
     await openFileInTab(browser, mdPath);
 
-    const preview = await browser.$(".preview-pane");
-    await preview.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".preview-pane", 10000);
 
     // 记录初始滚动位置
     const initialPreviewScroll = await browser.execute(() => {

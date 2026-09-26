@@ -19,6 +19,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
+import { waitForPresent } from "../helpers/wait";
 import {
   openWorkspace,
   closeWorkspace,
@@ -125,7 +126,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 应有代码块 wrapper
     const codeblock = await browser.$(".murasaki-wysiwyg-codeblock-wrapper");
-    await codeblock.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-wysiwyg-codeblock-wrapper", 5000);
     expect(await codeblock.isExisting()).toBe(true);
 
     // 应有语言标签（ts）
@@ -170,7 +171,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 应有链接 widget
     const link = await browser.$(".murasaki-wysiwyg-link");
-    await link.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-wysiwyg-link", 5000);
     expect(await link.isExisting()).toBe(true);
     const href = await link.getAttribute("href");
     expect(href).toContain("github.com");
@@ -212,7 +213,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 应有图片 widget
     const img = await browser.$(".murasaki-wysiwyg-image");
-    await img.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-wysiwyg-image", 5000);
     expect(await img.isExisting()).toBe(true);
     const src = await img.getAttribute("src");
     expect(src).toContain("example.com");
@@ -254,12 +255,12 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 应有表格 widget
     const table = await browser.$(".murasaki-wysiwyg-table");
-    await table.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-wysiwyg-table", 5000);
     expect(await table.isExisting()).toBe(true);
 
     // 内部应有 <table> 元素
     const tableEl = await browser.$(".murasaki-wysiwyg-table table");
-    await tableEl.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-wysiwyg-table table", 5000);
     expect(await tableEl.isExisting()).toBe(true);
   });
 
@@ -297,7 +298,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 应有行内数学 widget
     const math = await browser.$(".murasaki-wysiwyg-math");
-    await math.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-wysiwyg-math", 5000);
     expect(await math.isExisting()).toBe(true);
   });
 
@@ -337,7 +338,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 应有块级数学 widget
     const mathBlock = await browser.$(".murasaki-wysiwyg-math-block");
-    await mathBlock.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-wysiwyg-math-block", 5000);
     expect(await mathBlock.isExisting()).toBe(true);
   });
 
@@ -372,8 +373,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     });
 
     // 应有至少 3 个 bullet widget（• 替换 -）
-    const firstBullet = await browser.$(".murasaki-wysiwyg-bullet");
-    await firstBullet.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-wysiwyg-bullet", 5000);
     const bullets = await browser.$$(".murasaki-wysiwyg-bullet");
     expect(bullets.length).toBeGreaterThanOrEqual(1);
   });
@@ -403,7 +403,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 应有分隔线 widget
     const hr = await browser.$(".murasaki-wysiwyg-hr");
-    await hr.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-wysiwyg-hr", 5000);
     expect(await hr.isExisting()).toBe(true);
   });
 

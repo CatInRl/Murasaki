@@ -20,6 +20,7 @@ import {
   waitForPinia,
   dismissAllDialogs,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -84,7 +85,7 @@ describe("设置显式 Save 模型", () => {
       /* ignore */
     }
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await dismissAllDialogs(browser);
   });
 
@@ -94,7 +95,7 @@ describe("设置显式 Save 模型", () => {
     await navigateToSettings(browser);
 
     const shell = await browser.$(".settings-shell");
-    await shell.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".settings-shell", 5000);
     expect(await shell.isDisplayed()).toBe(true);
 
     await navigateToEditor(browser);
@@ -146,8 +147,7 @@ describe("设置显式 Save 模型", () => {
     });
 
     // 2. 等待对话框出现
-    const dialogEl = await browser.$(".dialog-overlay");
-    await dialogEl.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 验证对话框包含三按钮
     const buttons = await browser.$$(".dialog-overlay button");
@@ -203,8 +203,7 @@ describe("设置显式 Save 模型", () => {
     });
 
     // 2. 等待对话框出现
-    const dialogEl = await browser.$(".dialog-overlay");
-    await dialogEl.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 点击 "保存"
     const buttons = await browser.$$(".dialog-overlay button");
@@ -249,8 +248,7 @@ describe("设置显式 Save 模型", () => {
     });
 
     // 2. 等待对话框出现
-    const dialogEl = await browser.$(".dialog-overlay");
-    await dialogEl.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 在 dialog overlay 上派发 Escape keydown 事件
     await browser.execute(() => {

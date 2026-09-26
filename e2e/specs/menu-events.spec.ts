@@ -23,6 +23,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -48,7 +49,7 @@ describe("菜单事件链", () => {
       // ignore
     }
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
   });
 
   describe("主题切换菜单", () => {
@@ -84,8 +85,7 @@ describe("菜单事件链", () => {
       await emitMenuEvent(browser, "new-file");
 
       // 文件树根目录出现内联命名输入框
-      const input = await browser.$(".root-creating-row input");
-      await input.waitForExist({ timeout: 3000 });
+      await waitForPresent(browser, ".root-creating-row input", 3000);
       // 不新建未命名 Tab
       expect((await getTabsState(browser)).tabs.length).toBe(initial);
     });
