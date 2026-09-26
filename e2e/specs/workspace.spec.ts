@@ -11,6 +11,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
+import { waitForInBrowser } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -86,12 +87,23 @@ describe("工作区 + 文件树", () => {
     await node.waitForExist({ timeout: 10000 });
     await node.click();
 
-    // 验证 Tab 栏出现，且包含 intro.md
-    const tab = await browser.$(
-      '//div[contains(@class, "tab-bar-container")]//span[contains(@class, "tab-title") and normalize-space()="intro.md"]'
+    // 等 tab 栏出现名为 intro.md 且真正渲染出来的标签。
+    // 必须手写轮询：元素等待命令（waitForExist / waitForDisplayed）在 tauri-driver +
+    // msedgedriver 下**不重试**（对不存在的元素 ~10ms 内即抛错），本地跑得快掩盖了
+    // 这一点，CI 上就成片失败（#266）。
+    const tabRendered = await waitForInBrowser(
+      browser,
+      (name: string) =>
+        Array.from(document.querySelectorAll(".tab-bar-container .tab-title")).some((el) => {
+          const rect = (el as HTMLElement).getBoundingClientRect();
+          return (
+            (el.textContent ?? "").trim() === name && rect.width > 0 && rect.height > 0
+          );
+        }),
+      ["intro.md"],
+      { timeout: 15000, message: 'tab 栏出现已渲染的 "intro.md" 标签' }
     );
-    await tab.waitForExist({ timeout: 5000 });
-    expect(await tab.isDisplayed()).toBe(true);
+    expect(tabRendered).toBe(true);
   });
 
   it("关闭工作区后侧栏消失", async () => {
@@ -123,23 +135,20 @@ describe("工作区 + 文件树", () => {
     await refreshBtn.waitForExist({ timeout: 5000 });
     await refreshBtn.click();
 
-    // 等待 loading 完成（最多 10 秒，远低于 refreshTree 的 30s 超时兜底）
-    // bug 7 修复前 loading 可能永久卡住；修复后必然在 30s 内归位
-    await browser.waitUntil(async () => {
-      const loading = await browser.execute(() => {
+    // 等待 loading 归位。预算 45s **必须大于** refreshTree 自身的 30s 兜底
+    // （src/stores/useWorkspaceStore.ts 的 REFRESH_TIMEOUT_MS）：本用例断言的是
+    // 「不会永久卡住」，给到正好 30s 就是与那个兜底抢跑，CI 上必然输（#266）。
+    // 手写轮询的理由同上一处：元素等待命令在本栈下不重试。
+    const loadingStopped = await waitForInBrowser(
+      browser,
+      () => {
         // @ts-ignore
         const ws = window.__pinia__._s.get("workspace");
-        return ws.loading;
-      });
-      return loading === false;
-    }, { timeout: 10000, timeoutMsg: "刷新按钮动画未在 10 秒内停止" });
-
-    // 最终 loading 必须为 false
-    const loading = await browser.execute(() => {
-      // @ts-ignore
-      const ws = window.__pinia__._s.get("workspace");
-      return ws.loading;
-    });
-    expect(loading).toBe(false);
+        return ws.loading === false;
+      },
+      [],
+      { timeout: 45000, interval: 500, message: "刷新按钮停止 loading" }
+    );
+    expect(loadingStopped).toBe(true);
   });
 });

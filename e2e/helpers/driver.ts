@@ -19,6 +19,7 @@ import { execSync } from "node:child_process";
 import http from "node:http";
 import { createConnection } from "node:net";
 import { existsSync, rmSync } from "node:fs";
+import { waitForPinia } from "./store";
 
 const DEFAULT_BINARY = resolve(
   process.cwd(),
@@ -156,6 +157,7 @@ export async function createSession(
   //（DevToolsActivePort file doesn't exist / Chrome instance exited）
   // 注意：不要在重试间杀 msedgedriver —— 那会孤立 tauri-driver。
   let lastError: unknown = null;
+  let browser: Browser | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       // 1. 用 Node.js http 模块创建 session（绕过 undici 兼容性问题）
@@ -164,7 +166,7 @@ export async function createSession(
       // 2. 用 webdriverio attach 连接到已有 session
       //    attach 不发送新的 POST /session 请求，直接复用 sessionId
       //    必须显式传入 hostname/port/protocol —— 见上方 DRIVER_HOSTNAME 注释
-      const browser = await attach({
+      browser = await attach({
         sessionId,
         hostname: DRIVER_HOSTNAME,
         port: DRIVER_PORT,
@@ -176,8 +178,7 @@ export async function createSession(
           }
         } as any
       } as any);
-
-      return browser;
+      break;
     } catch (err) {
       lastError = err;
       console.warn(
@@ -188,7 +189,25 @@ export async function createSession(
       await new Promise((r) => setTimeout(r, 2000));
     }
   }
-  throw lastError;
+
+  if (!browser) throw lastError;
+
+  // 3. 等应用就绪后再交还给调用方：WebView2 起来不等于前端就绪，Vue/Pinia 还在
+  //    加载期间 window.__pinia__ 是 undefined，任何读 store 的 helper 都会抛
+  //    "Cannot read properties of undefined (reading '_s')"。
+  //    放在重试循环之外：就绪超时应带着清晰报错直接失败，而不是再试 3 遍（30s × 3
+  //    会顶穿 beforeAll 的 60s hook 超时）。
+  try {
+    await waitForPinia(browser);
+  } catch (err) {
+    // 就绪超时：调用方的 `browser = await createSession()` 还没赋值，spec 的
+    // afterAll 会跳过 closeSession —— 这里自行收尾，否则残留的 murasaki 进程与
+    // EBWebView 状态会污染下一个 spec。收尾自身出错不掩盖原始的就绪错误。
+    await closeSession(browser).catch(() => {});
+    throw err;
+  }
+
+  return browser;
 }
 
 /**
