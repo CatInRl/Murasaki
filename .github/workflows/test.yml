@@ -1,7 +1,14 @@
 name: Test
 
-# 门禁：PR 与 main 推送时跑单测 / 类型检查 / Rust 测试
-# e2e 依赖 tauri-driver（Windows 专属），保持本地跑，不进 CI
+# 门禁：PR 与 main 推送时跑单测 / 类型检查 / Rust 测试 / E2E
+#
+# e2e job 在 windows-latest 上用 tauri-driver + msedgedriver 驱动真实 WebView2，覆盖
+# 单测覆盖不到的渲染与原生窗口行为。两个必须注意的点（见 #257）：
+#   ① 被测二进制必须用 Tauri CLI 构建 —— 裸 `cargo build --release` 产出的二进制前端
+#      起不来（webview 停在 title="localhost"），整套 e2e 会系统性失败；
+#   ② 跑之前不能有残留的 tauri-driver / msedgedriver 占用 4444 / 4445，否则 setup 会
+#      静默复用一个半死的 driver，所有 session 报 ECONNRESET。
+# 目前 e2e 只跑不拦（未加入 required status checks），避免拖慢每个 PR（见 #261）。
 on:
   pull_request:
   push:
@@ -69,3 +76,57 @@ jobs:
 
       - name: Rust 测试
         run: npm run test:rust
+
+  e2e:
+    name: e2e
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      TAURI_ENV_PLATFORM: windows
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: 安装 Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Rust 构建
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 安装 npm 依赖
+        run: npm ci
+
+      - name: 安装 tauri-driver
+        run: cargo install tauri-driver --locked
+
+      # 下载与本地 WebView2 Runtime 版本匹配的 msedgedriver，
+      # 装到 %USERPROFILE%\.cargo\bin（check-env.ps1 与 setup.ts 的默认查找位置）
+      - name: 安装匹配版本的 msedgedriver
+        run: powershell -ExecutionPolicy Bypass -File e2e/scripts/install-msedgedriver.ps1
+
+      # 用 Tauri CLI 构建（不能用裸 cargo build，理由见文件头注释 ①）。
+      # --no-bundle 跳过打包与 updater 签名产物 —— e2e 只需要可运行的 exe，
+      # 而签名需要 TAURI_SIGNING_PRIVATE_KEY，CI 上不应为测试引入该依赖。
+      - name: 构建应用
+        run: npx tauri build --no-bundle
+
+      - name: 运行 E2E
+        run: npm run test:e2e
+
+      # 失败时留诊断日志：应用侧在 E2E 模式会写 %TEMP%\murasaki-devtools.log
+      # （Windows 更新通道 / DevToolsActivePort 写入等排查线索）
+      - name: 上传失败诊断日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: ${{ runner.temp }}/murasaki-devtools.log
+          if-no-files-found: ignore
