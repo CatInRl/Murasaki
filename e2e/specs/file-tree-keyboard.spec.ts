@@ -22,7 +22,7 @@ import {
   resetPersistenceSettings,
   getTabsState,
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { waitForPresent, waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -70,12 +70,17 @@ async function focusedRow(b: Browser): Promise<{
 }
 
 async function focusFirstRow(b: Browser): Promise<void> {
-  await b.execute(() => {
+  const focused = await b.execute(() => {
     const el = document.querySelector(
       '[role="tree"] .node-row'
     ) as HTMLElement | null;
-    el?.focus();
+    if (!el) return false;
+    el.focus();
+    return true;
   });
+  // 显式失败：节点没渲染出来时静默跳过会让后续按键全部落空，
+  // 错误表象（菜单/焦点不对）离真因很远（#270）
+  if (!focused) throw new Error("focusFirstRow: 未找到 .node-row（文件树节点未渲染）");
   await b.pause(200);
 }
 
@@ -104,10 +109,9 @@ describe("文件树键盘导航", () => {
     await dismissAllDialogs(browser);
     wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
-    await browser.waitUntil(
-      async () => (await browser.$('[role="tree"]')).isExisting(),
-      { timeout: 10000 }
-    );
+    // 等「行」渲染出来，而不是只等容器 [role="tree"] —— 容器先挂载、行由异步
+    // list_tree 结果渲染，只等容器会让 focusFirstRow() 与后续按键静默落空（#270）
+    await waitForRendered(browser, '[role="treeitem"]', 10000);
   });
 
   it("ARIA tree 结构：容器 role=tree，行 role=treeitem + aria-level", async () => {

@@ -29,6 +29,33 @@ import { waitForPresent, waitForRendered } from "../helpers/wait";
 let browser: Browser;
 let wsPath: string;
 
+/**
+ * 在文件树里对指定名字的节点派发一次合成 `contextmenu` 事件。
+ *
+ * TreeNode 的事件监听器挂在 `.node-row` 上；节点没渲染出来时会**显式失败**，
+ * 而不是静默不派发 —— 否则错误表象会变成「菜单没出现」，离真因很远（#270）。
+ */
+async function dispatchContextMenu(b: Browser, nodeName: string): Promise<void> {
+  const dispatched = await b.execute((name: string) => {
+    // @ts-ignore
+    const menu = window.__pinia__._s.get("contextMenu");
+    menu.hide();
+    const evt = new MouseEvent("contextmenu", {
+      bubbles: true,
+      clientX: 100,
+      clientY: 100,
+    });
+    const nodes = document.querySelectorAll('.file-tree .tree-node .node-name');
+    const node = Array.from(nodes).find((n) => n.textContent?.trim() === name);
+    if (!node) return false;
+    const row = node.closest(".node-row");
+    if (!row) return false;
+    row.dispatchEvent(evt);
+    return true;
+  }, nodeName);
+  expect(dispatched).toBe(true);
+}
+
 describe("文件树右键菜单 + 文件操作安全", () => {
   beforeAll(async () => {
     browser = await createSession();
@@ -55,8 +82,10 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     await browser.pause(200); // 等待 file watcher 释放句柄
     wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
-    // 等待文件树就绪
-    await waitForPresent(browser, ".file-tree", 10000);
+    // 等文件树「节点」渲染出来，而不是只等容器 .file-tree —— 容器先挂载、节点由
+    // 异步 list_tree 结果渲染，只等容器会留下「容器在但节点还没出来」的窗口，
+    // 下面的合成 contextmenu 事件就会静默落空（#270，CI 上偶发）
+    await waitForRendered(browser, ".file-tree .node-name", 10000);
     await dismissAllDialogs(browser);
   });
 
@@ -65,31 +94,8 @@ describe("文件树右键菜单 + 文件操作安全", () => {
   it("右键文件节点显示文件专属菜单项（打开/重命名/剪切/复制/删除）", async () => {
     // 通过 contextMenu store 模拟右键点击 intro.md 节点
     // TreeNode.vue 的 onContextMenu 会调用 contextMenu.show(e, buildMenuItems())
-    // 这里直接调用 fileOps + 验证菜单项结构
-    await browser.execute(() => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const menu = pinia._s.get("contextMenu");
-      menu.hide();
-      // 模拟 contextmenu 事件
-      const evt = new MouseEvent("contextmenu", {
-        bubbles: true,
-        clientX: 100,
-        clientY: 100,
-      });
-      // 找到 intro.md 节点元素并派发事件
-      const nodes = document.querySelectorAll(
-        '.file-tree .tree-node .node-name'
-      );
-      const introNode = Array.from(nodes).find(
-        (n) => n.textContent?.trim() === "intro.md"
-      );
-      if (introNode) {
-        // TreeNode 的事件监听器挂在 .node-row 上
-        const row = introNode.closest(".node-row");
-        row?.dispatchEvent(evt);
-      }
-    });
+    // 这里派发合成 contextmenu 事件并验证菜单项结构
+    await dispatchContextMenu(browser, "intro.md");
 
     // 用 waitForRendered 判定菜单已渲染：元素可见性等待与菜单入场动画
     // （opacity 0 → 1）阶段交互不稳定，会误报「still not displayed」
@@ -109,27 +115,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
   });
 
   it("右键目录节点显示目录专属菜单项（新建文件/新建文件夹/粘贴）", async () => {
-    await browser.execute(() => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const menu = pinia._s.get("contextMenu");
-      menu.hide();
-      const evt = new MouseEvent("contextmenu", {
-        bubbles: true,
-        clientX: 100,
-        clientY: 100,
-      });
-      const nodes = document.querySelectorAll(
-        '.file-tree .tree-node .node-name'
-      );
-      const subNode = Array.from(nodes).find(
-        (n) => n.textContent?.trim() === "sub"
-      );
-      if (subNode) {
-        const row = subNode.closest(".node-row");
-        row?.dispatchEvent(evt);
-      }
-    });
+    await dispatchContextMenu(browser, "sub");
 
     // 同本文件上一处：改用 waitForRendered，避免入场动画期间误报
     await waitForRendered(browser, ".murasaki-context-menu", 5000);
