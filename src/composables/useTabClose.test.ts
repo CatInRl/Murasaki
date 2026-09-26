@@ -34,13 +34,8 @@ function makeDeps(overrides: Partial<TabCloseDeps> = {}): TabCloseDeps {
       saveTab: vi.fn().mockResolvedValue(undefined),
       saveTabAs: vi.fn().mockResolvedValue(undefined),
     } as never,
-    agentStore: {
-      isThinking: false,
-      cancel: vi.fn(),
-    } as never,
     dialog: {
       unsavedChanges: vi.fn().mockResolvedValue("cancel"),
-      confirm: vi.fn().mockResolvedValue(false),
       alert: vi.fn(),
     } as never,
     ...overrides,
@@ -52,7 +47,7 @@ beforeEach(() => {
 });
 
 describe("useTabClose", () => {
-  describe("onCloseTabRequest - 无 agent", () => {
+  describe("onCloseTabRequest", () => {
     it("无未保存修改 → 直接 closeTab", async () => {
       const deps = makeDeps({
         tabsStore: {
@@ -158,91 +153,6 @@ describe("useTabClose", () => {
     });
   });
 
-  describe("onCloseTabRequest - agent 运行中", () => {
-    it("agent 运行 + 有未保存 → unsavedChanges + cancel 不中断 agent", async () => {
-      const cancel = vi.fn();
-      const deps = makeDeps({
-        tabsStore: {
-          tabs: [makeTab({ isDirty: true })],
-          activeTabId: "tab1",
-          closeTab: vi.fn(),
-          doCloseTab: vi.fn(),
-          saveTab: vi.fn(),
-          saveTabAs: vi.fn(),
-        } as never,
-        agentStore: {
-          isThinking: true,
-          cancel,
-        } as never,
-        dialog: {
-          unsavedChanges: vi.fn().mockResolvedValue("cancel"),
-          confirm: vi.fn(),
-          alert: vi.fn(),
-        } as never,
-      });
-      const { onCloseTabRequest } = useTabClose(deps);
-      await onCloseTabRequest("tab1");
-      expect(deps.dialog.unsavedChanges).toHaveBeenCalled();
-      expect(cancel).not.toHaveBeenCalled();
-      expect(deps.tabsStore.doCloseTab).not.toHaveBeenCalled();
-    });
-
-    it("agent 运行 + 有未保存 → discard（不保存）→ cancel agent + doCloseTab", async () => {
-      const cancel = vi.fn();
-      const deps = makeDeps({
-        tabsStore: {
-          tabs: [makeTab({ isDirty: true })],
-          activeTabId: "tab1",
-          closeTab: vi.fn(),
-          doCloseTab: vi.fn().mockResolvedValue(undefined),
-          saveTab: vi.fn(),
-          saveTabAs: vi.fn(),
-        } as never,
-        agentStore: {
-          isThinking: true,
-          cancel,
-        } as never,
-        dialog: {
-          unsavedChanges: vi.fn().mockResolvedValue("discard"),
-          confirm: vi.fn(),
-          alert: vi.fn(),
-        } as never,
-      });
-      const { onCloseTabRequest } = useTabClose(deps);
-      await onCloseTabRequest("tab1");
-      expect(cancel).toHaveBeenCalled();
-      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("tab1");
-    });
-
-    it("agent 运行 + 无未保存 → confirm + 强制关闭 → cancel agent + doCloseTab", async () => {
-      const cancel = vi.fn();
-      const deps = makeDeps({
-        tabsStore: {
-          tabs: [makeTab({ isDirty: false })],
-          activeTabId: "tab1",
-          closeTab: vi.fn(),
-          doCloseTab: vi.fn().mockResolvedValue(undefined),
-          saveTab: vi.fn(),
-          saveTabAs: vi.fn(),
-        } as never,
-        agentStore: {
-          isThinking: true,
-          cancel,
-        } as never,
-        dialog: {
-          unsavedChanges: vi.fn(),
-          confirm: vi.fn().mockResolvedValue(true),
-          alert: vi.fn(),
-        } as never,
-      });
-      const { onCloseTabRequest } = useTabClose(deps);
-      await onCloseTabRequest("tab1");
-      expect(deps.dialog.confirm).toHaveBeenCalled();
-      expect(cancel).toHaveBeenCalled();
-      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("tab1");
-    });
-  });
-
   describe("批量关闭", () => {
     function batchDeps(
       tabs: ReturnType<typeof makeTab>[],
@@ -313,7 +223,7 @@ describe("useTabClose", () => {
       const unsavedChanges = vi.fn().mockResolvedValue("cancel");
       const deps = batchDeps(
         [makeTab({ id: "t1", isDirty: true }), makeTab({ id: "t2", isDirty: true })],
-        { dialog: { unsavedChanges, confirm: vi.fn(), alert: vi.fn() } as never }
+        { dialog: { unsavedChanges, alert: vi.fn() } as never }
       );
       await useTabClose(deps).onCloseAllTabs();
       expect(unsavedChanges).toHaveBeenCalledTimes(1);
@@ -323,7 +233,7 @@ describe("useTabClose", () => {
     it("选「不保存关闭」→ 全部关闭", async () => {
       const deps = batchDeps(
         [makeTab({ id: "t1", isDirty: true }), makeTab({ id: "t2", isDirty: true })],
-        { dialog: { unsavedChanges: vi.fn().mockResolvedValue("discard"), confirm: vi.fn(), alert: vi.fn() } as never }
+        { dialog: { unsavedChanges: vi.fn().mockResolvedValue("discard"), alert: vi.fn() } as never }
       );
       await useTabClose(deps).onCloseAllTabs();
       expect(deps.tabsStore.saveTab).not.toHaveBeenCalled();
@@ -337,7 +247,7 @@ describe("useTabClose", () => {
           makeTab({ id: "t1", path: "/test/a.md", isDirty: true }),
           makeTab({ id: "t2", path: "/test/b.md", isDirty: true }),
         ],
-        { dialog: { unsavedChanges: vi.fn().mockResolvedValue("save"), confirm: vi.fn(), alert: vi.fn() } as never }
+        { dialog: { unsavedChanges: vi.fn().mockResolvedValue("save"), alert: vi.fn() } as never }
       );
       await useTabClose(deps).onCloseAllTabs();
       expect(deps.tabsStore.saveTab).toHaveBeenCalledWith("t1");
@@ -352,7 +262,7 @@ describe("useTabClose", () => {
           makeTab({ id: "t1", path: "/test/a.md", isDirty: true }),
           makeTab({ id: "t2", path: null, isDirty: true }),
         ],
-        { dialog: { unsavedChanges, confirm: vi.fn(), alert: vi.fn() } as never }
+        { dialog: { unsavedChanges, alert: vi.fn() } as never }
       );
       await useTabClose(deps).onCloseAllTabs();
       const options = unsavedChanges.mock.calls[0][0] as { message: string; saveText: string };
@@ -366,7 +276,7 @@ describe("useTabClose", () => {
       mockedSaveDialog.mockResolvedValue(null);
       const deps = batchDeps(
         [makeTab({ id: "t1", path: null, isDirty: true })],
-        { dialog: { unsavedChanges: vi.fn().mockResolvedValue("save"), confirm: vi.fn(), alert: vi.fn() } as never }
+        { dialog: { unsavedChanges: vi.fn().mockResolvedValue("save"), alert: vi.fn() } as never }
       );
       await useTabClose(deps).onCloseAllTabs();
       expect(mockedSaveDialog).toHaveBeenCalled();

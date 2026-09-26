@@ -55,9 +55,6 @@ function makeDeps(overrides: Partial<AppLifecycleDeps> = {}): AppLifecycleDeps {
     editorBridge: {
       setEditorMode: vi.fn(),
     } as never,
-    proposalsStore: {
-      clearAllForWorkspace: vi.fn(),
-    } as never,
     currentTheme: ref("github"),
     sidebarView: ref<"files" | "outline">("files"),
     settingsVisible: ref(false),
@@ -126,7 +123,7 @@ describe("useAppLifecycle", () => {
       scope.stop();
     });
 
-    it("initialized=true 时 workspacePath 变化触发 updateSettings + clearAllForWorkspace", async () => {
+    it("initialized=true 时 workspacePath 变化触发 updateSettings", async () => {
       const deps = makeDeps();
       const scope = effectScope();
       const { initialized } = scope.run(() => useAppLifecycle(deps))!;
@@ -139,7 +136,6 @@ describe("useAppLifecycle", () => {
       expect(deps.persistence.updateSettings).toHaveBeenCalledWith({
         lastWorkspacePath: "/new/workspace",
       });
-      expect(deps.proposalsStore.clearAllForWorkspace).toHaveBeenCalled();
       scope.stop();
     });
 

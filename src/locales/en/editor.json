@@ -20,10 +20,6 @@
     "lineCol": "Ln {line}, Col {col}",
     "wordCount": "{count} words",
     "charCount": "{count} chars",
-    "agentRunning": "Agent running",
-    "orphanCount": "{count} orphan chats",
-    "orphanTooltip": "Click to clean up {count} orphan chats",
-    "providerTooltip": "Current AI Provider: {name}",
     "modeTooltip": "Click to switch display mode",
     "zoomLabel": "{percent}%",
     "zoomTooltip": "Presentation zoom: Ctrl+wheel / Ctrl+= / Ctrl+-, click to reset to 100%"

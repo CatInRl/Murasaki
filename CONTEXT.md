@@ -153,7 +153,7 @@ markdown 格式操作菜单：
 
 - **源码模式 (Source Mode)** —— 纯 markdown 源码编辑，CodeMirror 6 占满编辑区，无预览区。
 - **分屏模式 (Split Mode)** —— 界面分为源码编辑区与渲染预览区，输入时预览实时更新。默认模式。
-- **所见即所得 (WYSIWYG Mode)** —— 用户直接在渲染结果上编辑，所见即所得。通过 CodeMirror 6 ViewPlugin + Decoration 隐藏 markdown 语法标记实现（Typora 路线），源文件始终是纯 markdown 文本，不引入第二套文档模型。Agent 提案在所有模式原生兼容。
+- **所见即所得 (WYSIWYG Mode)** —— 用户直接在渲染结果上编辑，所见即所得。通过 CodeMirror 6 ViewPlugin + Decoration 隐藏 markdown 语法标记实现（Typora 路线），源文件始终是纯 markdown 文本，不引入第二套文档模型。
 - **演示模式 (Presentation Mode)** —— 只挂预览、不挂编辑器：编辑区仅渲染预览内容（铺满、无工具栏与分隔条），用于纯阅读与演示。内容不可编辑；内部 `.md` 链接仍开新 tab、外部链接走系统浏览器、任务列表 checkbox 只读不写回；大纲点击滚动预览到对应标题。支持整体等比缩放（50%–200%，步进 10%，`Ctrl+=` / `Ctrl+-` / `Ctrl+0` / 按住 Ctrl 滚轮，持久化 `settings.presentationZoom`）。菜单栏与状态栏不自动隐藏。
 
 前三种模式共用同一 CodeMirror 6 实例，**全部支持运行时切换**（无需重启）；演示模式不挂载编辑器实例，切换即卸载/重挂编辑器：
@@ -188,7 +188,7 @@ markdown 格式操作菜单：
 - 光标在当前段：所有语法标记可见（dim 灰色 + 缩小字号）+ 渲染样式保留
 - 光标离开当前段：所有语法标记隐藏 + 渲染样式保留
 - "当前段"定义：光标所在段落（空行分隔的连续文本行）
-- Agent 提案 decoration 优先级高于 WYSIWYG 隐藏 decoration，提案覆盖范围不隐藏语法标记
+- 装饰优先级：代码块 / 表格 / 图表等块级 widget 与内联标记的隐藏规则互不覆盖
 
 ## 主题 (Theme)
 
@@ -213,11 +213,11 @@ markdown 渲染样式的预设组合，影响预览区的内容外观（标题�
 
 ### 设置分类（0.4.0，3 个）
 
-- **常规** —— UI 模式（亮色/暗色/跟随系统）/ 显示隐藏文件 / 显示 Agent 面板 / 默认图片目录 / 语言（中文/English，0.4.0 起，详见 [ADR-0013](docs/adr/0013-i18n-via-vue-i18n-with-zh-cn-and-en-bilingual.md)）/ 启动时检查更新（0.4.0 起，默认开）
+- **常规** —— UI 模式（亮色/暗色/跟随系统）/ 显示隐藏文件 / 默认图片目录 / 语言（中文/English，0.4.0 起，详见 [ADR-0013](docs/adr/0013-i18n-via-vue-i18n-with-zh-cn-and-en-bilingual.md)）/ 启动时检查更新（0.4.0 起，默认开）
 - **编辑器** —— 编辑模式（source/split/wysiwyg）/ 字体大小 / 行高 / 字体族 / 显示行号 / 软折行
-- **AI** —— Provider 列表 + 编辑表单（类型含 OpenAI 兼容与 Anthropic，0.4.0 起，详见 [ADR-0011](docs/adr/0011-provider-interface-abstraction-with-openai-and-anthropic-dual-implementation.md)）/ 默认 Provider / 高级参数折叠区（4 项统一设置：Agent 循环轮数上限 / 单次请求 token 上限 / 累计 token 软上限 / propose_replace 二次确认阈值）
+- **快捷键** —— 快捷键一览与自定义（只读 + 恢复默认）
 
-不再设置「主题」分类（markdown 主题通过 OS 原生菜单切换）和「快捷键」分类（后续版本）。
+不再设置「主题」分类（markdown 主题通过 OS 原生菜单切换）。AI 分类随 AI Agent 功能一并移除（#264）。
 
 ### 保存模型（0.3.0 起）
 
@@ -639,35 +639,9 @@ LaTeX 语法的数学公式支持，使用 KaTeX 渲染（轻量、快速）。
 - 复制范围：整篇当前 tab 内容（与导出 HTML 同源，但走剪贴板而非文件）。
 - 不弹对话框，操作完成后 toast 提示"已复制富文本到剪贴板"。
 
-## Agent (Agent Capability)
+## WYSIWYG 模式 (WYSIWYG Mode)
 
-应用内置的 AI 助手能力，帮助用户编辑和管理 Markdown 文档。MVP 阶段不支持无工作区的独立文件（agent 在无工作区时整体禁用）。
-
-### Agent 能力分层
-
-为避免测试与讨论中的"全功能"语义漂移，约定 agent 能力分为以下七层，每层独立可测：
-
-- **A. 上下文 UI 层** —— 上下文卡片显示、token 估算、× 移除、切 tab 跟随、工具调用条目（calling/done/error）的可见性与展开。
-- **B. 工具后端集成层** —— 10 个工具（4 CM6 状态 + 3 文件 + 3 提议）通过 `executeTool` 直接调用的行为正确性，与 LLM 无关。
-- **C. 真实 LLM 调用循环层** —— `sendMessage` 入口：provider 解析 → API key 获取 → 上下文拼装 → 流式请求 → 工具调用循环 → 收尾。
-- **D. 提议渲染与接受层** —— CM6 装饰渲染 propose_insert / propose_replace / propose_new_file，✓/✗ 按钮，>50 行二次确认，严格失效。
-- **E. 对话持久化与隔离层** —— `chats/{sha1(workspacePath)}.json.gz` + `chats/index.json`，500ms 防抖保存，工作区隔离，单实例锁，孤儿清理。
-- **F. 上下文压缩与护栏层** —— 三层压缩（工具结果省略 → 滑窗+摘要 → 单请求截断），累计 token 跟踪与软上限。
-- **G. 取消/中断与并发层** —— AbortController 中断、partial answer 保留、"⚠ 已中断"标记、关闭运行中 tab 合并弹窗、tab 切换后台继续。
-
-### 全功能 E2E (Full-Stack Agent E2E)
-
-指覆盖 A–G 全部七层的端到端测试集合。单测/集成测试不算"全功能 E2E"。当前现有 E2E 仅覆盖 A、B 两层（绕过 LLM），C–G 全部为零覆盖。
-
-**API key 注入方式**：通过环境变量 `MURASAKI_E2E_API_KEY` 传入，不在任何文件落盘。
-
-### Agent UX 遗留问题 (Agent UX Follow-ups)
-
-全功能 E2E 测试中发现的 Agent 相关 UI/UX 不符合预期的问题（包括设置界面 UX 设计），记录为 GitHub issue 并标记 `agent-ux` 标签，待后续修复后由对应 E2E 测试回归验证。
-
-### WYSIWYG 模式 (WYSIWYG Mode)
-
-所见即所得编辑模式——用户直接在渲染结果上编辑。0.3.0 起实施，采用 CodeMirror 6 内 WYSIWYG（Typora 路线），与 Agent 功能原生协同（proposal 在 WYSIWYG 下直接渲染，无需切换源码模式）。详见 [ADR-0008](docs/adr/0008-wysiwyg-via-codemirror6-typora-approach.md) 与上方"编辑模式"章节。
+所见即所得编辑模式——用户直接在渲染结果上编辑。0.3.0 起实施，采用 CodeMirror 6 内 WYSIWYG（Typora 路线）。详见 [ADR-0008](docs/adr/0008-wysiwyg-via-codemirror6-typora-approach.md) 与上方"编辑模式"章节。
 
 ## 搜索 (Search)
 
@@ -722,7 +696,7 @@ issue #104 范围：性能修复 + UX 导航。
 - **硬编码守卫**：`src/locales/i18nHardcodedGuard.test.ts` 扫描 `composables` / `components` / `stores` / `settings` 下的 `dialog.*` / `toast.*` 调用，实参含 CJK 字符即测试失败，禁止用户可见文案绕过 i18n。
 - **切换入口**：系统设置 → 常规 → 语言。切换即时生效（前端 vue-i18n 运行时切换 + Rust 菜单重建），无需重启。
 - **持久化**：`settings.json` 的 `language` 字段。
-- **不翻译的内容**：markdown 主题名（GitHub/Newsprint 等）、代码块语言标签、Agent 工具名、markdown 语法。
+- **不翻译的内容**：markdown 主题名（GitHub/Newsprint 等）、代码块语言标签、markdown 语法。
 
 ## 设计系统基础 (Design System Foundation)
 
@@ -774,7 +748,7 @@ issue #104 范围：性能修复 + UX 导航。
 
 - **吐司系统**：`useToastStore` + `ToastContainer.vue`，6 变体（success/info/warning/error/progress/deleted），栈位置右上角
 - **对话框系统**：`useDialogStore` + `DialogContainer.vue`，4 类型（alert/confirm/prompt/conflict），Promise-based API，按钮顺序"取消在左/确认在右"（与 naive-ui 默认相反），替换所有 36 处原生 `alert()/confirm()/prompt()`
-- **右键菜单系统**：`useContextMenuStore` + `ContextMenuContainer.vue`，数据驱动（MenuItem 接口含 label/icon/shortcut/action/disabled/danger/separator），4 处右键菜单（TabBar/Editor/Agent 消息/TreeNode）
+- **右键菜单系统**：`useContextMenuStore` + `ContextMenuContainer.vue`，数据驱动（MenuItem 接口含 label/icon/shortcut/action/disabled/danger/separator），3 处右键菜单（TabBar/Editor/TreeNode）
 
 ### 状态展示组件家族 (State Display Component Family)
 

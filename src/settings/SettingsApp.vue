@@ -13,17 +13,14 @@
  */
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { Settings, Type, Keyboard, Bot } from "lucide-vue-next";
+import { Settings, Type, Keyboard } from "lucide-vue-next";
 import { emit } from "@tauri-apps/api/event";
-import { AGENT_ENABLED } from "../features";
 import "./settings.css";
 import GeneralPanel from "./panels/GeneralPanel.vue";
 import EditorPanel from "./panels/EditorPanel.vue";
-import AiPanel from "./panels/AiPanel.vue";
 import ShortcutPanel from "./panels/ShortcutPanel.vue";
 import DialogContainer from "../components/DialogContainer.vue";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
-import { useAiProvidersStore } from "../stores/useAiProvidersStore";
 import { useDialogStore } from "../stores/useDialogStore";
 import { DEFAULT_SETTINGS, type SettingsState } from "../types";
 import {
@@ -35,7 +32,6 @@ import {
 } from "./settingsLogic";
 
 const persistence = usePersistenceStore();
-const aiProviders = useAiProvidersStore();
 const dialog = useDialogStore();
 const { t } = useI18n();
 
@@ -69,7 +65,6 @@ onMounted(async () => {
   await persistence.loadSettings();
   draft.value = { ...persistence.settings };
   snapshot.value = { ...persistence.settings };
-  await aiProviders.load();
   // E2E test hook：release 构建后 dynamic import 不可用，暴露纯函数供测试调用
   // @ts-ignore
   window.__settingsLogic__ = { fieldsForCategory, isDirty, isCategoryDirty, restoreCategoryDefaults };
@@ -146,16 +141,6 @@ async function handleClose(): Promise<void> {
           <span>{{ $t('settings.categories.editor') }}</span>
         </button>
         <button
-          v-if="AGENT_ENABLED"
-          type="button"
-          class="category-item"
-          :class="{ active: activeCategory === 'ai' }"
-          @click="selectCategory('ai')"
-        >
-          <Bot :size="16" />
-          <span>{{ $t('settings.categories.ai') }}</span>
-        </button>
-        <button
           type="button"
           class="category-item"
           :class="{ active: activeCategory === 'shortcuts' }"
@@ -178,7 +163,6 @@ async function handleClose(): Promise<void> {
           v-else-if="activeCategory === 'editor'"
           v-model="draft"
         />
-        <AiPanel v-else-if="activeCategory === 'ai' && AGENT_ENABLED" />
         <ShortcutPanel
           v-else-if="activeCategory === 'shortcuts'"
           v-model="draft"

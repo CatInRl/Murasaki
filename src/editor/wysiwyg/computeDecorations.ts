@@ -211,8 +211,6 @@ export interface ComputeInput {
   selectionHead: number;
   /** 解析后的 markdown 语法树。 */
   tree: Tree;
-  /** Agent 提案范围 —— 与提案重叠的标记不隐藏（提案优先级高于 WYSIWYG 隐藏）。 */
-  proposalRanges: Array<{ from: number; to: number }>;
   /** 可选视口；大文档时仅计算可见区域 ± buffer。 */
   viewport?: { from: number; to: number };
 }
@@ -299,18 +297,6 @@ export function getParagraphRange(doc: string, pos: number): { from: number; to:
     to = nextLineEndAbs;
   }
   return { from, to };
-}
-
-/** 判断 [markFrom, markTo] 是否与任一提案范围重叠。 */
-function overlapsAnyProposal(
-  markFrom: number,
-  markTo: number,
-  proposalRanges: Array<{ from: number; to: number }>
-): boolean {
-  for (const r of proposalRanges) {
-    if (markFrom < r.to && markTo > r.from) return true;
-  }
-  return false;
 }
 
 /** 判断节点是否在视口内（含边界）。 */
@@ -400,7 +386,7 @@ function findMathRanges(
  * 返回的描述符已按 (from, to) 排序，可直接转换为 CodeMirror DecorationSet。
  */
 export function computeDecorations(input: ComputeInput): ComputedDeco[] {
-  const { doc, selectionHead, tree, proposalRanges, viewport } = input;
+  const { doc, selectionHead, tree, viewport } = input;
   const cursorLine = getCursorLineRange(doc, selectionHead);
   // 提前计算 frontmatter 范围：供块内 HorizontalRule 避让用（frontmatter 的 --- 分隔符
   // 属于卡片整体，不应被替换为 hr widget）。
@@ -425,7 +411,6 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       if (name === "InlineCode") {
         codeRanges.push({ from, to });
         if (!inViewport(from, to, viewport)) return;
-        if (overlapsAnyProposal(from, to, proposalRanges)) return;
         decos.push({
           type: "render",
           from,
@@ -442,7 +427,6 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
         const cursorInRange = selectionHead >= from && selectionHead <= to;
         codeRanges.push({ from, to });
         if (!inViewport(from, to, viewport)) return false;
-        if (overlapsAnyProposal(from, to, proposalRanges)) return false;
 
         if (cursorInRange) {
           // 光标在代码块内：整个块为激活范围，块内 CodeMark 保持 dim
@@ -483,7 +467,6 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       // 链接 / 图片：行内 widget
       if (name === "Link" || name === "Image") {
         if (!inViewport(from, to, viewport)) return;
-        if (overlapsAnyProposal(from, to, proposalRanges)) return;
 
         const inParagraph = to >= cursorLine.from && from <= cursorLine.to;
         if (inParagraph) {
@@ -520,7 +503,6 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       // 表格：块级 widget（就地可编辑，始终渲染）
       if (name === "Table") {
         if (!inViewport(from, to, viewport)) return false;
-        if (overlapsAnyProposal(from, to, proposalRanges)) return false;
 
         // T1.2 就地编辑：表格始终渲染为可编辑 <table> widget，不随光标翻回源码。
         // 语义：光标在表内/表外都显示可编辑表格；CM 文档与 contentEditable DOM 分离，
@@ -539,7 +521,6 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       // 行内 HTML 的渲染由预览/导出管线（sanitizeInlineHtml）保证安全与样式。
       if (name === "HTMLBlock") {
         if (!inViewport(from, to, viewport)) return false;
-        if (overlapsAnyProposal(from, to, proposalRanges)) return false;
 
         // 块级：光标在节点范围内 → 显示源码可编辑
         const cursorInRange = selectionHead >= from && selectionHead <= to;
@@ -553,7 +534,6 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       // 行级标记：hide / dim
       if (INLINE_MARK_TYPES.has(name)) {
         if (!inViewport(from, to, viewport)) return;
-        if (overlapsAnyProposal(from, to, proposalRanges)) return;
 
         // 光标在代码块内：以整个块为激活范围（围栏 CodeMark 保持 dim）；
         // 否则按当前段判断（段内标记 dim，段外标记 hide）。
@@ -611,7 +591,6 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       // 分隔线：段内 dim，离开替换为 hr widget
       if (name === "HorizontalRule") {
         if (!inViewport(from, to, viewport)) return;
-        if (overlapsAnyProposal(from, to, proposalRanges)) return;
         // frontmatter 的 --- 分隔符属于卡片整体：不生成 hr widget，保持 dim 可编辑
         const inFrontmatter = fmRange && from >= fmRange.from && to <= fmRange.to;
         const inParagraph = inFrontmatter || (to >= cursorLine.from && from <= cursorLine.to);
@@ -665,7 +644,6 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   const mathRanges = findMathRanges(doc, codeRanges);
   for (const mr of mathRanges) {
     if (!inViewport(mr.from, mr.to, viewport)) continue;
-    if (overlapsAnyProposal(mr.from, mr.to, proposalRanges)) continue;
     const inParagraph = mr.to >= cursorLine.from && mr.from <= cursorLine.to;
     if (inParagraph) continue; // 光标在段内：显示原始 markdown（可编辑）
     decos.push({
@@ -692,7 +670,6 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
     // 跳过代码范围内的匹配
     if (inAnyCodeRange(from, to, codeRanges)) continue;
     if (!inViewport(from, to, viewport)) continue;
-    if (overlapsAnyProposal(from, to, proposalRanges)) continue;
     const inParagraph = to >= cursorLine.from && from <= cursorLine.to;
     if (inParagraph) continue; // 光标在段内：显示原始 shortcode（可编辑）
     decos.push({
@@ -709,18 +686,16 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   // 光标离开 frontmatter 范围 → 渲染为样式化卡片 widget；光标进入 → 显示原始文本可编辑
   if (fmRange) {
     if (inViewport(fmRange.from, fmRange.to, viewport)) {
-      if (!overlapsAnyProposal(fmRange.from, fmRange.to, proposalRanges)) {
-        const cursorInRange =
-          selectionHead >= fmRange.from && selectionHead <= fmRange.to;
-        if (!cursorInRange) {
-          decos.push({
-            type: "blockWidget",
-            widget: "frontmatter",
-            from: fmRange.from,
-            to: fmRange.to,
-            content: fmRange.content,
-          });
-        }
+      const cursorInRange =
+        selectionHead >= fmRange.from && selectionHead <= fmRange.to;
+      if (!cursorInRange) {
+        decos.push({
+          type: "blockWidget",
+          widget: "frontmatter",
+          from: fmRange.from,
+          to: fmRange.to,
+          content: fmRange.content,
+        });
       }
     }
   }

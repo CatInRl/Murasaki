@@ -12,19 +12,16 @@ import common from "./zh-CN/common.json";
 import menu from "./zh-CN/menu.json";
 import settings from "./zh-CN/settings.json";
 import editor from "./zh-CN/editor.json";
-import agent from "./zh-CN/agent.json";
 
 import enCommon from "./en/common.json";
 import enMenu from "./en/menu.json";
 import enSettings from "./en/settings.json";
 import enEditor from "./en/editor.json";
-import enAgent from "./en/agent.json";
 
 import jaCommon from "./ja/common.json";
 import jaMenu from "./ja/menu.json";
 import jaSettings from "./ja/settings.json";
 import jaEditor from "./ja/editor.json";
-import jaAgent from "./ja/agent.json";
 
 type Json = Record<string, unknown>;
 
@@ -55,26 +52,23 @@ const languages: Record<string, Record<string, Json>> = {
     menu: menu as Json,
     settings: settings as Json,
     editor: editor as Json,
-    agent: agent as Json,
   },
   en: {
     common: enCommon as Json,
     menu: enMenu as Json,
     settings: enSettings as Json,
     editor: enEditor as Json,
-    agent: enAgent as Json,
   },
   ja: {
     common: jaCommon as Json,
     menu: jaMenu as Json,
     settings: jaSettings as Json,
     editor: jaEditor as Json,
-    agent: jaAgent as Json,
   },
 };
 
 const baseLang = "zh-CN";
-const moduleNames = ["common", "menu", "settings", "editor", "agent"] as const;
+const moduleNames = ["common", "menu", "settings", "editor"] as const;
 
 describe("locale key 同步", () => {
   for (const lang of Object.keys(languages)) {

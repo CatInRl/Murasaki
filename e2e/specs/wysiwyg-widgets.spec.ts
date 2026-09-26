@@ -1,9 +1,8 @@
 /**
- * WYSIWYG 块级 widget + Agent 面板三模式 + Bold 立即渲染 E2E 测试
+ * WYSIWYG 块级 widget + Bold 立即渲染 E2E 测试
  *
  * 覆盖：
  * - M15: WYSIWYG 块级 widget（代码块 / Mermaid / 链接 / 图片 / 表格 / KaTeX）
- * - M16: Agent 面板在 source/split/wysiwyg 三模式下均可见
  * - M17: Bold（**text**）光标离开段时立即隐藏 ** 标记
  *
  * 关键 CSS 类：
@@ -17,7 +16,6 @@
  * - 模式：.editor-pane.mode-{source|split|wysiwyg}
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { AGENT_ENABLED } from "../../src/features";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
@@ -62,7 +60,7 @@ async function setCursor(browser: Browser, pos: number): Promise<void> {
   await browser.pause(500);
 }
 
-describe("WYSIWYG 块级 widget + Agent 面板三模式 + Bold 立即渲染", () => {
+describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
   beforeAll(async () => {
     browser = await createSession();
     await waitForPinia(browser);
@@ -407,80 +405,6 @@ describe("WYSIWYG 块级 widget + Agent 面板三模式 + Bold 立即渲染", ()
     const hr = await browser.$(".murasaki-wysiwyg-hr");
     await hr.waitForExist({ timeout: 5000 });
     expect(await hr.isExisting()).toBe(true);
-  });
-
-  // ============ M16: Agent 面板三模式可见性 ============
-
-  // AGENT_ENABLED=false 时 Agent 面板不挂载，故这三条用例随开关跳过
-  it.skipIf(!AGENT_ENABLED)("Agent 面板在 source 模式下可见", async () => {
-    const wsPath = resetWorkspace([
-      { path: "agent.md", content: "# 测试\n" },
-    ]);
-    await openWorkspace(browser, wsPath);
-    await openFileInTab(browser, `${wsPath}\\agent.md`);
-    await ensureSplitMode(browser);
-
-    // 确保 showAgentPanel=true
-    await browser.execute(() => {
-      // @ts-ignore
-      const persistence = window.__pinia__._s.get("persistence");
-      persistence.updateSettings({ showAgentPanel: true });
-    });
-    await browser.pause(300);
-
-    // 切到 source 模式
-    await browser.execute(() => {
-      // @ts-ignore
-      const editorBridge = window.__pinia__._s.get("editorBridge");
-      editorBridge.setEditorMode("source");
-    });
-    await browser.pause(400);
-
-    // Agent 面板应可见
-    const agentPanel = await browser.$(".agent-panel, [class*='agent-panel']");
-    expect(await agentPanel.isExisting()).toBe(true);
-  });
-
-  it.skipIf(!AGENT_ENABLED)("Agent 面板在 split 模式下可见", async () => {
-    const wsPath = resetWorkspace([
-      { path: "agent.md", content: "# 测试\n" },
-    ]);
-    await openWorkspace(browser, wsPath);
-    await openFileInTab(browser, `${wsPath}\\agent.md`);
-    await ensureSplitMode(browser);
-
-    // split 模式下应可见
-    const agentPanel = await browser.$(".agent-panel, [class*='agent-panel']");
-    expect(await agentPanel.isExisting()).toBe(true);
-  });
-
-  it.skipIf(!AGENT_ENABLED)("Agent 面板在 wysiwyg 模式下可见", async () => {
-    const wsPath = resetWorkspace([
-      { path: "agent.md", content: "# 测试\n" },
-    ]);
-    await openWorkspace(browser, wsPath);
-    await openFileInTab(browser, `${wsPath}\\agent.md`);
-    await ensureSplitMode(browser);
-
-    // 确保 showAgentPanel=true
-    await browser.execute(() => {
-      // @ts-ignore
-      const persistence = window.__pinia__._s.get("persistence");
-      persistence.updateSettings({ showAgentPanel: true });
-    });
-    await browser.pause(300);
-
-    // 切到 wysiwyg 模式
-    await browser.execute(() => {
-      // @ts-ignore
-      const editorBridge = window.__pinia__._s.get("editorBridge");
-      editorBridge.setEditorMode("wysiwyg");
-    });
-    await browser.pause(500);
-
-    // Agent 面板应可见
-    const agentPanel = await browser.$(".agent-panel, [class*='agent-panel']");
-    expect(await agentPanel.isExisting()).toBe(true);
   });
 
   // ============ M17: Bold 立即渲染 ============

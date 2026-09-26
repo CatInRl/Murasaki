@@ -20,10 +20,6 @@
     "lineCol": "行 {line}, 列 {col}",
     "wordCount": "{count} 語",
     "charCount": "{count} 文字",
-    "agentRunning": "Agent 実行中",
-    "orphanCount": "{count} 個の孤立セッション",
-    "orphanTooltip": "クリックして {count} 個の孤立セッションをクリーンアップ",
-    "providerTooltip": "現在の AI Provider：{name}",
     "modeTooltip": "クリックして表示モードを切り替え",
     "zoomLabel": "{percent}%",
     "zoomTooltip": "プレゼンテーションのズーム：Ctrl+ホイール / Ctrl+= / Ctrl+-、クリックで 100% に戻す"

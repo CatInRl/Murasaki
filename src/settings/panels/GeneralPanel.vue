@@ -2,12 +2,11 @@
 /**
  * GeneralPanel — 常规设置面板
  *
- * 设置项：UI 模式、界面语言、显示隐藏文件、显示 Agent 面板、默认图片目录
+ * 设置项：UI 模式、界面语言、显示隐藏文件、默认图片目录
  * Design ref: settings-general.html
  */
 import { computed } from "vue";
 import type { SettingsState } from "../../types";
-import { AGENT_ENABLED } from "../../features";
 import { LOCALE_DEFS } from "../../locales/registry";
 import type { AppLocale } from "../../locales/registry";
 
@@ -109,27 +108,6 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
               type="checkbox"
               :checked="draft.reopenLastWorkspace"
               @change="patch('reopenLastWorkspace', ($event.target as HTMLInputElement).checked)"
-            />
-            <span class="toggle-track" aria-hidden="true"></span>
-          </label>
-        </div>
-      </div>
-    </section>
-
-    <!-- Agent（AGENT_ENABLED 关闭时整体隐藏，恢复仅需置 true） -->
-    <section v-if="AGENT_ENABLED" class="settings-section">
-      <h2 class="settings-section-title">{{ $t('settings.general.agent') }}</h2>
-      <div class="setting-row">
-        <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.general.showAgentPanel') }}</span>
-          <span class="setting-description">{{ $t('settings.general.showAgentPanelDesc') }}</span>
-        </div>
-        <div class="setting-control-column">
-          <label class="toggle-switch">
-            <input
-              type="checkbox"
-              :checked="draft.showAgentPanel"
-              @change="patch('showAgentPanel', ($event.target as HTMLInputElement).checked)"
             />
             <span class="toggle-track" aria-hidden="true"></span>
           </label>

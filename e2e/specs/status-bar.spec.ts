@@ -7,12 +7,10 @@
  * - 光标位置显示
  * - 字符数显示
  * - 已保存/未保存指示
- * - provider chip 显示
  *
  * 通过 Pinia store 操作 tabs/workspace，验证 StatusBar 渲染。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { AGENT_ENABLED } from "../../src/features";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
@@ -148,37 +146,5 @@ describe("状态栏", () => {
     await saved.waitForExist({ timeout: 10000 });
     expect(await saved.isDisplayed()).toBe(true);
     expect((await saved.getText()).trim()).toBe("已保存");
-  });
-
-  // AGENT_ENABLED=false 时不渲染 provider chip，故该用例随开关跳过
-  it.skipIf(!AGENT_ENABLED)("配置 provider 后显示 provider chip", async () => {
-    // 通过 store 直接添加 provider
-    await browser.execute(() => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const aiProviders = pinia._s.get("aiProviders");
-      // 直接设置 providers 数组（绕过 saveProvider 的 Tauri 命令）
-      aiProviders.providers = [{
-        id: "test-provider",
-        name: "TestProvider",
-        type: "custom",
-        baseUrl: "https://example.com",
-        model: "test-model",
-        isActive: true,
-      }];
-    });
-
-    const chip = await browser.$(".status-provider-chip");
-    await chip.waitForExist({ timeout: 5000 });
-    expect(await chip.isDisplayed()).toBe(true);
-    expect((await chip.getText()).trim()).toBe("TestProvider");
-
-    // 清理
-    await browser.execute(() => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const aiProviders = pinia._s.get("aiProviders");
-      aiProviders.providers = [];
-    });
   });
 });

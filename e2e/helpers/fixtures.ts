@@ -121,57 +121,6 @@ export function getWorkspaceRoot(): string {
   return WORKSPACE_ROOT;
 }
 
-/**
- * 编程式注入活动的 AI provider（用于 Agent 全功能 E2E 测试 C–G 层）
- * 返回构建好的 provider 配置信息。
- */
-export async function setupActiveProvider(
-  browser: import("webdriverio").Browser,
-  apiKey: string,
-  baseUrl = "https://api.deepseek.com",
-  model = "deepseek-v4-flash"
-): Promise<{ id: string; name: string }> {
-  const result = await browser.executeAsync(
-    (key: string, url: string, mdl: string, done: (res: unknown) => void) => {
-      const pinia = (window as any).__pinia__;
-      const store = pinia._s.get("aiProviders");
-      const newProvider = {
-        id: "", name: "E2E Test", type: "deepseek",
-        baseUrl: url, model: mdl, isActive: true,
-      };
-      store.saveProvider(newProvider, key)
-        .then((saved: any) => done({ id: saved.id, name: saved.name }))
-        .catch((err: unknown) => done({ error: `saveProvider failed: ${String(err)}` }));
-    },
-    apiKey, baseUrl, model
-  );
-
-  if ((result as any)?.error) {
-    throw new Error(`setupActiveProvider failed: ${(result as any).error}`);
-  }
-  return result as { id: string; name: string };
-}
-
-/** 清理活动 provider（测试隔离） */
-export async function teardownActiveProvider(
-  browser: import("webdriverio").Browser
-): Promise<void> {
-  await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
-    const pinia = window.__pinia__;
-    // 应用未就绪或已退出时直接跳过：afterAll 里不该因为清理而让整个 suite 失败
-    if (!pinia) {
-      done(null);
-      return;
-    }
-    const store = pinia._s.get("aiProviders");
-    const ids = store.providers.map((p: any) => p.id);
-    Promise.all(ids.map((id: string) => Promise.resolve(store.deleteProvider(id))))
-      .then(() => { store.providers = []; done(null); })
-      .catch((err: unknown) => done(err ? String(err) : null));
-  });
-}
-
 /** 默认 fixture：3 个 .md 文件 + 1 个子目录 */
 export function defaultFixtureFiles(): FixtureFile[] {
   return [

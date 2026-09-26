@@ -14,8 +14,7 @@
  *
  * Decoration 计算逻辑提取为纯函数 computeDecorations（便于单元测试），本文件负责：
  * - 把描述符转换为 CodeMirror DecorationSet（StateField.create / update）
- * - 监听 selection / doc / 提案 / 语法树变化（同步重算）
- * - Agent 提案覆盖范围不隐藏标记（提案优先级高于 WYSIWYG 隐藏）
+ * - 监听 selection / doc / 语法树变化（同步重算）
  *
  * 详见 ADR-0008（CodeMirror 6 内 WYSIWYG / Typora 路线）。
  */
@@ -25,13 +24,6 @@ import { syntaxTree, syntaxTreeAvailable } from "@codemirror/language";
 import { codeToHtml } from "shiki";
 import katex from "katex";
 import mermaid from "mermaid";
-import {
-  proposalField,
-  addProposalEffect,
-  removeProposalEffect,
-  expireAllProposalsEffect,
-  proposalActionEffect,
-} from "../../agent/proposals";
 import { currentShikiTheme, resolveShikiThemeOption, getCurrentFilePath } from "../../composables/useMarkdownRenderer";
 import {
   computeDecorations,
@@ -780,16 +772,6 @@ function toDecorationSet(
   return Decoration.set(ranges, true);
 }
 
-// ===== Agent 提案范围（提案覆盖的标记不隐藏） =====
-
-function getProposalRanges(state: EditorState): Array<{ from: number; to: number }> {
-  const set = state.field(proposalField, false);
-  if (!set) return [];
-  return set.proposals
-    .filter((p) => p.status === "pending")
-    .map((p) => ({ from: p.from, to: p.to }));
-}
-
 // ===== StateField：提供装饰（支持跨换行块级替换） =====
 
 /**
@@ -835,7 +817,6 @@ function computeDecorationsForState(state: EditorState): DecorationSet {
     doc: state.doc.toString(),
     selectionHead: state.selection.main.head,
     tree: syntaxTree(state),
-    proposalRanges: getProposalRanges(state),
     // StateField 不访问 viewport —— 全量计算（大文档性能可接受）
     viewport: undefined,
   });
@@ -850,7 +831,6 @@ function computeDecorationsForState(state: EditorState): DecorationSet {
  *
  * 重算时机：
  * - docChanged / selectionSet → 立即重算（光标移动改变段范围，标记 hide/dim 切换）
- * - 提案 effect（add/remove/expire/action）→ 重算（提案覆盖范围标记可见性变化）
  * - recomputeWysiwygEffect → 重算（语法树异步解析完成）
  * - 其他 → 映射现有装饰到新位置（保持 widget 实例，避免重渲染）
  */
@@ -863,18 +843,6 @@ export const wysiwygField = StateField.define<DecorationSet>({
     // 注意：Transaction 没有 selectionSet 布尔属性（那是 ViewUpdate 的），
     // 用 tr.selection !== undefined 检测事务是否包含选区变化。
     if (tr.docChanged || tr.selection !== undefined) {
-      return computeDecorationsForState(tr.state);
-    }
-    // 提案变化 → 重算
-    if (
-      tr.effects.some(
-        (e) =>
-          e.is(addProposalEffect) ||
-          e.is(removeProposalEffect) ||
-          e.is(expireAllProposalsEffect) ||
-          e.is(proposalActionEffect)
-      )
-    ) {
       return computeDecorationsForState(tr.state);
     }
     // 显式重算 effect（语法树异步完成等）

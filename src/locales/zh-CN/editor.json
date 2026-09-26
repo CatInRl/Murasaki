@@ -20,10 +20,6 @@
     "lineCol": "行 {line}, 列 {col}",
     "wordCount": "{count} 字",
     "charCount": "{count} 字符",
-    "agentRunning": "Agent 运行中",
-    "orphanCount": "{count} 个未归附会话",
-    "orphanTooltip": "点击清理 {count} 个未归附会话",
-    "providerTooltip": "当前 AI Provider：{name}",
     "modeTooltip": "点击切换显示模式",
     "zoomLabel": "{percent}%",
     "zoomTooltip": "演示模式缩放：Ctrl+滚轮 / Ctrl+= / Ctrl+-，点击重置为 100%"

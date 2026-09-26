@@ -1,7 +1,4 @@
-pub mod agent_files;
-pub mod ai_providers;
 pub mod assets;
-pub mod chats;
 pub mod drafts;
 pub mod files;
 pub mod launch;
@@ -19,7 +16,7 @@ use sha1::{Digest, Sha1};
 
 /// 计算字节序列的 SHA1 摘要并转成小写十六进制串（40 字符）。
 ///
-/// 草稿文件名（`drafts/<hash>`）、资源短哈希与对话文件名（`chats/<hash>.json.gz`）都依赖
+/// 草稿文件名（`drafts/<hash>`）与资源短哈希都依赖
 /// 这个编码：一旦变化，老用户就找不到既有文件。所以集中在这里，并用已知答案测试固定住。
 pub(crate) fn sha1_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha1::new();
