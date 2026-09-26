@@ -158,7 +158,13 @@ export async function teardownActiveProvider(
 ): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
     // @ts-ignore
-    const store = window.__pinia__._s.get("aiProviders");
+    const pinia = window.__pinia__;
+    // 应用未就绪或已退出时直接跳过：afterAll 里不该因为清理而让整个 suite 失败
+    if (!pinia) {
+      done(null);
+      return;
+    }
+    const store = pinia._s.get("aiProviders");
     const ids = store.providers.map((p: any) => p.id);
     Promise.all(ids.map((id: string) => Promise.resolve(store.deleteProvider(id))))
       .then(() => { store.providers = []; done(null); })

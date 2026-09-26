@@ -12,15 +12,18 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles, setupActiveProvider, teardownActiveProvider } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, dismissAllDialogs, closeAllTabs } from "../helpers/store";
+import { openWorkspace, closeWorkspace, openFileInTab, dismissAllDialogs, closeAllTabs, waitForPinia } from "../helpers/store";
 
 const API_KEY = process.env.MURASAKI_E2E_API_KEY ?? "";
 
 let browser: Browser;
 
 // 共享 session 生命周期：确定性模式测试不需要 API_KEY，也要创建 session
+// 注意：必须等 __pinia__ 就绪 —— 下面的用例/清理都直接访问 window.__pinia__._s，
+// CI 上应用启动更慢，漏了这一步会报 `Cannot read properties of undefined (reading '_s')`
 beforeAll(async () => {
   browser = await createSession();
+  await waitForPinia(browser);
 }, 60000);
 
 afterAll(async () => {
