@@ -25,11 +25,23 @@ use commands::windows::{self, WindowRegistry};
 /// WebView2 Runtime 150 之后，msedgedriver 不再把 `--remote-debugging-port` 作为
 /// 命令行参数传给应用，而是通过 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 环境变量注入，
 /// 因此两种来源都需检测。
+///
+/// 环境变量来源要求 `--remote-debugging-port=` 与 `--test-type=webdriver` 同时出现：
+/// 只认前者会把「用户自己恰好设了调试端口环境变量」误判成 E2E，从而错误地禁用单实例锁。
 fn is_e2e_mode() -> bool {
-    std::env::args().any(|a| a.starts_with("--remote-debugging-port="))
-        || std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
-            .map(|v| v.contains("--remote-debugging-port="))
-            .unwrap_or(false)
+    let argv: Vec<String> = std::env::args().collect();
+    let env_additional_args = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").ok();
+    is_e2e_mode_from(&argv, env_additional_args.as_deref())
+}
+
+/// [`is_e2e_mode`] 的纯函数版本，便于单测
+fn is_e2e_mode_from(argv: &[String], env_additional_args: Option<&str>) -> bool {
+    if argv.iter().any(|a| a.starts_with("--remote-debugging-port=")) {
+        return true;
+    }
+    env_additional_args
+        .map(|v| v.contains("--remote-debugging-port=") && v.contains("--test-type=webdriver"))
+        .unwrap_or(false)
 }
 
 /// 取当前活动窗口（菜单事件与外部入口的路由目标）。
@@ -41,24 +53,55 @@ fn active_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
     app.get_webview_window(&label)
 }
 
-/// 解析 `--user-data-dir=PATH` 参数（msedgedriver 会传给 murasaki）
-/// 同时兼容 WebView2 Runtime 150 的环境变量注入方式
-fn parse_user_data_dir() -> Option<std::path::PathBuf> {
-    for arg in std::env::args().skip(1) {
+/// 从三个来源解析 WebView2 的 user data folder，按优先级取第一个命中的：
+///
+/// 1. 命令行 `--user-data-dir=PATH`（WebView2 Runtime < 150 的 msedgedriver 走这条路）
+/// 2. 环境变量 `WEBVIEW2_USER_DATA_FOLDER`（Runtime 150+ 改用这条通道）
+/// 3. `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 里的 `--user-data-dir=PATH`
+///
+/// 这个目录必须与 msedgedriver 等待 `DevToolsActivePort` 的目录一致，否则它等不到文件
+/// 就会把应用杀掉，报 `DevToolsActivePort file doesn't exist`（issue #255）。
+fn resolve_user_data_dir(
+    argv: &[String],
+    env_user_data_folder: Option<&str>,
+    env_additional_args: Option<&str>,
+) -> Option<std::path::PathBuf> {
+    let to_path = |p: &str| std::path::PathBuf::from(p.trim_matches('"'));
+
+    for arg in argv.iter().skip(1) {
         if let Some(p) = arg.strip_prefix("--user-data-dir=") {
-            let p = p.trim_matches('"');
-            return Some(std::path::PathBuf::from(p));
+            return Some(to_path(p));
         }
     }
-    if let Ok(env_args) = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS") {
+
+    if let Some(dir) = env_user_data_folder {
+        let dir = dir.trim();
+        if !dir.is_empty() {
+            return Some(to_path(dir));
+        }
+    }
+
+    if let Some(env_args) = env_additional_args {
         for token in env_args.split_whitespace() {
             if let Some(p) = token.strip_prefix("--user-data-dir=") {
-                let p = p.trim_matches('"');
-                return Some(std::path::PathBuf::from(p));
+                return Some(to_path(p));
             }
         }
     }
+
     None
+}
+
+/// 读取进程环境后调用 [`resolve_user_data_dir`]
+fn parse_user_data_dir() -> Option<std::path::PathBuf> {
+    let argv: Vec<String> = std::env::args().collect();
+    let env_user_data_folder = std::env::var("WEBVIEW2_USER_DATA_FOLDER").ok();
+    let env_additional_args = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").ok();
+    resolve_user_data_dir(
+        &argv,
+        env_user_data_folder.as_deref(),
+        env_additional_args.as_deref(),
+    )
 }
 
 /// 从 argv 或 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 环境变量中提取
@@ -158,7 +201,7 @@ pub(crate) fn detect_remote_debugging_args() -> Option<(String, u16)> {
 
     let port: u16 = if port_str == "0" {
         let p = find_available_port();
-        eprintln!("[murasaki] msedgedriver 传 port=0，改用固定端口 {}", p);
+        e2e_trace(&format!("msedgedriver 传 port=0，改用固定端口 {}", p));
         p
     } else {
         port_str.parse().unwrap_or(9222)
@@ -291,25 +334,29 @@ fn spawn_devtools_active_port_writer(port: u16, user_data_dir: std::path::PathBu
                     .map(|p| format!("/{}", p));
 
                 if let Some(ws_path) = ws_path {
-                    let file_path = user_data_dir.join("DevToolsActivePort");
                     let content = format!("{}\n{}", port, ws_path);
 
-                    let _ = std::fs::create_dir_all(&user_data_dir);
-                    match std::fs::write(&file_path, &content) {
-                        Ok(_) => {
-                            e2e_trace(&format!(
+                    // msedgedriver 轮询的路径在不同版本间有过差异：可能查
+                    // `<dir>/DevToolsActivePort`，也可能查 WebView2 profile 所在的
+                    // `<dir>/EBWebView/`。两处都写，多出来的那份只是临时目录里的冗余文件。
+                    for dir in [user_data_dir.clone(), user_data_dir.join("EBWebView")] {
+                        let _ = std::fs::create_dir_all(&dir);
+                        let file_path = dir.join("DevToolsActivePort");
+                        match std::fs::write(&file_path, &content) {
+                            Ok(_) => e2e_trace(&format!(
                                 "DevToolsActivePort 已写入: {} (port={}, path={})",
                                 file_path.display(),
                                 port,
                                 ws_path
-                            ));
-                            return;
-                        }
-                        Err(e) => {
-                            e2e_trace(&format!("写入 DevToolsActivePort 失败: {}", e));
-                            return;
+                            )),
+                            Err(e) => e2e_trace(&format!(
+                                "写入 DevToolsActivePort 失败 ({}): {}",
+                                file_path.display(),
+                                e
+                            )),
                         }
                     }
+                    return;
                 } else {
                     e2e_trace("ws_path 解析失败");
                 }
@@ -566,4 +613,105 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Murasaki");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_e2e_mode_from, resolve_user_data_dir};
+    use std::path::PathBuf;
+
+    fn argv(args: &[&str]) -> Vec<String> {
+        std::iter::once("murasaki.exe".to_string())
+            .chain(args.iter().map(|s| s.to_string()))
+            .collect()
+    }
+
+    /// WebView2 Runtime < 150 的 msedgedriver 通过命令行传 user data dir
+    #[test]
+    fn prefers_argv_user_data_dir() {
+        let args = argv(&["--user-data-dir=C:\\tmp\\scoped_argv"]);
+        let got = resolve_user_data_dir(
+            &args,
+            Some("C:\\tmp\\scoped_env"),
+            Some("--user-data-dir=C:\\tmp\\scoped_args"),
+        );
+        assert_eq!(got, Some(PathBuf::from("C:\\tmp\\scoped_argv")));
+    }
+
+    /// Runtime 150+ 的唯一通道是环境变量 `WEBVIEW2_USER_DATA_FOLDER`。
+    /// 这是 issue #255 的回归点：漏读它会把 DevToolsActivePort 写到别的目录，
+    /// msedgedriver 等不到文件就把应用杀掉。
+    #[test]
+    fn uses_webview2_user_data_folder_env() {
+        let got = resolve_user_data_dir(
+            &argv(&[]),
+            Some("C:\\Users\\u\\AppData\\Local\\Temp\\scoped_dir123_456"),
+            Some("--remote-debugging-port=0 --test-type=webdriver"),
+        );
+        assert_eq!(
+            got,
+            Some(PathBuf::from(
+                "C:\\Users\\u\\AppData\\Local\\Temp\\scoped_dir123_456"
+            ))
+        );
+    }
+
+    /// 空 / 纯空白的 `WEBVIEW2_USER_DATA_FOLDER` 视为未设置，继续往下找
+    #[test]
+    fn ignores_blank_user_data_folder_env() {
+        let got = resolve_user_data_dir(
+            &argv(&[]),
+            Some("   "),
+            Some("--user-data-dir=C:\\tmp\\scoped_args"),
+        );
+        assert_eq!(got, Some(PathBuf::from("C:\\tmp\\scoped_args")));
+    }
+
+    #[test]
+    fn falls_back_to_additional_browser_arguments_with_quotes() {
+        let got = resolve_user_data_dir(
+            &argv(&[]),
+            None,
+            Some("--remote-debugging-port=0 --user-data-dir=\"C:\\tmp\\quoted\""),
+        );
+        assert_eq!(got, Some(PathBuf::from("C:\\tmp\\quoted")));
+    }
+
+    #[test]
+    fn none_when_no_source_present() {
+        assert_eq!(resolve_user_data_dir(&argv(&[]), None, None), None);
+    }
+
+    /// 旧通道：msedgedriver 直接把调试参数放在命令行里
+    #[test]
+    fn e2e_mode_detects_debug_port_in_argv() {
+        assert!(is_e2e_mode_from(&argv(&["--remote-debugging-port=9222"]), None));
+    }
+
+    /// 新通道：Runtime 150+ 的 msedgedriver 通过环境变量注入，
+    /// 实测同时带 `--remote-debugging-port=0` 与 `--test-type=webdriver`
+    #[test]
+    fn e2e_mode_detects_env_injection() {
+        let env = "--enable-automation --remote-debugging-port=0 --test-type=webdriver";
+        assert!(is_e2e_mode_from(&argv(&[]), Some(env)));
+    }
+
+    /// 只含调试端口、缺 `--test-type=webdriver` 时不判 E2E，
+    /// 避免用户自己的环境变量把产品误带进 E2E 分支（禁用单实例锁）
+    #[test]
+    fn e2e_mode_ignores_env_without_webdriver_test_type() {
+        assert!(!is_e2e_mode_from(
+            &argv(&[]),
+            Some("--remote-debugging-port=9222")
+        ));
+    }
+
+    #[test]
+    fn e2e_mode_false_for_plain_launch() {
+        assert!(!is_e2e_mode_from(&argv(&[]), None));
+        assert!(!is_e2e_mode_from(
+            &argv(&["--user-data-dir=C:\\tmp\\x"]),
+            None
+        ));
+    }
 }

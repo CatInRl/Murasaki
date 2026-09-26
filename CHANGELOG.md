@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- 修复 tauri-driver E2E 无法建立 WebDriver session（#255）：WebView2 Runtime 150 起，msedgedriver 改用环境变量 `WEBVIEW2_USER_DATA_FOLDER` 传 user data folder，应用侧漏读该变量，导致 `DevToolsActivePort` 写到 msedgedriver 不轮询的目录、会话建立失败。顺带修掉「用户环境变量恰好含 `--remote-debugging-port=` 时被误判为 E2E，进而禁用单实例锁」的边界情形；E2E 分支之外无行为变化。
+
 ### Changed
 
 - 依赖：`vue-i18n` 9.14.4 → 11.1.11（跨 v10/v11 两个大版本；应用侧无需改动，仍为 Composition API 模式）
