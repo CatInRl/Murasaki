@@ -15,6 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -43,7 +44,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // 等待编辑器渲染
     const editorPane = await browser.$(".editor-pane");
-    await editorPane.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".editor-pane", 10000);
 
     // 默认应为 split 模式
     const modeClass = await editorPane.getAttribute("class");
@@ -109,7 +110,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // 等待工具栏渲染
     const toolbar = await browser.$(".editor-toolbar");
-    await toolbar.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".editor-toolbar", 10000);
     expect(await toolbar.isDisplayed()).toBe(true);
 
     // 切换到 source 模式
@@ -245,7 +246,7 @@ describe("WYSIWYG 模式切换", () => {
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
     const editorPane = await browser.$(".editor-pane");
-    await editorPane.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".editor-pane", 10000);
 
     // source
     await browser.execute(() => {

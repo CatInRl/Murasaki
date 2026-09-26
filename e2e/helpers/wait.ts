@@ -15,8 +15,10 @@
  * - `getText()` 会返回空串：实测 `.dialog-message` 的 `textContent` 是「第一个」时
  *   `getText()` 返回 `''`（`.murasaki-context-menu-shortcut` 首个元素同样如此）。
  *
- * 因此这里不使用 WebDriver 的等待/可见性 API，改为在浏览器上下文用
- * `getBoundingClientRect()` + `getComputedStyle` 判断「已渲染」，并手写轮询等待。
+ * 因此这里不使用 WebDriver 的等待/可见性 API：`isRendered` / `waitForRendered` 在浏览器
+ * 上下文用 `getBoundingClientRect()` + `getComputedStyle` 判定「已渲染」；`waitForPresent`
+ * / `waitForAbsent` 则由我们**自己**按间隔调 `browser.$().isExisting()` 轮询（用的是
+ * WebDriver 元素 API，但轮询控制权在我们手里，不依赖它的等待命令是否重试）。
  */
 import type { Browser } from "webdriverio";
 
@@ -58,6 +60,41 @@ export async function waitForRendered(
   throw new Error(
     `waitForRendered: "${selector}" still not rendered after ${timeout}ms`
   );
+}
+
+/**
+ * 手写轮询等待「选择器命中」（元素出现），超时抛错。
+ *
+ * 替代 `el.waitForExist({ timeout })` —— 后者在本栈下不重试（见文件头注释），
+ * 只在「检查时元素恰好已经在」时才碰巧通过。
+ */
+export async function waitForPresent(
+  browser: Browser,
+  selector: string,
+  timeout = 15000,
+  interval = 150
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    if (await browser.$(selector).isExisting()) return;
+    await browser.pause(interval);
+  }
+  throw new Error(`waitForPresent: "${selector}" 未在 ${timeout}ms 内出现`);
+}
+
+/** 手写轮询等待「选择器不再命中」（元素消失）；替代 `el.waitForExist({ reverse: true })` */
+export async function waitForAbsent(
+  browser: Browser,
+  selector: string,
+  timeout = 15000,
+  interval = 150
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    if (!(await browser.$(selector).isExisting())) return;
+    await browser.pause(interval);
+  }
+  throw new Error(`waitForAbsent: "${selector}" 未在 ${timeout}ms 内消失`);
 }
 
 /**

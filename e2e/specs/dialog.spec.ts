@@ -13,6 +13,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { closeWorkspace, waitForPinia } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -51,8 +52,7 @@ describe("对话框系统", () => {
       });
     });
 
-    const overlay = await browser.$(".dialog-overlay");
-    await overlay.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 通过 store 状态验证对话框已入队（比 DOM 文本更可靠，Transition 可能延迟文本渲染）
     await browser.waitUntil(async () => {
@@ -99,8 +99,7 @@ describe("对话框系统", () => {
       });
     });
 
-    const overlay = await browser.$(".dialog-overlay");
-    await overlay.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 点击 primary 确认按钮
     const confirmBtn = await browser.$(".dialog-footer .dialog-btn.primary");
@@ -133,8 +132,7 @@ describe("对话框系统", () => {
       });
     });
 
-    const overlay = await browser.$(".dialog-overlay");
-    await overlay.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 点击取消按钮（非 primary）
     const cancelBtn = await browser.$(".dialog-footer .dialog-btn:not(.primary)");
@@ -168,7 +166,7 @@ describe("对话框系统", () => {
     });
 
     const input = await browser.$(".dialog-input");
-    await input.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-input", 5000);
 
     // 验证默认值
     const defaultValue = await input.getValue();
@@ -200,8 +198,7 @@ describe("对话框系统", () => {
       });
     });
 
-    const overlay = await browser.$(".dialog-overlay");
-    await overlay.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // Escape 取消
     await browser.keys(["Escape"]);
@@ -233,8 +230,7 @@ describe("对话框系统", () => {
       });
     });
 
-    const overlay = await browser.$(".dialog-overlay");
-    await overlay.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 点击 danger 覆盖按钮（confirmText = "覆盖"）
     const overwriteBtn = await browser.$(".dialog-footer .dialog-btn.danger");
@@ -268,8 +264,7 @@ describe("对话框系统", () => {
       });
     });
 
-    const overlay = await browser.$(".dialog-overlay");
-    await overlay.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 点击保存（primary）
     const saveBtn = await browser.$(".dialog-footer .dialog-btn.primary");
@@ -320,8 +315,7 @@ describe("对话框系统", () => {
 
     // 第一个对话框应显示：轮询到 .dialog-message 文本渲染完成再断言，
     // 避免读到过渡中的空串
-    const firstMsg = await browser.$(".dialog-message");
-    await firstMsg.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-message", 5000);
     // 断言前重新查询元素并读 textContent：Vue 重渲染后 browser.$ 拿到的旧句柄
     // 调 getText() 会读到空串（实测 DOM 里 textContent 正常为「第一个」），
     // 用 execute 每次重新查询最稳。

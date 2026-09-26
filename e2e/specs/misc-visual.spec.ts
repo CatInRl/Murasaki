@@ -24,6 +24,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -52,7 +53,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
     }
     await dismissAllDialogs(browser);
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await ensureSplitMode(browser);
   });
 

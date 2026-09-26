@@ -29,6 +29,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 /** 当前测试用工作区路径（由 beforeEach 设置，it 块直接复用，避免重复 resetWorkspace） */
@@ -133,7 +134,7 @@ describe("快捷键", () => {
       /* ignore */
     }
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await ensureSplitMode(browser);
     // 最后清除所有残留对话框/toast（前序 spec 可能遗留 dirty tab 对话框遮挡）
     await dismissAllDialogs(browser);

@@ -18,6 +18,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -42,7 +43,7 @@ describe("编辑器 + 预览 同步", () => {
       // ignore
     }
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
   });
 
   it("打开 .md 文件后 CodeMirror 编辑器可见", async () => {
@@ -50,7 +51,7 @@ describe("编辑器 + 预览 同步", () => {
     await openFileInTab(browser, `${ws}/intro.md`);
 
     const cm = await browser.$(".pane-left .cm-editor");
-    await cm.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".pane-left .cm-editor", 10000);
     expect(await cm.isDisplayed()).toBe(true);
   });
 
@@ -59,7 +60,7 @@ describe("编辑器 + 预览 同步", () => {
     await openFileInTab(browser, `${ws}/intro.md`);
 
     const preview = await browser.$(".pane-right .markdown-body");
-    await preview.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".pane-right .markdown-body", 10000);
     expect(await preview.isDisplayed()).toBe(true);
   });
 
@@ -69,7 +70,7 @@ describe("编辑器 + 预览 同步", () => {
 
     // intro.md 第一行是 "# 简介"
     const h1 = await browser.$(".pane-right .markdown-body h1");
-    await h1.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".pane-right .markdown-body h1", 10000);
     const text = (await h1.getText()).trim();
     expect(text).toBe("简介");
   });
@@ -100,7 +101,7 @@ describe("编辑器 + 预览 同步", () => {
     await openFileInTab(browser, `${ws}/tasks.md`);
 
     const checkbox = await browser.$(".pane-right .markdown-body input[type=checkbox]");
-    await checkbox.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".pane-right .markdown-body input[type=checkbox]", 10000);
     expect(await checkbox.isDisplayed()).toBe(true);
   });
 
@@ -110,7 +111,7 @@ describe("编辑器 + 预览 同步", () => {
 
     // 默认主题（PreviewPane 通过 data-md-theme 属性驱动主题，非 class）
     const preview = await browser.$(".preview-pane");
-    await preview.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".preview-pane", 10000);
     const initialTheme = await preview.getAttribute("data-md-theme");
 
     // 通过 App.vue 暴露的 __setTheme__ 设置器切换主题（走真实响应式代码路径）

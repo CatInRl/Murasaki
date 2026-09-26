@@ -20,6 +20,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { closeWorkspace, waitForPinia } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 let mainHandle: string;
@@ -183,7 +184,7 @@ describe("设置窗口", () => {
 
     // 设置页 DOM 应在主窗口内渲染
     const settingsShell = await browser.$(".settings-shell");
-    await settingsShell.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".settings-shell", 5000);
     expect(await settingsShell.isExisting()).toBe(true);
 
     // 不应创建新窗口（单入口路由 vs 旧多窗口方案）

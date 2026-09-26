@@ -24,7 +24,7 @@ import {
 } from "../helpers/store";
 import { existsSync, statSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { waitForRendered } from "../helpers/wait";
+import { waitForPresent, waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -56,7 +56,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
     // 等待文件树就绪
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await dismissAllDialogs(browser);
   });
 
@@ -91,7 +91,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
       }
     });
 
-    // 用 waitForRendered 替代 waitForDisplayed：后者与菜单入场动画
+    // 用 waitForRendered 判定菜单已渲染：元素可见性等待与菜单入场动画
     // （opacity 0 → 1）阶段交互不稳定，会误报「still not displayed」
     await waitForRendered(browser, ".murasaki-context-menu", 5000);
 
@@ -164,7 +164,11 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     const newNode = await browser.$(
       '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="new-file.md"]'
     );
-    await newNode.waitForExist({ timeout: 5000 });
+    await waitForPresent(
+      browser,
+      '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="new-file.md"]',
+      5000
+    );
     expect(await newNode.isDisplayed()).toBe(true);
   });
 
@@ -179,10 +183,11 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     expect(statSync(dirPath).isDirectory()).toBe(true);
 
     // 文件树应显示新目录
-    const newNode = await browser.$(
-      '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="new-folder"]'
+    await waitForPresent(
+      browser,
+      '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="new-folder"]',
+      5000
     );
-    await newNode.waitForExist({ timeout: 5000 });
   });
 
   it("重命名：fileOps.renamePath 修改文件名并刷新文件树", async () => {
@@ -202,10 +207,11 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     expect(existsSync(newPath)).toBe(true);
 
     // 文件树显示新名称
-    const newNode = await browser.$(
-      '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="intro-renamed.md"]'
+    await waitForPresent(
+      browser,
+      '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="intro-renamed.md"]',
+      5000
     );
-    await newNode.waitForExist({ timeout: 5000 });
   });
 
   it("删除：fileOps.deletePath 移除文件并刷新文件树（走系统回收站）", async () => {
@@ -321,10 +327,9 @@ describe("文件树右键菜单 + 文件操作安全", () => {
         .catch((err: any) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
     }, oldPath.replace(/\\/g, "/"), "notes.md");
 
-    // 2. 等待冲突对话框出现（用 waitForExist 而非 waitForDisplayed，Vue Transition 会让元素
-    //    存在但 opacity:0 延迟显示，waitForDisplayed 可能误判）
-    const dialogEl = await browser.$(".dialog-overlay");
-    await dialogEl.waitForExist({ timeout: 5000 });
+    // 2. 等待冲突对话框出现（用 waitForPresent 而非元素可见性等待，Vue Transition 会让元素
+    //    存在但 opacity:0 延迟显示，可见性判定可能误判）
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 3. 点击取消按钮（conflict footer 第一个非 primary/非 danger 按钮，cancelText="取消"）
     const cancelBtn = await browser.$(".dialog-footer .dialog-btn:not(.primary):not(.danger)");
@@ -387,10 +392,9 @@ describe("文件树右键菜单 + 文件操作安全", () => {
         .catch((err: any) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
     }, srcPath.replace(/\\/g, "/"), targetName);
 
-    // 2. 等待对话框出现并点击"覆盖"（用 waitForExist 而非 waitForDisplayed，Vue Transition
+    // 2. 等待对话框出现并点击"覆盖"（用 waitForPresent 而非元素可见性等待，Vue Transition
     //    会让元素存在但 opacity:0 延迟显示）
-    const dialogEl = await browser.$(".dialog-overlay");
-    await dialogEl.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 3. 点击覆盖按钮（conflict 默认 confirmText="覆盖"，class 含 danger）
     const overwriteBtn = await browser.$(".dialog-footer .dialog-btn.danger");
@@ -438,7 +442,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     ]);
     // 重新打开工作区以加载新 fixture
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
 
     const srcPath = resolve(wsPath, "one");
     const targetName = "two";

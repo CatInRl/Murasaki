@@ -22,6 +22,7 @@ import {
   dismissAllDialogs,
   getActiveContent,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -51,7 +52,7 @@ describe("持久化恢复", () => {
       /* ignore */
     }
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await dismissAllDialogs(browser);
   });
 

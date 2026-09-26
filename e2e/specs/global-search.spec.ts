@@ -24,6 +24,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 import { resolve } from "node:path";
 
 let browser: Browser;
@@ -114,7 +115,7 @@ describe("统一搜索条主链路", () => {
       /* ignore */
     }
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await ensureSplitMode(browser);
     await dismissAllDialogs(browser);
   });

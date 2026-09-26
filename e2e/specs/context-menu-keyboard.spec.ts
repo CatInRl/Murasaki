@@ -14,6 +14,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { waitForPinia, dismissAllDialogs } from "../helpers/store";
+import { waitForPresent, waitForAbsent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -74,8 +75,7 @@ async function showTestMenu(b: Browser): Promise<void> {
       },
     ]);
   });
-  const menu = await browser.$(".murasaki-context-menu");
-  await menu.waitForExist({ timeout: 5000 });
+  await waitForPresent(browser, ".murasaki-context-menu", 5000);
   await browser.pause(200);
 }
 
@@ -139,8 +139,7 @@ describe("右键菜单键盘导航", () => {
     await pressMenuKey(browser, "ArrowDown"); // → 第三项
     await pressMenuKey(browser, "Enter");
 
-    const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForExist({ timeout: 5000, reverse: true });
+    await waitForAbsent(browser, ".murasaki-context-menu", 5000);
 
     const action = await browser.execute(() => {
       // @ts-ignore
@@ -153,8 +152,7 @@ describe("右键菜单键盘导航", () => {
     await showTestMenu(browser);
     await pressMenuKey(browser, "Escape");
 
-    const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForExist({ timeout: 5000, reverse: true });
+    await waitForAbsent(browser, ".murasaki-context-menu", 5000);
 
     const focusedClass = await browser.execute(
       () => (document.activeElement as HTMLElement | null)?.className ?? ""

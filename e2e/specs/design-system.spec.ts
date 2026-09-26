@@ -15,6 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -37,7 +38,7 @@ describe("设计系统", () => {
     // （前序 spec 可能将 statusBarVisible 切换为 false，打开工作区不直接重置它，
     //  但状态栏内的图标渲染依赖 StatusBar 组件挂载，配合下方 waitUntil 保证存在）
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     // 显式恢复状态栏可见（前序 spec 的 Alt+Shift+S 可能隐藏状态栏且未恢复）
     await browser.execute(() => {
       // @ts-ignore
@@ -54,8 +55,7 @@ describe("设计系统", () => {
     });
     await browser.pause(150);
     // 等待状态栏出现（若已被隐藏）
-    const statusBar = await browser.$(".status-bar");
-    await statusBar.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".status-bar", 5000);
   });
 
   it("--murasaki-primary token 解析为 #9333ea", async () => {
@@ -83,8 +83,7 @@ describe("设计系统", () => {
 
   it("lucide 图标渲染为 inline SVG", async () => {
     // 状态栏的 FileText 图标应渲染为 <svg>
-    const statusBar = await browser.$(".status-bar");
-    await statusBar.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".status-bar", 10000);
 
     const svgCount = await browser.execute(() => {
       const icons = document.querySelectorAll(".status-bar .status-icon");
@@ -94,8 +93,7 @@ describe("设计系统", () => {
   });
 
   it("欢迎页显示 BookOpen 图标 SVG", async () => {
-    const welcome = await browser.$(".welcome-page");
-    await welcome.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".welcome-page", 10000);
 
     // .brand-mark 内应有一个 SVG（BookOpen 图标）
     const brandSvg = await browser.execute(() => {
@@ -107,7 +105,7 @@ describe("设计系统", () => {
 
   it("欢迎页显示品牌标题 Murasaki", async () => {
     const title = await browser.$(".welcome-page .brand-title");
-    await title.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".welcome-page .brand-title", 10000);
     expect((await title.getText()).trim()).toBe("Murasaki");
   });
 
@@ -145,7 +143,7 @@ describe("设计系统", () => {
     await browser.pause(500);
 
     const emptyState = await browser.$(".file-tree .empty-state");
-    await emptyState.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree .empty-state", 10000);
     expect(await emptyState.isDisplayed()).toBe(true);
 
     const title = await browser.$(".file-tree .empty-state .empty-title");
@@ -161,8 +159,7 @@ describe("设计系统", () => {
     await closeWorkspace(browser);
     await browser.pause(500);
 
-    const emptyState = await browser.$(".file-tree .empty-state");
-    await emptyState.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree .empty-state", 10000);
 
     const borderStyle = await browser.execute(() => {
       const el = document.querySelector(".file-tree .empty-state") as HTMLElement | null;
@@ -182,7 +179,7 @@ describe("设计系统", () => {
     await browser.pause(500);
 
     const actionBtn = await browser.$(".file-tree .empty-state .empty-action");
-    await actionBtn.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree .empty-state .empty-action", 10000);
     expect(await actionBtn.isDisplayed()).toBe(true);
     expect((await actionBtn.getText()).trim()).toBe("打开文件夹");
   });

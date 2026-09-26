@@ -24,6 +24,7 @@ import {
   openFileInTab,
 } from "../helpers/store";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
+import { waitForPresent } from "../helpers/wait";
 
 /** 测试用 markdown 文件路径 */
 const TEST_FILE = "test.md";
@@ -94,8 +95,7 @@ async function setContentAndWait(
 
   // 打开 test.md tab（新 tab，会从磁盘读取最新内容）
   await openFileInTab(b, testPath);
-  const editorPane = await b.$(".editor-pane");
-  await editorPane.waitForExist({ timeout: 10000 });
+  await waitForPresent(b, ".editor-pane", 10000);
   // 等 CodeMirror 完全初始化
   await b.pause(500);
 
@@ -187,7 +187,7 @@ async function waitForSelector(
   timeout = 5000
 ): Promise<WebdriverIO.Element> {
   const el = await b.$(selector);
-  await el.waitForExist({ timeout });
+  await waitForPresent(b, selector, timeout);
   return el;
 }
 
@@ -388,7 +388,7 @@ describe("WYSIWYG 模式全量测试", () => {
       await setCursorToEnd(browser);
       // mermaid 异步渲染，等待更长时间
       const mermaid = await browser.$(".murasaki-wysiwyg-mermaid, .murasaki-wysiwyg-codeblock-wrapper");
-      await mermaid.waitForExist({ timeout: 10000 });
+      await waitForPresent(browser, ".murasaki-wysiwyg-mermaid, .murasaki-wysiwyg-codeblock-wrapper", 10000);
       expect(await mermaid.isExisting()).toBe(true);
     });
   });

@@ -22,7 +22,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { waitForRendered } from "../helpers/wait";
+import { waitForRendered, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -58,7 +58,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     });
     await browser.pause(150);
     await openWorkspace(browser, wsPath);
-    await (await browser.$(".file-tree")).waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".file-tree", 10000);
     await ensureSplitMode(browser);
   });
 
@@ -122,7 +122,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     });
 
     const shortcut = await browser.$(".murasaki-context-menu-shortcut");
-    await shortcut.waitForExist({ timeout: 5000 });
+    await waitForPresent(browser, ".murasaki-context-menu-shortcut", 5000);
     expect((await shortcut.getText()).trim()).toBe("Ctrl+W");
   });
 

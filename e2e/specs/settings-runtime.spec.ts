@@ -28,6 +28,7 @@ import {
   closeAllTabs,
   waitForPinia,
 } from "../helpers/store";
+import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -52,8 +53,7 @@ describe("设置保存后运行时生效", () => {
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
     // 等待编辑器渲染
-    const editorPane = await browser.$(".editor-pane");
-    await editorPane.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".editor-pane", 10000);
 
     // 1. 写入 wysiwyg 到磁盘（updateSettings 同时更新内存 + 磁盘 + Rust 缓存）
     await browser.executeAsync((done: (res: unknown) => void) => {
@@ -111,7 +111,7 @@ describe("设置保存后运行时生效", () => {
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
     const editorPane = await browser.$(".editor-pane");
-    await editorPane.waitForExist({ timeout: 10000 });
+    await waitForPresent(browser, ".editor-pane", 10000);
 
     // 1. 初始设为 source（磁盘 + 内存）
     await browser.executeAsync((done: (res: unknown) => void) => {
