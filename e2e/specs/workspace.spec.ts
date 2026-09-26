@@ -87,10 +87,11 @@ describe("工作区 + 文件树", () => {
     await node.click();
 
     // 验证 Tab 栏出现，且包含 intro.md
+    // 15s：CI runner 比本地慢，5s 会在慢机器上偶发超时（#266）
     const tab = await browser.$(
       '//div[contains(@class, "tab-bar-container")]//span[contains(@class, "tab-title") and normalize-space()="intro.md"]'
     );
-    await tab.waitForExist({ timeout: 5000 });
+    await tab.waitForExist({ timeout: 15000 });
     expect(await tab.isDisplayed()).toBe(true);
   });
 
@@ -123,8 +124,9 @@ describe("工作区 + 文件树", () => {
     await refreshBtn.waitForExist({ timeout: 5000 });
     await refreshBtn.click();
 
-    // 等待 loading 完成（最多 10 秒，远低于 refreshTree 的 30s 超时兜底）
+    // 等待 loading 完成（最多 30 秒，与 refreshTree 自身的 30s 超时兜底对齐）
     // bug 7 修复前 loading 可能永久卡住；修复后必然在 30s 内归位
+    // 注意：CI runner 更慢，此前给的 10s 会在慢机器上偶发超时（#266）
     await browser.waitUntil(async () => {
       const loading = await browser.execute(() => {
         // @ts-ignore
@@ -132,7 +134,7 @@ describe("工作区 + 文件树", () => {
         return ws.loading;
       });
       return loading === false;
-    }, { timeout: 10000, timeoutMsg: "刷新按钮动画未在 10 秒内停止" });
+    }, { timeout: 30000, timeoutMsg: "刷新按钮动画未在 30 秒内停止" });
 
     // 最终 loading 必须为 false
     const loading = await browser.execute(() => {
