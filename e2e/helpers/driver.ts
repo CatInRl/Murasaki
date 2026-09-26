@@ -197,7 +197,15 @@ export async function createSession(
   //    "Cannot read properties of undefined (reading '_s')"。
   //    放在重试循环之外：就绪超时应带着清晰报错直接失败，而不是再试 3 遍（30s × 3
   //    会顶穿 beforeAll 的 60s hook 超时）。
-  await waitForPinia(browser);
+  try {
+    await waitForPinia(browser);
+  } catch (err) {
+    // 就绪超时：调用方的 `browser = await createSession()` 还没赋值，spec 的
+    // afterAll 会跳过 closeSession —— 这里自行收尾，否则残留的 murasaki 进程与
+    // EBWebView 状态会污染下一个 spec。收尾自身出错不掩盖原始的就绪错误。
+    await closeSession(browser).catch(() => {});
+    throw err;
+  }
 
   return browser;
 }
