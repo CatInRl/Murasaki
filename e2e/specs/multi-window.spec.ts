@@ -18,6 +18,7 @@ import {
   waitForPinia,
   waitForPiniaInCurrentWindow,
   closeAllTabs,
+  closeWorkspace,
   dismissAllDialogs,
   resetPersistenceSettings,
 } from "../helpers/store";
@@ -121,6 +122,18 @@ describe("多窗口多工作区", () => {
     await resetPersistenceSettings(browser);
     try {
       await closeAllTabs(browser);
+    } catch {
+      /* ignore */
+    }
+    // 必须关掉当前工作区：应用启动时会按 lastWorkspacePath 恢复上次工作区
+    // （reopenLastWorkspace 默认为 true），此时 main 窗口已持有本次要打开的目录，
+    // open_path_in_new_window 就会走「同目录聚焦」分支返回 'main'，断言不到新窗口。
+    // 本地因残留 settings 里恰好 reopenLastWorkspace=false 而掩盖了这一点，CI 上
+    // （全新 appdata、按默认值启动）必现。
+    // closeWorkspace 会把 workspacePath 置 null，useAppLifecycle 随即同步
+    // set_window_workspace(null)，Rust 侧的窗口注册表也随之清空。
+    try {
+      await closeWorkspace(browser);
     } catch {
       /* ignore */
     }

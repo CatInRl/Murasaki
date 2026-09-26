@@ -92,6 +92,7 @@ murasaki/
 | `npm run tauri:build` | 生产构建 |
 | `npm test` | 前端单元测试 |
 | `npm run test:rust` | Rust 测试 |
+| `npm run test:e2e` | E2E（真实 WebView2；需先构建 + 装 tauri-driver/msedgedriver） |
 | `npm run build` | 仅构建前端（vue-tsc + vite build） |
 
 ## 开发流程
@@ -101,11 +102,16 @@ murasaki/
 1. **先有 issue**：任何改动都要有 issue 跟踪（见下「Issue 跟踪约定」），禁止无 issue 开工。
 2. **切分支**：从最新 `main` 切出 `<type>/<issue>-<slug>`，例如 `fix/198-multi-window-deadlock`、`docs/205-dev-workflow`。`<type>` 取 Conventional Commits 类型（feat / fix / docs / refactor / test / chore）。分支名必须带 issue 号，所以**先有 issue 才有分支**。**不要在 main 上直接提交**。
 3. **开 PR**：推送分支后开 PR，标题格式 `<type>(<scope>): <描述> (#<issue>)`，描述按 [.github/pull_request_template.md](.github/pull_request_template.md) 模板填写（dependabot 等机器人开的 PR 不受此标题格式约束）。
-4. **过门禁**：[.github/workflows/test.yml](.github/workflows/test.yml) 两个 job 必须全绿——
+4. **过门禁**：[.github/workflows/test.yml](.github/workflows/test.yml) 中 `frontend` 与 `rust` 两个 job 必须全绿——
    - `frontend`（ubuntu-24.04）：`npm test` + `npm run build`
    - `rust`（windows-latest）：`npm run build` + `npm run test:rust`（`tauri.conf.json` 的 `frontendDist` 指向 `../dist`，需先产出 dist）
 
-   e2e 依赖 tauri-driver，保持本地 `npm run test:e2e`，不进 CI。
+   同文件还有第三个 job `e2e`（windows-latest）：用 tauri-driver + msedgedriver 驱动**真实 WebView2**，跑 `npx tauri build --no-bundle` + `npm run test:e2e`。它**当前只跑不拦**（未加入 required status checks，见 #261），避免每个 PR 多等约 20 分钟；要提升为必过项时改分支保护即可。
+
+   **e2e 的三个坑（都踩过，别再踩）**：
+   - 被测二进制必须走 Tauri CLI（`npm run tauri:build` 或 `npx tauri build --no-bundle`）。裸 `cargo build --release` 产出的二进制**前端起不来**（webview 停在 `title="localhost"`），整套 e2e 会系统性失败、极易误判成代码回归。
+   - 跑之前不能有残留的 tauri-driver / msedgedriver 占用 4444/4445：`e2e/setup.ts` 会复用外部 driver，若它是半死状态，之后所有 session 报 `ECONNRESET`。跑前先清进程。
+   - **界面语言必须固定为 zh-CN**：e2e 断言全基于中文文案，而应用首次启动会按系统语言自动探测并持久化（CI runner 是 en-US）。`e2e/setup.ts` 的 globalSetup 会在启动前把 `%APPDATA%\com.murasaki.app\settings.json` 的 `language` 预置为 zh-CN，别把它删掉。
 5. **自查后再合**：合入前跑 `/code-review` skill，把结论贴在 PR 里；有阻断项先修掉。
 6. **合入**：**squash merge**（一个 PR = 一个 conventional commit），合入后自动删除头分支。Agent 可自主切分支 / 提交 / 推送 / 开 PR，但**squash 合入 main 前必须得到用户确认**。
 7. **main 受保护**：禁止直推、必须 CI 全绿、必须与 main 同步（Require branches to be up to date）；管理员豁免**仅用于紧急修复**；不设 required approving review（单人仓库无法自批自己的 PR）。
