@@ -14,6 +14,8 @@ import {
   isExternalUrl,
   isDataUrl,
   isAbsolutePath,
+  isAssetUrl,
+  assetUrlToPath,
 } from "./imagePath";
 
 describe("utils/imagePath", () => {
@@ -154,6 +156,61 @@ describe("utils/imagePath", () => {
       // 走相对路径分支解析
       const result = resolveImageSrc("invalid%zzpath.png", "C:/docs/file.md");
       expect(result).toBe("asset://localhost/C:/docs/invalid%zzpath.png");
+    });
+  });
+
+  describe("isAssetUrl / assetUrlToPath（导出 HTML 内联图片用，issue #258）", () => {
+    it("识别两种平台的 asset URL", () => {
+      expect(isAssetUrl("asset://localhost/C:/images/img.png")).toBe(true);
+      expect(isAssetUrl("https://asset.localhost/C:/images/img.png")).toBe(true);
+      expect(isAssetUrl("http://asset.localhost/C:/images/img.png")).toBe(true);
+    });
+
+    it("非 asset URL 一律返回 false", () => {
+      expect(isAssetUrl("assets/img.png")).toBe(false);
+      expect(isAssetUrl("https://example.com/img.png")).toBe(false);
+      expect(isAssetUrl("data:image/png;base64,AAAA")).toBe(false);
+      expect(isAssetUrl("C:/images/img.png")).toBe(false);
+      expect(isAssetUrl("file:///C:/images/img.png")).toBe(false);
+    });
+
+    it("Unix 形式回解为绝对路径", () => {
+      expect(assetUrlToPath("asset://localhost//home/user/img.png")).toBe(
+        "/home/user/img.png"
+      );
+    });
+
+    it("Windows 形式回解为绝对路径（保留盘符）", () => {
+      expect(assetUrlToPath("asset://localhost/C:/images/img.png")).toBe(
+        "C:/images/img.png"
+      );
+      expect(assetUrlToPath("https://asset.localhost/C:/images/img.png")).toBe(
+        "C:/images/img.png"
+      );
+    });
+
+    it("还原反斜杠与空格的百分号编码", () => {
+      // resolveImageSrc 会把 `C:\my docs\a.png` 编码成 `C:%5Cmy%20docs%5Ca.png`
+      expect(
+        assetUrlToPath("asset://localhost/C:%5Cmy%20docs%5Ca.png")
+      ).toBe("C:/my docs/a.png");
+    });
+
+    it("非 asset URL 与无效百分号序列原样（不抛错）", () => {
+      expect(assetUrlToPath("assets/img.png")).toBe("assets/img.png");
+      expect(assetUrlToPath("https://example.com/img.png")).toBe(
+        "https://example.com/img.png"
+      );
+      // %zz 非法 → 保留原文，交由「读取失败则跳过」兜底
+      expect(assetUrlToPath("asset://localhost/C:/docs/invalid%zz.png")).toBe(
+        "C:/docs/invalid%zz.png"
+      );
+    });
+
+    it("与 resolveImageSrc 互为逆运算", () => {
+      const original = "C:/docs/assets/photo one.png";
+      const url = resolveImageSrc(original, "C:/docs/file.md");
+      expect(assetUrlToPath(url)).toBe(original);
     });
   });
 });

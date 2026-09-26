@@ -3,6 +3,7 @@ import { renderFrontMatterCard } from "./useFrontMatter";
 import { MARKDOWN_THEMES } from "./useTheme";
 import { codeToHtml, type ThemeRegistration } from "shiki";
 import { dirname, extname, joinPaths } from "../utils/path";
+import { assetUrlToPath, isAbsolutePath } from "../utils/imagePath";
 import { fileSystem } from "../services/fileSystem";
 import markdownContentCss from "../styles/markdown-content.css?raw";
 
@@ -128,14 +129,18 @@ async function inlineImages(
   let match: RegExpExecArray | null;
 
   while ((match = imgRegex.exec(html)) !== null) {
-    const src = match[1];
-    // 跳过远程和已是 data URI 的图片
+    const rawSrc = match[1];
+
+    // 渲染给 WebView 用时本地图片 src 已被改写成 asset 协议 URL，先回解为文件路径（issue #258）
+    const src = assetUrlToPath(rawSrc);
+
+    // 跳过远程 URL 与已是 data URI 的图片（本地 asset URL 已在上面还原为路径）
     if (/^(https?:|data:|file:)/i.test(src)) continue;
 
     // 解析为绝对路径
     let absPath: string | null = null;
-    if (src.startsWith("/")) {
-      // 绝对路径
+    if (isAbsolutePath(src)) {
+      // 绝对路径（含 Windows 盘符）
       absPath = src;
     } else if (filePath) {
       // 相对当前 md 文件
@@ -168,7 +173,8 @@ async function inlineImages(
       const dataUri = `data:${mime};base64,${base64}`;
       replacements.push({
         original: match[0],
-        replacement: match[0].replace(src, dataUri),
+        // 用 HTML 里实际出现的 rawSrc 替换（src 已回解为文件路径，不再出现在 HTML 中）
+        replacement: match[0].replace(rawSrc, dataUri),
       });
     } catch (err) {
       console.warn(`内联图片失败: ${src}`, err);
