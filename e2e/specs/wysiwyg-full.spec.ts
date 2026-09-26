@@ -454,7 +454,7 @@ describe("WYSIWYG 模式全量测试", () => {
       expect(await codeblock.isExisting()).toBe(true);
     });
 
-    it("3.6 表格内的链接（表格整体替换，链接由 markdown-it 渲染）", async () => {
+    it("3.6 表格内的链接（表格整体替换为 widget，单元格纯文本）", async () => {
       await setContentAndWait(
         browser,
         "| 链接 |\n|------|\n| [GitHub](https://github.com) |\n\n正文"
@@ -462,9 +462,14 @@ describe("WYSIWYG 模式全量测试", () => {
       await setCursorToEnd(browser);
       const table = await waitForSelector(browser, ".murasaki-wysiwyg-table");
       expect(await table.isExisting()).toBe(true);
-      // 表格内的链接应由 markdown-it 渲染为 <a>
+      // 表格在 WYSIWYG 下被整体替换为 contentEditable 表格 widget，
+      // 单元格直接承载 parseTable 读出的 markdown 原文纯文本（见 tableEditor.ts），
+      // 不再交给 markdown-it 渲染，因此表内不再有 <a>，链接文字以源码形式留在单元格里
       const innerLink = await browser.$(".murasaki-wysiwyg-table a");
-      expect(await innerLink.isExisting()).toBe(true);
+      expect(await innerLink.isExisting()).toBe(false);
+      const cellText = await table.getText();
+      expect(cellText).toContain("GitHub");
+      expect(cellText).toContain("https://github.com");
     });
   });
 

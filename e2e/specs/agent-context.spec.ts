@@ -14,6 +14,7 @@
  * T4.1 更新：工具调用现在在折叠卡片内，需先点击 .tool-call-card-header 展开。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { AGENT_ENABLED } from "../../src/features";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
@@ -44,7 +45,9 @@ async function injectMockProvider(browser: Browser): Promise<void> {
   await browser.pause(200);
 }
 
-describe("Agent 上下文 + 工具调用可见性", () => {
+// AGENT_ENABLED=false 时 Agent 面板整体不挂载（见 src/features.ts 功能开关），
+// 本 spec 全部用例依赖该面板，故开关关闭时整组跳过；将来打开开关会自动恢复。
+describe.skipIf(!AGENT_ENABLED)("Agent 上下文 + 工具调用可见性", () => {
   beforeAll(async () => {
     browser = await createSession();
     await waitForPinia(browser);

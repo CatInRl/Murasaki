@@ -72,7 +72,13 @@ describe("设计系统", () => {
       const root = document.documentElement;
       return window.getComputedStyle(root).getPropertyValue("--murasaki-primary-foreground").trim();
     });
-    expect(color.toLowerCase()).toBe("#ffffff");
+    // getComputedStyle 会把 6 位十六进制最短化为 3 位（#ffffff → #fff），
+    // 故先把取到的值归一化补齐为 6 位再比较（theme.css 里字面量为 #ffffff）
+    const lower = color.toLowerCase();
+    const hex = /^#[0-9a-f]{3}$/.test(lower)
+      ? `#${lower[1]}${lower[1]}${lower[2]}${lower[2]}${lower[3]}${lower[3]}`
+      : lower;
+    expect(hex).toBe("#ffffff");
   });
 
   it("lucide 图标渲染为 inline SVG", async () => {

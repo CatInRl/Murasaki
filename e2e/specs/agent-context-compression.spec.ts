@@ -8,6 +8,7 @@
  * 不发起真实 LLM 请求：通过直接构造 messages 数组验证 compression 行为。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { AGENT_ENABLED } from "../../src/features";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles, setupActiveProvider, teardownActiveProvider } from "../helpers/fixtures";
@@ -15,7 +16,9 @@ import { openWorkspace, closeWorkspace, openFileInTab, dismissAllDialogs, closeA
 
 let browser: Browser;
 
-describe("Agent 上下文压缩与护栏", () => {
+// AGENT_ENABLED=false 时 Agent 面板整体不挂载（见 src/features.ts 功能开关），
+// 本 spec 全部用例依赖该面板，故开关关闭时整组跳过；将来打开开关会自动恢复。
+describe.skipIf(!AGENT_ENABLED)("Agent 上下文压缩与护栏", () => {
   beforeAll(async () => {
     browser = await createSession();
   }, 60000);

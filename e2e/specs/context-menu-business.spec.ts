@@ -84,7 +84,13 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     });
 
     const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForDisplayed({ timeout: 5000 });
+    // 用 waitForExist + waitUntil(isDisplayed) 替代 waitForDisplayed：
+    // 后者在 tauri-driver 下与菜单入场动画（opacity 0 → 1）阶段交互不稳定，
+    // 会直接超时报「still not displayed」。
+    await menuEl.waitForExist({ timeout: 5000 });
+    await browser.waitUntil(async () => {
+      return await menuEl.isDisplayed().catch(() => false);
+    }, { timeout: 5000 });
 
     // 应有 7 个菜单项 + 1 个分隔符
     const items = await browser.$$(".murasaki-context-menu-item");
@@ -177,7 +183,12 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     });
 
     const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForDisplayed({ timeout: 5000 });
+    // 同 TabBar 用例：改用 waitForExist + waitUntil(isDisplayed)，
+    // 避免 waitForDisplayed 在入场动画期间误报超时。
+    await menuEl.waitForExist({ timeout: 5000 });
+    await browser.waitUntil(async () => {
+      return await menuEl.isDisplayed().catch(() => false);
+    }, { timeout: 5000 });
 
     // 应有 9 个菜单项 + 1 个分隔符
     const items = await browser.$$(".murasaki-context-menu-item");
@@ -224,11 +235,23 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     const shortcuts = await browser.$$(".murasaki-context-menu-shortcut");
     expect(shortcuts.length).toBe(5);
 
-    const texts: string[] = [];
-    for (const s of shortcuts) {
-      texts.push((await s.getText()).trim());
-    }
-    expect(texts).toEqual([
+    // 注意：tauri-driver 下 getText() 对这些 span 不可靠（实测首个元素返回空串，
+    // 而 textContent 完全正确），故改用 execute 读 textContent，并轮询到渲染完成
+    const readShortcutTexts = () =>
+      browser.execute(() =>
+        Array.from(
+          document.querySelectorAll(".murasaki-context-menu-shortcut")
+        ).map((e) => (e.textContent ?? "").trim())
+      );
+
+    await browser.waitUntil(
+      async () => {
+        const t = await readShortcutTexts();
+        return t.length === 5 && t.every((v) => v.length > 0);
+      },
+      { timeout: 5000 }
+    );
+    expect(await readShortcutTexts()).toEqual([
       "Ctrl+X",
       "Ctrl+C",
       "Ctrl+V",

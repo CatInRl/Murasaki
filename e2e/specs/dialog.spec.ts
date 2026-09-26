@@ -308,10 +308,34 @@ describe("对话框系统", () => {
       });
     });
 
-    // 第一个对话框应显示
+    // 先等第一个对话框成为 store 的 current（与文件内其它用例一致，
+    // 用 store 状态判定比在 Transition 未完成时读 DOM 文本可靠）
+    await browser.waitUntil(async () => {
+      return await browser.execute(() => {
+        // @ts-ignore
+        const cur = window.__pinia__._s.get("dialog").current;
+        return cur !== null && cur.message === "第一个";
+      });
+    }, { timeout: 5000 });
+
+    // 第一个对话框应显示：轮询到 .dialog-message 文本渲染完成再断言，
+    // 避免读到过渡中的空串
     const firstMsg = await browser.$(".dialog-message");
     await firstMsg.waitForExist({ timeout: 5000 });
-    expect((await firstMsg.getText()).trim()).toBe("第一个");
+    // 断言前重新查询元素并读 textContent：Vue 重渲染后 browser.$ 拿到的旧句柄
+    // 调 getText() 会读到空串（实测 DOM 里 textContent 正常为「第一个」），
+    // 用 execute 每次重新查询最稳。
+    await browser.waitUntil(async () => {
+      return await browser.execute(() => {
+        const el = document.querySelector(".dialog-message");
+        return (el?.textContent ?? "").trim() === "第一个";
+      });
+    }, { timeout: 5000 });
+    expect(
+      await browser.execute(() =>
+        (document.querySelector(".dialog-message")?.textContent ?? "").trim()
+      )
+    ).toBe("第一个");
 
     // 确认第一个
     const confirmBtn = await browser.$(".dialog-footer .dialog-btn.primary");

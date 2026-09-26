@@ -62,12 +62,24 @@ describe("吐司系统", () => {
     await browser.execute(() => {
       // @ts-ignore
       const toast = window.__pinia__._s.get("toast");
-      toast.error("操作失败");
+      // duration: 0 防止 3s 自动消失导致测试期间 toast 消失
+      toast.error("操作失败", { duration: 0 });
     });
 
     const item = await browser.$(".toast-item.toast-error");
     await item.waitForExist({ timeout: 5000 });
-    expect(await item.isDisplayed()).toBe(true);
+    // 该环境下 isDisplayed() 对 toast 不可靠：实测元素 display:flex、visibility:visible、
+    // rect 138x42 且 store 中确实存在时，isDisplayed() 仍返回 false（enter transition 期间
+    // opacity 未到 1，且复用旧元素句柄会失效）。故改为 execute 断言「已渲染且有非零尺寸」。
+    const isRendered = () =>
+      browser.execute(() => {
+        const el = document.querySelector(".toast-item.toast-error") as HTMLElement | null;
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      });
+    await browser.waitUntil(async () => await isRendered(), { timeout: 5000 });
+    expect(await isRendered()).toBe(true);
   });
 
   it("progress 变体显示进度条", async () => {
@@ -91,12 +103,22 @@ describe("吐司系统", () => {
     await browser.execute(() => {
       // @ts-ignore
       const toast = window.__pinia__._s.get("toast");
-      toast.info("提示", { description: "详细说明文字" });
+      // duration: 0 防止 3s 自动消失导致测试期间 toast 消失
+      toast.info("提示", { description: "详细说明文字", duration: 0 });
     });
 
     const desc = await browser.$(".toast-info .toast-desc");
     await desc.waitForExist({ timeout: 5000 });
-    expect((await desc.getText()).trim()).toBe("详细说明文字");
+    // enter transition 期间 getText 可能读到空串（且 tauri-driver 下 getText 对小文本节点
+    // 本身不稳定），故用 execute 读 textContent 并轮询到文案渲染出来
+    const readDesc = () =>
+      browser.execute(() =>
+        (document.querySelector(".toast-info .toast-desc")?.textContent ?? "").trim()
+      );
+    await browser.waitUntil(async () => (await readDesc()) === "详细说明文字", {
+      timeout: 5000,
+    });
+    expect(await readDesc()).toBe("详细说明文字");
   });
 
   it("点击关闭按钮 dismiss 吐司", async () => {
@@ -109,7 +131,18 @@ describe("吐司系统", () => {
 
     const item = await browser.$(".toast-item.toast-warning");
     await item.waitForExist({ timeout: 5000 });
-    expect(await item.isDisplayed()).toBe(true);
+    // 同「error 变体渲染」：该环境下 isDisplayed() 对 toast 不可靠，改用几何断言
+    const isRendered = () =>
+      browser.execute(() => {
+        const el = document.querySelector(
+          ".toast-item.toast-warning"
+        ) as HTMLElement | null;
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      });
+    await browser.waitUntil(async () => await isRendered(), { timeout: 5000 });
+    expect(await isRendered()).toBe(true);
 
     const closeBtn = await browser.$(".toast-warning .toast-close-btn");
     await closeBtn.click();

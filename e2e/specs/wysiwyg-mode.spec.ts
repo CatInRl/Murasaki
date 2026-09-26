@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia } from "../helpers/store";
+import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
 
 let browser: Browser;
 
@@ -29,6 +29,9 @@ describe("WYSIWYG 模式切换", () => {
   });
 
   beforeEach(async () => {
+    // 重置持久化设置：前序 spec 可能把 editorMode 持久化为 wysiwyg/source，
+    // 若不重置，本 spec 的「默认 split 模式」前提不成立（实测读到 mode-wysiwyg）
+    await resetPersistenceSettings(browser);
     try { await closeAllTabs(browser); } catch { /* ignore */ }
     try { await closeWorkspace(browser); } catch { /* ignore */ }
   });

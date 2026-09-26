@@ -11,6 +11,7 @@
  * 实现方式：通过 store 直接注入 messages / proposals，绕过真实 LLM 调用。
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from "vitest";
+import { AGENT_ENABLED } from "../../src/features";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles, getWorkspaceRoot } from "../helpers/fixtures";
@@ -88,7 +89,9 @@ async function injectMessages(browser: Browser): Promise<void> {
   await browser.pause(400);
 }
 
-describe("Agent 面板视觉对齐", () => {
+// AGENT_ENABLED=false 时 Agent 面板整体不挂载（见 src/features.ts 功能开关），
+// 本 spec 全部用例依赖该面板，故开关关闭时整组跳过；将来打开开关会自动恢复。
+describe.skipIf(!AGENT_ENABLED)("Agent 面板视觉对齐", () => {
   beforeAll(async () => {
     browser = await createSession();
     await waitForPinia(browser);

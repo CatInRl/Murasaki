@@ -91,7 +91,12 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     });
 
     const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForDisplayed({ timeout: 5000 });
+    // 用 waitForExist + waitUntil(isDisplayed) 替代 waitForDisplayed：
+    // 后者与菜单入场动画（opacity 0 → 1）阶段交互不稳定，会误报「still not displayed」
+    await menuEl.waitForExist({ timeout: 5000 });
+    await browser.waitUntil(async () => {
+      return await menuEl.isDisplayed().catch(() => false);
+    }, { timeout: 5000 });
 
     const items = await browser.$$(".murasaki-context-menu-item");
     const labels: string[] = [];
@@ -130,7 +135,11 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     });
 
     const menuEl = await browser.$(".murasaki-context-menu");
-    await menuEl.waitForDisplayed({ timeout: 5000 });
+    // 同本文件上一处：改用 waitForExist + waitUntil(isDisplayed)，避免入场动画期间误报
+    await menuEl.waitForExist({ timeout: 5000 });
+    await browser.waitUntil(async () => {
+      return await menuEl.isDisplayed().catch(() => false);
+    }, { timeout: 5000 });
 
     const items = await browser.$$(".murasaki-context-menu-item");
     const labels: string[] = [];

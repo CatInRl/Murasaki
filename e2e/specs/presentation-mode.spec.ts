@@ -115,7 +115,8 @@ describe("演示模式", () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
-    await pressShortcut(browser, "!", { ctrl: true, shift: true });
+    // Ctrl+Shift+4 → e.key 为上档字符 "$"（"!" 是 Ctrl+Shift+1，切的是源码模式）
+    await pressShortcut(browser, "$", { ctrl: true, shift: true });
 
     await browser.waitUntil(
       async () => (await browser.$(".editor-pane.mode-presentation")).isExisting(),
@@ -133,7 +134,7 @@ describe("演示模式", () => {
   it("演示模式只读：无 CodeMirror 实例，任务列表 checkbox 禁用", async () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
-    await pressShortcut(browser, "!", { ctrl: true, shift: true });
+    await pressShortcut(browser, "$", { ctrl: true, shift: true });
     await browser.waitUntil(
       async () => (await browser.$(".editor-pane.mode-presentation")).isExisting(),
       { timeout: 10000 }
@@ -145,19 +146,25 @@ describe("演示模式", () => {
     // intro.md 含任务列表 `- [ ] 协作模式`
     const boxes = await browser.$$('.preview-pane input[type="checkbox"]');
     expect(boxes.length).toBeGreaterThan(0);
+    // 任务列表 checkbox 只读：实现是在预览区点击时 preventDefault 取消激活行为、
+    // 不写回源码（见 PreviewPane.vue 的 readonly 分支），**不设 disabled 属性**，
+    // 因此断言「点击后勾选状态不变」而非 isEnabled() === false
     for (const box of boxes) {
-      expect(await box.isEnabled()).toBe(false);
+      const checkedBefore = await box.isSelected();
+      await box.click();
+      await browser.pause(100);
+      expect(await box.isSelected()).toBe(checkedBefore);
     }
   });
 
   it("状态栏显示「演示」模式 chip 与 100% 缩放 chip", async () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
-    await pressShortcut(browser, "!", { ctrl: true, shift: true });
+    await pressShortcut(browser, "$", { ctrl: true, shift: true });
 
     const modeChip = await browser.$(".status-mode-chip");
     await modeChip.waitForExist({ timeout: 10000 });
-    expect((await modeChip.getText()).trim()).toBe("演示");
+    expect((await modeChip.getText()).trim()).toBe("演示模式");
 
     const zoomChip = await browser.$(".status-zoom-chip");
     await zoomChip.waitForExist({ timeout: 5000 });
@@ -167,7 +174,7 @@ describe("演示模式", () => {
   it("Ctrl+= / Ctrl+- 步进 10%，Ctrl+0 复位，并持久化", async () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
-    await pressShortcut(browser, "!", { ctrl: true, shift: true });
+    await pressShortcut(browser, "$", { ctrl: true, shift: true });
 
     const zoomChip = await browser.$(".status-zoom-chip");
     await zoomChip.waitForExist({ timeout: 10000 });
@@ -212,7 +219,7 @@ describe("演示模式", () => {
     await openWorkspace(browser, wsPath);
     // 先在 md 上进入演示模式
     await openFileInTab(browser, `${wsPath}\\intro.md`);
-    await pressShortcut(browser, "!", { ctrl: true, shift: true });
+    await pressShortcut(browser, "$", { ctrl: true, shift: true });
     await browser.waitUntil(
       async () => (await browser.$(".editor-pane.mode-presentation")).isExisting(),
       { timeout: 10000 }

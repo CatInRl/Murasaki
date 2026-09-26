@@ -13,7 +13,7 @@
  */
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { Settings, Type, Keyboard } from "lucide-vue-next";
+import { Settings, Type, Keyboard, Bot } from "lucide-vue-next";
 import { emit } from "@tauri-apps/api/event";
 import { AGENT_ENABLED } from "../features";
 import "./settings.css";

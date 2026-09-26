@@ -58,35 +58,42 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
   // ============ M18: 设置分类导航 ============
 
-  it("settingsLogic.fieldsForCategory('general') 返回 4 个字段", async () => {
+  it("settingsLogic.fieldsForCategory('general') 返回 6 个字段", async () => {
     const result = await browser.execute((category: string) => {
       const logic = (window as any).__settingsLogic__;
       if (!logic) return { error: "window.__settingsLogic__ not exposed" };
       return { fields: logic.fieldsForCategory(category) };
     }, "general");
     expect((result as any).error).toBeUndefined();
+    // 期望与实现 GENERAL_FIELDS 一致（uiMode 已从 general 分类移除）
     expect((result as any).fields).toEqual([
-      "uiMode",
       "showHiddenFiles",
       "showAgentPanel",
+      "reopenLastWorkspace",
       "defaultImageDir",
+      "checkUpdatesOnStartup",
+      "language",
     ]);
   });
 
-  it("settingsLogic.fieldsForCategory('editor') 返回 6 个字段", async () => {
+  it("settingsLogic.fieldsForCategory('editor') 返回 9 个字段", async () => {
     const result = await browser.execute((category: string) => {
       const logic = (window as any).__settingsLogic__;
       if (!logic) return { error: "window.__settingsLogic__ not exposed" };
       return { fields: logic.fieldsForCategory(category) };
     }, "editor");
     expect((result as any).error).toBeUndefined();
+    // 期望与实现 EDITOR_FIELDS 一致（新增 editorFontPreset / entryOverflowMode / fullwidthToMarkdown）
     expect((result as any).fields).toEqual([
       "editorMode",
       "editorFontSize",
       "editorLineHeight",
       "editorFontFamily",
+      "editorFontPreset",
       "showLineNumbers",
       "softWrap",
+      "entryOverflowMode",
+      "fullwidthToMarkdown",
     ]);
   });
 
@@ -104,16 +111,17 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
     const result = await browser.execute(() => {
       const logic = (window as any).__settingsLogic__;
       if (!logic) return { error: "window.__settingsLogic__ not exposed" };
-      // draft 与 snapshot 在 uiMode 上不同 → dirty=true
+      // draft 与 snapshot 在 showHiddenFiles 上不同 → dirty=true
+      // （原先用已移除的 uiMode，该字段不属于 general 分类，永远判不出 dirty）
       const dirty = logic.isCategoryDirty(
-        { uiMode: "dark" } as any,
-        { uiMode: "light" } as any,
+        { showHiddenFiles: false } as any,
+        { showHiddenFiles: true } as any,
         "general"
       );
       // 完全相同 → dirty=false
       const clean = logic.isCategoryDirty(
-        { uiMode: "dark" } as any,
-        { uiMode: "dark" } as any,
+        { showHiddenFiles: false } as any,
+        { showHiddenFiles: false } as any,
         "general"
       );
       return { dirty, clean };
