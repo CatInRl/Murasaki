@@ -32,10 +32,7 @@ dirs = "5"
 regex = "1"
 walkdir = "2"
 notify = "7"
-reqwest = { version = "0.12", features = ["json"] }
 uuid = { version = "1", features = ["v4"] }
-flate2 = "1"
-base64 = "0.22"
 sys-locale = "0.3.2"
 
 [target.'cfg(windows)'.dependencies]

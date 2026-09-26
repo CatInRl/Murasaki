@@ -19,7 +19,7 @@ import {
 } from "./shortcutRegistry";
 import { normalizeShortcut } from "./shortcutsLogic";
 
-const VALID_CATEGORIES: ShortcutCategory[] = ["file", "edit", "paragraph", "view", "agent"];
+const VALID_CATEGORIES: ShortcutCategory[] = ["file", "edit", "paragraph", "view"];
 const VALID_SCOPES: ShortcutScope[] = ["global", "editor"];
 
 describe("shortcutRegistry - 完整性", () => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from "vue";
+import { computed, h } from "vue";
 import { useI18n } from "vue-i18n";
 import { NDropdown } from "naive-ui";
 import {
@@ -11,15 +11,10 @@ import {
   ChevronDown,
   ZoomIn,
   PencilLine,
-  MessageSquare,
-  Sparkles,
 } from "lucide-vue-next";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useTabsStore } from "../stores/useTabsStore";
-import { useAiProvidersStore } from "../stores/useAiProvidersStore";
-import { useAgentStore } from "../stores/useAgentStore";
 import { basename, dirname } from "../utils/path";
-import { AGENT_ENABLED } from "../features";
 import type { EditorMode } from "../types";
 
 interface Props {
@@ -28,8 +23,6 @@ interface Props {
   cursorCol: number;
   charCount: number;
   wordCount: number;
-  /** Agent 是否运行中 */
-  agentRunning?: boolean;
   /** 当前生效的显示模式（受文件类型降级后的值） */
   editorMode?: EditorMode;
   /** 演示模式缩放百分比 */
@@ -42,7 +35,6 @@ const props = withDefaults(defineProps<Props>(), {
   cursorCol: 0,
   charCount: 0,
   wordCount: 0,
-  agentRunning: false,
   editorMode: "source",
   zoom: 100,
 });
@@ -56,14 +48,7 @@ const emit = defineEmits<{
 
 const workspace = useWorkspaceStore();
 const tabs = useTabsStore();
-const aiProviders = useAiProvidersStore();
-const agentStore = useAgentStore();
 const { t } = useI18n();
-
-/** 孤立会话数量（启动时检测，清理后刷新） */
-const orphanCount = ref(0);
-/** 清理中标志 */
-const cleaningOrphans = ref(false);
 
 /**
  * 相对工作区根的文件路径；无文件时显示"未打开文件"
@@ -101,11 +86,6 @@ const savedState = computed<"saved" | "unsaved" | "none">(() => {
   return tab.isDirty ? "unsaved" : "saved";
 });
 
-/** 当前活动 provider 名（无则 null） */
-const providerName = computed<string | null>(
-  () => aiProviders.activeProvider?.name ?? null
-);
-
 /** 显示模式顺序 + 文案 key（下拉项按此顺序渲染，复用菜单文案） */
 const MODE_LABEL_KEYS: Record<EditorMode, string> = {
   source: "menu.view.modeSource",
@@ -136,32 +116,6 @@ function onModeSelect(key: string): void {
   if (key === props.editorMode) return;
   emit("select-mode", key as EditorMode);
 }
-
-async function refreshOrphans(): Promise<void> {
-  try {
-    orphanCount.value = await agentStore.checkOrphanChats();
-  } catch {
-    orphanCount.value = 0;
-  }
-}
-
-async function onCleanupOrphans(): Promise<void> {
-  if (cleaningOrphans.value || orphanCount.value <= 0) return;
-  cleaningOrphans.value = true;
-  try {
-    await agentStore.cleanupOrphanChats();
-    await refreshOrphans();
-  } finally {
-    cleaningOrphans.value = false;
-  }
-}
-
-onMounted(() => {
-  if (!aiProviders.loaded) {
-    void aiProviders.load();
-  }
-  void refreshOrphans();
-});
 </script>
 
 <template>
@@ -210,13 +164,7 @@ onMounted(() => {
       <span>{{ $t('common.status.unsaved') }}</span>
     </div>
 
-    <!-- Agent 运行中指示器 -->
-    <div v-if="AGENT_ENABLED && agentRunning" class="status-agent-indicator">
-      <span class="status-agent-dot"></span>
-      {{ $t('editor.statusBar.agentRunning') }}
-    </div>
-
-    <!-- 右侧：显示模式下拉 + 缩放 + 孤立会话清理 + provider chip -->
+    <!-- 右侧：显示模式下拉 + 缩放 -->
     <div class="status-right">
       <!-- 显示模式：点击弹出四选一下拉（不循环切换） -->
       <NDropdown
@@ -246,27 +194,6 @@ onMounted(() => {
         <ZoomIn :size="14" />
         <span>{{ $t('editor.statusBar.zoomLabel', { percent: zoom }) }}</span>
       </button>
-
-      <button
-        v-if="AGENT_ENABLED && orphanCount > 0"
-        type="button"
-        class="status-orphan"
-        :disabled="cleaningOrphans"
-        :title="$t('editor.statusBar.orphanTooltip', { count: orphanCount })"
-        @click="onCleanupOrphans"
-      >
-        <MessageSquare :size="14" />
-        <span>{{ $t('editor.statusBar.orphanCount', { count: orphanCount }) }}</span>
-      </button>
-
-      <div
-        v-if="AGENT_ENABLED && providerName"
-        class="status-provider-chip"
-        :title="$t('editor.statusBar.providerTooltip', { name: providerName })"
-      >
-        <Sparkles :size="14" />
-        <span>{{ providerName }}</span>
-      </div>
     </div>
   </div>
 </template>
@@ -348,28 +275,6 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-/* 孤立会话清理按钮 */
-.status-orphan {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-  color: var(--murasaki-ink-3);
-  cursor: pointer;
-  transition: color var(--murasaki-transition-fast);
-}
-.status-orphan:hover:not(:disabled) {
-  color: var(--murasaki-primary);
-}
-.status-orphan:disabled {
-  cursor: progress;
-  opacity: 0.6;
-}
-
 /* 显示模式 / 缩放 chip：透明底，hover 变主色 */
 .status-chip {
   display: inline-flex;
@@ -390,45 +295,6 @@ onMounted(() => {
 .status-chip:hover {
   color: var(--murasaki-primary);
   background: rgba(147, 51, 234, 0.1);
-}
-
-/* Provider chip: bg-primary/10 + text-primary + rounded */
-.status-provider-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 1px 8px;
-  background: rgba(147, 51, 234, 0.1);
-  color: var(--murasaki-primary);
-  border-radius: var(--murasaki-radius-sm);
-  white-space: nowrap;
-}
-
-/* Agent 运行中指示器 */
-.status-agent-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--murasaki-primary, #9333ea);
-  font-weight: 500;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-.status-agent-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--murasaki-primary, #9333ea);
-  animation: agent-pulse 1.5s ease-in-out infinite;
-}
-@keyframes agent-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.3;
-  }
 }
 
 /* 紧凑模式 */

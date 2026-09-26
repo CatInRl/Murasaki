@@ -27,14 +27,12 @@ function treeOf(doc: string): Tree {
 
 function compute(
   doc: string,
-  head: number,
-  proposalRanges: Array<{ from: number; to: number }> = []
+  head: number
 ): ComputedDeco[] {
   return computeDecorations({
     doc,
     selectionHead: head,
     tree: treeOf(doc),
-    proposalRanges,
   });
 }
 
@@ -47,7 +45,6 @@ function computeWithViewport(
     doc,
     selectionHead: head,
     tree: treeOf(doc),
-    proposalRanges: [],
     viewport,
   };
   return computeDecorations(input);
@@ -217,12 +214,6 @@ describe("computeDecorations — 行内代码", () => {
     expect("`inline code`".slice(r[0].from, r[0].to)).toBe("`inline code`");
   });
 
-  it("`code` 与提案范围重叠时不生成样式装饰", () => {
-    const d = compute("`code`", 20, [{ from: 0, to: 7 }]);
-    const r = renders(d).filter((x) => x.cssClass === "murasaki-wysiwyg-inline-code");
-    expect(r).toHaveLength(0);
-  });
-
   it("代码块（FencedCode）的 ``` 反引号不单独隐藏（整体替换为 widget）", () => {
     const doc = "```js\nconsole.log(1)\n```\n\nbody";
     const d = compute(doc, 30); // 光标在 body
@@ -305,27 +296,6 @@ describe("computeDecorations — 分隔线", () => {
       marks(d).some((m) => m.markType === "HorizontalRule" && m.kind === "dim")
     ).toBe(true);
     expect(replaces(d).some((r) => r.widget === "hr")).toBe(false);
-  });
-});
-
-// ===== Agent 提案优先级 =====
-
-describe("computeDecorations — Agent 提案优先级", () => {
-  it("完全落在提案范围内的标记不隐藏", () => {
-    const doc = "**bold**\n\nbody";
-    // 提案覆盖整个 **bold**（0..8）
-    const d = compute(doc, 10, [{ from: 0, to: 8 }]);
-    const ms = marks(d).filter((m) => m.markType === "EmphasisMark");
-    expect(ms).toHaveLength(0);
-  });
-
-  it("未与提案重叠的标记仍然 hide", () => {
-    const doc = "**bold**\n\nbody";
-    // 提案仅覆盖开头 0..1，会吃掉首个标记，但末尾标记仍 hide
-    const d = compute(doc, 10, [{ from: 0, to: 1 }]);
-    const ms = marks(d).filter((m) => m.markType === "EmphasisMark");
-    expect(ms.length).toBeGreaterThanOrEqual(1);
-    expect(ms.every((m) => m.kind === "hide")).toBe(true);
   });
 });
 
@@ -577,34 +547,6 @@ describe("computeDecorations — 数学公式 widget (T7.2)", () => {
     const doc = "$a$ and $b$\n\nbody";
     const d = compute(doc, 15);
     expect(blockWidgets(d).filter((w) => w.widget === "math")).toHaveLength(2);
-  });
-});
-
-// ===== T7.2：提案优先级（块级 widget） =====
-
-describe("computeDecorations — T7.2 提案优先级", () => {
-  it("提案覆盖的代码块不替换为 widget", () => {
-    const doc = "```js\nconsole.log(1)\n```\n\nbody";
-    const d = compute(doc, 30, [{ from: 0, to: 24 }]);
-    expect(blockWidgets(d).filter((w) => w.widget === "codeBlock")).toHaveLength(0);
-  });
-
-  it("提案覆盖的链接不替换为 widget", () => {
-    const doc = "[text](https://example.com)\n\nbody";
-    const d = compute(doc, 30, [{ from: 0, to: 27 }]);
-    expect(blockWidgets(d).filter((w) => w.widget === "link")).toHaveLength(0);
-  });
-
-  it("提案覆盖的表格不替换为 widget", () => {
-    const doc = "| a | b |\n|---|---|\n| 1 | 2 |\n\nbody";
-    const d = compute(doc, 35, [{ from: 0, to: 29 }]);
-    expect(blockWidgets(d).filter((w) => w.widget === "table")).toHaveLength(0);
-  });
-
-  it("提案覆盖的数学公式不替换为 widget", () => {
-    const doc = "inline $a^2$ math\n\nbody";
-    const d = compute(doc, 20, [{ from: 7, to: 12 }]);
-    expect(blockWidgets(d).filter((w) => w.widget === "math")).toHaveLength(0);
   });
 });
 

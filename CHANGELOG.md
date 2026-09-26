@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Removed
+
+- **移除 AI Agent 功能**（#264）：该功能自 0.5.0 起由 `AGENT_ENABLED = false` 整体关闭、没有任何入口，本次彻底删除，不再保留「改一个常量即恢复」的开关 —— 前端 Agent 引擎（provider / tools / context / proposals）、右侧面板、设置里的 AI 分类与「显示 Agent 面板」开关、相关 i18n 文案，Rust 侧的 agent 文件工具、AI provider（含 DPAPI 密钥读写）与聊天记录命令，以及对应的单测与 e2e 用例；运行期依赖 `openai` 与 Rust 依赖 `reqwest` / `flate2` / `base64` 一并移除。磁盘上既有的 secrets / 聊天记录文件不迁移、不删除（留有旧数据的用户可自行清理）。
+
 ### Fixed
 
 - 修复导出 HTML 时本地图片不再内联为 Base64（#258）：渲染期图片 src 已被改写成 Tauri asset 协议 URL，而导出侧只认文件路径形态于是静默跳过，导致导出的 HTML 换台机器打开时本地图片全部丢失。现把 asset URL 回解为本地路径后再内联，并让导出渲染临时指向本次导出的文件（避免相对图片按别的目录解析、被内联成错误图片）；顺带修正 Windows 盘符绝对路径此前被误当相对路径处理的问题。

@@ -2,10 +2,7 @@ pub mod commands;
 pub mod i18n;
 
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
-use commands::agent_files;
-use commands::ai_providers;
 use commands::assets;
-use commands::chats;
 use commands::drafts;
 use commands::files;
 use commands::launch::{self, PendingOpenState};
@@ -215,7 +212,7 @@ pub(crate) fn detect_remote_debugging_args() -> Option<(String, u16)> {
     Some((format!("--remote-debugging-port={}", port), port))
 }
 
-/// 通过原始 TCP 发送 HTTP GET，返回响应 body（避免引入 async reqwest）
+/// 通过原始 TCP 发送 HTTP GET，返回响应 body（不引入 HTTP 客户端依赖）
 fn http_get_body(host: &str, port: u16, path: &str) -> Option<String> {
     use std::io::{Read, Write};
     use std::net::TcpStream;
@@ -483,22 +480,6 @@ pub fn run() {
             settings::open_settings,
             locale::detect_system_locale,
             pdf::export_pdf,
-            ai_providers::get_ai_providers,
-            ai_providers::save_ai_provider,
-            ai_providers::delete_ai_provider,
-            ai_providers::set_active_provider,
-            ai_providers::get_api_key,
-            ai_providers::test_provider_connection,
-            agent_files::agent_list_files,
-            agent_files::agent_read_file,
-            agent_files::agent_search_files,
-            agent_files::agent_write_file,
-            chats::save_chat,
-            chats::load_chat,
-            chats::delete_chat,
-            chats::list_chats,
-            chats::check_orphan_chats,
-            chats::cleanup_orphan_chats,
         ])
         .setup(|app| {
             // 手动创建主窗口（tauri.conf.json 中 windows 数组为空）

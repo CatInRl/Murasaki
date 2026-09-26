@@ -29,14 +29,6 @@ import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
 import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
 import type { MenuItem } from "../stores/useContextMenuStore";
-import {
-  proposalField,
-  proposalActionEffect,
-  addProposalEffect,
-  removeProposalEffect,
-  expireAllProposalsEffect,
-} from "../agent/proposals";
-import { useProposalsStore } from "../stores/useProposalsStore";
 import { wysiwygExtensions, recomputeWysiwygEffect } from "../editor/wysiwyg/wysiwygPlugin";
 import { setCurrentFilePath } from "../composables/useMarkdownRenderer";
 import { fullwidthToMarkdownExtension } from "../editor/fullwidthToMarkdown";
@@ -346,8 +338,6 @@ function buildExtensions() {
     foldGutter({ openText: "▾", closedText: "▸" }),
     murasakiTheme,
     syntaxHighlighting(murasakiHighlightStyle),
-    // Agent proposal decorations (Ticket #23)
-    proposalField,
     EditorView.updateListener.of((update) => {
       // 外部值同步（watch 触发的 dispatch）不应回传 update:modelValue，
       // 否则切换 tab / 打开文件时会把新激活的 tab 错误标记为 dirty
@@ -358,19 +348,6 @@ function buildExtensions() {
         const { head } = update.state.selection.main;
         const lineObj = update.state.doc.lineAt(head);
         emit("cursor-change", { line: lineObj.number, ch: head - lineObj.from });
-      }
-      // Sync proposal store when proposals change (e.g., strict invalidation expires them)
-      const hasProposalEffect = update.transactions.some((tr) =>
-        tr.effects.some((e) =>
-          e.is(addProposalEffect) ||
-          e.is(removeProposalEffect) ||
-          e.is(expireAllProposalsEffect) ||
-          e.is(proposalActionEffect)
-        )
-      );
-      if (update.docChanged || hasProposalEffect) {
-        const proposalsStore = useProposalsStore();
-        proposalsStore.syncFromEditor();
       }
     }),
   ];
@@ -437,7 +414,7 @@ onMounted(() => {
     stateCache.set(props.tabId, view.state);
   }
   emit("ready", view);
-  // 注册到 editor bridge（供 agent 工具使用）
+  // 注册到 editor bridge
   useEditorBridgeStore().registerView(view);
   // 监听 WYSIWYG 链接 widget 的内部跳转事件（Ctrl+Click 相对 .md 路径）
   // LinkWidget.dispatchEvent 发出自定义事件，这里接收后透传给父组件

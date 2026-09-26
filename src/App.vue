@@ -16,7 +16,6 @@ import TableInsertDialog from "./components/TableInsertDialog.vue";
 import CompareWindow from "./components/CompareWindow.vue";
 import ImagePreviewModal from "./components/ImagePreviewModal.vue";
 import UpdateDialog from "./components/UpdateDialog.vue";
-import AgentPanel from "./components/AgentPanel.vue";
 import ToastContainer from "./components/ToastContainer.vue";
 import DialogContainer from "./components/DialogContainer.vue";
 import ContextMenuContainer from "./components/ContextMenuContainer.vue";
@@ -26,9 +25,7 @@ import { useTabsStore } from "./stores/useTabsStore";
 import { usePersistenceStore } from "./stores/usePersistenceStore";
 import { useSearchStore } from "./stores/useSearchStore";
 import { useFileOpsStore } from "./stores/useFileOpsStore";
-import { useAgentStore } from "./stores/useAgentStore";
 import { useEditorBridgeStore } from "./stores/useEditorBridgeStore";
-import { useProposalsStore } from "./stores/useProposalsStore";
 import { useDialogStore } from "./stores/useDialogStore";
 import { useToastStore } from "./stores/useToastStore";
 import { useFileWatcher } from "./composables/useFileWatcher";
@@ -60,9 +57,8 @@ import { basename } from "./utils/path";
 import { isMarkdownFile, isSourceOnlyFile } from "./utils/fileKind";
 import { DEFAULT_THEME } from "./composables/useTheme";
 import { useNaiveTheme } from "./composables/useNaiveTheme";
-import { AGENT_ENABLED } from "./features";
 import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
-import type { SidebarView, SettingsState, EditorMode } from "./types";
+import type { SidebarView, EditorMode } from "./types";
 import type { SearchEntry } from "./search/searchLogic";
 import { READING_FONT_PRESETS } from "./types";
 import {
@@ -76,9 +72,7 @@ const tabsStore = useTabsStore();
 const persistence = usePersistenceStore();
 const searchStore = useSearchStore();
 const fileOps = useFileOpsStore();
-const agentStore = useAgentStore();
 const editorBridge = useEditorBridgeStore();
-const proposalsStore = useProposalsStore();
 const dialog = useDialogStore();
 const toastStore = useToastStore();
 const { t } = useI18n();
@@ -162,10 +156,9 @@ async function onSelectMode(mode: EditorMode): Promise<void> {
   await persistence.updateSettings({ editorMode: mode });
 }
 
-// 切 tab 时更新 editor bridge 的文档路径（供 agent 工具使用）
+// 切 tab 时更新 editor bridge 的文档路径
 // 用 flush: 'post' 确保在 SourceEditor.onMounted（registerView(view, null)）之后触发，
-// 否则首次打开 tab 时 EditorPane 挂载会重置 activeDocPath 为 null，
-// 导致 agent.hasContext 为 false、上下文卡片不显示。
+// 否则首次打开 tab 时 EditorPane 挂载会重置 activeDocPath 为 null。
 watch(currentFilePath, (path) => {
   editorBridge.updateDocPath(path);
 }, { flush: 'post' });
@@ -195,7 +188,7 @@ const {
 // ===== Tab 关闭逻辑 composable（对话框改走 dialog store）=====
 const {
   onCloseTabRequest, onCloseOthers, onCloseRight, onCloseLeft, onCloseAllTabs,
-} = useTabClose({ tabsStore, agentStore, dialog, workspace });
+} = useTabClose({ tabsStore, dialog, workspace });
 
 // ===== 侧栏视图（受控） =====
 const sidebarView = ref<SidebarView>("files");
@@ -299,11 +292,6 @@ const imagePreviewPath = ref<string | null>(null);
 function onPreviewImage(path: string): void {
   imagePreviewPath.value = path;
   imagePreviewVisible.value = true;
-}
-
-// ===== 收起 Agent 面板 =====
-async function onCollapseAgentPanel(): Promise<void> {
-  await persistence.updateSettings({ showAgentPanel: false } as Partial<SettingsState>);
 }
 
 // ===== 设置页（单入口路由，在主窗口内通过 navigate 事件切换） =====
@@ -470,33 +458,16 @@ onMounted(async () => {
   // 8. 注入冲突解决器给 fileOps store（供文件树右键菜单使用）
   fileOps.setConflictResolver(askConflict);
 
-  // 9. 注入新文件提议的冲突解决器（Ticket #24b: propose_new_file 复用 T2 ConflictDialog）
-  //     operation 使用 "save-as"，因为 agent 创建新文件相当于另存为新路径
-  proposalsStore.setNewFileConflictResolver((targetPath: string) =>
-    askConflict(targetPath, "save-as")
-  );
-
-  // 10. 检测孤儿对话（Ticket #25: workspace 已删除但对话文件残留）
-  //     若存在孤儿，在控制台提示（后续可扩展到状态栏提示 + 一键清理）
-  try {
-    const orphanCount = await agentStore.checkOrphanChats();
-    if (orphanCount > 0) {
-      console.warn(`[Murasaki] 检测到 ${orphanCount} 个孤儿对话，可通过状态栏手动清理`);
-    }
-  } catch (err) {
-    console.warn("检测孤儿对话失败:", err);
-  }
-
   initialized.value = true;
 
-  // 11. 打开本窗口的待打开路径（多窗口，spec #194）
-  //     路径已在 1.5 处提前取走（take-and-clear，不能二次 take），此处只消费。
-  //     此时事件监听器已就绪、文件监听已启动，打开动作不会漏事件。
+  // 9. 打开本窗口的待打开路径（多窗口，spec #194）
+  //    路径已在 1.5 处提前取走（take-and-clear，不能二次 take），此处只消费。
+  //    此时事件监听器已就绪、文件监听已启动，打开动作不会漏事件。
   if (pendingOpen) {
     void onOpenPath(pendingOpen.path, pendingOpen.type);
   }
 
-  // 12. 启动时静默检查更新（可被设置关闭，ADR-0012）
+  // 10. 启动时静默检查更新（可被设置关闭，ADR-0012）
   //     silent=true：不弹 toast / 不弹对话框，仅填充 availableUpdate 状态
   if (persistence.settings.checkUpdatesOnStartup) {
     void checkForUpdate(true);
@@ -550,9 +521,6 @@ onBeforeUnmount(() => {
   fileWatcher.stop();
   imagePaste.teardown();
   fileOps.setConflictResolver(null);
-  proposalsStore.setNewFileConflictResolver(null);
-  // 刷新待保存的对话到磁盘（Ticket #25）
-  void agentStore.saveChatDebounced.flush();
 });
 
 // ===== 文件监听（外部修改检测） =====
@@ -685,7 +653,6 @@ const { initialized, setupEventListeners } = useAppLifecycle({
   persistence,
   workspace,
   editorBridge,
-  proposalsStore,
   currentTheme,
   sidebarView,
   settingsVisible,
@@ -868,19 +835,10 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
           :word-count="wordCount"
           :editor-mode="effectiveEditorMode"
           :zoom="presentationZoom"
-          :agent-running="agentStore.isThinking"
           @select-mode="onSelectMode"
           @zoom-reset="zoomReset"
         />
       </div>
-
-      <!-- Agent 面板（AGENT_ENABLED 关闭时隐藏整个入口，issue #112；非 markdown 文件隐藏，issue 0.x） -->
-      <AgentPanel
-        v-if="AGENT_ENABLED && persistence.settings.showAgentPanel && currentIsMarkdown"
-        @collapse="onCollapseAgentPanel"
-        @open-folder-dialog="onOpenFolder"
-        @open-settings="openSettings"
-      />
     </div>
 
     <!-- 右键菜单容器（全局唯一，数据驱动） -->
@@ -926,7 +884,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
       @close="imagePreviewVisible = false"
     />
 
-    <!-- 外部修改三选一 / Agent 运行中关闭 / 冲突 / 未保存改动 均由 DialogContainer 统一渲染 -->
+    <!-- 外部修改三选一 / 冲突 / 未保存改动 均由 DialogContainer 统一渲染 -->
     <ToastContainer />
   </NConfigProvider>
 </template>

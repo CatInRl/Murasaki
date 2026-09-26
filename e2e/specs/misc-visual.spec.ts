@@ -58,17 +58,16 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
   // ============ M18: 设置分类导航 ============
 
-  it("settingsLogic.fieldsForCategory('general') 返回 6 个字段", async () => {
+  it("settingsLogic.fieldsForCategory('general') 返回 5 个字段", async () => {
     const result = await browser.execute((category: string) => {
       const logic = (window as any).__settingsLogic__;
       if (!logic) return { error: "window.__settingsLogic__ not exposed" };
       return { fields: logic.fieldsForCategory(category) };
     }, "general");
     expect((result as any).error).toBeUndefined();
-    // 期望与实现 GENERAL_FIELDS 一致（uiMode 已从 general 分类移除）
+    // 期望与实现 GENERAL_FIELDS 一致（uiMode 已移除；showAgentPanel 随 AI Agent 功能一并移除）
     expect((result as any).fields).toEqual([
       "showHiddenFiles",
-      "showAgentPanel",
       "reopenLastWorkspace",
       "defaultImageDir",
       "checkUpdatesOnStartup",
@@ -378,14 +377,5 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
       return persistence.settings.editorMode;
     });
     expect(editorMode).toBe("split");
-  });
-
-  it("默认 showAgentPanel 为 true（preset 默认值）", async () => {
-    const showAgentPanel = await browser.execute(() => {
-      // @ts-ignore
-      const persistence = window.__pinia__._s.get("persistence");
-      return persistence.settings.showAgentPanel;
-    });
-    expect(showAgentPanel).toBe(true);
   });
 });

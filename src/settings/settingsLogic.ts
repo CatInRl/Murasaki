@@ -5,19 +5,17 @@
  * 便于单元测试（参考项目测试哲学：优先测纯逻辑，不测组件实现细节）。
  *
  * 分类与字段映射来自 spec 议题簇 8：
- * - 常规：showHiddenFiles / showAgentPanel / defaultImageDir / checkUpdatesOnStartup / language
+ * - 常规：showHiddenFiles / defaultImageDir / checkUpdatesOnStartup / language
  * - 编辑器：editorMode / editorFontSize / editorLineHeight / editorFontFamily / showLineNumbers / softWrap
- * - AI：Provider 有独立持久化（useAiProvidersStore），不参与 footer Save 的 draft 模型
  */
 import type { SettingsState } from "../types";
 import { DEFAULT_SETTINGS } from "../types";
 
-export type SettingsCategory = "general" | "editor" | "ai" | "shortcuts";
+export type SettingsCategory = "general" | "editor" | "shortcuts";
 
 /** 常规分类下受 footer Save 管理的字段 */
 export const GENERAL_FIELDS: (keyof SettingsState)[] = [
   "showHiddenFiles",
-  "showAgentPanel",
   "reopenLastWorkspace",
   "defaultImageDir",
   "checkUpdatesOnStartup",
@@ -40,7 +38,7 @@ export const EDITOR_FIELDS: (keyof SettingsState)[] = [
 /** 快捷键分类下受 footer Save 管理的字段（覆盖表整体比较） */
 export const SHORTCUTS_FIELD: (keyof SettingsState)[] = ["shortcuts"];
 
-/** 返回某分类下参与 draft 比较的字段列表（ai 不参与，provider 走独立持久化） */
+/** 返回某分类下参与 draft 比较的字段列表 */
 export function fieldsForCategory(
   category: SettingsCategory
 ): (keyof SettingsState)[] {
@@ -88,7 +86,7 @@ export function isCategoryDirty(
   });
 }
 
-/** 判断是否有任意未保存改动（general + editor + shortcuts，不含 ai） */
+/** 判断是否有任意未保存改动（general + editor + shortcuts） */
 export function isDirty(
   draft: SettingsState,
   snapshot: SettingsState
@@ -116,7 +114,6 @@ export function restoreCategoryDefaults(
       return {
         ...draft,
         showHiddenFiles: DEFAULT_SETTINGS.showHiddenFiles,
-        showAgentPanel: DEFAULT_SETTINGS.showAgentPanel,
         reopenLastWorkspace: DEFAULT_SETTINGS.reopenLastWorkspace,
         defaultImageDir: DEFAULT_SETTINGS.defaultImageDir,
         checkUpdatesOnStartup: DEFAULT_SETTINGS.checkUpdatesOnStartup,

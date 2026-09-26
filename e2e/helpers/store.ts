@@ -261,7 +261,7 @@ export async function ensureSplitMode(browser: Browser): Promise<void> {
 /**
  * 重置持久化设置到默认值（测试隔离用）。
  *
- * 清理前序 spec 残留的 editorMode / showAgentPanel / sidebarView 等设置，
+ * 清理前序 spec 残留的 editorMode / sidebarView 等设置，
  * 确保当前 spec 从干净状态开始。
  */
 export async function resetPersistenceSettings(browser: Browser): Promise<void> {
@@ -271,7 +271,6 @@ export async function resetPersistenceSettings(browser: Browser): Promise<void> 
     const persistence = pinia._s.get("persistence");
     Promise.resolve(persistence.updateSettings({
       editorMode: "split",
-      showAgentPanel: true,
       sidebarView: "files",
       showLineNumbers: true,
       softWrap: true,

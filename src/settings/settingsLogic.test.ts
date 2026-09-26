@@ -25,7 +25,6 @@ describe("settingsLogic - fieldsForCategory", () => {
   it("general 返回常规分类字段", () => {
     expect(fieldsForCategory("general")).toEqual(GENERAL_FIELDS);
     expect(GENERAL_FIELDS).toContain("showHiddenFiles");
-    expect(GENERAL_FIELDS).toContain("showAgentPanel");
     expect(GENERAL_FIELDS).toContain("defaultImageDir");
     expect(GENERAL_FIELDS).toContain("language");
     // uiMode 已从字段列表中移除（issue #114）
@@ -48,10 +47,6 @@ describe("settingsLogic - fieldsForCategory", () => {
   it("shortcuts 返回快捷键覆盖表字段", () => {
     expect(fieldsForCategory("shortcuts")).toEqual(SHORTCUTS_FIELD);
     expect(SHORTCUTS_FIELD).toEqual(["shortcuts"]);
-  });
-
-  it("ai 返回空数组（provider 走独立持久化）", () => {
-    expect(fieldsForCategory("ai")).toEqual([]);
   });
 });
 
@@ -119,14 +114,6 @@ describe("settingsLogic - isCategoryDirty", () => {
     const snapshot = clone(DEFAULT_SETTINGS);
     draft.fullwidthToMarkdown = false;
     expect(isCategoryDirty(draft, snapshot, "editor")).toBe(true);
-  });
-
-  it("ai 分类永远不 dirty（不参与 draft 模型）", () => {
-    const draft = clone(DEFAULT_SETTINGS);
-    const snapshot = clone(DEFAULT_SETTINGS);
-    draft.showHiddenFiles = true;
-    draft.editorFontSize = 20;
-    expect(isCategoryDirty(draft, snapshot, "ai")).toBe(false);
   });
 
   it("shortcuts 无改动时不 dirty", () => {
@@ -211,7 +198,6 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
     const result = restoreCategoryDefaults(draft, "general");
     expect(result.showHiddenFiles).toBe(DEFAULT_SETTINGS.showHiddenFiles);
     expect(result.defaultImageDir).toBe(DEFAULT_SETTINGS.defaultImageDir);
-    expect(result.showAgentPanel).toBe(DEFAULT_SETTINGS.showAgentPanel);
     // editor 字段保持改动
     expect(result.editorFontSize).toBe(20);
     expect(result.editorMode).toBe("source");
@@ -241,16 +227,6 @@ describe("settingsLogic - restoreCategoryDefaults", () => {
     expect(result.fullwidthToMarkdown).toBe(DEFAULT_SETTINGS.fullwidthToMarkdown);
     // general 字段保持改动
     expect(result.showHiddenFiles).toBe(true);
-  });
-
-  it("恢复 ai 分类：无字段变化（ai 不参与 draft 模型）", () => {
-    const draft: SettingsState = {
-      ...DEFAULT_SETTINGS,
-      showHiddenFiles: true,
-      editorFontSize: 20,
-    };
-    const result = restoreCategoryDefaults(draft, "ai");
-    expect(result).toEqual(draft);
   });
 
   it("恢复 shortcuts 分类：覆盖表清空，其他分类不变", () => {

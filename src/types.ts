@@ -198,8 +198,6 @@ export interface SettingsState {
   lastWorkspacePath: string | null;
   /** 启动时自动打开上次工作区（默认关，issue #96） */
   reopenLastWorkspace: boolean;
-  /** 是否显示 Agent 面板（默认开） */
-  showAgentPanel: boolean;
   /** 编辑器字体大小（px，12-20） */
   editorFontSize: number;
   /** 编辑器行高 */
@@ -210,14 +208,6 @@ export interface SettingsState {
   editorFontPreset: ReadingFontPreset;
   /** 粘贴图片时默认保存的相对目录 */
   defaultImageDir: string;
-  /** Agent 循环轮数上限（默认 15） */
-  aiAgentMaxRounds: number;
-  /** 单次请求 token 上限（默认 16384） */
-  aiSingleRequestTokenLimit: number;
-  /** 累计 token 软上限（默认 51200） */
-  aiCumulativeTokenSoftLimit: number;
-  /** propose_replace 二次确认阈值（默认 50 行） */
-  aiProposeReplaceConfirmThreshold: number;
   /** 启动时静默检查更新（默认开，ADR-0012） */
   checkUpdatesOnStartup: boolean;
   /** 界面语言（默认 zh-CN，ADR-0013） */
@@ -257,16 +247,11 @@ export const DEFAULT_SETTINGS: SettingsState = {
   sidebarCollapsed: false,
   lastWorkspacePath: null,
   reopenLastWorkspace: true,
-  showAgentPanel: true,
   editorFontSize: 14,
   editorLineHeight: 1.6,
   editorFontFamily: "JetBrains Mono",
   editorFontPreset: "d",
   defaultImageDir: "assets/images",
-  aiAgentMaxRounds: 15,
-  aiSingleRequestTokenLimit: 16384,
-  aiCumulativeTokenSoftLimit: 51200,
-  aiProposeReplaceConfirmThreshold: 50,
   checkUpdatesOnStartup: true,
   language: DEFAULT_LOCALE,
   entryOverflowMode: "hover",
@@ -275,140 +260,4 @@ export const DEFAULT_SETTINGS: SettingsState = {
   presentationZoom: PRESENTATION_ZOOM_DEFAULT,
 };
 
-/**
- * AI Provider 配置（与 Rust 端 AiProvider 对齐）
- * 注意：apiKey 明文不在前端持久化，仅通过 get_api_key 命令按需获取
- */
-export interface AiProvider {
-  id: string;
-  name: string;
-  type: "deepseek" | "openai" | "anthropic" | "custom";
-  baseUrl: string;
-  model: string;
-  /** 是否为活动 provider（仅一个可为 true） */
-  isActive: boolean;
-}
-
-/**
- * AI Provider 预设（用于一键填充）
- */
-export interface AiProviderPreset {
-  type: AiProvider["type"];
-  label: string;
-  baseUrl: string;
-  model: string;
-}
-
-/**
- * DeepSeek / OpenAI / Anthropic 默认预设
- */
-export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
-  {
-    type: "deepseek",
-    label: "DeepSeek",
-    baseUrl: "https://api.deepseek.com",
-    model: "deepseek-v4-flash",
-  },
-  {
-    type: "openai",
-    label: "OpenAI",
-    baseUrl: "https://api.openai.com",
-    model: "gpt-4o-mini",
-  },
-  {
-    type: "anthropic",
-    label: "Anthropic",
-    baseUrl: "https://api.anthropic.com",
-    model: "claude-sonnet-4-5-20250929",
-  },
-  {
-    type: "custom",
-    label: "自定义",
-    baseUrl: "",
-    model: "",
-  },
-];
-
-// ===== Agent 对话类型 =====
-
-/**
- * Agent 对话消息
- * 后续 ticket 会扩展 contextSnapshot / toolCalls / toolResult 字段
- */
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  /** 是否被中断（AbortController.abort 触发） */
-  interrupted?: boolean;
-  /** 创建时间戳（ms） */
-  createdAt: number;
-  /** 该 user 消息发送时的文档上下文快照 */
-  contextSnapshot?: ContextSnapshot;
-  /** assistant 消息的工具调用列表 */
-  toolCalls?: ToolCallEntry[];
-}
-
-/** 文档上下文快照（每条 user 消息发送时捕获） */
-export interface ContextSnapshot {
-  docPath: string | null;
-  cursor: { line: number; ch: number } | null;
-  selection: { from: number; to: number; text: string } | null;
-}
-
-/** 工具调用条目（UI 可见） */
-export interface ToolCallEntry {
-  id: string;
-  name: string;
-  /** 调用参数（原始 JSON 字符串） */
-  arguments: string;
-  /** 调用状态 */
-  status: "calling" | "done" | "error";
-  /** 摘要（如「已获取 286 字符」「L15-17」） */
-  summary?: string;
-  /** 工具结果（结构化 {ok, data|error}） */
-  result?: { ok: boolean; data?: unknown; error?: string };
-  /** 摘要参数（展开时显示） */
-  parsedArgs?: unknown;
-}
-
-/**
- * Agent 状态机
- */
-export type AgentStatus = "idle" | "thinking" | "cancelled" | "error";
-
-// ===== 新文件提议（Ticket #24: propose_new_file）=====
-
-/**
- * 新文件提议
- *
- * 与 inline Proposal 不同：
- * - 不绑定编辑器位置（不进入 CM6 StateField）
- * - 在 Agent 面板底部以卡片形式展示
- * - 用户接受后才尝试写文件（冲突时走 T2 dialog）
- */
-export interface NewFileProposal {
-  id: string;
-  /** 相对工作区的目标路径（如 "notes/new.md"） */
-  path: string;
-  /** 文件内容 */
-  content: string;
-  /** 简短描述（agent 提供） */
-  label: string;
-  /** 行数 */
-  lineCount: number;
-  /** 状态 */
-  status: NewFileProposalStatus;
-  /** 写入后的绝对路径（仅 status === "written" 时有值） */
-  writtenPath?: string;
-  /** 错误信息（status === "error" 时有值） */
-  error?: string;
-}
-
-export type NewFileProposalStatus =
-  | "pending" // 等待用户接受/拒绝
-  | "accepted" // 用户已接受（写入中或已写入）
-  | "rejected" // 用户已拒绝
-  | "written" // 已成功写入磁盘
-  | "error"; // 写入失败（如路径无效、冲突未解决）
 

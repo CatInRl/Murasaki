@@ -10,7 +10,7 @@
  * 新增语言只需在此处加一项 LOCALE_DEFS 条目并新增对应 locale 目录，
  * 语言下拉、i18n messages、类型都会自动跟随。
  * 注意：新增语言同时需在 src/locales/{lang} 下提供与 zh-CN 相同的模块结构
- *（common/menu/settings/editor/agent），并由 locales.test.ts 自动校验 key 同步。
+ *（common/menu/settings/editor），并由 locales.test.ts 自动校验 key 同步。
  */
 import type { LocaleMessages } from "vue-i18n";
 import zhCN from "./zh-CN";

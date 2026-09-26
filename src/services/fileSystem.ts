@@ -20,15 +20,6 @@ export interface DraftMeta {
 }
 
 /**
- * Agent 写文件结果
- */
-export interface AgentWriteResult {
-  docPath: string;
-  absolutePath: string;
-  contentLength: number;
-}
-
-/**
  * 文件系统适配器
  *
  * 集中管理所有 Tauri 文件命令调用，消除 invoke 散落。
@@ -119,28 +110,6 @@ export const fileSystem = {
   /** 删除草稿（静默失败） */
   async deleteDraft(path: string): Promise<void> {
     await invoke("delete_draft", { path }).catch(() => {});
-  },
-
-  // ===== Agent 写文件 =====
-
-  /**
-   * Agent 写文件（通过 Rust 端 agent_write_file 命令）
-   *
-   * 候选 2 阶段 1：从 useProposalsStore 迁移至此，消除动态 import。
-   */
-  async writeAgentFile(
-    workspace: string,
-    path: string,
-    content: string
-  ): Promise<AgentWriteResult> {
-    return invoke<AgentWriteResult>("agent_write_file", { workspace, path, content });
-  },
-
-  /** 解析工作区内相对路径为绝对路径（agent 覆盖文件时用） */
-  async resolveAgentPath(workspace: string, path: string): Promise<string | null> {
-    return invoke<string>("agent_resolve_workspace_path", { workspace, path }).catch(
-      () => null
-    );
   },
 
   // ===== PDF 导出 =====

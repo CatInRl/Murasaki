@@ -13,7 +13,7 @@
  * 兼容 macOS 的 Cmd）。
  */
 
-export type ShortcutCategory = "file" | "edit" | "paragraph" | "view" | "agent";
+export type ShortcutCategory = "file" | "edit" | "paragraph" | "view";
 
 /** 命令作用域：global=窗口级 keydown 处理；editor=CodeMirror keymap 处理 */
 export type ShortcutScope = "global" | "editor";
@@ -111,4 +111,4 @@ export function commandById(id: string): ShortcutCommand | undefined {
 }
 
 /** 命令展示分组顺序（设置面板按此排序） */
-export const CATEGORY_ORDER: ShortcutCategory[] = ["file", "edit", "paragraph", "view", "agent"];
+export const CATEGORY_ORDER: ShortcutCategory[] = ["file", "edit", "paragraph", "view"];

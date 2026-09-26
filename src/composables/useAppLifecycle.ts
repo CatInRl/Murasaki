@@ -39,9 +39,6 @@ export interface AppLifecycleDeps {
     /** 方法语法（bivariant）以兼容 store 的 EditorMode 参数 */
     setEditorMode(mode: string): void;
   };
-  proposalsStore: {
-    clearAllForWorkspace(): void;
-  };
   currentTheme: Ref<string>;
   sidebarView: Ref<"files" | "outline">;
   settingsVisible: Ref<boolean>;
@@ -65,7 +62,6 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
     persistence,
     workspace,
     editorBridge,
-    proposalsStore,
     currentTheme,
     sidebarView,
     settingsVisible,
@@ -126,7 +122,7 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
     }
   );
 
-  // 5. 工作区变化时上报窗口注册表 + 保存 + 清空所有提议（gated）
+  // 5. 工作区变化时上报窗口注册表 + 保存（gated）
   watch(
     () => workspace.workspacePath,
     (p) => {
@@ -141,9 +137,6 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
         if (isMainWindow()) {
           void persistence.updateSettings({ lastWorkspacePath: p });
         }
-        // 工作区切换时清空所有提议（包括新文件提议）
-        // 避免上一个工作区的提议残留导致写入到错误的工作区
-        proposalsStore.clearAllForWorkspace();
       }
     }
   );
