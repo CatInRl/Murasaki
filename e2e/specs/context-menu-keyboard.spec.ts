@@ -27,13 +27,24 @@ async function pressMenuKey(b: Browser, key: string): Promise<void> {
   await b.pause(200);
 }
 
-/** 当前高亮项的下标（无则 -1） */
+/**
+ * 当前高亮项在 menu.items 中的下标（无则 -1）。
+ *
+ * 注意：分隔线渲染为独立的 `.murasaki-context-menu-separator`，**不在**
+ * `.murasaki-context-menu-item` 列表里。因此若按该 DOM 列表的顺序取下标，会与
+ * menu.items 下标错位（示例菜单 [第一项, 分隔线, 禁用项, 第三项] 的 DOM 列表只有
+ * 3 项，第三项的顺序下标是 2 而非 3）。这里改读元素 id
+ * （`murasaki-context-menu-item-<menu.items 下标>`）以拿到真实下标，
+ * 与用例注释中「idx=1 分隔线 / idx=2 禁用项 / idx=3 第三项」的语义一致。
+ */
 async function activeIndex(b: Browser): Promise<number> {
   return b.execute(() => {
-    const items = Array.from(
-      document.querySelectorAll(".murasaki-context-menu-item")
-    );
-    return items.findIndex((el) => el.classList.contains("is-active"));
+    const el = document.querySelector(
+      ".murasaki-context-menu-item.is-active"
+    ) as HTMLElement | null;
+    if (!el) return -1;
+    const m = el.id.match(/^murasaki-context-menu-item-(\d+)$/);
+    return m ? Number(m[1]) : -1;
   });
 }
 

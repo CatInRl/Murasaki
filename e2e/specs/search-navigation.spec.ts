@@ -201,7 +201,13 @@ describe("跨文件搜索结果跳转", () => {
 
     // 结果区应出现含 file-b.md 的条目（文件名分组）
     const items = await browser.$$(".gsb__item");
-    const texts = await Promise.all(items.map((i) => i.getText()));
-    expect(texts.some((t) => t.includes("file-b.md"))).toBe(true);
+    // webdriverio v9 的 `$$` 返回值把原生 Array.map 覆盖成了异步版（返回 Promise 而非可迭代数组），
+    // 所以 `Promise.all(items.map(...))` 会因「参数不可迭代」报错；直接 await 这个异步 map 即可拿到文本数组
+    const texts = await items.map((i) => i.getText());
+    // 条目渲染为「图标字形 + 文件名分段」多行文本（实测形如 "M\nfile-b\n.md"），
+    // 直接 includes("file-b.md") 会被换行卡住，故先去掉所有空白再比对
+    expect(
+      texts.some((t) => t.replace(/\s/g, "").includes("file-b.md"))
+    ).toBe(true);
   });
 });

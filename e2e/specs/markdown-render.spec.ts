@@ -711,13 +711,17 @@ describe("10. 链接", () => {
 describe("11. 图片渲染", () => {
   it("11.1 相对路径图片渲染为 <img>", async () => {
     await openAndWait(browser, "render/image.md");
-    const imgCount = await previewQuery(browser, "img[src='assets/logo.png']");
+    // ADR-0015：渲染时 resolveImageSrc() 会把相对路径改写为 asset 协议 URL
+    // （asset://localhost/<绝对路径>，Windows 为 https://asset.localhost/...），
+    // 因此不能再按原始相对路径 assets/logo.png 匹配，改按改写后 URL 的结尾定位
+    const imgCount = await previewQuery(browser, "img[src$='logo.png']");
     expect(imgCount).toBe(1);
   });
 
   it("11.2 带标题图片含 title 属性", async () => {
     await openAndWait(browser, "render/image.md");
-    const title = await previewAttr(browser, "img[src='assets/screenshot.png']", "title");
+    // src 同样被改写为 asset 协议 URL，按改写后 URL 结尾定位（title 属性不受 src 改写影响）
+    const title = await previewAttr(browser, "img[src$='screenshot.png']", "title");
     expect(title).toBe("Murasaki 截图");
   });
 

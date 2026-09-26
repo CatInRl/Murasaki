@@ -492,8 +492,10 @@ describe("AI Provider UI 配置", () => {
     const hasSuccess = await successAlert.isExisting();
     
     // 验证 provider 出现在左侧列表中
+    // 注意：webdriverio 的 $$ 返回的 ElementArray 把原生 map 覆盖为 async 实现
+    // （返回 Promise），因此这里直接 await map 的结果，不能再包 Promise.all
     const listItems = await browser.$$(".ai-list-item");
-    const listTexts = await Promise.all(listItems.map((el) => el.getText()));
+    const listTexts = await listItems.map((el) => el.getText());
     const hasProvider = listTexts.some((t) => t.includes("E2E UI Test"));
     
     expect(hasSuccess || hasProvider).toBe(true);

@@ -16,6 +16,7 @@ import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import {
   waitForPinia,
+  waitForPiniaInCurrentWindow,
   closeAllTabs,
   dismissAllDialogs,
   resetPersistenceSettings,
@@ -144,7 +145,9 @@ describe("多窗口多工作区", () => {
     const newHandle = handles.find((h) => !before.includes(h));
     expect(newHandle).toBeDefined();
     await browser.switchToWindow(newHandle!);
-    await waitForPinia(browser, 30000);
+    // 必须用「不切句柄」的等待：waitForPinia 会遍历句柄并停回主窗口，
+    // 导致下面的 label / session 断言读的是主窗口（见 helpers/store.ts）
+    await waitForPiniaInCurrentWindow(browser, 30000);
 
     // 新窗口是独立前端会话：不恢复上次标签（外部入口不恢复会话）
     const session = await currentSession();
@@ -165,7 +168,7 @@ describe("多窗口多工作区", () => {
     const afterFirst = await browser.getWindowHandles();
     const wsWindow = afterFirst.find((h) => h !== mainHandle)!;
     await browser.switchToWindow(wsWindow);
-    await waitForPinia(browser, 30000);
+    await waitForPiniaInCurrentWindow(browser, 30000);
 
     // 第二次打开同一目录（从该窗口发起）
     const label2 = await openInNewWindow(wsPath);
@@ -189,7 +192,7 @@ describe("多窗口多工作区", () => {
       (h) => h !== mainHandle
     )!;
     await browser.switchToWindow(wsWindow);
-    await waitForPinia(browser, 30000);
+    await waitForPiniaInCurrentWindow(browser, 30000);
 
     await browser.execute(() => {
       try {

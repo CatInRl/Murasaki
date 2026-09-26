@@ -17,6 +17,7 @@
  * - 模式：.editor-pane.mode-{source|split|wysiwyg}
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { AGENT_ENABLED } from "../../src/features";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
@@ -410,7 +411,8 @@ describe("WYSIWYG 块级 widget + Agent 面板三模式 + Bold 立即渲染", ()
 
   // ============ M16: Agent 面板三模式可见性 ============
 
-  it("Agent 面板在 source 模式下可见", async () => {
+  // AGENT_ENABLED=false 时 Agent 面板不挂载，故这三条用例随开关跳过
+  it.skipIf(!AGENT_ENABLED)("Agent 面板在 source 模式下可见", async () => {
     const wsPath = resetWorkspace([
       { path: "agent.md", content: "# 测试\n" },
     ]);
@@ -439,7 +441,7 @@ describe("WYSIWYG 块级 widget + Agent 面板三模式 + Bold 立即渲染", ()
     expect(await agentPanel.isExisting()).toBe(true);
   });
 
-  it("Agent 面板在 split 模式下可见", async () => {
+  it.skipIf(!AGENT_ENABLED)("Agent 面板在 split 模式下可见", async () => {
     const wsPath = resetWorkspace([
       { path: "agent.md", content: "# 测试\n" },
     ]);
@@ -452,7 +454,7 @@ describe("WYSIWYG 块级 widget + Agent 面板三模式 + Bold 立即渲染", ()
     expect(await agentPanel.isExisting()).toBe(true);
   });
 
-  it("Agent 面板在 wysiwyg 模式下可见", async () => {
+  it.skipIf(!AGENT_ENABLED)("Agent 面板在 wysiwyg 模式下可见", async () => {
     const wsPath = resetWorkspace([
       { path: "agent.md", content: "# 测试\n" },
     ]);

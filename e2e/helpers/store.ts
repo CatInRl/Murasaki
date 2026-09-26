@@ -65,6 +65,35 @@ export async function waitForPinia(
   );
 }
 
+/**
+ * 只在**当前窗口句柄**内等待 __pinia__，绝不切换句柄。
+ *
+ * `waitForPinia()` 为了容错会遍历所有句柄并停在第一个暴露 __pinia__ 的窗口 ——
+ * 在单窗口场景下没问题，但多窗口场景会把当前句柄**切回主窗口**，导致后续断言读到
+ * 主窗口的状态（multi-window.spec 曾因此误判为「新窗口没建出来」）。
+ * 切窗之后请用本函数。
+ */
+export async function waitForPiniaInCurrentWindow(
+  browser: Browser,
+  timeout = 30000
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const ready = await browser
+      .execute(() => {
+        // @ts-ignore
+        return !!(window as any).__pinia__;
+      })
+      .catch(() => false);
+    if (ready) return;
+    await browser.pause(500);
+  }
+  const title = await browser.getTitle().catch(() => "<unknown>");
+  throw new Error(
+    `waitForPiniaInCurrentWindow 超时 (${timeout}ms)：当前句柄未暴露 __pinia__。title="${title}"。`
+  );
+}
+
 /** 获取 store 实例（在浏览器上下文中执行） */
 export async function getStore<T = any>(
   browser: Browser,
@@ -290,10 +319,11 @@ export async function dismissAllDialogs(browser: Browser): Promise<void> {
       }
       dialog.queue.length = 0;
     }
-    // 清理 toast
+    // 清理 toast（store 暴露的是 toasts 且有 dismissAll；旧写法 `toast.items` 是死代码，
+    // 残留的吐司连同其定时器会污染后续用例）
     const toast = pinia._s.get("toast");
-    if (toast && toast.items) {
-      toast.items.length = 0;
+    if (toast && typeof toast.dismissAll === "function") {
+      toast.dismissAll();
     }
   });
   await browser.pause(150);

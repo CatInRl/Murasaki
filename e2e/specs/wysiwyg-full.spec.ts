@@ -454,7 +454,7 @@ describe("WYSIWYG 模式全量测试", () => {
       expect(await codeblock.isExisting()).toBe(true);
     });
 
-    it("3.6 表格内的链接（表格整体替换，链接由 markdown-it 渲染）", async () => {
+    it("3.6 表格内的链接（表格整体替换为 widget，单元格纯文本）", async () => {
       await setContentAndWait(
         browser,
         "| 链接 |\n|------|\n| [GitHub](https://github.com) |\n\n正文"
@@ -462,9 +462,19 @@ describe("WYSIWYG 模式全量测试", () => {
       await setCursorToEnd(browser);
       const table = await waitForSelector(browser, ".murasaki-wysiwyg-table");
       expect(await table.isExisting()).toBe(true);
-      // 表格内的链接应由 markdown-it 渲染为 <a>
-      const innerLink = await browser.$(".murasaki-wysiwyg-table a");
-      expect(await innerLink.isExisting()).toBe(true);
+      // 表格在 WYSIWYG 下被整体替换为 contentEditable 表格 widget，单元格承载
+      // parseTable 读出的 markdown 原文纯文本（见 tableEditor.ts），不交给 markdown-it。
+      // 这里断言「单元格里是链接的 markdown 源码」—— 具体且能捕获回归；
+      // 不断言「表内没有 <a>」，避免把当前的局限固化成期望（将来若在单元格内渲染链接，
+      // 那条断言会反过来惩罚正确的改动）。
+      const cellText = await browser.execute(
+        () =>
+          (document.querySelector(".murasaki-wysiwyg-table")?.textContent ?? "").replace(
+            /\s/g,
+            ""
+          )
+      );
+      expect(cellText).toContain("[GitHub](https://github.com)");
     });
   });
 

@@ -11,6 +11,7 @@
  * 通过 settingsLogic 纯函数 + 设置页 UI 元素 + dialog store 验证。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { AGENT_ENABLED } from "../../src/features";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
@@ -110,7 +111,12 @@ describe("设置显式 Save 模型", () => {
     for (const btn of navButtons) {
       texts.push((await btn.getText()).trim());
     }
-    expect(texts).toEqual(expect.arrayContaining(["常规", "编辑器", "AI"]));
+    // AGENT_ENABLED=true 时分类为 常规/编辑器/AI；关闭时「AI」分类不渲染，为 常规/编辑器/快捷键
+    expect(texts).toEqual(
+      expect.arrayContaining(
+        AGENT_ENABLED ? ["常规", "编辑器", "AI"] : ["常规", "编辑器", "快捷键"]
+      )
+    );
 
     await navigateToEditor(browser);
   });

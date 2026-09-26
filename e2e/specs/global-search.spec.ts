@@ -153,8 +153,14 @@ describe("统一搜索条主链路", () => {
 
     // 结果区出现文件名命中条目
     const items = await browser.$$(".gsb__item");
-    const texts = await Promise.all(items.map((i) => i.getText()));
-    expect(texts.some((t) => t.includes("notes.md"))).toBe(true);
+    // webdriverio v9 的 `$$` 返回值把原生 Array.map 覆盖成了异步版（返回 Promise 而非可迭代数组），
+    // 所以 `Promise.all(items.map(...))` 会因「参数不可迭代」报错；直接 await 这个异步 map 即可拿到文本数组
+    const texts = await items.map((i) => i.getText());
+    // 条目渲染为「图标字形 + 文件名分段」多行文本（实测形如 "M\nnotes\n.md"），
+    // 直接 includes("notes.md") 会被换行卡住，故先去掉所有空白再比对
+    expect(
+      texts.some((t) => t.replace(/\s/g, "").includes("notes.md"))
+    ).toBe(true);
 
     // 回车打开首项
     await pressOnInput(browser, "Enter");

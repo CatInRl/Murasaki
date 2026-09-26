@@ -15,6 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { waitForPinia, dismissAllDialogs } from "../helpers/store";
+import { waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -94,7 +95,8 @@ describe("右键菜单", () => {
     });
 
     const item = await browser.$(".murasaki-context-menu-item");
-    await item.waitForDisplayed({ timeout: 5000 });
+    // 改用 waitForRendered：waitForDisplayed 与菜单/项入场动画（opacity 0 → 1）阶段交互不稳定
+    await waitForRendered(browser, ".murasaki-context-menu-item", 5000);
     await item.click();
 
     // 菜单应关闭
@@ -220,9 +222,24 @@ describe("右键菜单", () => {
       );
     });
 
-    const shortcut = await browser.$(".murasaki-context-menu-shortcut");
-    await shortcut.waitForExist({ timeout: 5000 });
-    expect((await shortcut.getText()).trim()).toBe("F2");
+    // tauri-driver 下 getText() 对该 span 不可靠（实测可能返回空串；textContent 正常），
+    // 故改用 execute 读 textContent，并轮询到目标文案渲染出来
+    await browser.waitUntil(
+      async () =>
+        await browser.execute(() =>
+          Array.from(
+            document.querySelectorAll(".murasaki-context-menu-shortcut")
+          ).some((e) => (e.textContent ?? "").trim() === "F2")
+        ),
+      { timeout: 5000 }
+    );
+    expect(
+      await browser.execute(() =>
+        Array.from(
+          document.querySelectorAll(".murasaki-context-menu-shortcut")
+        ).map((e) => (e.textContent ?? "").trim())
+      )
+    ).toContain("F2");
   });
 });
 
@@ -292,8 +309,7 @@ describe("Agent 消息右键菜单（H14）", () => {
       );
     });
 
-    const menuEl = await browser2.$(".murasaki-context-menu");
-    await menuEl.waitForDisplayed({ timeout: 5000 });
+    await waitForRendered(browser2, ".murasaki-context-menu", 5000);
 
     const items = await browser2.$$(".murasaki-context-menu-item");
     expect(items.length).toBe(4);
@@ -360,7 +376,7 @@ describe("Agent 消息右键菜单（H14）", () => {
     });
 
     const firstItem = await browser2.$(".murasaki-context-menu-item");
-    await firstItem.waitForDisplayed({ timeout: 5000 });
+    await waitForRendered(browser2, ".murasaki-context-menu-item", 5000);
     await firstItem.click();
 
     // 菜单应关闭
