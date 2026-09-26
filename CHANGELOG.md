@@ -6,6 +6,7 @@
 
 ### Fixed
 
+- 修复导出 HTML 时本地图片不再内联为 Base64（#258）：渲染期图片 src 已被改写成 Tauri asset 协议 URL，而导出侧只认文件路径形态于是静默跳过，导致导出的 HTML 换台机器打开时本地图片全部丢失。现把 asset URL 回解为本地路径后再内联，并让导出渲染临时指向本次导出的文件（避免相对图片按别的目录解析、被内联成错误图片）；顺带修正 Windows 盘符绝对路径此前被误当相对路径处理的问题。
 - 修复 tauri-driver E2E 无法建立 WebDriver session（#255）：WebView2 Runtime 150 起，msedgedriver 改用环境变量 `WEBVIEW2_USER_DATA_FOLDER` 传 user data folder，应用侧漏读该变量，导致 `DevToolsActivePort` 写到 msedgedriver 不轮询的目录、会话建立失败。顺带修掉「用户环境变量恰好含 `--remote-debugging-port=` 时被误判为 E2E，进而禁用单实例锁」的边界情形；E2E 分支之外无行为变化。
 
 ### Changed

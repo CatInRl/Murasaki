@@ -86,11 +86,17 @@ export function resolveImageSrc(src: string, currentFilePath: string | null): st
 }
 
 /**
+ * Tauri asset 协议 URL 的前缀（`convertFileSrc` 的产物）：
+ * Windows 为 `http(s)://asset.localhost/`，其它平台为 `asset://localhost/`。
+ * 无 `g` 标志，`.test()` 与 `.replace()` 可安全复用。
+ */
+const ASSET_URL_PREFIX = /^(?:asset:\/\/localhost\/|https?:\/\/asset\.localhost\/)/i;
+
+/**
  * 判断 src 是否为 Tauri asset 协议 URL（即 `resolveImageSrc` 转换后的产物）。
- * Windows 为 `http(s)://asset.localhost/...`，其它平台为 `asset://localhost/...`。
  */
 export function isAssetUrl(src: string): boolean {
-  return /^(?:asset:\/\/localhost\/|https?:\/\/asset\.localhost\/)/i.test(src);
+  return ASSET_URL_PREFIX.test(src);
 }
 
 /**
@@ -99,17 +105,14 @@ export function isAssetUrl(src: string): boolean {
  * 渲染给 WebView 用时图片 src 会被改写成 asset 协议 URL；而导出 HTML 需要按文件
  * 路径读字节内联为 Base64，故必须先回解（issue #258）。非 asset URL 原样返回。
  *
- * 注意：`resolveImageSrc` 会对路径做 URL 编码（反斜杠 → `%5C`、空格 → `%20`），
- * 因此这里要 decode 一次还原；解码失败（含非法百分号转义）时保留原文，交由后续
- * 「读取失败则跳过」兜底。
+ * 注意：`convertFileSrc` 会对整个路径做 URL 编码（`C:\a b.png` → `C%3A%5Ca%20b.png`，
+ * 也见 `resolveImageSrc` 对 markdown-it `%5C` 的还原），因此这里 decode 一次还原；
+ * 解码失败（含非法百分号转义）时保留原文，交由后续「读取失败则跳过」兜底。
  */
 export function assetUrlToPath(src: string): string {
   if (!isAssetUrl(src)) return src;
 
-  const stripped = src.replace(
-    /^(?:asset:\/\/localhost\/|https?:\/\/asset\.localhost\/)/i,
-    ""
-  );
+  const stripped = src.replace(ASSET_URL_PREFIX, "");
 
   let decoded = stripped;
   try {

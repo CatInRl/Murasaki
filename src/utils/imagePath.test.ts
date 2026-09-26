@@ -196,6 +196,23 @@ describe("utils/imagePath", () => {
       ).toBe("C:/my docs/a.png");
     });
 
+    it("还原真实 convertFileSrc 的整串编码形态（Windows）", () => {
+      // 生产环境 Windows 上 convertFileSrc 得到的是
+      // http(s)://asset.localhost/<encodeURIComponent(绝对路径)>，即冒号与斜杠都被编码
+      expect(
+        assetUrlToPath("http://asset.localhost/C%3A%2Fimages%2Fimg.png")
+      ).toBe("C:/images/img.png");
+      expect(
+        assetUrlToPath("https://asset.localhost/D%3A%5Cphotos%5Cmy%20pic.jpg")
+      ).toBe("D:/photos/my pic.jpg");
+    });
+
+    it("还原真实 convertFileSrc 的整串编码形态（Unix）", () => {
+      expect(
+        assetUrlToPath("asset://localhost/%2Fhome%2Fuser%2Fimg.png")
+      ).toBe("/home/user/img.png");
+    });
+
     it("非 asset URL 与无效百分号序列原样（不抛错）", () => {
       expect(assetUrlToPath("assets/img.png")).toBe("assets/img.png");
       expect(assetUrlToPath("https://example.com/img.png")).toBe(
