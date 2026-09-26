@@ -1,8 +1,15 @@
-import { getMarkdownRenderer, getFrontMatter, resolveShikiThemeOption } from "./useMarkdownRenderer";
+import {
+  getMarkdownRenderer,
+  getFrontMatter,
+  getCurrentFilePath,
+  setCurrentFilePath,
+  resolveShikiThemeOption,
+} from "./useMarkdownRenderer";
 import { renderFrontMatterCard } from "./useFrontMatter";
 import { MARKDOWN_THEMES } from "./useTheme";
 import { codeToHtml, type ThemeRegistration } from "shiki";
 import { dirname, extname, joinPaths } from "../utils/path";
+import { assetUrlToPath, isAbsolutePath } from "../utils/imagePath";
 import { fileSystem } from "../services/fileSystem";
 import markdownContentCss from "../styles/markdown-content.css?raw";
 
@@ -128,14 +135,18 @@ async function inlineImages(
   let match: RegExpExecArray | null;
 
   while ((match = imgRegex.exec(html)) !== null) {
-    const src = match[1];
-    // 跳过远程和已是 data URI 的图片
+    const rawSrc = match[1];
+
+    // 渲染给 WebView 用时本地图片 src 已被改写成 asset 协议 URL，先回解为文件路径（issue #258）
+    const src = assetUrlToPath(rawSrc);
+
+    // 跳过远程 URL 与已是 data URI 的图片（本地 asset URL 已在上面还原为路径）
     if (/^(https?:|data:|file:)/i.test(src)) continue;
 
     // 解析为绝对路径
     let absPath: string | null = null;
-    if (src.startsWith("/")) {
-      // 绝对路径
+    if (isAbsolutePath(src)) {
+      // 绝对路径（含 Windows 盘符）
       absPath = src;
     } else if (filePath) {
       // 相对当前 md 文件
@@ -168,7 +179,9 @@ async function inlineImages(
       const dataUri = `data:${mime};base64,${base64}`;
       replacements.push({
         original: match[0],
-        replacement: match[0].replace(src, dataUri),
+        // 用 HTML 里实际出现的 `src="rawSrc"` 整段替换（src 已回解为文件路径，不再出现在
+        // HTML 中）；带上 `src="` 前缀可避免 rawSrc 恰好是标签内其它属性的子串时误替换
+        replacement: match[0].replace(`src="${rawSrc}"`, `src="${dataUri}"`),
       });
     } catch (err) {
       console.warn(`内联图片失败: ${src}`, err);
@@ -229,7 +242,19 @@ export async function exportHtml(options: ExportHtmlOptions): Promise<string> {
   renderer.setShikiTheme(resolveShikiTheme(theme));
 
   // 1. 渲染 markdown 为 HTML
-  const bodyHtml = renderer.render(source);
+  //
+  // 图片 src 改写依赖渲染器的模块级 currentFilePath（由 PreviewPane / SourceEditor
+  // 在切文件时设置）。导出时必须临时指向「本次导出的文件」，否则相对图片会按别的
+  // 目录解析 —— 一旦 base 目录不对，回解出的绝对路径会指向错误文件，被静默内联成
+  // 错误图片（issue #258）。render 是同步的，set/restore 之间不会与预览交错。
+  const previousFilePath = getCurrentFilePath();
+  let bodyHtml: string;
+  try {
+    setCurrentFilePath(filePath);
+    bodyHtml = renderer.render(source);
+  } finally {
+    setCurrentFilePath(previousFilePath);
+  }
 
   // 2. 高亮代码块
   const shikiTheme = resolveShikiThemeOption(resolveShikiTheme(theme));
