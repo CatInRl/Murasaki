@@ -59,7 +59,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
   // ============ M18: 设置分类导航 ============
 
-  it("settingsLogic.fieldsForCategory('general') 返回 5 个字段", async () => {
+  it("settingsLogic.fieldsForCategory('general') 返回 6 个字段", async () => {
     const result = await browser.execute((category: string) => {
       const logic = (window as any).__settingsLogic__;
       if (!logic) return { error: "window.__settingsLogic__ not exposed" };
@@ -71,6 +71,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
       "showHiddenFiles",
       "reopenLastWorkspace",
       "defaultImageDir",
+      "imageInsertMode",
       "checkUpdatesOnStartup",
       "language",
     ]);

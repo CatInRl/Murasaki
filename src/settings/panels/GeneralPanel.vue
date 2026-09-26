@@ -2,11 +2,11 @@
 /**
  * GeneralPanel — 常规设置面板
  *
- * 设置项：UI 模式、界面语言、显示隐藏文件、默认图片目录
+ * 设置项：UI 模式、界面语言、显示隐藏文件、默认图片目录、图片插入方式
  * Design ref: settings-general.html
  */
 import { computed } from "vue";
-import type { SettingsState } from "../../types";
+import type { SettingsState, ImageInsertMode } from "../../types";
 import { LOCALE_DEFS } from "../../locales/registry";
 import type { AppLocale } from "../../locales/registry";
 
@@ -94,6 +94,27 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
             :placeholder="$t('settings.general.defaultImageDirPlaceholder')"
             @input="patch('defaultImageDir', ($event.target as HTMLInputElement).value)"
           />
+        </div>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-label-column">
+          <span class="setting-label">{{ $t('settings.general.imageInsertMode') }}</span>
+          <span class="setting-description">{{ $t('settings.general.imageInsertModeDesc') }}</span>
+        </div>
+        <div class="setting-control-column">
+          <div class="select-wrapper">
+            <select
+              :value="draft.imageInsertMode"
+              @change="patch('imageInsertMode', ($event.target as HTMLSelectElement).value as ImageInsertMode)"
+            >
+              <option value="file">{{ $t('settings.general.imageInsertModeFile') }}</option>
+              <option value="base64">{{ $t('settings.general.imageInsertModeBase64') }}</option>
+            </select>
+            <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
         </div>
       </div>
 

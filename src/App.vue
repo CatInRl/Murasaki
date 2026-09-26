@@ -30,7 +30,6 @@ import { useDialogStore } from "./stores/useDialogStore";
 import { useToastStore } from "./stores/useToastStore";
 import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
-import { isImageExt } from "./composables/useImagePaste";
 import { useRecentMenuSync } from "./composables/useRecentMenuSync";
 import { useFileActions } from "./composables/useFileActions";
 import { useCopyRichText } from "./composables/useCopyRichText";
@@ -54,7 +53,7 @@ import {
   restoreCategoryDefaults,
 } from "./settings/settingsLogic";
 import { basename } from "./utils/path";
-import { isMarkdownFile, isSourceOnlyFile } from "./utils/fileKind";
+import { isMarkdownFile, isSourceOnlyFile, isImageFile } from "./utils/fileKind";
 import { DEFAULT_THEME } from "./composables/useTheme";
 import { useNaiveTheme } from "./composables/useNaiveTheme";
 import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
@@ -559,6 +558,9 @@ const imagePaste = useImagePaste({
   getEditorView: () => editorRef.value?.getView() ?? null,
   getWorkspacePath: () => workspace.workspacePath,
   getCurrentFilePath: () => activeTab.value?.path ?? null,
+  // issue #151：插入方式与落盘目录由设置决定（Alt 临时切换、无工作区自动内嵌在 composable 内处理）
+  getInsertMode: () => persistence.settings.imageInsertMode,
+  getImageDir: () => persistence.settings.defaultImageDir,
 });
 
 // ===== 编辑器导航/插入 composable =====
@@ -611,8 +613,8 @@ function onOpenPath(path: string, type: "file" | "folder"): Promise<void> {
   if (type === "folder") {
     return workspace.openWorkspace(path);
   }
-  const ext = path.split(".").pop() ?? "";
-  if (isImageExt(ext)) {
+  // 图片 → 按当前插入方式落到工作区或内嵌；其它 → 打开为 tab
+  if (isImageFile(path)) {
     imagePaste.insertExistingImage(path);
     return Promise.resolve();
   }
