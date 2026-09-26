@@ -8,6 +8,11 @@
  * - `browser.waitUntil` 本身**正常重试**（实测 5s / interval 300ms → 轮询 17 次），
  *   但它的条件函数要读应用状态就得用 `browser.execute`，而这里需要按选择器判定，
  *   于是统一改成手写轮询（`browser.execute` + `browser.pause`），不依赖两者行为。
+ * - **带动画的浮层（右键菜单等）用 `waitForPresent`，不要用 `waitForRendered`**：后者把
+ *   `opacity: "0"` 判为「未渲染」，而淡入浮层（`opacity 0 → 1`）在过渡进行中就是这个值；
+ *   CI runner 上窗口未重绘时 CSS 过渡甚至可能完全不推进，于是每次都判 false、直到超时
+ *   （#273 实测偶发：同一个菜单，用 `waitForPresent` 的 spec 稳定通过，用 `waitForRendered`
+ *   的间歇性失败）。浮层类断言「存在」+ 读元素内容即可，别判几何/透明度。
  * - `isDisplayed()` / `waitForDisplayed()` 会误判：实测 toast 元素 `display:flex`、
  *   `visibility:visible`、`getBoundingClientRect()` 为 138x42、且 store 中确实存在时，
  *   `isDisplayed()` 仍返回 `false`；`waitForDisplayed()` 在元素/菜单入场动画

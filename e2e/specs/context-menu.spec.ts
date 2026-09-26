@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { waitForPinia, dismissAllDialogs } from "../helpers/store";
-import { waitForRendered, waitForPresent, waitForAbsent } from "../helpers/wait";
+import { waitForPresent, waitForAbsent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -94,8 +94,8 @@ describe("右键菜单", () => {
     });
 
     const item = await browser.$(".murasaki-context-menu-item");
-    // 改用 waitForRendered：waitForDisplayed 与菜单/项入场动画（opacity 0 → 1）阶段交互不稳定
-    await waitForRendered(browser, ".murasaki-context-menu-item", 5000);
+    // 菜单项在淡入浮层内：等存在即可，别用 waitForRendered（#273）
+    await waitForPresent(browser, ".murasaki-context-menu-item", 10000);
     await item.click();
 
     // 菜单应关闭
