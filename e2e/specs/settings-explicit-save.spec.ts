@@ -172,19 +172,21 @@ describe("设置显式 Save 模型", () => {
 
     // 验证对话框包含三按钮
     const buttons = await browser.$$(".dialog-overlay button");
-    const buttonTexts: string[] = [];
-    for (const btn of buttons) {
-      buttonTexts.push((await btn.getText()).trim());
-    }
+    // tauri-driver 下 getText() 对按钮这类小文本节点会返回空串（CI 实测拿到 ['','','' ]），
+    // 故改读 textContent；元素句柄仍用于后面的点击
+    const buttonTexts: string[] = await browser.execute(() =>
+      Array.from(document.querySelectorAll(".dialog-overlay button")).map((b) =>
+        (b.textContent ?? "").trim()
+      )
+    );
     // 应包含 "取消" / "不保存" / "保存"（按顺序或乱序）
     expect(buttonTexts).toEqual(expect.arrayContaining(["取消", "不保存", "保存"]));
 
     // 点击 "不保存"
     let clicked = false;
-    for (const btn of buttons) {
-      const text = (await btn.getText()).trim();
-      if (text === "不保存") {
-        await btn.click();
+    for (let i = 0; i < buttons.length; i++) {
+      if (buttonTexts[i] === "不保存") {
+        await buttons[i].click();
         clicked = true;
         break;
       }
