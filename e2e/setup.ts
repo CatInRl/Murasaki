@@ -6,7 +6,8 @@
  */
 import { spawn, execSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createConnection } from "node:net";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const DRIVER_PORT = 4444;
 // tauri-driver 默认把 msedgedriver 监听在这个端口（cli.rs --native-port 默认 4445）。
@@ -120,16 +121,65 @@ async function isPortListening(port: number, host = "127.0.0.1"): Promise<boolea
   });
 }
 
+/**
+ * 固定界面语言为 zh-CN。
+ *
+ * e2e 断言全部基于中文文案（`打开文件夹` / `加粗` / `已保存` …），而应用首次启动会按
+ * 系统语言自动探测并持久化（App.vue 的 languageEmpty 分支，issue #141）—— CI runner
+ * 是 en-US，于是**整套** e2e 会因界面对不上而失败。应用只在 settings.json 的
+ * `language` 从未写入时才探测，所以启动前预置该字段即可（合并写入，不覆盖开发机上
+ * 的其它设置）。
+ */
+function ensureChineseLocale(): void {
+  const appData = process.env.APPDATA;
+  if (!appData) return;
+
+  const dir = join(appData, "com.murasaki.app");
+  const file = join(dir, "settings.json");
+
+  let state: Record<string, unknown> = {};
+  try {
+    if (existsSync(file)) {
+      const parsed = JSON.parse(readFileSync(file, "utf-8")) as {
+        state?: Record<string, unknown>;
+      };
+      if (parsed?.state && typeof parsed.state === "object") {
+        state = parsed.state;
+      }
+    }
+  } catch {
+    // 读到损坏内容就当空设置处理
+    state = {};
+  }
+
+  if (state.language === "zh-CN") return;
+
+  state.language = "zh-CN";
+  try {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(file, JSON.stringify({ state }, null, 2), "utf-8");
+    console.log("[e2e] 已固定界面语言为 zh-CN（settings.json）");
+  } catch (err) {
+    // 写不进去时不致命：界面会退回英文，断言失败信息本身就能说明原因
+    console.warn(
+      `[e2e] 固定界面语言失败（settings.json 不可写）：${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
 export default async function setup(): Promise<void | (() => Promise<void>)> {
   // 0. 清理残留进程（避免上一次测试残留的 murasaki 持有文件句柄）
   killStaleProcesses();
 
-  // 1. AppData 清理已移至 closeSession（每 spec 间清理）和运行前 PowerShell 外部清理。
+  // 1. 固定界面语言：必须在任何 app 启动之前完成
+  ensureChineseLocale();
+
+  // 2. AppData 清理已移至 closeSession（每 spec 间清理）和运行前 PowerShell 外部清理。
   //    TRAE Sandbox 会直接 kill 尝试删除 AppData 的 Node.js 进程，try/catch 无法兜底。
   //    所以 setup.ts 不再做 AppData 清理，由 driver.ts 的 closeSession 通过
   //    PowerShell 子进程清理（sandbox 允许 PowerShell 操作 AppData）。
 
-  // 2. 启动 tauri-driver，显式传入 --native-driver 路径
+  // 3. 启动 tauri-driver，显式传入 --native-driver 路径
   //    用 detached + shell 方式启动，避免 vitest fork 环境影响 tauri-driver 的 hyper 服务器
   //    （vitest 环境下 spawn 启动的 tauri-driver 处理 HTTP 请求时会出现 IncompleteMessage）
   //
