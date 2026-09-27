@@ -5,7 +5,7 @@ import EditorToolbar from "./EditorToolbar.vue";
 import PreviewPane from "./PreviewPane.vue";
 import HtmlPreview from "./HtmlPreview.vue";
 import { useScrollSync } from "../composables/useScrollSync";
-import { isHtmlFile, isImageFile } from "../utils/fileKind";
+import { isHtmlFile } from "../utils/fileKind";
 import type { EditorMode } from "../types";
 
 interface Props {
@@ -233,7 +233,9 @@ function onTaskToggle(payload: { li: HTMLElement; checked: boolean }) {
 
 // ============ 文件树拖入图片处理 ============
 // spec：从工作区文件树拖入已有图片 → 计算相对当前 .md 文件的路径 → 插入 ![](<relative-path>)
-// 与粘贴/外部拖入不同：不复制，直接以相对路径引用
+// 与粘贴/外部拖入不同：不复制，直接以相对路径引用。
+// 外部拖入（系统文件）由 Tauri 原生拖放驱动（#288），不经过这里的 HTML5 dragover/drop ——
+// 下方 onEditorDragOver / onEditorDrop 只处理**文件树内部拖拽**（FILE_TREE_DRAG_MIME）。
 const FILE_TREE_DRAG_MIME = "application/x-murasaki-file-path";
 
 /** 编辑区拖拽悬停态（落点反馈，issue #151） */
@@ -241,15 +243,10 @@ const dropActive = ref(false);
 
 function onEditorDragOver(e: DragEvent): void {
   if (!e.dataTransfer) return;
-  const types = e.dataTransfer.types;
-  const isTreeDrag = types.includes(FILE_TREE_DRAG_MIME);
-  // 外部文件拖入：dragover 不 preventDefault 就可能收不到 drop（WebView2/Chromium 行为），
-  // 因此图片文件也要放行；dragover 阶段拿不到 files 时先放行，交给 drop 端按扩展名再校验
-  // （否则会在驱动不填 files 时静默收不到 drop，issue #151）
-  const files = e.dataTransfer.files;
-  const looksLikeImage = files.length === 0 || isImageFile(files[0].name);
-  const isExternalImage = types.includes("Files") && looksLikeImage;
-  if (!isTreeDrag && !isExternalImage) {
+  // HTML5 只负责文件树内部拖拽；**外部文件拖入**由 Tauri 原生拖放驱动（#288）——
+  // `dragDropEnabled`（默认 true）下 WebView2 会拦截系统文件拖放，HTML5 事件根本不会触发，
+  // 原生链路自带 `.murasaki-drop-overlay` 提示，这里不能再叠加一层 `.drop-hint`
+  if (!e.dataTransfer.types.includes(FILE_TREE_DRAG_MIME)) {
     dropActive.value = false;
     return;
   }

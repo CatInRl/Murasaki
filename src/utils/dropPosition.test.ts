@@ -36,13 +36,24 @@ describe("toViewportCoords", () => {
     expect(toViewportCoords({ x: 200, y: 200 }, -3)).toEqual(expected);
   });
 
-  it("缺省 / 坐标为 0 / NaN / Infinity → null（回退光标）", () => {
+  it("缺省 / NaN / Infinity / 负值 → null（回退光标）", () => {
     expect(toViewportCoords(null, 1)).toBeNull();
     expect(toViewportCoords(undefined, 1)).toBeNull();
-    expect(toViewportCoords({ x: 0, y: 200 }, 1)).toBeNull();
-    expect(toViewportCoords({ x: 200, y: 0 }, 1)).toBeNull();
     expect(toViewportCoords({ x: Number.NaN, y: 200 }, 1)).toBeNull();
     expect(toViewportCoords({ x: 200, y: Number.POSITIVE_INFINITY }, 1)).toBeNull();
+    expect(toViewportCoords({ x: -1, y: 200 }, 1)).toBeNull();
+    expect(toViewportCoords({ x: 200, y: -1 }, 1)).toBeNull();
+  });
+
+  it("坐标 0 是合法落点（不再按 0 提前作废；issue #288 审查）", () => {
+    // 关闭装饰偏移时可直接观察：0/0 与 1/1 都应换算成有效视口坐标，而非 null
+    expect(toViewportCoords({ x: 0, y: 0 }, 1, 0, 0)).toEqual({ x: 0, y: 0 });
+    expect(toViewportCoords({ x: 1, y: 1 }, 1, 0, 0)).toEqual({ x: 1, y: 1 });
+  });
+
+  it("坐标 0 但减掉装饰偏移后为负 → null（落点在非客户区，视口内无对应位置）", () => {
+    expect(toViewportCoords({ x: 0, y: 200 }, 1)).toBeNull();
+    expect(toViewportCoords({ x: 200, y: 0 }, 1)).toBeNull();
   });
 
   it("减掉装饰偏移后为负 → null（落点在非客户区，视口内无对应位置）", () => {

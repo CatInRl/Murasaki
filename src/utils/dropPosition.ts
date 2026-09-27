@@ -6,7 +6,7 @@
  * **视口 CSS 像素**的 `clientX/clientY`（相对 webview 内容区左上角），因此要先把物理像素
  * 按 `devicePixelRatio` 折成 CSS 像素，再减掉窗口装饰造成的偏移。
  *
- * 纯函数，便于单测；换算不出（坐标为 0/NaN 等）时返回 `null`，调用方据此回退到「插入到
+ * 纯函数，便于单测；换算不出（坐标为负/NaN 等）时返回 `null`，调用方据此回退到「插入到
  * 当前光标位置」，而不是抛错。
  */
 
@@ -32,7 +32,7 @@ export const WINDOW_DECORATION_OFFSET_Y = 31;
 /**
  * 把 Tauri 给的窗口物理像素落点换算成视口 CSS 像素（即 `clientX/clientY`）。
  *
- * @param position 物理像素落点；缺省/非法（NaN、<= 0）时返回 null
+ * @param position 物理像素落点；缺省/非法（NaN、负值）时返回 null
  * @param devicePixelRatio 当前设备的 DPR；非法（NaN、<= 0）时按 1 处理
  * @param offsetX 窗口装饰水平偏移（CSS 像素），默认 {@link WINDOW_DECORATION_OFFSET_X}
  * @param offsetY 窗口装饰垂直偏移（CSS 像素），默认 {@link WINDOW_DECORATION_OFFSET_Y}
@@ -47,8 +47,9 @@ export function toViewportCoords(
   if (!position) return null;
   const { x, y } = position;
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  // 坐标为 0 或负：视为「拿不到有效落点」（Tauri 在部分平台可能给 0）
-  if (x <= 0 || y <= 0) return null;
+  // 只拒绝负值：`0` 是合法落点（贴近窗口/内容区左上角），旧实现按 `<= 0` 一律作废，
+  // 导致贴近左上角拖入被误判为无效、回退到「插入当前光标」（issue #288 审查）
+  if (x < 0 || y < 0) return null;
 
   const dpr =
     Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
