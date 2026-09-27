@@ -471,7 +471,12 @@ onMounted(async () => {
   imagePaste.setup();
 
   // 7.5 注册原生拖放打开（Tauri drag-drop 事件，issue #92）
-  await setupDragDrop();
+  // 这是 IPC 边界：注册失败（权限/窗口未就绪）不应阻断 onMounted 后续接线，故自行吞掉并记录
+  try {
+    await setupDragDrop();
+  } catch (err) {
+    console.error("注册拖放监听失败:", err);
+  }
 
   // 8. 注入冲突解决器给 fileOps store（供文件树右键菜单使用）
   fileOps.setConflictResolver(askConflict);
