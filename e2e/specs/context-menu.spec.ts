@@ -207,26 +207,47 @@ describe("右键菜单", () => {
   });
 
   it("shortcut 提示渲染", async () => {
-    await browser.execute(() => {
-      // @ts-ignore
-      const menu = window.__pinia__._s.get("contextMenu");
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [
-          { label: "重命名", shortcut: "F2" },
-        ]
-      );
-    });
-
     // 读文案走 textOfElement（句柄 + textContent），别用 getText()——它对该 span 会返回空串
-    const shortcutTexts = async (): Promise<string[]> => {
+    const readShortcutTexts = async (): Promise<string[]> => {
       const texts: string[] = [];
       for (const el of await browser.$$(".murasaki-context-menu-shortcut")) {
         texts.push(await textOfElement(browser, el));
       }
       return texts;
     };
-    await browser.waitUntil(async () => (await shortcutTexts()).includes("F2"), { timeout: 5000 });
-    expect(await shortcutTexts()).toContain("F2");
+
+    // 菜单弹出后可能被 window 上的 scroll/resize（capture 阶段）立刻收起（AGENTS 第 4 个坑），
+    // 于是「等 F2 出现」会一直等不到。按 `file-operations.spec.ts` 的既有做法**有界重派发** ——
+    // 重试用户动作，而不是放宽断言。断言复用满足等待的那次快照（#302：原先等完再读一次，
+    // 两次读取之间的空隙也会读到空数组，实测约 1/3 概率挂在那里）。
+    let shortcutTexts: string[] = [];
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await browser.execute(() => {
+        // @ts-ignore
+        const menu = window.__pinia__._s.get("contextMenu");
+        menu.hide();
+        menu.show(
+          new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
+          [
+            { label: "重命名", shortcut: "F2" },
+          ]
+        );
+      });
+
+      try {
+        await browser.waitUntil(
+          async () => {
+            shortcutTexts = await readShortcutTexts();
+            return shortcutTexts.includes("F2");
+          },
+          { timeout: 3000 }
+        );
+        break;
+      } catch (err) {
+        if (attempt === 3) throw err;
+      }
+    }
+
+    expect(shortcutTexts).toContain("F2");
   });
 });
