@@ -8,7 +8,7 @@
  * - **顺序 = 标签栏顺序**：不按最近使用排序；
  * - **窗口内**：只处理本窗口传进来的 tabs（标签状态本就按窗口隔离）。
  */
-import { dirname, isPathUnder } from "./path";
+import { dirname, isTabOutOfWorkspace } from "./path";
 import type { Tab } from "../types";
 
 export interface TabListEntry {
@@ -37,10 +37,8 @@ export function buildTabList(tabs: Tab[], opts: BuildTabListOptions): TabListEnt
     subtitle: tab.path ? dirname(tab.path) : null,
     isActive: tab.id === opts.activeTabId,
     isDirty: tab.isDirty,
-    // 与 TabBar 的角标判定同源：未命名标签与无工作区都不算「工作区外」
-    isOutOfWorkspace: Boolean(
-      opts.workspacePath && tab.path && !isPathUnder(opts.workspacePath, tab.path)
-    ),
+    // 与 TabBar 的角标判定同源（未命名标签与无工作区都不算「工作区外」）
+    isOutOfWorkspace: isTabOutOfWorkspace(opts.workspacePath, tab.path),
   }));
 }
 

@@ -9,6 +9,7 @@ import {
   resolveRelative,
   relativePath,
   isPathUnder,
+  isTabOutOfWorkspace,
 } from "./path";
 
 describe("utils/path", () => {
@@ -157,6 +158,21 @@ describe("utils/path", () => {
     it("空 base 或空 target 返回 false", () => {
       expect(isPathUnder("", "C:/docs/a.md")).toBe(false);
       expect(isPathUnder("C:/docs", "")).toBe(false);
+    });
+  });
+
+  describe("isTabOutOfWorkspace", () => {
+    it("工作区内标签不算工作区外", () => {
+      expect(isTabOutOfWorkspace("C:/docs", "C:/docs/sub/a.md")).toBe(false);
+    });
+    it("工作区外文件算工作区外", () => {
+      expect(isTabOutOfWorkspace("C:/docs", "C:/other/a.md")).toBe(true);
+    });
+    it("未命名标签（path=null）不算工作区外", () => {
+      expect(isTabOutOfWorkspace("C:/docs", null)).toBe(false);
+    });
+    it("未打开工作区时不算工作区外", () => {
+      expect(isTabOutOfWorkspace(null, "C:/other/a.md")).toBe(false);
     });
   });
 });

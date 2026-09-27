@@ -4,8 +4,8 @@
  * 覆盖：
  * - 入口常驻 + 计数徽标；面板列出**全部**标签（不受全局搜索条 5 条上限影响）
  * - 按「标题 + 所在目录」过滤；无命中显示空态
- * - 点击项定位并关面板；激活项高亮
- * - Esc 关闭并把焦点还给入口按钮；`↓` 进列表 + `Enter` 定位；点击面板外部关闭
+ * - 工作区外标签显示 ↗ 角标；点击项定位并关面板；激活项高亮
+ * - Esc 关闭并把焦点还给入口按钮；`↓` 进列表、`↑` 回搜索框、`Enter` 定位；点击面板外部关闭
  * - 关闭 dirty 标签弹确认框时面板保持打开
  *
  * 注意（AGENTS.md「e2e 的六个坑」）：等元素一律用 `helpers/wait.ts` 的手写轮询，
@@ -14,6 +14,7 @@
  * `createSession` 已内含 `waitForPinia` 就绪等待，无需重复。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { resolve } from "node:path";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
@@ -49,20 +50,28 @@ const FIXTURE_FILES: FixtureFile[] = [
   { path: "drafts/three.md", content: "# 草稿三\n" },
 ];
 
+/** 工作区外的 fixture（位于 e2e/fixtures，不在 e2e/.workspace 下），用于验证 ↗ 角标 */
+const OUTSIDE_FILE = resolve(process.cwd(), "e2e/fixtures/markdown-full-test.md");
+
+/** 等标签总数落到期望值 */
+async function waitForTabCount(expected: number, message: string): Promise<void> {
+  await waitForInBrowser(
+    browser,
+    (want: number) => {
+      // @ts-ignore
+      return window.__pinia__._s.get("tabs").tabs.length === want;
+    },
+    [expected],
+    { timeout: 15000, message }
+  );
+}
+
 /** 按相对路径打开若干文件（最后一个成为激活项）；`expectedTotal` 用于分两批打开的场景 */
 async function openFiles(relPaths: string[], expectedTotal = relPaths.length): Promise<void> {
   for (const rel of relPaths) {
     await openFileInTab(browser, `${wsPath}/${rel}`);
   }
-  await waitForInBrowser(
-    browser,
-    (expected: number) => {
-      // @ts-ignore
-      return window.__pinia__._s.get("tabs").tabs.length === expected;
-    },
-    [expectedTotal],
-    { timeout: 15000, message: `打开 ${relPaths.length} 个标签` }
-  );
+  await waitForTabCount(expectedTotal, `打开 ${relPaths.length} 个标签`);
 }
 
 /** 打开「全部标签」面板（若已打开则不再点击，避免把面板切回去） */
@@ -94,6 +103,14 @@ async function panelTitles(): Promise<string[]> {
     Array.from(document.querySelectorAll(`${sel} .all-tabs-item .all-tabs-title`)).map((el) =>
       (el.textContent ?? "").trim()
     ), PANEL);
+}
+
+/** 读面板中带「工作区外」↗ 角标的条目标题 */
+async function panelTitlesWithMark(): Promise<string[]> {
+  return await browser.execute((sel: string) =>
+    Array.from(document.querySelectorAll(`${sel} .all-tabs-item`))
+      .filter((el) => el.querySelector(".all-tabs-mark"))
+      .map((el) => (el.querySelector(".all-tabs-title")?.textContent ?? "").trim()), PANEL);
 }
 
 /** 等面板条目数落到期望值 */
@@ -196,9 +213,12 @@ describe("全部标签面板", () => {
 
   it("入口常驻并显示标签总数，面板列出全部标签（不受全局搜索条 5 条上限影响）", async () => {
     await openFiles(FIXTURE_FILES.map((f) => f.path));
+    // 再开一个工作区外的文件，用于验证 ↗ 角标
+    await openFileInTab(browser, OUTSIDE_FILE);
+    await waitForTabCount(8, "打开工作区外文件");
 
     const state = await getTabsState(browser);
-    expect(state.tabs.length).toBe(7);
+    expect(state.tabs.length).toBe(8);
 
     // 计数徽标 = 标签总数
     await waitForPresent(browser, BTN, 8000);
@@ -206,10 +226,13 @@ describe("全部标签面板", () => {
     expect((await badge.getText()).trim()).toBe(String(state.tabs.length));
 
     await openPanel();
-    await waitForEntryCount(7, "面板列出全部 7 个标签");
+    await waitForEntryCount(8, "面板列出全部 8 个标签");
 
     // 顺序 = 标签栏顺序（store 中的 tabs 顺序）
     expect(await panelTitles()).toEqual(state.tabs.map((t) => t.title));
+
+    // 仅工作区外的那个标签带 ↗ 角标
+    expect(await panelTitlesWithMark()).toEqual(["markdown-full-test.md"]);
 
     // 激活项高亮
     const activeTitle = await browser.execute(
@@ -290,7 +313,7 @@ describe("全部标签面板", () => {
     expect(await focusInBrowser(BTN)).toBe(true);
   });
 
-  it("键盘 ↓ 进入列表，Enter 定位并关面板", async () => {
+  it("键盘 ↓ 进入列表、↑ 回到搜索框，Enter 定位并关面板", async () => {
     await openFiles(["intro.md", "notes.md", "docs/api.md"]);
 
     await openPanel();
@@ -298,6 +321,30 @@ describe("全部标签面板", () => {
     await focusSearch();
 
     // 两次 ↓ → 高亮第 2 项（notes.md）
+    await browser.keys(["ArrowDown"]);
+    await browser.keys(["ArrowDown"]);
+    await waitForInBrowser(
+      browser,
+      (sel: string) =>
+        Array.from(document.querySelectorAll(`${sel} .all-tabs-item`))[1]?.classList.contains("focused") === true,
+      [PANEL],
+      { timeout: 5000, message: "↓↓ 后第 2 项成为键盘高亮项" }
+    );
+
+    // 两次 ↑ → 到顶后焦点回到搜索框
+    await browser.keys(["ArrowUp"]);
+    await browser.keys(["ArrowUp"]);
+    await waitForInBrowser(
+      browser,
+      (sel: string) => {
+        const input = document.querySelector(`${sel} .all-tabs-search`);
+        return !!input && document.activeElement === input;
+      },
+      [PANEL],
+      { timeout: 5000, message: "↑↑ 到顶后焦点回到搜索框" }
+    );
+
+    // 再 ↓↓ + Enter → 定位到 notes.md 并关面板
     await browser.keys(["ArrowDown"]);
     await browser.keys(["ArrowDown"]);
     await browser.keys(["Enter"]);

@@ -8,7 +8,7 @@ import { useFileOpsStore } from "../stores/useFileOpsStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
 import { useDialogStore } from "../stores/useDialogStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
-import { isPathUnder } from "../utils/path";
+import { isTabOutOfWorkspace } from "../utils/path";
 import { buildTabList, filterTabList } from "../utils/tabList";
 import type { TabListEntry } from "../utils/tabList";
 import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
@@ -101,13 +101,10 @@ function isActive(tabId: string): boolean {
 
 /**
  * 工作区归属：tab 是否位于当前工作区之外。
- * 派生布尔属性：由 workspacePath 与 tab.path 实时计算（前缀 + 目录边界 + 大小写不敏感）。
- * 未保存 tab（path=null）与无工作区时均视为工作区内（不加角标）。
+ * 判定收敛在 `utils/path.isTabOutOfWorkspace`，与「全部标签」面板同源。
  */
 function isOutOfWorkspace(tab: Tab): boolean {
-  const ws = workspace.workspacePath;
-  if (!ws || !tab.path) return false;
-  return !isPathUnder(ws, tab.path);
+  return isTabOutOfWorkspace(workspace.workspacePath, tab.path);
 }
 
 /** tab 的 hover 提示：工作区外 tab 加前缀 */
@@ -235,6 +232,11 @@ watch(
 function closeAllTabsPanel(): void {
   emit("update:allTabsOpen", false);
 }
+
+/** 过滤条件变化后旧的高亮下标可能越界或指错行，回到「焦点在搜索框」的初始态 */
+watch(tabQuery, () => {
+  focusIndex.value = -1;
+});
 
 /** 定位到某个标签：切换 + 关面板（列表由 store 派生，无需手动同步） */
 function activateEntry(entry: TabListEntry): void {
@@ -393,7 +395,7 @@ function onPanelKeydown(e: KeyboardEvent): void {
               />
               <span class="all-tabs-text">
                 <span class="all-tabs-title">{{ entry.title }}</span>
-                <span class="all-tabs-subtitle">{{ entry.subtitle ?? $t('common.status.unsavedFile') }}</span>
+                <span class="all-tabs-subtitle">{{ entry.subtitle ?? $t('common.untitled') }}</span>
               </span>
               <span v-if="entry.isDirty" class="dirty-dot" aria-hidden="true"></span>
               <button
