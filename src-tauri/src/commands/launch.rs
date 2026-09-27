@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -52,6 +53,47 @@ pub fn first_non_flag_arg() -> Option<String> {
         .find(|a| !a.starts_with("--") && !a.is_empty())
 }
 
+/// 单条拖放路径的分类结果（供前端 `planDrop` 规划打开动作）。
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DropPathInfo {
+    /// 原始路径
+    pub path: String,
+    /// `"file"` | `"folder"` | `"missing"`
+    pub kind: String,
+}
+
+/// 批量判定拖放路径是文件、目录还是已不存在（issue #92）。
+///
+/// Tauri 原生 drag-drop 事件（前端 `onDragDropEvent`）的 payload 只带一串路径字符串，
+/// 「是目录还是文件」「还在不在」必须落到文件系统判定后才好规划打开动作，故一次性交回前端。
+/// `kind` 为 `"missing"` 表示路径已不存在（拖放期间被移走）。**是否支持打开**由前端
+/// `fileKind` 判定（单一来源），这里只做需要落到文件系统的「文件/目录/不存在」三分类。
+pub fn classify_drop_paths_impl(paths: &[String]) -> Vec<DropPathInfo> {
+    paths
+        .iter()
+        .map(|path| {
+            let p = std::path::Path::new(path);
+            let kind = if !p.exists() {
+                "missing"
+            } else if p.is_dir() {
+                "folder"
+            } else {
+                "file"
+            };
+            DropPathInfo {
+                path: path.clone(),
+                kind: kind.to_string(),
+            }
+        })
+        .collect()
+}
+
+/// 前端调用：分类一批拖放路径（原生 drag-drop 事件的 `payload.paths`）。
+#[tauri::command]
+pub fn classify_drop_paths(paths: Vec<String>) -> Vec<DropPathInfo> {
+    classify_drop_paths_impl(&paths)
+}
+
 /// 取走**本窗口**的待打开文件/文件夹路径（取一次即清空，避免重复打开）。
 ///
 /// 返回值与 `open-from-argv` 事件 payload 同构（`{ path, type }`），
@@ -91,5 +133,37 @@ mod tests {
     fn take_missing_window_returns_none() {
         let state = PendingOpenState::default();
         assert_eq!(state.take("win-9"), None);
+    }
+
+    #[test]
+    fn classify_drop_paths_splits_file_folder_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().to_string_lossy().to_string();
+        let file = dir
+            .path()
+            .join("a.md")
+            .to_string_lossy()
+            .to_string();
+        std::fs::write(&file, "x").unwrap();
+        let missing = dir
+            .path()
+            .join("nope.md")
+            .to_string_lossy()
+            .to_string();
+
+        let got = classify_drop_paths_impl(&[file.clone(), folder.clone(), missing.clone()]);
+
+        assert_eq!(got.len(), 3);
+        assert_eq!(got[0].path, file);
+        assert_eq!(got[0].kind, "file");
+        assert_eq!(got[1].path, folder);
+        assert_eq!(got[1].kind, "folder");
+        assert_eq!(got[2].path, missing);
+        assert_eq!(got[2].kind, "missing");
+    }
+
+    #[test]
+    fn classify_drop_paths_empty_input() {
+        assert!(classify_drop_paths_impl(&[]).is_empty());
     }
 }
