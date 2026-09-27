@@ -5,6 +5,7 @@ import { renderFrontMatterCard } from "../composables/useFrontMatter";
 import { MARKDOWN_THEMES } from "../composables/useTheme";
 // 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
 import "../styles/markdown-content.css";
+import { ensureMermaid } from "../utils/mermaidTheme";
 
 interface Props {
   source: string;
@@ -47,45 +48,11 @@ function resolveShikiTheme(themeName: string): string {
 // 初始化 Shiki 主题（与 props.theme 同步，确保首次渲染就用对的主题）
 renderer.setShikiTheme(resolveShikiTheme(props.theme));
 
-interface MermaidApi {
-  initialize(config: Record<string, unknown>): void;
-  render(id: string, code: string): Promise<{ svg: string }>;
-}
-
-let mermaidReady: MermaidApi | null = null;
-
-async function ensureMermaid(): Promise<MermaidApi> {
-  if (!mermaidReady) {
-    const mod = await import("mermaid");
-    const mermaid = (mod.default ?? mod) as unknown as MermaidApi;
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: "base",
-      securityLevel: "loose",
-      themeVariables: {
-        primaryColor: "#f3e8ff",
-        primaryBorderColor: "#9333ea",
-        primaryTextColor: "#581c87",
-        lineColor: "#9333ea",
-        secondaryColor: "#fdf4ff",
-        tertiaryColor: "#faf5ff",
-        background: "#ffffff",
-        mainBkg: "#f3e8ff",
-        secondBkg: "#fdf4ff",
-        borderColor: "#9333ea",
-        edgeLabelBackground: "#faf5ff",
-        clusterBkg: "#faf5ff",
-        clusterBorder: "#9333ea",
-      },
-    });
-    mermaidReady = mermaid;
-  }
-  return mermaidReady;
-}
-
 async function renderMermaid(container: HTMLElement) {
   const blocks = container.querySelectorAll<HTMLElement>(".mermaid");
   if (blocks.length === 0) return;
+  // 初始化与 token 派生的 themeVariables 统一在 utils/mermaidTheme.ts（issue #295），
+  // 与 WYSIWYG 共用一个初始化入口，不再依赖「本组件先 initialize」的隐式副作用。
   const mermaid = await ensureMermaid();
   for (const block of Array.from(blocks)) {
     const code = block.textContent || "";
@@ -94,7 +61,7 @@ async function renderMermaid(container: HTMLElement) {
       const { svg } = await mermaid.render(id, code);
       block.innerHTML = svg;
     } catch (err) {
-      block.innerHTML = `<pre style="color:#c00">${(err as Error).message}</pre>`;
+      block.innerHTML = `<pre style="color:var(--murasaki-state-error)">${(err as Error).message}</pre>`;
     }
   }
 }
@@ -360,7 +327,7 @@ defineExpose({
   padding: 28px 36px;
   background: var(--md-bg, var(--murasaki-background));
   color: var(--md-fg, var(--murasaki-ink));
-  font-family: var(--murasaki-font-reading, var(--murasaki-font-ui));
+  font-family: var(--murasaki-font-reading);
   font-size: 14px;
   line-height: 1.75;
   transition: padding var(--murasaki-duration-base) var(--murasaki-ease);

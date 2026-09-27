@@ -14,41 +14,73 @@ import { fileSystem } from "../services/fileSystem";
 import markdownContentCss from "../styles/markdown-content.css?raw";
 
 /**
- * Murasaki 应用级 design token（--murasaki-* 变量）
+ * 导出 HTML 是独立文件，不在 Vue 应用内，不继承 :root 上的 --murasaki-* 值。
+ * markdown-content.css 与下方导出容器样式会引用这些 token，故导出时把它们在应用
+ * 运行时（`getComputedStyle(documentElement)`）的**解析值**内联到导出 CSS 的 :root。
  *
- * 导出 HTML 是独立文件，不在 Vue 应用内，无法从 :root 继承主题.css 中
- * 声明的 --murasaki-* 值。markdown-content.css 在多处引用了这些变量
- * （如 var(--murasaki-primary)、var(--murasaki-radius-md)），因此需要把
- * markdown-content.css 实际引用到的 --murasaki-* 值内联到导出 CSS 的 :root。
- *
- * 取值必须与 src/styles/theme.css 的 :root 块保持一致；任何主题.css 的
- * 调整都需要同步反映到这里。
+ * 需要内联的 token 名直接从将要内联的 CSS 文本里扫出（见 collectRuntimeTokens），
+ * 不再手抄一份会漂移的表（issue #295）。取不到值的 token 直接跳过 —— 不抛错、不塞兜底色。
  */
-const MURASAKI_DESIGN_TOKENS = `
-  --murasaki-primary: #9333ea;
-  --murasaki-purple-50: #faf5ff;
-  --murasaki-purple-200: #e9d5ff;
-  --murasaki-purple-300: #d8b4fe;
-  --murasaki-purple-700: #7e22ce;
-  --murasaki-purple-800: #6b21a8;
-  --murasaki-muted-foreground: #737373;
-  --murasaki-surface-2: #f3f4f6;
-  --murasaki-line: #e5e5e5;
-  --murasaki-border: #e5e5e5;
-  --murasaki-state-info: #2563eb;
-  --murasaki-neutral-900: #171717;
-  --murasaki-background: #ffffff;
-  --murasaki-ink: #171717;
-  --murasaki-ink-2: #525252;
-  --murasaki-ink-3: #a3a3a3;
-  --murasaki-radius-sm: 4px;
-  --murasaki-radius-md: 8px;
-  --murasaki-font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
-  --murasaki-font-ui: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --murasaki-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --murasaki-duration-fast: 120ms;
-  --murasaki-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+/** 导出容器样式（镜像 PreviewPane 的 .preview-pane），参与 token 名扫描 */
+const EXPORT_WRAPPER_CSS = `
+html, body {
+  margin: 0;
+  padding: 0;
+}
+body.markdown-body {
+  /* 容器布局，与 PreviewPane.vue 的 .preview-pane 一致 */
+  padding: 28px 36px;
+  background: var(--md-bg, var(--murasaki-background));
+  color: var(--md-fg, var(--murasaki-ink));
+  font-family: var(--murasaki-font-ui);
+  font-size: 14px;
+  line-height: 1.75;
+}
 `;
+
+/**
+ * 读运行时 CSS 变量，为导出文件生成内联的 `--murasaki-*` 声明。
+ * 需要哪些 token 由将要内联的 CSS 文本（markdown-content.css + 导出容器样式）扫出。
+ */
+function collectRuntimeTokens(): string {
+  const styles = getComputedStyle(document.documentElement);
+  const names = new Set<string>();
+  const cssText = `${markdownContentCss}\n${EXPORT_WRAPPER_CSS}`;
+  for (const match of cssText.matchAll(/--murasaki-[a-z0-9-]+/g)) {
+    names.add(match[0]);
+  }
+  const lines: string[] = [];
+  for (const name of names) {
+    const value = styles.getPropertyValue(name).trim();
+    // 取不到则跳过该项（不抛错、不塞兜底色）
+    if (value) lines.push(`  ${name}: ${value};`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * 主题 CSS：从共享样式 src/styles/markdown-content.css 读取
+ *
+ * 实现导出=预览（GitHub issue #86 / T3）：
+ *   - markdown-content.css 的 [data-md-theme="X"] 块定义 --md-* 主题变量
+ *   - .markdown-body 后代选择器定义所有 markdown 元素样式（含 front-matter 卡片）
+ *   - 导出 HTML 的 body 同时带 markdown-body class 和 data-md-theme 属性，
+ *     使 [data-md-theme="X"] 与 .markdown-body 选择器在同一元素上生效，
+ *     主题切换通过 data-md-theme 属性驱动，与 PreviewPane 完全一致
+ *   - --murasaki-* 设计 token 在导出文件内未定义，需在 :root 内联运行时值（issue #295）
+ *   - 容器布局（padding/background/font）镜像 PreviewPane 的 .preview-pane 样式
+ */
+function getThemeCss(): string {
+  return `
+:root {
+${collectRuntimeTokens()}
+}
+${EXPORT_WRAPPER_CSS}
+/* 共享 markdown 元素样式（含 front-matter 卡片，主题差异由 data-md-theme 驱动） */
+${markdownContentCss}
+`;
+}
 
 /**
  * HTML 导出 composable
@@ -76,41 +108,6 @@ export interface ExportHtmlOptions {
   workspacePath: string | null;
   /** 当前 md 文件绝对路径（用于解析相对该文件的图片路径） */
   filePath: string | null;
-}
-
-/**
- * 主题 CSS：从共享样式 src/styles/markdown-content.css 读取
- *
- * 实现导出=预览（GitHub issue #86 / T3）：
- *   - markdown-content.css 的 [data-md-theme="X"] 块定义 --md-* 主题变量
- *   - .markdown-body 后代选择器定义所有 markdown 元素样式（含 front-matter 卡片）
- *   - 导出 HTML 的 body 同时带 markdown-body class 和 data-md-theme 属性，
- *     使 [data-md-theme="X"] 与 .markdown-body 选择器在同一元素上生效，
- *     主题切换通过 data-md-theme 属性驱动，与 PreviewPane 完全一致
- *   - --murasaki-* 设计 token 在导出文件内未定义，需在 :root 内联
- *   - 容器布局（padding/background/font）镜像 PreviewPane 的 .preview-pane 样式
- */
-function getThemeCss(_theme: string): string {
-  return `
-:root {
-${MURASAKI_DESIGN_TOKENS}
-}
-html, body {
-  margin: 0;
-  padding: 0;
-}
-body.markdown-body {
-  /* 容器布局，与 PreviewPane.vue 的 .preview-pane 一致 */
-  padding: 28px 36px;
-  background: var(--md-bg, var(--murasaki-background));
-  color: var(--md-fg, var(--murasaki-ink));
-  font-family: var(--murasaki-font-ui);
-  font-size: 14px;
-  line-height: 1.75;
-}
-/* 共享 markdown 元素样式（含 front-matter 卡片，主题差异由 data-md-theme 驱动） */
-${markdownContentCss}
-`;
 }
 
 /** 解析 Shiki 主题名 */
@@ -272,7 +269,7 @@ export async function exportHtml(options: ExportHtmlOptions): Promise<string> {
   //   - markdown-body 让 markdown-content.css 的 .markdown-body 后代选择器生效
   //   - data-md-theme 触发 [data-md-theme="X"] 块定义的 --md-* 主题变量
   //   - 不再需要内层 .markdown-body div 包裹（body 本身即容器）
-  const css = getThemeCss(theme);
+  const css = getThemeCss();
   const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>

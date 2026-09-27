@@ -23,7 +23,6 @@ import { EditorState, StateField, StateEffect } from "@codemirror/state";
 import { syntaxTree, syntaxTreeAvailable } from "@codemirror/language";
 import { codeToHtml } from "shiki";
 import katex from "katex";
-import mermaid from "mermaid";
 import { currentShikiTheme, resolveShikiThemeOption, getCurrentFilePath } from "../../composables/useMarkdownRenderer";
 import {
   computeDecorations,
@@ -38,6 +37,7 @@ import { TableEditor } from "./tableEditor";
 import { renderFrontMatterCard } from "../../composables/useFrontMatter";
 import { resolveImageSrc } from "../../utils/imagePath";
 import { renderPlantUmlCode } from "../../utils/plantuml";
+import { ensureMermaid } from "../../utils/mermaidTheme";
 
 // ===== T7.1 Widgets =====
 
@@ -240,8 +240,8 @@ class MermaidWidget extends WysiwygBlockWidget {
     container.className = `murasaki-wysiwyg-mermaid mermaid${this.selectionClass()}`;
     // 占位：出错时显示源码，便于排错
     container.textContent = this.code;
-    void mermaid
-      .render(this.id, this.code)
+    void ensureMermaid()
+      .then((mermaid) => mermaid.render(this.id, this.code))
       .then(({ svg }) => {
         if (container.isConnected) container.innerHTML = svg;
       })
@@ -293,8 +293,8 @@ class DiagramPreviewWidget extends WysiwygBlockWidget {
       const id = `murasaki-preview-mermaid-${Math.random().toString(36).slice(2, 10)}`;
       body.classList.add("mermaid");
       body.textContent = this.code; // 占位：出错时保留源码便于排错
-      void mermaid
-        .render(id, this.code)
+      void ensureMermaid()
+        .then((mermaid) => mermaid.render(id, this.code))
         .then(({ svg }) => {
           if (body.isConnected) body.innerHTML = svg;
         })
@@ -1026,8 +1026,8 @@ export const wysiwygTheme = EditorView.theme({
   // position:relative 供 ::after 覆盖层相对块自身定位。
   ".murasaki-wysiwyg-selected": {
     position: "relative",
-    backgroundColor: "var(--md-code-selection, rgba(147, 51, 234, 0.08))",
-    outline: "1px solid var(--md-code-selection-outline, rgba(147, 51, 234, 0.30))",
+    backgroundColor: "var(--md-code-selection, var(--murasaki-primary-soft))",
+    outline: "1px solid var(--md-code-selection-outline, var(--murasaki-primary-ring-soft))",
     borderRadius: "4px",
   },
   // 自带不透明背景的块级 widget（代码块 Shiki pre / 图表卡片 / 预览卡 / 表格 / frontmatter 卡片）：
@@ -1040,7 +1040,7 @@ export const wysiwygTheme = EditorView.theme({
     position: "absolute",
     inset: "0",
     borderRadius: "inherit",
-    backgroundColor: "rgba(147, 51, 234, 0.12)",
+    backgroundColor: "var(--murasaki-primary-soft)",
     pointerEvents: "none",
   },
   // 行内代码：与预览 .markdown-body code 一致的视觉样式（背景/圆角/等宽字体）。
@@ -1052,7 +1052,7 @@ export const wysiwygTheme = EditorView.theme({
     background: "var(--md-code-bg, var(--murasaki-surface-2))",
     color: "var(--md-code-color, var(--murasaki-primary))",
     padding: "0.125rem 0.375rem",
-    borderRadius: "var(--murasaki-radius-sm, 4px)",
+    borderRadius: "var(--murasaki-radius-sm)",
   },
   // 中性化 CM 高亮 token span（class 以 ͼ 前缀开头）对 render 装饰内部文本的干扰：
   // 标题/引用/行内代码的视觉由 --md-* 变量统一提供，否则高亮样式（紫色、em 字号）
@@ -1074,17 +1074,17 @@ export const wysiwygTheme = EditorView.theme({
   // 注意：mark decoration 是行内 span，垂直 padding 不会撑开行盒（多行引用会挤压/重叠），
   // 因此只保留水平 padding，用 lineHeight 提供上下间距，保证引用内容完整展示。
   ".murasaki-wysiwyg-blockquote": {
-    borderLeft: "3px solid var(--md-quote-border, var(--murasaki-purple-300, #d8b4fe))",
-    background: "var(--md-quote-bg, var(--murasaki-purple-50, #faf5ff))",
-    color: "var(--md-quote-color, var(--murasaki-muted-foreground, #737373))",
+    borderLeft: "3px solid var(--md-quote-border, var(--murasaki-purple-300))",
+    background: "var(--md-quote-bg, var(--murasaki-purple-50))",
+    color: "var(--md-quote-color, var(--murasaki-muted-foreground))",
     fontStyle: "var(--md-quote-style, italic)",
     paddingLeft: "16px",
     paddingRight: "16px",
     lineHeight: "1.8",
-    borderRadius: "0 var(--murasaki-radius-sm, 4px) var(--murasaki-radius-sm, 4px) 0",
+    borderRadius: "0 var(--murasaki-radius-sm) var(--murasaki-radius-sm) 0",
   },
   ".murasaki-wysiwyg-bullet": {
-    color: "var(--md-list-marker-color, var(--murasaki-primary, #9333ea))",
+    color: "var(--md-list-marker-color, var(--murasaki-primary))",
     paddingRight: "6px",
     userSelect: "none",
   },
@@ -1145,7 +1145,7 @@ export const wysiwygTheme = EditorView.theme({
     margin: "8px 0",
   },
   ".murasaki-wysiwyg-table-edit th, .murasaki-wysiwyg-table-edit td": {
-    border: "1px solid var(--md-table-border, var(--murasaki-line, rgba(0,0,0,0.12)))",
+    border: "1px solid var(--md-table-border, var(--murasaki-line))",
     padding: "4px 12px",
     minWidth: "48px",
     minHeight: "24px",
@@ -1157,12 +1157,12 @@ export const wysiwygTheme = EditorView.theme({
     fontWeight: "600",
   },
   ".murasaki-wysiwyg-table-edit td:hover": {
-    background: "var(--md-table-row-hover-bg, var(--murasaki-purple-50, #faf5ff))",
+    background: "var(--md-table-row-hover-bg, var(--murasaki-purple-50))",
   },
   // 锚点格（当前聚焦）：绿色高亮，配合右缘/底缘 + 胶囊指示可插入位置
   ".murasaki-wysiwyg-table-edit .murasaki-anchor-cell": {
-    boxShadow: "0 0 0 2px var(--murasaki-primary, #9333ea) inset",
-    backgroundColor: "var(--md-table-row-hover-bg, var(--murasaki-purple-50, #faf5ff))",
+    boxShadow: "0 0 0 2px var(--murasaki-primary) inset",
+    backgroundColor: "var(--md-table-row-hover-bg, var(--murasaki-purple-50))",
   },
   // T1.4 悬停工具条：聚焦单元格时显示增删/对齐工具。
   // 默认隐藏、贴近表格左缘上方（absolute）；仅在编辑激活（有锚点格）时显示，
@@ -1175,10 +1175,10 @@ export const wysiwygTheme = EditorView.theme({
     gap: "3px",
     alignItems: "center",
     padding: "2px 6px",
-    background: "var(--murasaki-card, var(--murasaki-surface, #ffffff))",
-    border: "1px solid var(--murasaki-border, var(--murasaki-line, rgba(0,0,0,0.1)))",
-    borderRadius: "var(--murasaki-radius-md, 8px)",
-    boxShadow: "var(--murasaki-shadow-sm, 0 1px 3px rgba(0,0,0,0.10))",
+    background: "var(--murasaki-card)",
+    border: "1px solid var(--murasaki-border)",
+    borderRadius: "var(--murasaki-radius-md)",
+    boxShadow: "var(--murasaki-shadow-sm)",
     width: "max-content",
     maxWidth: "100%",
     flexWrap: "wrap",
@@ -1191,13 +1191,13 @@ export const wysiwygTheme = EditorView.theme({
   ".murasaki-wysiwyg-table-tool-label": {
     fontSize: "11px",
     fontWeight: "600",
-    color: "var(--murasaki-muted-foreground, var(--murasaki-ink-3, #a1a1aa))",
+    color: "var(--murasaki-muted-foreground)",
     padding: "0 2px",
   },
   ".murasaki-wysiwyg-table-tool-divider": {
     width: "1px",
     height: "16px",
-    background: "var(--murasaki-border, var(--murasaki-line, rgba(0,0,0,0.1)))",
+    background: "var(--murasaki-border)",
     margin: "0 2px",
   },
   ".murasaki-wysiwyg-table-tool": {
@@ -1208,19 +1208,19 @@ export const wysiwygTheme = EditorView.theme({
     lineHeight: "1",
     padding: "3px 5px",
     border: "none",
-    borderRadius: "var(--murasaki-radius-sm, 5px)",
+    borderRadius: "var(--murasaki-radius-sm)",
     background: "transparent",
-    color: "var(--murasaki-ink-2, #52525b)",
+    color: "var(--murasaki-ink-2)",
     cursor: "pointer",
     transition: "background 120ms, color 120ms",
   },
   ".murasaki-wysiwyg-table-tool:hover": {
-    background: "var(--murasaki-muted, var(--murasaki-surface-2, #f3f4f6))",
-    color: "var(--murasaki-primary, #9333ea)",
+    background: "var(--murasaki-muted)",
+    color: "var(--murasaki-primary)",
   },
   ".murasaki-wysiwyg-table-tool.active": {
-    background: "var(--murasaki-purple-100, #f3e8ff)",
-    color: "var(--murasaki-primary, #9333ea)",
+    background: "var(--murasaki-purple-100)",
+    color: "var(--murasaki-primary)",
   },
   ".murasaki-wysiwyg-table-tool:disabled": {
     opacity: 0.4,
@@ -1237,9 +1237,9 @@ export const wysiwygTheme = EditorView.theme({
     height: "18px",
     boxSizing: "border-box",
     borderRadius: "50%",
-    border: "1px solid var(--murasaki-primary, #9333ea)",
-    background: "var(--murasaki-surface, #ffffff)",
-    color: "var(--murasaki-primary, #9333ea)",
+    border: "1px solid var(--murasaki-primary)",
+    background: "var(--murasaki-surface)",
+    color: "var(--murasaki-primary)",
     fontSize: "13px",
     lineHeight: "16px",
     textAlign: "center",
@@ -1264,8 +1264,8 @@ export const wysiwygTheme = EditorView.theme({
     transform: "translateX(-50%)",
   },
   ".murasaki-table-edge-cap:hover": {
-    background: "var(--murasaki-primary, #9333ea)",
-    color: "#fff",
+    background: "var(--murasaki-primary)",
+    color: "var(--murasaki-primary-foreground)",
   },
   ".murasaki-wysiwyg-mermaid svg": {
     maxWidth: "100%",
@@ -1274,20 +1274,20 @@ export const wysiwygTheme = EditorView.theme({
   // 实时预览卡（问题2）：代码块下方，边框 + 内边距，与代码块视觉区分
   ".murasaki-wysiwyg-diagram-preview": {
     margin: "4px 0 12px",
-    border: "1px solid var(--md-pre-border, var(--murasaki-line, rgba(0,0,0,0.1)))",
-    borderRadius: "var(--murasaki-radius-sm, 6px)",
+    border: "1px solid var(--md-pre-border, var(--murasaki-line))",
+    borderRadius: "var(--murasaki-radius-sm)",
     overflow: "hidden",
-    background: "var(--murasaki-surface, var(--md-pre-bg, #fafafa))",
+    background: "var(--murasaki-surface)",
   },
   ".murasaki-wysiwyg-diagram-preview-head": {
     fontSize: "11px",
     fontWeight: "600",
-    color: "var(--md-code-lang-color, var(--murasaki-ink-3, #a1a1aa))",
+    color: "var(--md-code-lang-color, var(--murasaki-ink-3))",
     textTransform: "uppercase",
     letterSpacing: "0.05em",
     padding: "4px 10px",
-    borderBottom: "1px solid var(--md-pre-border, var(--murasaki-line, rgba(0,0,0,0.1)))",
-    background: "var(--murasaki-surface-2, transparent)",
+    borderBottom: "1px solid var(--md-pre-border, var(--murasaki-line))",
+    background: "var(--murasaki-surface-2)",
   },
   ".murasaki-wysiwyg-diagram-preview-body": {
     padding: "10px",

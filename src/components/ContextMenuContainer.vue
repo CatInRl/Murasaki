@@ -335,7 +335,7 @@ onBeforeUnmount(() => {
 .murasaki-context-menu-item.is-danger:hover:not(.is-disabled),
 .murasaki-context-menu-item.is-danger.is-active:not(.is-disabled) {
   background: var(--murasaki-state-error);
-  color: #fff;
+  color: var(--murasaki-primary-foreground);
 }
 
 .murasaki-context-menu-icon {

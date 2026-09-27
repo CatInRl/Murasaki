@@ -15,7 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { isRendered, waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent, waitForInBrowser } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -278,5 +278,64 @@ describe("WYSIWYG 模式切换", () => {
     // split 模式应恢复预览区
     const preview = await browser.$(".pane-right");
     expect(await preview.isExisting()).toBe(true);
+  });
+
+  it("wysiwyg 模式下 mermaid 使用主色（不依赖 PreviewPane 初始化）", async () => {
+    // 先切到 wysiwyg（在任何预览渲染之前）：此时 mermaid 只能由 WYSIWYG 侧首次初始化，
+    // 专门覆盖「WYSIWYG 先渲染会掉回 Mermaid 默认主题」这一隐式副作用（issue #295）。
+    await browser.execute(() => {
+      // @ts-ignore
+      window.__pinia__._s.get("editorBridge").setEditorMode("wysiwyg");
+    });
+    await browser.pause(200);
+
+    const wsPath = resetWorkspace([
+      {
+        path: "diagram.md",
+        content: "# 标题\n\n```mermaid\ngraph LR\n    A --> B\n```\n\n正文\n",
+      },
+    ]);
+    await openWorkspace(browser, wsPath);
+    await openFileInTab(browser, `${wsPath}\\diagram.md`);
+    await browser.pause(300);
+
+    // 光标移到正文（脱离 mermaid 段落）→ 该块被替换为 MermaidWidget
+    await browser.execute(() => {
+      // @ts-ignore
+      const view = window.__pinia__._s.get("editorBridge").editorView;
+      if (view) {
+        const pos = view.state.doc.toString().indexOf("正文");
+        view.dispatch({
+          selection: { anchor: pos >= 0 ? pos + 1 : view.state.doc.length },
+          scrollIntoView: false,
+        });
+        view.focus();
+      }
+    });
+
+    await waitForInBrowser(
+      browser,
+      () => !!document.querySelector(".murasaki-wysiwyg-mermaid svg"),
+      [],
+      { message: "wysiwyg mermaid SVG 未渲染", timeout: 20000 }
+    );
+
+    const expected = await browser.execute(() => {
+      const probe = document.createElement("div");
+      probe.style.color = "var(--murasaki-primary)";
+      document.body.appendChild(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    const strokes = await browser.execute(() => {
+      const svg = document.querySelector(".murasaki-wysiwyg-mermaid svg");
+      if (!svg) return [] as string[];
+      return Array.from(svg.querySelectorAll("*"))
+        .map((el) => getComputedStyle(el).stroke)
+        .filter((s) => s && s !== "none");
+    });
+    // 引用关系：WYSIWYG 图表描边 == --murasaki-primary 的解析值
+    expect(strokes).toContain(expected);
   });
 });

@@ -614,13 +614,13 @@ export default { name: "TreeNode" };
   outline-offset: -2px;
 }
 .node-row.is-selected {
-  background: rgba(147, 51, 234, 0.1);
+  background: var(--murasaki-primary-soft);
   color: var(--murasaki-primary);
   font-weight: 500;
 }
 .node-row.is-selected .md-badge {
   background: var(--murasaki-primary);
-  color: #fff;
+  color: var(--murasaki-primary-foreground);
 }
 .node-row.is-selected .node-file-icon,
 .node-row.is-selected .node-folder-icon {
@@ -641,7 +641,7 @@ export default { name: "TreeNode" };
   color: var(--murasaki-ink);
 }
 .node-row.is-drop-target {
-  background: rgba(147, 51, 234, 0.12);
+  background: var(--murasaki-primary-soft);
   outline: 1px dashed var(--murasaki-primary);
   outline-offset: -1px;
 }

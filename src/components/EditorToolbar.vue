@@ -392,8 +392,8 @@ function confirmTable(): void {
   background: transparent;
   color: var(--murasaki-muted-foreground);
   cursor: pointer;
-  transition: background-color var(--murasaki-duration-fast, 120ms) ease,
-              color var(--murasaki-duration-fast, 120ms) ease;
+  transition: background-color var(--murasaki-duration-fast) ease,
+              color var(--murasaki-duration-fast) ease;
 }
 
 .tb-btn:hover {
@@ -407,12 +407,12 @@ function confirmTable(): void {
 }
 
 .tb-btn.active {
-  background: rgba(147, 51, 234, 0.1);
+  background: var(--murasaki-primary-soft);
   color: var(--murasaki-primary);
 }
 
 .tb-btn.active:hover {
-  background: rgba(147, 51, 234, 0.16);
+  background: var(--murasaki-primary-soft-hover);
   color: var(--murasaki-primary);
 }
 

@@ -100,6 +100,6 @@ function onCancel(): void {
 }
 .form-label {
   font-size: 13px;
-  color: #555;
+  color: var(--murasaki-ink-2);
 }
 </style>

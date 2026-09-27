@@ -363,16 +363,16 @@ function onLocalInput(e: Event): void {
   background: var(--murasaki-muted);
 }
 .legend-add {
-  background: rgba(22, 163, 74, 0.15);
-  border: 1px solid rgba(22, 163, 74, 0.5);
+  background: color-mix(in srgb, var(--murasaki-state-success) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--murasaki-state-success) 50%, transparent);
 }
 .legend-del {
-  background: rgba(220, 38, 38, 0.15);
-  border: 1px solid rgba(220, 38, 38, 0.5);
+  background: color-mix(in srgb, var(--murasaki-state-error) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--murasaki-state-error) 50%, transparent);
 }
 .legend-mod {
-  background: rgba(217, 119, 6, 0.2);
-  border: 1px solid rgba(217, 119, 6, 0.5);
+  background: color-mix(in srgb, var(--murasaki-state-warning) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--murasaki-state-warning) 50%, transparent);
 }
 
 .compare-body {
@@ -444,22 +444,22 @@ function onLocalInput(e: Event): void {
   background: transparent;
 }
 .row-external-only {
-  background: rgba(220, 38, 38, 0.15);
+  background: color-mix(in srgb, var(--murasaki-state-error) 15%, transparent);
 }
 .row-local-only {
-  background: rgba(22, 163, 74, 0.15);
+  background: color-mix(in srgb, var(--murasaki-state-success) 15%, transparent);
 }
 .row-modified {
-  background: rgba(217, 119, 6, 0.2);
+  background: color-mix(in srgb, var(--murasaki-state-warning) 20%, transparent);
 }
 
 .seg-del {
-  background: rgba(220, 38, 38, 0.3);
+  background: color-mix(in srgb, var(--murasaki-state-error) 30%, transparent);
   text-decoration: line-through;
   color: var(--murasaki-state-error);
 }
 .seg-add {
-  background: rgba(22, 163, 74, 0.3);
+  background: color-mix(in srgb, var(--murasaki-state-success) 30%, transparent);
   color: var(--murasaki-state-success);
 }
 

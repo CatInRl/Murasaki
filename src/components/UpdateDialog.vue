@@ -116,12 +116,12 @@ function onConfirm(): void {
   max-height: 280px;
   overflow-y: auto;
   padding: 12px;
-  background: var(--murasaki-surface-muted, rgba(0, 0, 0, 0.03));
+  background: var(--murasaki-muted);
   border-radius: 6px;
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: var(--murasaki-font-mono, "JetBrains Mono", monospace);
+  font-family: var(--murasaki-font-mono);
 }
 </style>

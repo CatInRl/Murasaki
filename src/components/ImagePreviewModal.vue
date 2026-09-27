@@ -202,7 +202,7 @@ async function revealInExplorer(): Promise<void> {
   justify-content: center;
   overflow: auto;
   max-height: calc(88vh - 200px);
-  background: #f6f8fa;
+  background: #f6f8fa; /* 图片衬底灰，非色阶值，无对应 token */
   border-radius: 4px;
   padding: 12px;
 }

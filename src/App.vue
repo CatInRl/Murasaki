@@ -1095,7 +1095,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   height: 8px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--murasaki-purple-400), var(--murasaki-purple-700));
-  box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.12);
+  box-shadow: 0 0 0 3px var(--murasaki-primary-soft);
   flex-shrink: 0;
   animation: murasaki-pulse-soft 3.2s ease-in-out infinite;
 }
@@ -1116,7 +1116,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(147, 51, 234, 0.12);
+  background: var(--murasaki-primary-soft);
 }
 
 .murasaki-drop-overlay-card {
@@ -1129,7 +1129,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   border: 1.5px dashed var(--murasaki-primary);
   background: var(--murasaki-surface);
   color: var(--murasaki-primary);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18); /* 拖放遮罩卡片投影，一次性，无对应 token */
   animation: murasaki-fade-in var(--murasaki-duration-fast) var(--murasaki-ease-out) both;
 }
 

@@ -62,6 +62,39 @@ export async function ensurePlantUml(): Promise<PlantUmlApi> {
 }
 
 /**
+ * 从运行时 `--murasaki-*` token 解析值构造最小 skinparam 行（背景 / 边框 / 线条）。
+ * 边框与线条取主色，使图表跟随品牌主色（issue #295）。
+ */
+function buildSkinparamLines(): string[] {
+  const styles = getComputedStyle(document.documentElement);
+  const read = (name: string) => styles.getPropertyValue(name).trim();
+  const primary = read("--murasaki-primary");
+  const background = read("--murasaki-background");
+  const lines: string[] = [];
+  if (background) lines.push(`skinparam backgroundColor ${background}`);
+  if (primary) {
+    lines.push(`skinparam borderColor ${primary}`);
+    lines.push(`skinparam arrowColor ${primary}`);
+  }
+  return lines;
+}
+
+/**
+ * 把最小 skinparam 注入 PlantUML 源码：有 `@startuml` 则插在它之后，否则置于最前。
+ * 取不到 token 时不注入任何行（保持官方默认）。
+ */
+function injectSkinparam(code: string): string {
+  const lines = buildSkinparamLines();
+  if (lines.length === 0) return code;
+  const block = lines.join("\n");
+  const startMatch = code.match(/^[ \t]*@startuml[^\n]*\r?\n/im);
+  if (startMatch) {
+    return code.replace(startMatch[0], `${startMatch[0]}${block}\n`);
+  }
+  return `${block}\n${code}`;
+}
+
+/**
  * 把一段 PlantUML 源码渲染进 target 元素的 innerHTML。
  * 失败时在 target 内写入错误信息，调用方可据此展示渲染结果状态。
  *
@@ -78,8 +111,8 @@ export async function renderPlantUmlCode(
     const plantuml = await ensurePlantUml();
     const id = `${idPrefix}-${Math.random().toString(36).slice(2, 10)}`;
     target.id = id;
-    plantuml.render([code], id, { dark: false });
+    plantuml.render([injectSkinparam(code)], id, { dark: false });
   } catch (err) {
-    target.innerHTML = `<pre style="color:#c00">${(err as Error).message}</pre>`;
+    target.innerHTML = `<pre style="color:var(--murasaki-state-error)">${(err as Error).message}</pre>`;
   }
 }

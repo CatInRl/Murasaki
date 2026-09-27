@@ -149,7 +149,7 @@ function normLevel(level: number): number {
   width: 6px;
   height: 6px;
   background: var(--murasaki-primary);
-  box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.16);
+  box-shadow: 0 0 0 2px var(--murasaki-primary-soft-hover);
 }
 .outline-item.level-2 .outline-dot {
   background: var(--murasaki-purple-400);

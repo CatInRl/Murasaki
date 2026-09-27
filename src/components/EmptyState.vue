@@ -63,8 +63,8 @@ function onAction(): void {
   background: transparent;
 }
 .empty-icon {
-  /* text-muted-foreground/50 — 50% alpha over --murasaki-muted-foreground (#737373) */
-  color: rgba(115, 115, 115, 0.5);
+  /* text-muted-foreground/50 —— 50% alpha over --murasaki-muted-foreground (#737373) */
+  color: color-mix(in srgb, var(--murasaki-muted-foreground) 50%, transparent);
   margin-bottom: 8px;
 }
 .empty-title {

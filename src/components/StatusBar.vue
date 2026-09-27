@@ -294,7 +294,7 @@ function onModeSelect(key: string): void {
 }
 .status-chip:hover {
   color: var(--murasaki-primary);
-  background: rgba(147, 51, 234, 0.1);
+  background: var(--murasaki-primary-soft);
 }
 
 /* 紧凑模式 */
