@@ -224,14 +224,14 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     const shortcuts = await browser.$$(".murasaki-context-menu-shortcut");
     expect(shortcuts.length).toBe(5);
 
-    // 注意：tauri-driver 下 getText() 对这些 span 不可靠（实测首个元素返回空串，
-    // 而 textContent 完全正确），故改用 execute 读 textContent，并轮询到渲染完成
-    const readShortcutTexts = () =>
-      browser.execute(() =>
-        Array.from(
-          document.querySelectorAll(".murasaki-context-menu-shortcut")
-        ).map((e) => (e.textContent ?? "").trim())
-      );
+    // 读文案走 textOfElement（句柄 + textContent），别用 getText()——它对这类 span 会返回空串
+    const readShortcutTexts = async (): Promise<string[]> => {
+      const texts: string[] = [];
+      for (const el of await browser.$$(".murasaki-context-menu-shortcut")) {
+        texts.push(await textOfElement(browser, el));
+      }
+      return texts;
+    };
 
     await browser.waitUntil(
       async () => {

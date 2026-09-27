@@ -218,23 +218,15 @@ describe("右键菜单", () => {
       );
     });
 
-    // tauri-driver 下 getText() 对该 span 不可靠（实测可能返回空串；textContent 正常），
-    // 故改用 execute 读 textContent，并轮询到目标文案渲染出来
-    await browser.waitUntil(
-      async () =>
-        await browser.execute(() =>
-          Array.from(
-            document.querySelectorAll(".murasaki-context-menu-shortcut")
-          ).some((e) => (e.textContent ?? "").trim() === "F2")
-        ),
-      { timeout: 5000 }
-    );
-    expect(
-      await browser.execute(() =>
-        Array.from(
-          document.querySelectorAll(".murasaki-context-menu-shortcut")
-        ).map((e) => (e.textContent ?? "").trim())
-      )
-    ).toContain("F2");
+    // 读文案走 textOfElement（句柄 + textContent），别用 getText()——它对该 span 会返回空串
+    const shortcutTexts = async (): Promise<string[]> => {
+      const texts: string[] = [];
+      for (const el of await browser.$$(".murasaki-context-menu-shortcut")) {
+        texts.push(await textOfElement(browser, el));
+      }
+      return texts;
+    };
+    await browser.waitUntil(async () => (await shortcutTexts()).includes("F2"), { timeout: 5000 });
+    expect(await shortcutTexts()).toContain("F2");
   });
 });
