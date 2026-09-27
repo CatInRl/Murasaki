@@ -191,21 +191,25 @@ export async function createSession(
 
       // 关键（#300）：补上 waitUntil 的重试间隔默认值。
       //
-      // `attach()` 是复用既有 session，不会走 `remote()` 的那套默认配置合并，
-      // 于是 `browser.options.waitforInterval` / `waitforTimeout` 都是 undefined。
-      // 而 webdriverio 的 `waitUntil` 取的就是 `options.interval ?? this.options.waitforInterval`：
-      // 一旦两者都拿不到值，**轮询会退化成只跑一次**，并在几毫秒内抛出
+      // `attach()` 是复用既有 session，不会走 `remote()` 那套默认配置合并，于是
+      // `browser.options.waitforInterval` / `waitforTimeout` 都是 undefined。
+      // 而 webdriverio 的 `waitUntil`（node_modules/webdriverio/build/index.js:6435-6448）
+      // 是「解构默认值 + typeof 二次兜底」：
+      //     interval = this.options.waitforInterval      // 解构默认
+      //     if (typeof interval !== "number") interval = this.options.waitforInterval
+      // 两者都取不到数时 interval 是 NaN，Timer 的 `_hasTime(NaN)` 为 false →
+      // **首轮条件返回 false 就直接 reject**，并抛出
       // `waitUntil condition timed out after <timeout>ms`（消息里的耗时是假的）。
       //
-      // 实测（同一次运行内、同一 session，条件恒返回 false）：
-      //   `waitUntil(fn, { timeout: 5000 })`                       → 1 次， 0–15ms
-      //   `waitUntil(fn, { timeout: 5000, interval: 200 })`        → 101 次，20008ms
-      //   `waitUntil(fn, { timeout: 5000, interval: undefined })`  → 1 次， 0ms
-      //   设本默认值后 `waitUntil(fn, { timeout: 5000 })`          → 3 次， 404ms（符合预期）
+      // 实测（条件恒返回 false）：
+      //   `{ timeout: 20000 }`                        → 1 次，0–15ms
+      //   `{ timeout: 20000, interval: 200 }`         → 101 次，20008ms
+      //   设本默认值后 `{ timeout: 20000 }`            → 100 次，20000ms（符合预期）
       //
-      // 因此这里补默认值，而不是去 130 余处调用点逐个加 `interval`（多数只写了 `{ timeout }`）。
-      (browser.options as any).waitforInterval = WAITFOR_INTERVAL;
-      (browser.options as any).waitforTimeout = WAITFOR_TIMEOUT;
+      // 因此在这里补默认值，而不是去 90 个 `waitUntil` 调用点逐个加 `interval`
+      // （`e2e/specs` 里 90 处，其中只有 25 处带了 `interval`）。
+      browser.options.waitforInterval = WAITFOR_INTERVAL;
+      browser.options.waitforTimeout = WAITFOR_TIMEOUT;
       break;
     } catch (err) {
       lastError = err;

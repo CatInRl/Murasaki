@@ -5,16 +5,18 @@
  * - **元素等待命令不重试**：`waitForExist({ timeout: 15000 })` 对不存在的元素会在
  *   **~10ms 内**直接抛错（错误文案却写「after 15000ms」，纯属文案），实测见 #266。
  *   即「等元素出现」在本栈下是单次判定，本地跑得快所以一直没暴露，CI 慢就成片失败。
- * - `browser.waitUntil` **只有拿到 `interval` 才会重试**（#300）。实测同一 session、条件恒
- *   返回 false：`{ timeout: 5000 }` → **1 次，0–15ms** 就抛
- *   `waitUntil condition timed out after 5000ms`（耗时是假的）；`{ interval: 200 }` →
- *   101 次 / 20008ms；`{ interval: undefined }` → 又退回 1 次。原因是 webdriverio 取
- *   `options.interval ?? this.options.waitforInterval`，而本仓库的 session 由 `attach()`
- *   复用、**不合并 `remote()` 的默认配置**，两个值都是 undefined。（此前这里写「waitUntil
- *   正常重试」是错的：当年那次实测带了 `interval 300ms`，结论被过度外推了。）
+ * - `browser.waitUntil` **只有拿到数字型的 `interval` 才会重试**（#300）。实测条件恒返回
+ *   false 时：`{ timeout: 20000 }` → **1 次，0–15ms** 就抛
+ *   `waitUntil condition timed out after 20000ms`（耗时是假的）；
+ *   `{ timeout: 20000, interval: 200 }` → 101 次 / 20008ms。
+ *   机制（node_modules/webdriverio/build/index.js:6435-6448）：`waitUntil` 先按解构默认值取
+ *   `this.options.waitforInterval`，再用 `typeof interval !== "number"` 兜一次；两者都取不到
+ *   数时 interval 是 NaN，Timer 首轮就判超时。而本仓库的 session 由 `attach()` 复用、
+ *   **不合并 `remote()` 的默认配置**，`waitforInterval` 正是 undefined。（此前这里写
+ *   「waitUntil 正常重试」是错的：当年那次实测带了 `interval 300ms`，结论被过度外推了。）
  *   现在 `helpers/driver.ts` 的 `createSession` 会给 session options 补
- *   `waitforInterval` / `waitforTimeout` 默认值，所以只写 `{ timeout }` 也照常轮询 ——
- *   但**别再传 `interval: undefined`**，也不要绕过 `createSession` 自建 session。
+ *   `waitforInterval` / `waitforTimeout` 默认值，所以只写 `{ timeout }` 也照常轮询；
+ *   但**不要绕过 `createSession` 自建 session**，否则又退回单次判定。
  *   这里仍统一用手写轮询（`browser.execute` + `browser.pause`），不依赖这套默认值。
  * - **带动画的浮层（右键菜单等）用 `waitForPresent`，不要用 `waitForRendered`**：后者把
  *   `opacity: "0"` 判为「未渲染」，而淡入浮层（`opacity 0 → 1`）在过渡进行中就是这个值；
