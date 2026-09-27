@@ -167,7 +167,7 @@ describe("演示模式", () => {
     expect(await readText(browser, ".status-mode-chip", "演示模式")).toBe("演示模式");
 
     await waitForPresent(browser, ".status-zoom-chip", 5000);
-    expect(await readText(browser, ".status-zoom-chip")).toContain("100%");
+    expect(await readText(browser, ".status-zoom-chip", /100%/)).toContain("100%");
   });
 
   it("Ctrl+= / Ctrl+- 步进 10%，Ctrl+0 复位，并持久化", async () => {
@@ -179,7 +179,7 @@ describe("演示模式", () => {
 
     await pressShortcut(browser, "=", { ctrl: true });
     expect(await getZoom(browser)).toBe(110);
-    expect(await readText(browser, ".status-zoom-chip")).toContain("110%");
+    expect(await readText(browser, ".status-zoom-chip", /110%/)).toContain("110%");
 
     await pressShortcut(browser, "-", { ctrl: true });
     expect(await getZoom(browser)).toBe(100);
@@ -200,7 +200,7 @@ describe("演示模式", () => {
     await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
       timeout: 5000,
     });
-    expect(await readText(browser, ".status-zoom-chip")).toContain("100%");
+    expect(await readText(browser, ".status-zoom-chip", /100%/)).toContain("100%");
   });
 
   it("非演示模式下缩放快捷键不生效", async () => {

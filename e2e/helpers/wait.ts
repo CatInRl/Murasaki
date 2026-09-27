@@ -159,26 +159,33 @@ export async function textOfElement(browser: Browser, element: unknown): Promise
 /**
  * 读元素文本并**轮询**（选择器版）：
  * - 不传 `expected`：轮询到非空，返回该文本；
- * - 传 `expected`：轮询到 `textContent.trim() === expected`，返回它 —— 同时消掉
- *   「读到空串」与「读太早读到旧值」两种失败（#282 / #286）。
+ * - 传字符串：轮询到 `textContent.trim() === expected`；
+ * - 传正则：轮询到 `expected.test(textContent.trim())` —— 用于「文案会变、但只断言其中一段」
+ *   的场景（例：演示模式缩放 chip 从 `100%` 变 `110%`，只取首非空会读到旧值）。
  *
+ * 三种形态都同时消掉「读到空串」与「读太早读到旧值」两类失败（#282 / #286）。
  * 超时错误里带上最后一次读到的值，便于区分「一直为空」与「文案不对」。
  */
 export async function readText(
   browser: Browser,
   selector: string,
-  expected?: string,
+  expected?: string | RegExp,
   timeout = 5000,
   interval = 100
 ): Promise<string> {
+  const matches = (text: string): boolean => {
+    if (expected === undefined) return text.length > 0;
+    return expected instanceof RegExp ? expected.test(text) : text === expected;
+  };
   const start = Date.now();
   let last = "";
   while (Date.now() - start < timeout) {
     last = await textFrom(browser, selector);
-    if (expected === undefined ? last.length > 0 : last === expected) return last;
+    if (matches(last)) return last;
     await browser.pause(interval);
   }
-  const want = expected === undefined ? "非空文本" : `"${expected}"`;
+  const want =
+    expected === undefined ? "非空文本" : `"${String(expected)}"`;
   throw new Error(
     `readText: "${selector}" 未在 ${timeout}ms 内变为 ${want}（最后读到：${JSON.stringify(last)}）`
   );
