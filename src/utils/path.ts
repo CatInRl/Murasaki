@@ -118,6 +118,24 @@ export function isPathUnder(base: string, target: string): boolean {
 }
 
 /**
+ * 判断标签页是否位于当前工作区之外（标签栏 ↗ 角标与「全部标签」面板共用同一判定）
+ *
+ * 未命名标签（无路径）与未打开工作区时都不算「工作区外」。
+ *
+ * 例如：isTabOutOfWorkspace("C:/docs", "C:/docs/a.md") → false
+ *      isTabOutOfWorkspace("C:/docs", "C:/other/a.md") → true
+ *      isTabOutOfWorkspace("C:/docs", null) → false（未命名标签）
+ *      isTabOutOfWorkspace(null, "C:/other/a.md") → false（无工作区）
+ */
+export function isTabOutOfWorkspace(
+  workspacePath: string | null,
+  tabPath: string | null
+): boolean {
+  if (!workspacePath || !tabPath) return false;
+  return !isPathUnder(workspacePath, tabPath);
+}
+
+/**
  * 计算从 fromFile 所在目录到 toPath 的相对路径
  * `from` 被视为文件路径，先取其目录作为基准
  *

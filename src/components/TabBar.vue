@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { X, Copy, FolderOpen, ArrowUpRight } from "lucide-vue-next";
+import { NPopover, NScrollbar } from "naive-ui";
+import { X, Copy, FolderOpen, ArrowUpRight, LayoutList } from "lucide-vue-next";
 import { useTabsStore } from "../stores/useTabsStore";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
 import { useDialogStore } from "../stores/useDialogStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
-import { isPathUnder } from "../utils/path";
+import { isTabOutOfWorkspace } from "../utils/path";
+import { buildTabList, filterTabList } from "../utils/tabList";
+import type { TabListEntry } from "../utils/tabList";
 import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
 import type { MenuItem } from "../stores/useContextMenuStore";
 import type { Tab } from "../types";
@@ -18,6 +21,12 @@ const contextMenu = useContextMenuStore();
 const dialog = useDialogStore();
 const workspace = useWorkspaceStore();
 const { t } = useI18n();
+
+/**
+ * 「全部标签」面板的展开状态**由父组件持有**：这样快捷键命令（useCommands）
+ * 与按钮点击走同一条路径，不必为面板再造一个 store。详见 CONTEXT.md「全部标签面板」。
+ */
+const props = defineProps<{ allTabsOpen: boolean }>();
 
 const tabsListRef = ref<HTMLElement | null>(null);
 
@@ -33,6 +42,8 @@ const emit = defineEmits<{
   (e: "close-left", tabId: string): void;
   /** 关闭所有 tab */
   (e: "close-all"): void;
+  /** 「全部标签」面板展开状态变化 */
+  (e: "update:allTabsOpen", open: boolean): void;
 }>();
 
 const tabs = computed(() => tabsStore.tabs);
@@ -90,13 +101,10 @@ function isActive(tabId: string): boolean {
 
 /**
  * 工作区归属：tab 是否位于当前工作区之外。
- * 派生布尔属性：由 workspacePath 与 tab.path 实时计算（前缀 + 目录边界 + 大小写不敏感）。
- * 未保存 tab（path=null）与无工作区时均视为工作区内（不加角标）。
+ * 判定收敛在 `utils/path.isTabOutOfWorkspace`，与「全部标签」面板同源。
  */
 function isOutOfWorkspace(tab: Tab): boolean {
-  const ws = workspace.workspacePath;
-  if (!ws || !tab.path) return false;
-  return !isPathUnder(ws, tab.path);
+  return isTabOutOfWorkspace(workspace.workspacePath, tab.path);
 }
 
 /** tab 的 hover 提示：工作区外 tab 加前缀 */
@@ -177,6 +185,111 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
   ];
   contextMenu.show(e, items);
 }
+
+// ===== 全部标签面板（issue #168 / #279）=====
+// 定位器语义：只按标题 + 所在目录过滤，顺序与标签栏一致（见 CONTEXT.md）
+
+const tabQuery = ref("");
+/** 键盘高亮项下标（-1 = 焦点在搜索框） */
+const focusIndex = ref(-1);
+const searchInputRef = ref<HTMLInputElement | null>(null);
+const allTabsBtnRef = ref<HTMLButtonElement | null>(null);
+const panelRef = ref<HTMLElement | null>(null);
+
+const tabEntries = computed(() =>
+  buildTabList(tabsStore.tabs, {
+    activeTabId: tabsStore.activeTabId,
+    workspacePath: workspace.workspacePath,
+    titleOf: (tab) => tabsStore.getTabTitle(tab),
+  })
+);
+const filteredEntries = computed(() => filterTabList(tabEntries.value, tabQuery.value));
+
+/**
+ * 受控展开：单项关闭会弹全局确认对话框（挂在 body 上），对 NPopover 而言是「外部点击」。
+ * 面板在确认期间保持打开（面向「连续整理」场景），故此处挂起那次关闭请求。
+ */
+function onAllTabsShowUpdate(next: boolean): void {
+  if (!next && dialog.isOpen) return;
+  emit("update:allTabsOpen", next);
+}
+
+/** 打开时聚焦搜索框（过滤几乎总是第一步）；关闭时清空查询与高亮 */
+watch(
+  () => props.allTabsOpen,
+  (open) => {
+    if (open) {
+      // flush: "post" 保证 NPopover 的内容（含搜索框）已挂载
+      void nextTick(() => searchInputRef.value?.focus());
+      return;
+    }
+    tabQuery.value = "";
+    focusIndex.value = -1;
+  },
+  { flush: "post" }
+);
+
+function closeAllTabsPanel(): void {
+  emit("update:allTabsOpen", false);
+}
+
+/** 过滤条件变化后旧的高亮下标可能越界或指错行，回到「焦点在搜索框」的初始态 */
+watch(tabQuery, () => {
+  focusIndex.value = -1;
+});
+
+/** 定位到某个标签：切换 + 关面板（列表由 store 派生，无需手动同步） */
+function activateEntry(entry: TabListEntry): void {
+  tabsStore.switchTo(entry.id);
+  closeAllTabsPanel();
+}
+
+function onCloseEntry(e: MouseEvent, entry: TabListEntry): void {
+  e.stopPropagation();
+  // 未保存提示仍由父组件（useTabClose）处理；关掉或取消后列表自动同步
+  emit("close-tab", entry.id);
+}
+
+/** 把键盘高亮滚入可视区并聚焦该行 */
+function moveFocus(next: number): void {
+  const max = filteredEntries.value.length - 1;
+  if (max < 0) return;
+  focusIndex.value = Math.min(Math.max(next, -1), max);
+  void nextTick(() => {
+    if (focusIndex.value < 0) {
+      searchInputRef.value?.focus();
+      return;
+    }
+    const row = panelRef.value?.querySelector<HTMLElement>(".all-tabs-item.focused");
+    row?.focus();
+    row?.scrollIntoView({ block: "nearest" });
+  });
+}
+
+function onPanelKeydown(e: KeyboardEvent): void {
+  switch (e.key) {
+    case "ArrowDown":
+      e.preventDefault();
+      moveFocus(focusIndex.value + 1);
+      break;
+    case "ArrowUp":
+      e.preventDefault();
+      moveFocus(focusIndex.value - 1);
+      break;
+    case "Enter": {
+      e.preventDefault();
+      const target = filteredEntries.value[focusIndex.value] ?? filteredEntries.value[0];
+      if (target) activateEntry(target);
+      break;
+    }
+    case "Escape":
+      e.preventDefault();
+      closeAllTabsPanel();
+      // 焦点还给入口按钮，留一条再次打开的路（不回编辑器）
+      void nextTick(() => allTabsBtnRef.value?.focus());
+      break;
+  }
+}
 </script>
 
 <template>
@@ -224,6 +337,84 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
         </button>
       </div>
     </div>
+
+    <!-- 全部标签：常驻入口（固定宽度、不参与标签区压缩），详见 CONTEXT.md -->
+    <NPopover
+      :show="allTabsOpen"
+      trigger="click"
+      placement="bottom-end"
+      :show-arrow="false"
+      :style="{ padding: 0 }"
+      @update:show="onAllTabsShowUpdate"
+    >
+      <template #trigger>
+        <button
+          ref="allTabsBtnRef"
+          class="all-tabs-btn"
+          type="button"
+          :title="$t('editor.tabBar.allTabs')"
+          :aria-label="$t('editor.tabBar.allTabs')"
+          :aria-expanded="allTabsOpen"
+          data-testid="all-tabs-btn"
+        >
+          <LayoutList :size="14" aria-hidden="true" />
+          <span class="all-tabs-count">{{ tabs.length }}</span>
+        </button>
+      </template>
+
+      <div ref="panelRef" class="all-tabs-panel" data-testid="all-tabs-panel" @keydown="onPanelKeydown">
+        <input
+          ref="searchInputRef"
+          v-model="tabQuery"
+          class="all-tabs-search"
+          type="text"
+          :placeholder="$t('editor.tabBar.allTabsSearchPlaceholder')"
+          :aria-label="$t('editor.tabBar.allTabsSearchPlaceholder')"
+        />
+        <NScrollbar class="all-tabs-scroll" :style="{ maxHeight: '320px' }">
+          <div class="all-tabs-list" role="listbox">
+            <p v-if="filteredEntries.length === 0" class="all-tabs-empty">
+              {{ $t('editor.tabBar.allTabsEmpty') }}
+            </p>
+            <div
+              v-for="(entry, i) in filteredEntries"
+              :key="entry.id"
+              class="all-tabs-item"
+              :class="{ active: entry.isActive, focused: i === focusIndex }"
+              role="option"
+              :aria-selected="entry.isActive"
+              :tabindex="i === focusIndex ? 0 : -1"
+              :title="entry.subtitle ?? entry.title"
+              @click="activateEntry(entry)"
+            >
+              <ArrowUpRight
+                v-if="entry.isOutOfWorkspace"
+                class="all-tabs-mark"
+                :size="12"
+                aria-hidden="true"
+              />
+              <span class="all-tabs-text">
+                <span class="all-tabs-title">{{ entry.title }}</span>
+                <span class="all-tabs-subtitle">{{ entry.subtitle ?? $t('common.untitled') }}</span>
+              </span>
+              <span v-if="entry.isDirty" class="dirty-dot" aria-hidden="true"></span>
+              <button
+                class="all-tabs-close"
+                type="button"
+                :title="$t('editor.tabBar.close')"
+                :aria-label="$t('editor.tabBar.closeTabAria')"
+                @click="onCloseEntry($event, entry)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </NScrollbar>
+      </div>
+    </NPopover>
 
     <!-- + 按钮 -->
     <button
@@ -381,9 +572,171 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
   transform: scale(0.94);
 }
 
+/* ===== 全部标签入口 + 面板（issue #168 / #279）===== */
+/* 入口固定宽度、不参与标签区压缩：收起时它仍要能点开，所以不能跟着溢出被挤掉 */
+.all-tabs-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 28px;
+  min-width: 40px;
+  margin-bottom: 2px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: var(--murasaki-ink-3);
+  border-radius: var(--murasaki-radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
+              color var(--murasaki-duration-fast) var(--murasaki-ease);
+}
+
+.all-tabs-btn:hover,
+.all-tabs-btn[aria-expanded="true"] {
+  background: var(--murasaki-neutral-200);
+  color: var(--murasaki-ink-2);
+}
+
+.all-tabs-count {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.all-tabs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 320px;
+  max-width: 80vw;
+  padding: 8px;
+}
+
+.all-tabs-search {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--murasaki-ink);
+  background: var(--murasaki-background);
+  border: 1px solid var(--murasaki-border);
+  border-radius: var(--murasaki-radius-sm);
+  outline: none;
+  transition: border-color var(--murasaki-duration-fast) var(--murasaki-ease);
+}
+
+.all-tabs-search:focus {
+  border-color: var(--murasaki-primary);
+}
+
+.all-tabs-scroll {
+  width: 100%;
+}
+
+.all-tabs-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--murasaki-radius-sm);
+  cursor: pointer;
+  outline: none;
+  transition: background var(--murasaki-duration-fast) var(--murasaki-ease);
+}
+
+.all-tabs-item:hover {
+  background: var(--murasaki-neutral-100);
+}
+
+.all-tabs-item.active {
+  background: color-mix(in srgb, var(--murasaki-primary) 10%, transparent);
+}
+
+/* 键盘高亮独立于鼠标 hover，便于「↓ 进列表」后看清落点 */
+.all-tabs-item.focused {
+  box-shadow: inset 0 0 0 1px var(--murasaki-primary);
+}
+
+.all-tabs-mark {
+  flex-shrink: 0;
+  color: var(--murasaki-ink-3);
+}
+
+.all-tabs-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.all-tabs-title,
+.all-tabs-subtitle {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.all-tabs-title {
+  font-size: 12.5px;
+  color: var(--murasaki-ink);
+}
+
+.all-tabs-item.active .all-tabs-title {
+  color: var(--murasaki-primary);
+}
+
+.all-tabs-subtitle {
+  font-size: 11px;
+  color: var(--murasaki-ink-3);
+}
+
+/* 关闭按钮与标签栏同款：hover 才显，避免列表看起来像一排叉号 */
+.all-tabs-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--murasaki-ink-3);
+  border-radius: var(--murasaki-radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--murasaki-duration-fast) var(--murasaki-ease),
+              background var(--murasaki-duration-fast) var(--murasaki-ease),
+              color var(--murasaki-duration-fast) var(--murasaki-ease);
+}
+
+.all-tabs-item:hover .all-tabs-close,
+.all-tabs-item.focused .all-tabs-close {
+  opacity: 1;
+}
+
+.all-tabs-close:hover {
+  background: var(--murasaki-neutral-300);
+  color: var(--murasaki-ink);
+}
+
+.all-tabs-empty {
+  padding: 12px 0;
+  font-size: 12px;
+  color: var(--murasaki-ink-3);
+  text-align: center;
+}
+
 /* 触屏：始终显示关闭按钮 */
 @media (pointer: coarse) {
   .close-btn {
+    opacity: 1;
+  }
+  .all-tabs-close {
     opacity: 1;
   }
   .tab-item {
@@ -392,6 +745,9 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
   }
   .new-tab-btn {
     width: 36px;
+    height: 36px;
+  }
+  .all-tabs-btn {
     height: 36px;
   }
 }

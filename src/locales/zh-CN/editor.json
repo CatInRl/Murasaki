@@ -32,7 +32,10 @@
     "closeLeft": "关闭左侧",
     "closeAll": "关闭所有",
     "closeTabAria": "关闭标签页",
-    "outOfWorkspacePrefix": "工作区外："
+    "outOfWorkspacePrefix": "工作区外：",
+    "allTabs": "全部标签",
+    "allTabsSearchPlaceholder": "按标题或所在目录过滤…",
+    "allTabsEmpty": "无匹配的标签"
   },
   "sidebar": {
     "filesTab": "文件树",

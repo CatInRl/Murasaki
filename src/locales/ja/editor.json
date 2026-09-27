@@ -32,7 +32,10 @@
     "closeLeft": "左側を閉じる",
     "closeAll": "すべて閉じる",
     "closeTabAria": "タブを閉じる",
-    "outOfWorkspacePrefix": "ワークスペース外："
+    "outOfWorkspacePrefix": "ワークスペース外：",
+    "allTabs": "すべてのタブ",
+    "allTabsSearchPlaceholder": "タイトルまたはフォルダで絞り込み…",
+    "allTabsEmpty": "一致するタブがありません"
   },
   "sidebar": {
     "filesTab": "ファイルツリー",
