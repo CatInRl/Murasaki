@@ -11,7 +11,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { isRendered, waitForInBrowser, waitForPresent } from "../helpers/wait";
+import { isRendered, readText, textOfElement, waitForInBrowser, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -51,9 +51,8 @@ describe("工作区 + 文件树", () => {
     const wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
 
-    const title = await browser.$(".file-tree .toolbar-title");
     await waitForPresent(browser, ".file-tree .toolbar-title", 10000);
-    const text = (await title.getText()).trim();
+    const text = await readText(browser, ".file-tree .toolbar-title");
     expect(text.length).toBeGreaterThan(0);
     // 工作区目录名应出现在标题中（fixture 目录名 .workspace 被 UI 大写显示为 .WORKSPACE）
     expect(text.toLowerCase()).toContain("workspace");
@@ -71,7 +70,7 @@ describe("工作区 + 文件树", () => {
     const names = await browser.$$(".file-tree .node-name");
     const texts: string[] = [];
     for (const n of names) {
-      texts.push((await n.getText()).trim());
+      texts.push(await textOfElement(browser, n));
     }
     expect(texts).toEqual(expect.arrayContaining(["intro.md", "notes.md", "sub"]));
   });

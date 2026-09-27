@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { closeWorkspace, closeAllTabs, waitForPinia } from "../helpers/store";
-import { isRendered, isRenderedElement, waitForPresent } from "../helpers/wait";
+import { isRendered, isRenderedElement, readText, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -55,14 +55,9 @@ describe("Murasaki 启动 smoke 测试", () => {
   });
 
   it("欢迎页包含 'Murasaki' 标题文本", async () => {
-    const titleEl = await browser.$(".welcome-page .brand-title");
     await waitForPresent(browser, ".welcome-page .brand-title", 10000);
     // Vue 异步渲染可能需要额外时间填充文本
-    await browser.waitUntil(async () => {
-      const text = (await titleEl.getText()).trim();
-      return text.length > 0;
-    }, { timeout: 5000 });
-    const text = (await titleEl.getText()).trim();
+    const text = await readText(browser, ".welcome-page .brand-title");
     expect(text).toMatch(/Murasaki/i);
   });
 

@@ -26,7 +26,7 @@ import {
   dismissAllDialogs,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { readText, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -163,13 +163,11 @@ describe("演示模式", () => {
     await openFileInTab(browser, `${wsPath}\\intro.md`);
     await pressShortcut(browser, "$", { ctrl: true, shift: true });
 
-    const modeChip = await browser.$(".status-mode-chip");
     await waitForPresent(browser, ".status-mode-chip", 10000);
-    expect((await modeChip.getText()).trim()).toBe("演示模式");
+    expect(await readText(browser, ".status-mode-chip", "演示模式")).toBe("演示模式");
 
-    const zoomChip = await browser.$(".status-zoom-chip");
     await waitForPresent(browser, ".status-zoom-chip", 5000);
-    expect((await zoomChip.getText()).trim()).toContain("100%");
+    expect(await readText(browser, ".status-zoom-chip", /100%/)).toContain("100%");
   });
 
   it("Ctrl+= / Ctrl+- 步进 10%，Ctrl+0 复位，并持久化", async () => {
@@ -177,12 +175,11 @@ describe("演示模式", () => {
     await openFileInTab(browser, `${wsPath}\\intro.md`);
     await pressShortcut(browser, "$", { ctrl: true, shift: true });
 
-    const zoomChip = await browser.$(".status-zoom-chip");
     await waitForPresent(browser, ".status-zoom-chip", 10000);
 
     await pressShortcut(browser, "=", { ctrl: true });
     expect(await getZoom(browser)).toBe(110);
-    expect((await zoomChip.getText()).trim()).toContain("110%");
+    expect(await readText(browser, ".status-zoom-chip", /110%/)).toContain("110%");
 
     await pressShortcut(browser, "-", { ctrl: true });
     expect(await getZoom(browser)).toBe(100);
@@ -203,7 +200,7 @@ describe("演示模式", () => {
     await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
       timeout: 5000,
     });
-    expect((await zoomChip.getText()).trim()).toContain("100%");
+    expect(await readText(browser, ".status-zoom-chip", /100%/)).toContain("100%");
   });
 
   it("非演示模式下缩放快捷键不生效", async () => {

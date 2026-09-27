@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { closeWorkspace, waitForPinia } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { readText, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -65,8 +65,7 @@ describe("对话框系统", () => {
 
     // 等待 DOM 渲染稳定后验证文本
     await browser.pause(200);
-    const message = await browser.$(".dialog-message");
-    expect((await message.getText()).trim()).toBe("测试提示");
+    expect(await readText(browser, ".dialog-message", "测试提示")).toBe("测试提示");
 
     // 点击确认按钮
     const confirmBtn = await browser.$(".dialog-footer .dialog-btn.primary");

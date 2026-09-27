@@ -24,7 +24,7 @@ import {
   openFileInTab,
 } from "../helpers/store";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { waitForPresent } from "../helpers/wait";
+import { readText, textOfElement, waitForPresent } from "../helpers/wait";
 
 /** 测试用 markdown 文件路径 */
 const TEST_FILE = "test.md";
@@ -324,9 +324,8 @@ describe("WYSIWYG 模式全量测试", () => {
       await setCursorToEnd(browser);
       const wrapper = await waitForSelector(browser, ".murasaki-wysiwyg-codeblock-wrapper");
       expect(await wrapper.isExisting()).toBe(true);
-      const langLabel = await browser.$(".murasaki-wysiwyg-code-lang-label");
       // 语言标签经 CSS text-transform: uppercase 渲染为 "TS"，用大小写不敏感比较
-      expect((await langLabel.getText()).toLowerCase()).toContain("ts");
+      expect((await readText(browser, ".murasaki-wysiwyg-code-lang-label")).toLowerCase()).toContain("ts");
     });
 
     it("2.2 代码块 widget 渲染（无语言）", async () => {
@@ -432,7 +431,7 @@ describe("WYSIWYG 模式全量测试", () => {
       await setCursorToEnd(browser);
       const link = await waitForSelector(browser, ".murasaki-wysiwyg-link");
       expect(await link.isExisting()).toBe(true);
-      const linkText = await link.getText();
+      const linkText = await textOfElement(browser, link);
       // 预期：链接内文本应为 "bold link"（粗体渲染由 CSS 处理）
       // 已知问题：Link widget return false 不进入子节点，粗体标记可能不渲染
       expect(linkText).toContain("bold link");
@@ -517,7 +516,7 @@ describe("WYSIWYG 模式全量测试", () => {
       const math = await waitForSelector(browser, ".murasaki-wysiwyg-math", 5000);
       expect(await math.isExisting()).toBe(true);
       // 无效公式应显示原始文本或错误标记
-      const text = await math.getText();
+      const text = await textOfElement(browser, math);
       expect(text.length).toBeGreaterThan(0);
     });
 

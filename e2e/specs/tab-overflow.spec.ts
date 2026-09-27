@@ -30,7 +30,7 @@ import {
   resetPersistenceSettings,
   dismissAllDialogs,
 } from "../helpers/store";
-import { waitForPresent, waitForAbsent, waitForInBrowser } from "../helpers/wait";
+import { readText, waitForPresent, waitForAbsent, waitForInBrowser } from "../helpers/wait";
 
 let browser: Browser;
 /** 每次 beforeEach 重建的工作区根目录 */
@@ -222,8 +222,7 @@ describe("全部标签面板", () => {
 
     // 计数徽标 = 标签总数
     await waitForPresent(browser, BTN, 8000);
-    const badge = await browser.$(`${BTN} .all-tabs-count`);
-    expect((await badge.getText()).trim()).toBe(String(state.tabs.length));
+    expect(await readText(browser, `${BTN} .all-tabs-count`, String(state.tabs.length))).toBe(String(state.tabs.length));
 
     await openPanel();
     await waitForEntryCount(8, "面板列出全部 8 个标签");

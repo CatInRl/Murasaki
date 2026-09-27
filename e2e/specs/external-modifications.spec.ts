@@ -24,7 +24,7 @@ import {
   setActiveContent,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { textOfElement, waitForPresent } from "../helpers/wait";
 import { writeFileSync, rmSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -199,7 +199,7 @@ describe("外部修改检测", () => {
       // 回退：找所有按钮中的 "加载磁盘版本"
       const buttons = await browser.$$(".external-change-dialog button");
       for (const btn of buttons) {
-        const text = (await btn.getText()).trim();
+        const text = await textOfElement(browser, btn);
         if (text.includes("加载") || text.includes("磁盘")) {
           await btn.click();
           break;
@@ -256,7 +256,7 @@ describe("外部修改检测", () => {
     const buttons = await browser.$$(".external-change-dialog button");
     let clicked = false;
     for (const btn of buttons) {
-      const text = (await btn.getText()).trim();
+      const text = await textOfElement(browser, btn);
       if (text.includes("保留") || text.includes("本地")) {
         await btn.click();
         clicked = true;
@@ -267,7 +267,7 @@ describe("外部修改检测", () => {
       // 回退：找所有按钮
       const allBtns = await browser.$$("button");
       for (const btn of allBtns) {
-        const text = (await btn.getText()).trim();
+        const text = await textOfElement(browser, btn);
         if (text.includes("保留") || text.includes("本地")) {
           await btn.click();
           break;

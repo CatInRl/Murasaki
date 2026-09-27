@@ -15,7 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, dismissAllDialogs } from "../helpers/store";
-import { isRendered, waitForPresent } from "../helpers/wait";
+import { isRendered, readText, textOfElement, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -43,14 +43,9 @@ describe("状态栏", () => {
       return statusBar.isExisting();
     }, { timeout: 10000 });
 
-    const fileName = await browser.$(".status-filename");
     await waitForPresent(browser, ".status-filename", 10000);
     // 前序 spec 可能持久化了 tabs，closeAllTabs 后 Vue 异步渲染需要时间更新状态栏
-    await browser.waitUntil(async () => {
-      const text = (await fileName.getText()).trim();
-      return text === "未打开文件";
-    }, { timeout: 5000 });
-    expect((await fileName.getText()).trim()).toBe("未打开文件");
+    expect(await readText(browser, ".status-filename", "未打开文件")).toBe("未打开文件");
   });
 
   it("打开文件后显示文件名", async () => {
@@ -58,10 +53,8 @@ describe("状态栏", () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
-    const fileName = await browser.$(".status-filename");
     await waitForPresent(browser, ".status-filename", 10000);
-    const nameText = (await fileName.getText()).trim();
-    expect(nameText).toBe("intro.md");
+    expect(await readText(browser, ".status-filename", "intro.md")).toBe("intro.md");
   });
 
   it("显示光标位置（行 X, 列 Y）", async () => {
@@ -76,7 +69,7 @@ describe("状态栏", () => {
     const groups = await browser.$$(".status-group");
     let foundCursor = false;
     for (const g of groups) {
-      const text = await g.getText();
+      const text = await textOfElement(browser, g);
       if (text.includes("行") && text.includes("列")) {
         foundCursor = true;
         expect(text).toMatch(/行\s*\d+,?\s*列\s*\d+/);
@@ -95,7 +88,7 @@ describe("状态栏", () => {
     await browser.waitUntil(async () => {
       const groups = await browser.$$(".status-group");
       for (const g of groups) {
-        const text = await g.getText();
+        const text = await textOfElement(browser, g);
         if (text.includes("字符")) return true;
       }
       return false;
@@ -104,7 +97,7 @@ describe("状态栏", () => {
     const groups = await browser.$$(".status-group");
     let foundCharCount = false;
     for (const g of groups) {
-      const text = await g.getText();
+      const text = await textOfElement(browser, g);
       if (text.includes("字符")) {
         foundCharCount = true;
         expect(text).toMatch(/\d+\s*字符/);
@@ -130,11 +123,10 @@ describe("状态栏", () => {
     });
 
     // 等待未保存指示出现
-    const unsaved = await browser.$(".status-unsaved");
     await waitForPresent(browser, ".status-unsaved", 5000);
     // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
     expect(await isRendered(browser, ".status-unsaved")).toBe(true);
-    expect((await unsaved.getText()).trim()).toBe("未保存");
+    expect(await readText(browser, ".status-unsaved", "未保存")).toBe("未保存");
   });
 
   it("已保存文件显示「已保存」指示", async () => {
@@ -143,9 +135,8 @@ describe("状态栏", () => {
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
     // 文件刚打开，isDirty 应为 false → 显示"已保存"
-    const saved = await browser.$(".status-saved");
     await waitForPresent(browser, ".status-saved", 10000);
     expect(await isRendered(browser, ".status-saved")).toBe(true);
-    expect((await saved.getText()).trim()).toBe("已保存");
+    expect(await readText(browser, ".status-saved", "已保存")).toBe("已保存");
   });
 });

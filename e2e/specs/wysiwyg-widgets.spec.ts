@@ -19,7 +19,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
-import { waitForPresent } from "../helpers/wait";
+import { textOfElement, waitForPresent } from "../helpers/wait";
 import {
   openWorkspace,
   closeWorkspace,
@@ -132,7 +132,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 应有语言标签（ts）
     const langLabel = await browser.$(".murasaki-wysiwyg-code-lang-label");
     if (await langLabel.isExisting()) {
-      const text = (await langLabel.getText()).trim().toLowerCase();
+      const text = (await textOfElement(browser, langLabel)).toLowerCase();
       expect(text).toContain("ts");
     }
   });
@@ -175,7 +175,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     expect(await link.isExisting()).toBe(true);
     const href = await link.getAttribute("href");
     expect(href).toContain("github.com");
-    const text = (await link.getText()).trim();
+    const text = await textOfElement(browser, link);
     expect(text).toContain("Murasaki");
   });
 

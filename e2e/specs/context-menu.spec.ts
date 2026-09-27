@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { waitForPinia, dismissAllDialogs } from "../helpers/store";
-import { waitForPresent, waitForAbsent } from "../helpers/wait";
+import { textOfElement, waitForPresent, waitForAbsent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -64,10 +64,11 @@ describe("右键菜单", () => {
     expect(items.length).toBe(2);
 
     // webdriverio 9.x $$ 数组索引访问需用 await
+    // 文案按句柄读（`.murasaki-context-menu-label` 同选择器命中第一个，用 nth-of-type 会把分隔符算进计数）
     const label0 = await items[0].$(".murasaki-context-menu-label");
     const label1 = await items[1].$(".murasaki-context-menu-label");
-    expect((await label0.getText()).trim()).toBe("重命名");
-    expect((await label1.getText()).trim()).toBe("删除");
+    expect(await textOfElement(browser, label0)).toBe("重命名");
+    expect(await textOfElement(browser, label1)).toBe("删除");
 
     // danger 项应有 is-danger class
     expect(await items[1].getAttribute("class")).toContain("is-danger");

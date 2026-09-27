@@ -24,7 +24,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { textOfElement, waitForPresent } from "../helpers/wait";
 import { resolve } from "node:path";
 
 let browser: Browser;
@@ -156,7 +156,7 @@ describe("统一搜索条主链路", () => {
     const items = await browser.$$(".gsb__item");
     // webdriverio v9 的 `$$` 返回值把原生 Array.map 覆盖成了异步版（返回 Promise 而非可迭代数组），
     // 所以 `Promise.all(items.map(...))` 会因「参数不可迭代」报错；直接 await 这个异步 map 即可拿到文本数组
-    const texts = await items.map((i) => i.getText());
+    const texts = await items.map((i) => textOfElement(browser, i));
     // 条目渲染为「图标字形 + 文件名分段」多行文本（实测形如 "M\nnotes\n.md"），
     // 直接 includes("notes.md") 会被换行卡住，故先去掉所有空白再比对
     expect(

@@ -15,7 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { isRendered, waitForPresent } from "../helpers/wait";
+import { isRendered, readText, textOfElement, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -160,8 +160,7 @@ describe("文件树选中态 & 搜索高亮", () => {
     expect(marks.length).toBeGreaterThan(0);
 
     // mark 元素的文字应包含搜索关键词
-    const firstMarkText = (await marks[0].getText()).trim();
-    expect(firstMarkText).toContain("特殊关键词");
+    expect(await readText(browser, ".gsb-hl")).toContain("特殊关键词");
   });
 
   it("文件名匹配渲染", async () => {
@@ -186,7 +185,7 @@ describe("文件树选中态 & 搜索高亮", () => {
     const items = await browser.$$(".gsb__item");
     // webdriverio v9 的 `$$` 返回值把原生 Array.map 覆盖成了异步版（返回 Promise 而非可迭代数组），
     // 所以 `Promise.all(items.map(...))` 会因「参数不可迭代」报错；直接 await 这个异步 map 即可拿到文本数组
-    const texts = await items.map((i) => i.getText());
+    const texts = await items.map((i) => textOfElement(browser, i));
     expect(texts.some((t) => t.includes("match-filename"))).toBe(true);
   });
 

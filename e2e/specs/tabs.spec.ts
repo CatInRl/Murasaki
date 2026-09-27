@@ -18,7 +18,7 @@ import {
   waitForPinia,
   resetPersistenceSettings
 } from "../helpers/store";
-import { isRendered, waitForPresent } from "../helpers/wait";
+import { isRendered, readText, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -110,8 +110,7 @@ describe("多 Tab 管理", () => {
     expect(activeTab?.title).toBe("intro.md");
 
     // 视觉上：.active class 应该在 intro.md tab 上
-    const activeTabEl = await browser.$(".tab-item.active .tab-title");
-    expect((await activeTabEl.getText()).trim()).toBe("intro.md");
+    expect(await readText(browser, ".tab-item.active .tab-title", "intro.md")).toBe("intro.md");
   });
 
   it("点击 Tab 关闭按钮关闭 Tab", async () => {

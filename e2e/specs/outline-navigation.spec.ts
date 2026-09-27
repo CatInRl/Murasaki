@@ -22,7 +22,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { isRendered, waitForPresent } from "../helpers/wait";
+import { isRendered, textOfElement, waitForPresent } from "../helpers/wait";
 import { resolve } from "node:path";
 
 let browser: Browser;
@@ -114,7 +114,7 @@ describe("大纲视图切换 + 标题跳转", () => {
     const items = await browser.$$(".outline-pane .outline-item, [class*='outline'] .outline-item");
     const texts: string[] = [];
     for (const item of items) {
-      texts.push((await item.getText()).trim());
+      texts.push(await textOfElement(browser, item));
     }
 
     // 应包含三个层级的标题
@@ -143,7 +143,7 @@ describe("大纲视图切换 + 标题跳转", () => {
     const outlineItems = await browser.$$(".outline-pane .outline-item, [class*='outline'] .outline-item");
     let clicked = false;
     for (const item of outlineItems) {
-      const text = (await item.getText()).trim();
+      const text = await textOfElement(browser, item);
       if (text === "二级标题 B") {
         await item.click();
         clicked = true;
