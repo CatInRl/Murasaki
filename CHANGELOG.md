@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- 修复从系统拖入外部图片在 Windows 上完全不生效（#288）：Tauri 的 `dragDropEnabled`（默认开）会拦截系统文件拖放，HTML5 `drop` 收不到事件，导致 #151 的「拖入图片」一直无反应。改由 Tauri 原生 drag-drop 事件驱动（`onDragDropEvent` → `useDragDrop` → `useImagePaste`），并**移除** window 级 HTML5 `drop` 这条失效入口（避免双重插入）；插入方式（file/base64）、`Alt` 临时取反、无工作区或落盘失败回退内嵌、落点在鼠标处、多张按顺序插入等既有语义不变。图片字节改由 Rust 侧读取（新增命令 `copy_image_to_workspace` / `read_image_base64`），前端不再直接读本地文件；落点从窗口物理像素换算为视口 CSS 像素（换算不出时回退光标）。
 - 修复导出 HTML 时本地图片不再内联为 Base64（#258）：渲染期图片 src 已被改写成 Tauri asset 协议 URL，而导出侧只认文件路径形态于是静默跳过，导致导出的 HTML 换台机器打开时本地图片全部丢失。现把 asset URL 回解为本地路径后再内联，并让导出渲染临时指向本次导出的文件（避免相对图片按别的目录解析、被内联成错误图片）；顺带修正 Windows 盘符绝对路径此前被误当相对路径处理的问题。
 - 修复 tauri-driver E2E 无法建立 WebDriver session（#255）：WebView2 Runtime 150 起，msedgedriver 改用环境变量 `WEBVIEW2_USER_DATA_FOLDER` 传 user data folder，应用侧漏读该变量，导致 `DevToolsActivePort` 写到 msedgedriver 不轮询的目录、会话建立失败。顺带修掉「用户环境变量恰好含 `--remote-debugging-port=` 时被误判为 E2E，进而禁用单实例锁」的边界情形；E2E 分支之外无行为变化。
 

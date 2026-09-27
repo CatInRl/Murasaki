@@ -172,7 +172,7 @@ const {
 
 // ===== 拖放打开（原生 drag-drop，issue #92）=====
 // 单个目录 → 走「打开文件夹」同一路径（同目录已开则聚焦，否则新窗口）；文件 → 当前窗口逐个开标签。
-// 图片本 PR 忽略（见 #288）。
+// 图片 → 当前窗口编辑器按插入方式插入（issue #288，见 onDropImages）。
 const {
   dragging: dropDragging,
   setup: setupDragDrop,
@@ -180,6 +180,7 @@ const {
 } = useDragDrop({
   openFile,
   openFolder: openPathInNewWindow,
+  insertImages: onDropImages,
 });
 
 // ===== 复制为富文本 composable（issue #108，复用 exportHtml 管线，走剪贴板而非文件）=====
@@ -587,6 +588,17 @@ const imagePaste = useImagePaste({
   getInsertMode: () => persistence.settings.imageInsertMode,
   getImageDir: () => persistence.settings.defaultImageDir,
 });
+
+/**
+ * 外部拖入图片 → 插入当前窗口编辑器（issue #288，由 useDragDrop 的原生拖放链路调用）。
+ * `position` 是 Tauri 给的窗口物理像素落点，换算/回退光标都在 composable 内处理。
+ */
+function onDropImages(
+  paths: string[],
+  position: { x: number; y: number } | null
+): Promise<void> {
+  return imagePaste.insertDroppedImages(paths, position).then(() => undefined);
+}
 
 // ===== 编辑器导航/插入 composable =====
 const {

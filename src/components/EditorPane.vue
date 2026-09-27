@@ -271,8 +271,7 @@ function onEditorDrop(e: DragEvent): void {
   dropActive.value = false;
   if (!e.dataTransfer) return;
   const path = e.dataTransfer.getData(FILE_TREE_DRAG_MIME);
-  // 外部图片文件不在这里处理：window 级监听器（useImagePaste.handleDrop）负责按
-  // 插入方式落图，它还会用落点坐标决定插入位置
+  // 外部图片不在这里处理：走 Tauri 原生拖放链路（useDragDrop → useImagePaste.insertDroppedImages）
   if (!path) return;
   e.preventDefault();
   emit("drop-image-path", path);

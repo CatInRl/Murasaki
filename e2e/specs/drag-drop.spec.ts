@@ -246,7 +246,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     expect(await browser.execute(() => !!window.__pinia__)).toBe(true);
   });
 
-  it("拖入图片 → 本 PR 不处理（不打开标签、不设工作区；图片链路见 #288）", async () => {
+  it("拖入图片 → 不打开标签、不设工作区（图片由图片链路插入编辑器，见 image-drop.spec）", async () => {
     const img = join(wsPath, "pic.png");
     writeFileSync(img, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     await dropPaths(browser, [img]);

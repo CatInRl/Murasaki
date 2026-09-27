@@ -132,17 +132,26 @@ pub fn save_image_asset(
     })
 }
 
-/// 复制已有图片文件到工作区 assets/ 目录（用于从外部拖入图片文件）
-/// - source_path: 源图片绝对路径
+/// 把外部图片文件复制到工作区的图片目录（从系统拖入图片，file 模式，issue #288）
+///
+/// - source_path: 源图片绝对路径（必须是已存在的**文件**）
 /// - workspace: 工作区根路径
+/// - dir: 相对工作区根的子目录（如 "assets/images"），空则用 "assets"；必须是相对路径
+///
+/// 返回落盘后的绝对路径等，前端据 `absolute_path` 计算相对当前 md 文件的 Markdown 链接
+/// （目录规则与 `save_image_asset` 完全一致，故直接复用）。
 #[tauri::command]
-pub fn copy_image_to_assets(
+pub fn copy_image_to_workspace(
     source_path: String,
     workspace: String,
+    dir: Option<String>,
 ) -> Result<SaveImageResult, String> {
     let src = Path::new(&source_path);
     if !src.exists() {
         return Err(format!("源文件不存在: {}", source_path));
+    }
+    if !src.is_file() {
+        return Err(format!("源路径不是文件: {}", source_path));
     }
     let bytes = fs::read(src).map_err(|e| e.to_string())?;
     let ext = src
@@ -150,7 +159,51 @@ pub fn copy_image_to_assets(
         .and_then(|e| e.to_str())
         .unwrap_or("png")
         .to_string();
-    save_image_asset(workspace, bytes, ext, None)
+    save_image_asset(workspace, bytes, ext, dir)
+}
+
+/// 读取本地图片文件并返回其标准 Base64 编码（从系统拖入图片，base64 模式，issue #288）
+///
+/// 前端不直接读本地文件；MIME 由前端按扩展名推断（单一来源见 `mimeForImageExt`）。
+#[tauri::command]
+pub fn read_image_base64(source_path: String) -> Result<String, String> {
+    let src = Path::new(&source_path);
+    if !src.exists() {
+        return Err(format!("源文件不存在: {}", source_path));
+    }
+    if !src.is_file() {
+        return Err(format!("源路径不是文件: {}", source_path));
+    }
+    let bytes = fs::read(src).map_err(|e| e.to_string())?;
+    Ok(base64_encode(&bytes))
+}
+
+/// 标准 Base64 编码（RFC 4648，带 `=` 填充）。
+///
+/// 依赖里曾有 `base64`，但已在 #264 随 AI Agent 功能一并移除；这里仅为「拖入图片内嵌」
+/// 一个用途保留极小的内置实现，避免为单点功能重新引入运行期依赖。
+fn base64_encode(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    for chunk in bytes.chunks(3) {
+        let n = ((chunk[0] as u32) << 16)
+            | ((*chunk.get(1).unwrap_or(&0) as u32) << 8)
+            | (*chunk.get(2).unwrap_or(&0) as u32);
+        out.push(TABLE[((n >> 18) & 0x3f) as usize] as char);
+        out.push(TABLE[((n >> 12) & 0x3f) as usize] as char);
+        out.push(if chunk.len() > 1 {
+            TABLE[((n >> 6) & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            TABLE[(n & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+    }
+    out
 }
 
 // ===== 单元测试 =====
@@ -221,7 +274,7 @@ mod tests {
     }
 
     #[test]
-    fn test_copy_image_to_assets() {
+    fn test_copy_image_to_workspace() {
         let dir = TempDir::new().unwrap();
         // 创建源图片
         let src_path = dir.path().join("source.png");
@@ -231,15 +284,117 @@ mod tests {
         fs::create_dir(&ws_dir).unwrap();
         let ws = ws_dir.to_string_lossy().to_string();
 
-        let result = copy_image_to_assets(
+        let result = copy_image_to_workspace(
             src_path.to_string_lossy().to_string(),
             ws.clone(),
+            None,
         )
         .unwrap();
         assert!(result.absolute_path.ends_with(".png"));
         assert!(Path::new(&result.absolute_path).exists());
+        // 默认目录回退 assets/
+        assert!(result.relative_path.starts_with("assets/"));
         // 原文件仍存在（不删除源）
         assert!(src_path.exists());
+    }
+
+    #[test]
+    fn test_copy_image_to_workspace_custom_dir() {
+        let dir = TempDir::new().unwrap();
+        let src_path = dir.path().join("photo.jpg");
+        fs::write(&src_path, b"jpegbytes").unwrap();
+        let ws_dir = dir.path().join("workspace");
+        fs::create_dir(&ws_dir).unwrap();
+        let ws = ws_dir.to_string_lossy().to_string();
+
+        let result = copy_image_to_workspace(
+            src_path.to_string_lossy().to_string(),
+            ws,
+            Some("assets/images".into()),
+        )
+        .unwrap();
+        assert!(result.relative_path.starts_with("assets/images/"));
+        assert!(result.relative_path.ends_with(".jpg"));
+        assert!(dir.path().join("workspace").join("assets").join("images").exists());
+    }
+
+    #[test]
+    fn test_copy_image_to_workspace_missing_source() {
+        let dir = TempDir::new().unwrap();
+        let ws = dir.path().to_string_lossy().to_string();
+        let result = copy_image_to_workspace(
+            dir.path()
+                .join("nope.png")
+                .to_string_lossy()
+                .to_string(),
+            ws,
+            None,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_copy_image_to_workspace_rejects_folder_source() {
+        let dir = TempDir::new().unwrap();
+        // 源是一个目录
+        let src_dir = dir.path().join("folder.png");
+        fs::create_dir(&src_dir).unwrap();
+        let ws_dir = dir.path().join("workspace");
+        fs::create_dir(&ws_dir).unwrap();
+        let result = copy_image_to_workspace(
+            src_dir.to_string_lossy().to_string(),
+            ws_dir.to_string_lossy().to_string(),
+            None,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_copy_image_to_workspace_rejects_escaping_dir() {
+        let dir = TempDir::new().unwrap();
+        let src_path = dir.path().join("source.png");
+        fs::write(&src_path, b"x").unwrap();
+        let ws_dir = dir.path().join("workspace");
+        fs::create_dir(&ws_dir).unwrap();
+        let result = copy_image_to_workspace(
+            src_path.to_string_lossy().to_string(),
+            ws_dir.to_string_lossy().to_string(),
+            Some("../outside".into()),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_base64_encode_known_vectors() {
+        // RFC 4648 §10 标准向量
+        assert_eq!(base64_encode(b""), "");
+        assert_eq!(base64_encode(b"f"), "Zg==");
+        assert_eq!(base64_encode(b"fo"), "Zm8=");
+        assert_eq!(base64_encode(b"foo"), "Zm9v");
+        assert_eq!(base64_encode(b"foob"), "Zm9vYg==");
+        assert_eq!(base64_encode(b"fooba"), "Zm9vYmE=");
+        assert_eq!(base64_encode(b"foobar"), "Zm9vYmFy");
+    }
+
+    #[test]
+    fn test_read_image_base64_roundtrip_prefix() {
+        let dir = TempDir::new().unwrap();
+        let src_path = dir.path().join("pic.png");
+        fs::write(&src_path, b"foo").unwrap();
+        let b64 = read_image_base64(src_path.to_string_lossy().to_string()).unwrap();
+        assert_eq!(b64, "Zm9v");
+    }
+
+    #[test]
+    fn test_read_image_base64_missing_source() {
+        let dir = TempDir::new().unwrap();
+        let result = read_image_base64(
+            dir.path()
+                .join("nope.png")
+                .to_string_lossy()
+                .to_string(),
+        );
+        assert!(result.is_err());
     }
 
     #[test]
