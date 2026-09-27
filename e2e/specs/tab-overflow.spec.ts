@@ -30,7 +30,13 @@ import {
   resetPersistenceSettings,
   dismissAllDialogs,
 } from "../helpers/store";
-import { readText, waitForPresent, waitForAbsent, waitForInBrowser } from "../helpers/wait";
+import {
+  readText,
+  textOfElement,
+  waitForPresent,
+  waitForAbsent,
+  waitForInBrowser,
+} from "../helpers/wait";
 
 let browser: Browser;
 /** 每次 beforeEach 重建的工作区根目录 */
@@ -99,18 +105,21 @@ async function closePanelIfOpen(): Promise<void> {
 
 /** 读面板中的条目标题（顺序即标签栏顺序） */
 async function panelTitles(): Promise<string[]> {
-  return await browser.execute((sel: string) =>
-    Array.from(document.querySelectorAll(`${sel} .all-tabs-item .all-tabs-title`)).map((el) =>
-      (el.textContent ?? "").trim()
-    ), PANEL);
+  const titles: string[] = [];
+  for (const el of await browser.$$(`${PANEL} .all-tabs-item .all-tabs-title`)) {
+    titles.push(await textOfElement(browser, el));
+  }
+  return titles;
 }
 
 /** 读面板中带「工作区外」↗ 角标的条目标题 */
 async function panelTitlesWithMark(): Promise<string[]> {
-  return await browser.execute((sel: string) =>
-    Array.from(document.querySelectorAll(`${sel} .all-tabs-item`))
-      .filter((el) => el.querySelector(".all-tabs-mark"))
-      .map((el) => (el.querySelector(".all-tabs-title")?.textContent ?? "").trim()), PANEL);
+  const marked: string[] = [];
+  for (const item of await browser.$$(`${PANEL} .all-tabs-item`)) {
+    if (!(await item.$(".all-tabs-mark").isExisting())) continue;
+    marked.push(await textOfElement(browser, await item.$(".all-tabs-title")));
+  }
+  return marked;
 }
 
 /** 等面板条目数落到期望值 */
@@ -234,11 +243,7 @@ describe("全部标签面板", () => {
     expect(await panelTitlesWithMark()).toEqual(["markdown-full-test.md"]);
 
     // 激活项高亮
-    const activeTitle = await browser.execute(
-      (sel: string) =>
-        (document.querySelector(`${sel} .all-tabs-item.active .all-tabs-title`)?.textContent ?? "").trim(),
-      PANEL
-    );
+    const activeTitle = await readText(browser, `${PANEL} .all-tabs-item.active .all-tabs-title`);
     const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
     expect(activeTitle).toBe(activeTab?.title ?? "");
   });

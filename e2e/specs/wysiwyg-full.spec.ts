@@ -466,13 +466,7 @@ describe("WYSIWYG 模式全量测试", () => {
       // 这里断言「单元格里是链接的 markdown 源码」—— 具体且能捕获回归；
       // 不断言「表内没有 <a>」，避免把当前的局限固化成期望（将来若在单元格内渲染链接，
       // 那条断言会反过来惩罚正确的改动）。
-      const cellText = await browser.execute(
-        () =>
-          (document.querySelector(".murasaki-wysiwyg-table")?.textContent ?? "").replace(
-            /\s/g,
-            ""
-          )
-      );
+      const cellText = (await readText(browser, ".murasaki-wysiwyg-table")).replace(/\s/g, "");
       expect(cellText).toContain("[GitHub](https://github.com)");
     });
   });

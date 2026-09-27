@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { closeWorkspace, waitForPinia } from "../helpers/store";
-import { isRendered, waitForPresent, waitForRendered } from "../helpers/wait";
+import { isRendered, readText, waitForPresent, waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -55,14 +55,8 @@ describe("吐司系统", () => {
     // isDisplayed() 在本栈下对此类元素会持久性误判，与下方 error/warning 用例统一改用 isRendered
     expect(await isRendered(browser, ".toast-item.toast-success")).toBe(true);
 
-    await waitForPresent(browser, ".toast-success .toast-title", 5000);
-    // tauri-driver 下 getText() 对小文本节点会返回空串，改读 textContent
-    expect(
-      await browser.execute(
-        () =>
-          (document.querySelector(".toast-success .toast-title")?.textContent ?? "").trim()
-      )
-    ).toBe("操作成功");
+    // 读文案走 readText（轮询到确切文案再返回），别用 getText()——它对本栈的小文本节点会返回空串
+    expect(await readText(browser, ".toast-success .toast-title", "操作成功")).toBe("操作成功");
   });
 
   it("error 变体渲染", async () => {
@@ -104,17 +98,8 @@ describe("吐司系统", () => {
       toast.info("提示", { description: "详细说明文字", duration: 0 });
     });
 
-    await waitForPresent(browser, ".toast-info .toast-desc", 5000);
-    // enter transition 期间 getText 可能读到空串（且 tauri-driver 下 getText 对小文本节点
-    // 本身不稳定），故用 execute 读 textContent 并轮询到文案渲染出来
-    const readDesc = () =>
-      browser.execute(() =>
-        (document.querySelector(".toast-info .toast-desc")?.textContent ?? "").trim()
-      );
-    await browser.waitUntil(async () => (await readDesc()) === "详细说明文字", {
-      timeout: 5000,
-    });
-    expect(await readDesc()).toBe("详细说明文字");
+    // 读文案走 readText，理由同「success 变体渲染」
+    expect(await readText(browser, ".toast-info .toast-desc", "详细说明文字")).toBe("详细说明文字");
   });
 
   it("点击关闭按钮 dismiss 吐司", async () => {
@@ -161,16 +146,8 @@ describe("吐司系统", () => {
     });
 
     const actionBtn = await browser.$(".toast-success .toast-action-btn");
-    await waitForPresent(browser, ".toast-success .toast-action-btn", 5000);
-    // 同上：getText() 不可靠，改读 textContent 并轮询到文案渲染出来
-    const readActionLabel = () =>
-      browser.execute(() =>
-        (document.querySelector(".toast-success .toast-action-btn")?.textContent ?? "").trim()
-      );
-    await browser.waitUntil(async () => (await readActionLabel()) === "撤销", {
-      timeout: 5000,
-    });
-    expect(await readActionLabel()).toBe("撤销");
+    // 读文案走 readText，理由同「success 变体渲染」
+    expect(await readText(browser, ".toast-success .toast-action-btn", "撤销")).toBe("撤销");
 
     await actionBtn.click();
 

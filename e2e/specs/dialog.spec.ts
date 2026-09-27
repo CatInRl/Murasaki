@@ -312,23 +312,9 @@ describe("对话框系统", () => {
       });
     }, { timeout: 5000 });
 
-    // 第一个对话框应显示：轮询到 .dialog-message 文本渲染完成再断言，
-    // 避免读到过渡中的空串
-    await waitForPresent(browser, ".dialog-message", 5000);
-    // 断言前重新查询元素并读 textContent：Vue 重渲染后 browser.$ 拿到的旧句柄
-    // 调 getText() 会读到空串（实测 DOM 里 textContent 正常为「第一个」），
-    // 用 execute 每次重新查询最稳。
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        const el = document.querySelector(".dialog-message");
-        return (el?.textContent ?? "").trim() === "第一个";
-      });
-    }, { timeout: 5000 });
-    expect(
-      await browser.execute(() =>
-        (document.querySelector(".dialog-message")?.textContent ?? "").trim()
-      )
-    ).toBe("第一个");
+    // 第一个对话框应显示「第一个」：readText 每次重新查询选择器并轮询到确切文案，
+    // 同时消掉「读到过渡中的空串」与「读太早读到旧文案」两类失败
+    expect(await readText(browser, ".dialog-message", "第一个")).toBe("第一个");
 
     // 确认第一个
     const confirmBtn = await browser.$(".dialog-footer .dialog-btn.primary");
