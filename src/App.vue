@@ -165,20 +165,21 @@ watch(currentFilePath, (path) => {
 
 // ===== 文件操作 composable（磁盘 IO 类入口）=====
 const {
-  openFile, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
+  openFile, openFileViaDialog, openPathInNewWindow, saveCurrentFile, saveAsCurrentFile,
   reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, onNewTab, onNewFile,
   onOpenFolder, onOpenFile, onOpenRecent,
 } = useFileActions({ tabsStore, workspace, fileOps, persistence, dialog, toast: toastStore, activeTab, currentTheme });
 
 // ===== 拖放打开（原生 drag-drop，issue #92）=====
-// 单个目录 → 本窗口工作区；文件 → 逐个开标签。图片本 PR 忽略（见 #288）。
+// 单个目录 → 走「打开文件夹」同一路径（同目录已开则聚焦，否则新窗口）；文件 → 当前窗口逐个开标签。
+// 图片本 PR 忽略（见 #288）。
 const {
   dragging: dropDragging,
   setup: setupDragDrop,
   teardown: teardownDragDrop,
 } = useDragDrop({
   openFile,
-  openWorkspace: (path: string) => workspace.openWorkspace(path),
+  openFolder: openPathInNewWindow,
 });
 
 // ===== 复制为富文本 composable（issue #108，复用 exportHtml 管线，走剪贴板而非文件）=====

@@ -68,17 +68,16 @@ pub struct DropPathInfo {
 /// 「是目录还是文件」「还在不在」必须落到文件系统判定后才好规划打开动作，故一次性交回前端。
 /// `kind` 为 `"missing"` 表示路径已不存在（拖放期间被移走）。**是否支持打开**由前端
 /// `fileKind` 判定（单一来源），这里只做需要落到文件系统的「文件/目录/不存在」三分类。
+/// 存在时复用 [`classify_path`] 的判定，只额外处理「已不存在」。
 pub fn classify_drop_paths_impl(paths: &[String]) -> Vec<DropPathInfo> {
     paths
         .iter()
         .map(|path| {
             let p = std::path::Path::new(path);
-            let kind = if !p.exists() {
-                "missing"
-            } else if p.is_dir() {
-                "folder"
+            let kind = if p.exists() {
+                classify_path(p)
             } else {
-                "file"
+                "missing"
             };
             DropPathInfo {
                 path: path.clone(),

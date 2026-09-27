@@ -264,6 +264,7 @@ export function useFileActions(deps: FileActionsDeps) {
   return {
     openFile,
     openFileViaDialog,
+    openPathInNewWindow,
     saveCurrentFile,
     saveAsCurrentFile,
     reloadCurrentFile,

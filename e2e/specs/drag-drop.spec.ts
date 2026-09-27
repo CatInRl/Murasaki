@@ -1,8 +1,8 @@
 /**
  * 拖拽打开 E2E（issue #92）
  *
- * 验证 Tauri 原生 drag-drop 事件驱动「拖入文件开标签 / 拖入目录设工作区 / 缺失路径静默忽略」，
- * 以及拖拽经过窗口时的遮罩提示。
+ * 验证 Tauri 原生 drag-drop 事件驱动「拖入文件开标签 / 拖入目录在新窗口打开工作区 /
+ * 缺失路径静默忽略」，以及拖拽经过窗口时的遮罩提示。
  *
  * 驱动方式（已实测，结论见下）：
  *   真实场景里由 WebView2 从 OS 拖放产生 `tauri://drag-enter|over|drop|leave` 事件，
@@ -18,6 +18,9 @@
  * `match_any_or_filter` 在 filter 为 None 时恒真 —— 即「emit（Any target）」会命中所有 JS 监听、
  * 不按 target 过滤。这与既有的 `emitMenuEvent`（`plugin:event|emit` 触发 App.vue 的 menu-event
  * 监听）完全同一机制。因此 **不需要在 App.vue 增加 test hook**。
+ *
+ * 目录语义（ADR-0018）：拖入单个目录走「打开文件夹」同一路径 —— 同目录已在某窗口打开则聚焦
+ * 那个窗口，否则**新开窗口**；**当前窗口的工作区不受影响**。故「拖入单个目录」用例断言的是**新窗口**。
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
@@ -25,6 +28,8 @@ import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import {
   waitForPinia,
+  waitForPiniaInCurrentWindow,
+  getTabsState,
   closeAllTabs,
   closeWorkspace,
   dismissAllDialogs,
@@ -36,6 +41,7 @@ import { join } from "node:path";
 
 let browser: Browser;
 let wsPath: string;
+let mainHandle: string;
 
 type DragEventName =
   | "tauri://drag-enter"
@@ -73,13 +79,10 @@ async function dropPaths(b: Browser, paths: string[]): Promise<void> {
   });
 }
 
-/** 当前窗口的标签路径列表 */
-async function tabPaths(): Promise<string[]> {
-  return browser.execute(() => {
-    // @ts-ignore
-    const pinia = window.__pinia__;
-    return (pinia._s.get("tabs")?.tabs ?? []).map((t: { path: string | null }) => t.path);
-  });
+/** 当前窗口的标签路径列表（复用 helpers/store 的 getTabsState，不再手写 execute 读 store） */
+async function tabPaths(): Promise<(string | null)[]> {
+  const state = await getTabsState(browser);
+  return state.tabs.map((t) => t.path);
 }
 
 /** 当前窗口的工作区路径 */
@@ -91,6 +94,32 @@ async function workspacePath(): Promise<string | null> {
   });
 }
 
+/** 关掉除主窗口外的所有窗口，并切回主窗口（保证后续用例从单窗口状态开始） */
+async function closeExtraWindows(): Promise<void> {
+  const handles = await browser.getWindowHandles().catch(() => [] as string[]);
+  for (const handle of handles) {
+    if (handle === mainHandle) continue;
+    try {
+      await browser.switchToWindow(handle);
+      await browser.execute(() => {
+        try {
+          window.__TAURI_INTERNALS__.invoke("close_window");
+        } catch {
+          /* ignore */
+        }
+      });
+    } catch {
+      /* ignore */
+    }
+    await browser.pause(800);
+  }
+  try {
+    await browser.switchToWindow(mainHandle);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 路径归一后再比较：tabs 里存的可能是正斜杠形式，比较时统一大小写与分隔符 */
 function normalize(paths: (string | null)[]): string[] {
   return paths.map((p) => (p ?? "").toLowerCase().replace(/\\/g, "/"));
@@ -100,6 +129,8 @@ describe("拖拽打开（原生 drag-drop）", () => {
   beforeAll(async () => {
     browser = await createSession();
     await waitForPinia(browser);
+    mainHandle = (await browser.getWindowHandle()) ?? "";
+    expect(mainHandle).not.toBe("");
     // 关键：`__pinia__` 暴露不代表 onMounted 跑完（drag-drop 监听在 onMounted 第 7.5 步注册）。
     // App.vue 在 onMounted **结尾**才赋值 `__setSidebarView__`，等它出现即保证监听已就绪，
     // 否则 session 刚建好就派发事件可能落在监听注册之前而丢失。
@@ -113,10 +144,17 @@ describe("拖拽打开（原生 drag-drop）", () => {
 
   afterAll(async () => {
     if (!browser) return;
+    try {
+      await closeExtraWindows();
+    } catch {
+      /* ignore */
+    }
     await closeSession(browser);
   });
 
   beforeEach(async () => {
+    // 先收掉上一用例可能留下的新窗口并切回主窗口（目录用例会新开窗口）
+    await closeExtraWindows();
     await dismissAllDialogs(browser);
     await resetPersistenceSettings(browser);
     try {
@@ -152,9 +190,26 @@ describe("拖拽打开（原生 drag-drop）", () => {
     expect(await workspacePath()).toBeNull();
   });
 
-  it("拖入单个目录 → 当前窗口打开为该目录工作区", async () => {
+  it("拖入单个目录 → 在新窗口打开为该目录工作区，当前窗口不受影响", async () => {
+    // 拖放前当前窗口显式无工作区（beforeEach 已 closeWorkspace）
+    expect(await workspacePath()).toBeNull();
+    const before = await browser.getWindowHandles();
+
     await dropPaths(browser, [wsPath]);
 
+    // 目录 → 走「打开文件夹」路径 → 新开窗口
+    await browser.waitUntil(
+      async () => (await browser.getWindowHandles()).length > before.length,
+      { timeout: 30000, interval: 500 }
+    );
+    const handles = await browser.getWindowHandles();
+    const newHandle = handles.find((h) => !before.includes(h));
+    expect(newHandle).toBeDefined();
+    await browser.switchToWindow(newHandle!);
+    // 必须用「不切句柄」的等待：waitForPinia 会遍历句柄并停回主窗口
+    await waitForPiniaInCurrentWindow(browser, 30000);
+
+    // 新窗口把该目录作为工作区打开
     const ok = await waitForInBrowser(
       browser,
       (p: string) => {
@@ -162,13 +217,18 @@ describe("拖拽打开（原生 drag-drop）", () => {
         return window.__pinia__._s.get("workspace")?.workspacePath === p;
       },
       [wsPath],
-      { timeout: 15000, message: "拖入的目录成为工作区" }
+      { timeout: 15000, message: "拖入的目录成为新窗口的工作区" }
     );
     expect(ok).toBe(true);
-    // 文件树随之出现
+    // 文件树随之出现，且新窗口没有继承任何标签（外部入口不恢复会话）
     await waitForPresent(browser, ".file-tree", 10000);
-    expect(await tabPaths()).toEqual([]);
-  });
+    expect(normalize(await tabPaths())).toEqual([]);
+
+    // 当前窗口（主窗口）的工作区保持不变 —— 仍在 null
+    await browser.switchToWindow(mainHandle);
+    await waitForPiniaInCurrentWindow(browser);
+    expect(await workspacePath()).toBeNull();
+  }, 90000);
 
   it("拖入不存在的路径 → 静默忽略，不打开标签也不设工作区", async () => {
     await dropPaths(browser, [join(wsPath, "no-such-file.md")]);
@@ -231,6 +291,29 @@ describe("拖拽打开（原生 drag-drop）", () => {
     const opened = await tabPaths();
     expect(normalize(opened)).toEqual(normalize([md]));
     expect(normalize(opened)).not.toContain(normalize([zip])[0]);
+  });
+
+  it("目录与文件混投 → 当前窗口只多出文件标签，不新开窗口", async () => {
+    const md = join(wsPath, "intro.md");
+    const before = await browser.getWindowHandles();
+
+    await dropPaths(browser, [wsPath, md]);
+
+    await waitForInBrowser(
+      browser,
+      (p: string) => {
+        // @ts-ignore
+        const tabs = window.__pinia__._s.get("tabs");
+        return (tabs.tabs ?? []).some((t: { path: string | null }) => t.path === p);
+      },
+      [md],
+      { timeout: 15000, message: "混投时文件被打开为标签" }
+    );
+    // 负向断言：留一段静默期，确认目录既没切换工作区也没新开窗口
+    await browser.pause(1500);
+    expect(normalize(await tabPaths())).toEqual(normalize([md]));
+    expect(await workspacePath()).toBeNull();
+    expect((await browser.getWindowHandles()).length).toBe(before.length);
   });
 
   it("拖拽经过窗口时显示遮罩，离开后消失", async () => {
