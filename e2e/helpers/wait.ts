@@ -134,31 +134,53 @@ export async function waitForAbsent(
 }
 
 /**
- * 读元素文本并**轮询到非空**，替代 `getText()` 的单次判定。
+ * 取元素文本的**单一实现**（浏览器上下文，单次）：选择器字符串或元素句柄 → `textContent.trim()`。
  *
- * 背景（见文件头注释）：`getText()` 在本栈下会偶发返回空串 —— 元素明明存在，但
- * 它不重试，于是「元素刚进 DOM、文本还没被 WebDriver 读到」会直接变成断言失败。
- * #282 实测：`state-display.spec.ts` 的 `.empty-state .empty-title` 在全量跑时
- * 间歇性返回 `''`（同一二进制、同一 spec 单独跑必过）。
+ * `getText()` 在本栈下会对某些元素返回空串（见文件头注释），故一律走这里；
+ * `textOfElement`（句柄，单次）与 `readText`（选择器，轮询）都建立在它之上。
+ */
+async function textFrom(browser: Browser, target: unknown): Promise<string> {
+  return await browser.execute((t: unknown) => {
+    const el = (typeof t === "string" ? document.querySelector(t) : t) as HTMLElement | null;
+    return (el?.textContent ?? "").trim();
+  }, target);
+}
+
+/**
+ * 读某个**元素句柄**的文本（单次，不轮询）。
  *
- * 这里在浏览器上下文读 `textContent` 并轮询，把「读太早」从失败变成等待。
+ * 用于对 `browser.$$(...)` 逐个读句柄的场景（收集标签数组、按文本找按钮等）——
+ * 这类地方给不出「单个选择器」，只能按句柄读，而 `getText()` 会偶发返回空串。
+ */
+export async function textOfElement(browser: Browser, element: unknown): Promise<string> {
+  return await textFrom(browser, element);
+}
+
+/**
+ * 读元素文本并**轮询**（选择器版）：
+ * - 不传 `expected`：轮询到非空，返回该文本；
+ * - 传 `expected`：轮询到 `textContent.trim() === expected`，返回它 —— 同时消掉
+ *   「读到空串」与「读太早读到旧值」两种失败（#282 / #286）。
  *
- * 注意：返回的是**首个非空**结果，适合「文本非空即可断言」的场景；若断言要求
- * 文本等于某个确定值，先用本函数等到非空、再断言该值即可（不要直接断言返回值，
- * 否则一旦读到「还在过渡中的中间文案」会给出误导性失败）。
+ * 超时错误里带上最后一次读到的值，便于区分「一直为空」与「文案不对」。
  */
 export async function readText(
   browser: Browser,
   selector: string,
+  expected?: string,
   timeout = 5000,
   interval = 100
 ): Promise<string> {
-  return await waitForInBrowser<string>(
-    browser,
-    (sel: string) =>
-      ((document.querySelector(sel) as HTMLElement | null)?.textContent ?? "").trim(),
-    [selector],
-    { timeout, interval, message: `"${selector}" 文本非空` }
+  const start = Date.now();
+  let last = "";
+  while (Date.now() - start < timeout) {
+    last = await textFrom(browser, selector);
+    if (expected === undefined ? last.length > 0 : last === expected) return last;
+    await browser.pause(interval);
+  }
+  const want = expected === undefined ? "非空文本" : `"${expected}"`;
+  throw new Error(
+    `readText: "${selector}" 未在 ${timeout}ms 内变为 ${want}（最后读到：${JSON.stringify(last)}）`
   );
 }
 

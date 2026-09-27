@@ -24,7 +24,7 @@ import {
 } from "../helpers/store";
 import { existsSync, statSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { isRenderedElement, waitForInBrowser, waitForPresent, waitForRendered } from "../helpers/wait";
+import { isRenderedElement, textOfElement, waitForInBrowser, waitForPresent, waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -137,7 +137,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     const labels: string[] = [];
     for (const item of items) {
       const label = await item.$(".murasaki-context-menu-label");
-      labels.push((await label.getText()).trim());
+      labels.push(await textOfElement(browser, label));
     }
     // 文件节点应有：打开 / 重命名 / 剪切 / 复制 / 复制路径 / 复制相对路径 / 删除 / 在文件资源管理器中显示
     expect(labels).toEqual(expect.arrayContaining(["打开", "重命名", "剪切", "复制", "删除"]));
@@ -153,7 +153,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     const labels: string[] = [];
     for (const item of items) {
       const label = await item.$(".murasaki-context-menu-label");
-      labels.push((await label.getText()).trim());
+      labels.push(await textOfElement(browser, label));
     }
     // 目录节点应有：新建文件 / 新建文件夹 / 重命名 / 剪切 / 复制 / 删除 / 在文件资源管理器中显示
     expect(labels).toEqual(

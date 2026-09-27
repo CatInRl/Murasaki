@@ -14,7 +14,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
 import { openWorkspace, openFileInTab, waitForPinia } from "../helpers/store";
-import { isRendered, waitForPresent } from "../helpers/wait";
+import { isRendered, readText, waitForPresent } from "../helpers/wait";
 
 describe("WYSIWYG 模式真实用户路径验证", () => {
   let browser: Browser;
@@ -191,8 +191,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // 验证编辑器内容区可见（非空，非只有行号）
     const content = await browser.$(".cm-content");
     expect(await content.isExisting()).toBe(true);
-    const text = await content.getText();
-    expect(text.length).toBeGreaterThan(0);
+    expect((await readText(browser, ".cm-content")).length).toBeGreaterThan(0);
   });
 
   it("步骤5: 验证光标进入段后标记显示（dim）", async () => {
@@ -242,7 +241,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
     expect(await isRendered(browser, ".cm-content")).toBe(true);
 
-    const text = await content.getText();
+    const text = await readText(browser, ".cm-content");
     expect(text.length).toBeGreaterThan(0);
     // 应包含标题和正文文本（证明渲染了文档内容，不只是行号）
     expect(text).toContain("大标题");

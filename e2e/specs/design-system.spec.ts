@@ -15,7 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { isRendered, waitForPresent } from "../helpers/wait";
+import { isRendered, readText, textOfElement, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -104,9 +104,8 @@ describe("设计系统", () => {
   });
 
   it("欢迎页显示品牌标题 Murasaki", async () => {
-    const title = await browser.$(".welcome-page .brand-title");
     await waitForPresent(browser, ".welcome-page .brand-title", 10000);
-    expect((await title.getText()).trim()).toBe("Murasaki");
+    expect(await readText(browser, ".welcome-page .brand-title", "Murasaki")).toBe("Murasaki");
   });
 
   it("欢迎页显示三张操作卡片", async () => {
@@ -122,7 +121,7 @@ describe("设计系统", () => {
     const hintTexts: string[] = [];
     for (let i = 0; i < hints.length; i++) {
       const kbd = await hints[i].$(".shortcut-key");
-      hintTexts.push((await kbd.getText()).trim());
+      hintTexts.push(await textOfElement(browser, kbd));
     }
     expect(hintTexts).toContain("Ctrl+O");
     expect(hintTexts).toContain("Ctrl+N");
@@ -146,8 +145,7 @@ describe("设计系统", () => {
     // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
     expect(await isRendered(browser, ".file-tree .empty-state")).toBe(true);
 
-    const title = await browser.$(".file-tree .empty-state .empty-title");
-    expect((await title.getText()).trim()).toBe("未打开工作区");
+    expect(await readText(browser, ".file-tree .empty-state .empty-title", "未打开工作区")).toBe("未打开工作区");
   });
 
   it("EmptyState 有虚线边框", async () => {
@@ -178,9 +176,8 @@ describe("设计系统", () => {
     await closeWorkspace(browser);
     await browser.pause(500);
 
-    const actionBtn = await browser.$(".file-tree .empty-state .empty-action");
     await waitForPresent(browser, ".file-tree .empty-state .empty-action", 10000);
     expect(await isRendered(browser, ".file-tree .empty-state .empty-action")).toBe(true);
-    expect((await actionBtn.getText()).trim()).toBe("打开文件夹");
+    expect(await readText(browser, ".file-tree .empty-state .empty-action", "打开文件夹")).toBe("打开文件夹");
   });
 });

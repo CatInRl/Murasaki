@@ -22,7 +22,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { readText, textOfElement, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -97,7 +97,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     const labels: string[] = [];
     for (const item of items) {
       const label = await item.$(".murasaki-context-menu-label");
-      labels.push((await label.getText()).trim());
+      labels.push(await textOfElement(browser, label));
     }
     expect(labels).toEqual([
       "关闭",
@@ -120,9 +120,8 @@ describe("TabBar / Editor 右键菜单具体项", () => {
       );
     });
 
-    const shortcut = await browser.$(".murasaki-context-menu-shortcut");
     await waitForPresent(browser, ".murasaki-context-menu-shortcut", 5000);
-    expect((await shortcut.getText()).trim()).toBe("Ctrl+W");
+    expect(await readText(browser, ".murasaki-context-menu-shortcut", "Ctrl+W")).toBe("Ctrl+W");
   });
 
   it("TabBar 未保存的 tab '复制路径' 和 '在文件资源管理器中显示' 禁用", async () => {
@@ -190,7 +189,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     const labels: string[] = [];
     for (const item of items) {
       const label = await item.$(".murasaki-context-menu-label");
-      labels.push((await label.getText()).trim());
+      labels.push(await textOfElement(browser, label));
     }
     expect(labels).toEqual([
       "剪切",
@@ -281,8 +280,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     const items = await browser.$$(".murasaki-context-menu-item");
     expect(items.length).toBeGreaterThan(0);
 
-    const firstLabel = await items[0].$(".murasaki-context-menu-label");
-    expect((await firstLabel.getText()).trim()).toBe("关闭");
+    expect(await readText(browser, ".murasaki-context-menu-item .murasaki-context-menu-label", "关闭")).toBe("关闭");
   });
 
   it("右键编辑器后弹出菜单（通过 UI 触发）", async () => {
@@ -314,7 +312,6 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     const items = await browser.$$(".murasaki-context-menu-item");
     expect(items.length).toBeGreaterThan(0);
 
-    const firstLabel = await items[0].$(".murasaki-context-menu-label");
-    expect((await firstLabel.getText()).trim()).toBe("剪切");
+    expect(await readText(browser, ".murasaki-context-menu-item .murasaki-context-menu-label", "剪切")).toBe("剪切");
   });
 });

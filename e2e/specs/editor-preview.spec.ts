@@ -18,7 +18,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings
 } from "../helpers/store";
-import { isRendered, waitForPresent } from "../helpers/wait";
+import { isRendered, readText, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -68,10 +68,8 @@ describe("编辑器 + 预览 同步", () => {
     await openFileInTab(browser, `${ws}/intro.md`);
 
     // intro.md 第一行是 "# 简介"
-    const h1 = await browser.$(".pane-right .markdown-body h1");
     await waitForPresent(browser, ".pane-right .markdown-body h1", 10000);
-    const text = (await h1.getText()).trim();
-    expect(text).toBe("简介");
+    expect(await readText(browser, ".pane-right .markdown-body h1", "简介")).toBe("简介");
   });
 
   it("修改源码后预览同步更新", async () => {
@@ -82,12 +80,7 @@ describe("编辑器 + 预览 同步", () => {
     await setActiveContent(browser, "# 新标题\n\n新段落。\n");
 
     // 预览应显示新标题
-    const h1 = await browser.$(".pane-right .markdown-body h1");
-    await browser.waitUntil(async () => {
-      const text = (await h1.getText()).trim();
-      return text === "新标题";
-    }, { timeout: 5000 });
-    expect((await h1.getText()).trim()).toBe("新标题");
+    expect(await readText(browser, ".pane-right .markdown-body h1", "新标题")).toBe("新标题");
   });
 
   it("任务列表勾选项在预览中渲染为 checkbox", async () => {

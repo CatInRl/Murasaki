@@ -20,7 +20,7 @@ import {
   waitForPinia,
   dismissAllDialogs,
 } from "../helpers/store";
-import { isRendered, waitForPresent } from "../helpers/wait";
+import { isRendered, textOfElement, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -228,7 +228,7 @@ describe("设置显式 Save 模型", () => {
     const buttons = await browser.$$(".dialog-overlay button");
     let clicked = false;
     for (const btn of buttons) {
-      const text = (await btn.getText()).trim();
+      const text = await textOfElement(browser, btn);
       if (text === "保存") {
         await btn.click();
         clicked = true;
