@@ -9,7 +9,7 @@
  * - 缩放值持久化到 settings.presentationZoom
  * - source-only 文件（.txt）强制降级为源码模式
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import {
@@ -110,6 +110,19 @@ describe("演示模式", () => {
     await dismissAllDialogs(browser);
     wsPath = resetWorkspace(presentationFixtures());
     await resetZoom(browser);
+  });
+
+  afterEach(async () => {
+    // 收尾：关掉本用例打开的标签。标签会持久化到 tabs.json，而下一个 spec（如
+    // tabs.spec）启动时会 restore 出来；其 beforeEach 重置工作区会把这些仍打开的
+    // 文件删掉，触发「文件已被外部删除」模态告警遮挡点击。这里清干净即断掉泄漏。
+    if (!browser) return;
+    try {
+      await closeAllTabs(browser);
+    } catch {
+      /* ignore */
+    }
+    await browser.pause(200);
   });
 
   it("Ctrl+Shift+4 切到演示模式：只挂预览，无工具栏/编辑器/分隔条", async () => {

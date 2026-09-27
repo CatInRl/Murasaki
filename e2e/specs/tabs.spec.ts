@@ -13,12 +13,14 @@ import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import {
   openWorkspace,
   closeWorkspace,
+  closeAllTabs,
   openFileInTab,
   getTabsState,
   waitForPinia,
-  resetPersistenceSettings
+  resetPersistenceSettings,
+  dismissAllDialogs
 } from "../helpers/store";
-import { isRendered, readText, waitForPresent } from "../helpers/wait";
+import { isRendered, readText, waitForPresent, waitForAbsent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -34,6 +36,15 @@ describe("多 Tab 管理", () => {
 
   beforeEach(async () => {
     await resetPersistenceSettings(browser);
+    // 先关掉可能由上一个 spec 经 tabs.json 恢复出来的标签（例如 presentation-mode
+    // 收尾遗留的 intro.md / plain.txt）。否则随后的 resetWorkspace 会把这些仍处于
+    // 打开状态的文件从磁盘删掉，文件监听据此弹出「文件已被外部删除」模态告警
+    // （.dialog-overlay），遮挡后续用例对 Tab 栏的点击。
+    try {
+      await closeAllTabs(browser);
+    } catch {
+      // ignore
+    }
     const wsPath = resetWorkspace(defaultFixtureFiles());
     try {
       await closeWorkspace(browser);
@@ -43,7 +54,15 @@ describe("多 Tab 管理", () => {
     await openWorkspace(browser, wsPath);
     // 等待侧栏就绪
     await waitForPresent(browser, ".file-tree", 10000);
+    // 兜底：清掉任何残留对话框，避免遮罩挡住后续点击
+    await dismissAllDialogs(browser);
   });
+
+  /** 点击前清掉可能残留的模态遮罩（外部修改告警等），避免点击被 .dialog-overlay 拦截 */
+  async function clearOverlays(): Promise<void> {
+    await dismissAllDialogs(browser);
+    await waitForAbsent(browser, ".dialog-overlay", 3000).catch(() => {});
+  }
 
   it("点击 + 按钮新建未命名 Tab", async () => {
     // TabBar 仅在 hasTabs 时渲染，先打开一个文件让 TabBar 出现
@@ -55,6 +74,7 @@ describe("多 Tab 管理", () => {
     const initialCount = initial.tabs.length;
 
     const newBtn = await browser.$(".new-tab-btn");
+    await clearOverlays();
     await newBtn.click();
 
     // 等待 tab 出现
@@ -102,6 +122,7 @@ describe("多 Tab 管理", () => {
 
     // 点击 intro.md tab
     const introTab = await browser.$(".tab-title=intro.md");
+    await clearOverlays();
     await introTab.click();
 
     // activeTabId 应对应 intro.md 的 tab
@@ -126,6 +147,7 @@ describe("多 Tab 管理", () => {
 
     // 关闭 intro.md tab（第一个 .close-btn）
     const closeBtn = await browser.$(".tab-bar-container .tab-item .close-btn");
+    await clearOverlays();
     await closeBtn.click();
 
     await browser.waitUntil(
