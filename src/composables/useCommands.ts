@@ -47,6 +47,7 @@ export interface CommandsDeps {
   // tabs store 切片
   tabsStore: {
     activeTabId: string | null;
+    hasTabs: boolean;
     switchNext: () => void;
     switchPrev: () => void;
   };
@@ -84,6 +85,8 @@ export interface CommandsDeps {
   sidebarView: Ref<SidebarView>;
   statusBarVisible: Ref<boolean>;
   tableDialogVisible: Ref<boolean>;
+  /** 「全部标签」面板展开状态（受控于 App.vue，TabBar 只读 + 双向绑定，issue #168） */
+  allTabsOpen: Ref<boolean>;
 
   // updater 切片（T1.1：检查更新）
   updater: {
@@ -119,7 +122,7 @@ export function useCommands(deps: CommandsDeps) {
     onCloseTabRequest,
     workspace, tabsStore, searchStore, fileOps, dialog,
     editorRef, currentTheme, sidebarView, statusBarVisible,
-    tableDialogVisible,
+    tableDialogVisible, allTabsOpen,
     openSettings, toggleFullscreen, updater,
     zoomIn, zoomOut, zoomReset,
     matchGlobalKeydown,
@@ -319,6 +322,12 @@ export function useCommands(deps: CommandsDeps) {
       }
       case "switch-tab-prev": {
         tabsStore.switchPrev();
+        break;
+      }
+      // 「全部标签」面板：无标签时面板不渲染，直接忽略（避免状态悬空）
+      case "open-all-tabs": {
+        if (!tabsStore.hasTabs) break;
+        allTabsOpen.value = !allTabsOpen.value;
         break;
       }
       case "fullscreen": {

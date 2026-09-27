@@ -32,7 +32,10 @@
     "closeLeft": "Close to the Left",
     "closeAll": "Close All",
     "closeTabAria": "Close tab",
-    "outOfWorkspacePrefix": "Outside workspace: "
+    "outOfWorkspacePrefix": "Outside workspace: ",
+    "allTabs": "All Tabs",
+    "allTabsSearchPlaceholder": "Filter by title or folder…",
+    "allTabsEmpty": "No matching tabs"
   },
   "sidebar": {
     "filesTab": "File Tree",

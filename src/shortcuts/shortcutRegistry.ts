@@ -87,6 +87,8 @@ export const SHORTCUT_COMMANDS: ShortcutCommand[] = [
   { id: "toggle-outline", labelKey: "settings.shortcuts.toggleOutline", category: "view", defaultShortcut: "Ctrl+Shift+M", scope: "global" },
   { id: "switch-tab-next", labelKey: "settings.shortcuts.switchTabNext", category: "view", defaultShortcut: "Ctrl+Tab", scope: "global" },
   { id: "switch-tab-prev", labelKey: "settings.shortcuts.switchTabPrev", category: "view", defaultShortcut: "Ctrl+Shift+Tab", scope: "global" },
+  // 全部标签面板（issue #168）：默认不绑定，避免与既有 Ctrl+Tab 家族撞车
+  { id: "open-all-tabs", labelKey: "settings.shortcuts.openAllTabs", category: "view", defaultShortcut: null, scope: "global" },
   { id: "fullscreen", labelKey: "settings.shortcuts.fullscreen", category: "view", defaultShortcut: "F11", scope: "global" },
   { id: "toggle-statusbar", labelKey: "settings.shortcuts.toggleStatusbar", category: "view", defaultShortcut: "Alt+Shift+S", scope: "global" },
   // 演示模式缩放（global；非演示模式调用无副作用，见 App.vue zoomEnabled）。

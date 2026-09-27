@@ -192,6 +192,9 @@ const {
 // ===== 侧栏视图（受控） =====
 const sidebarView = ref<SidebarView>("files");
 
+// ===== 「全部标签」面板展开状态（TabBar 受控，快捷键与按钮共用，issue #168）=====
+const allTabsOpen = ref(false);
+
 // ===== 侧栏宽度（可拖拽调整 + 折叠成细条，均持久化） =====
 const SIDEBAR_MIN_WIDTH = 140;
 const SIDEBAR_MAX_WIDTH = 600;
@@ -599,7 +602,7 @@ const { handleMenuEvent, onKeyDown } = useCommands({
   onCloseTabRequest,
   workspace, tabsStore, searchStore, fileOps, dialog,
   editorRef, currentTheme, sidebarView, statusBarVisible,
-  tableDialogVisible,
+  tableDialogVisible, allTabsOpen,
   openSettings, toggleFullscreen,
   updater: { check: checkForUpdate },
   matchGlobalKeydown,
@@ -771,6 +774,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
         <div class="top-bar">
           <TabBar
             v-if="tabsStore.hasTabs"
+            v-model:all-tabs-open="allTabsOpen"
             class="tab-bar-slot"
             @new-tab="onNewTab"
             @close-tab="onCloseTabRequest"
