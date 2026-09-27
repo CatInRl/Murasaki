@@ -174,6 +174,29 @@ export async function openFileInTab(
   }, path);
 }
 
+/**
+ * 清空标签并**落盘**（跨 spec 泄漏防护，由 `driver.ts` 的 `closeSession` 调用）。
+ *
+ * 与 `closeAllTabs` 有两处不同：
+ * ① 走 `clearAll()` —— 一次性清空，不需要逐个 `doCloseTab`（那会把每个 dirty tab 写成草稿）；
+ * ② 显式 `persist()` —— `clearAll()` 只清内存，并且它会把 `restoring` 置 true 让 Vue watcher
+ *    跳过 persist；不显式落盘的话 `tabs.json` 里仍是旧内容，等于没清。
+ *
+ * 应用未就绪（`__pinia__` 不存在）时静默返回：`createSession` 的就绪失败分支也会经
+ * `closeSession` 调到这里，那里不该再抛错。
+ */
+export async function clearPersistedTabs(browser: Browser): Promise<void> {
+  await browser.executeAsync((done: (res: unknown) => void) => {
+    // @ts-ignore
+    const tabs = window.__pinia__?._s?.get("tabs");
+    if (!tabs) return done(null);
+    tabs.clearAll();
+    Promise.resolve(tabs.persist())
+      .then(() => done(null))
+      .catch(() => done(null));
+  });
+}
+
 export interface TabSnapshot {
   id: string;
   path: string | null;

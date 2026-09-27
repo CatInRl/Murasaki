@@ -8,7 +8,7 @@
  * - Esc 关闭并把焦点还给入口按钮；`↓` 进列表、`↑` 回搜索框、`Enter` 定位；点击面板外部关闭
  * - 关闭 dirty 标签弹确认框时面板保持打开
  *
- * 注意（AGENTS.md「e2e 的六个坑」）：等元素一律用 `helpers/wait.ts` 的手写轮询，
+ * 注意（AGENTS.md「e2e 的九个坑」）：等元素一律用 `helpers/wait.ts` 的手写轮询，
  * **不要用元素等待命令**（在本栈下不重试）；浮层判「存在」用 `waitForPresent`
  * （动画期 `opacity: 0` 会被 `waitForRendered` 判为「未渲染」）。
  * `createSession` 已内含 `waitForPinia` 就绪等待，无需重复。
