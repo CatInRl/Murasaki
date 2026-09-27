@@ -44,6 +44,10 @@
   "exportPdfTitle": "PDF をエクスポート",
   "exportPdfSuccess": "PDF をエクスポートしました",
   "copyRichTextSuccess": "リッチテキストをクリップボードにコピーしました",
+  "drop": {
+    "overlayTitle": "ドロップして開く",
+    "overlayHint": "ファイルはこのウィンドウでタブ、フォルダーは新しいウィンドウでワークスペースとして開きます"
+  },
   "fileFilter": {
     "markdown": "Markdown ドキュメント",
     "textCode": "テキストとコードファイル",

@@ -449,6 +449,7 @@ pub fn run() {
             files::path_type,
             files::reveal_in_explorer,
             launch::take_pending_open_path,
+            launch::classify_drop_paths,
             lifecycle::exit_app,
             lifecycle::quit_app,
             windows::open_path_in_new_window,

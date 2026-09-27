@@ -32,6 +32,7 @@ import { useFileWatcher } from "./composables/useFileWatcher";
 import { useImagePaste } from "./composables/useImagePaste";
 import { useRecentMenuSync } from "./composables/useRecentMenuSync";
 import { useFileActions } from "./composables/useFileActions";
+import { useDragDrop } from "./composables/useDragDrop";
 import { useCopyRichText } from "./composables/useCopyRichText";
 import { exportHtml } from "./composables/useHtmlExport";
 import { useEditorNavigation } from "./composables/useEditorNavigation";
@@ -164,10 +165,22 @@ watch(currentFilePath, (path) => {
 
 // ===== 文件操作 composable（磁盘 IO 类入口）=====
 const {
-  openFile, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
+  openFile, openFileViaDialog, openPathInNewWindow, saveCurrentFile, saveAsCurrentFile,
   reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, onNewTab, onNewFile,
   onOpenFolder, onOpenFile, onOpenRecent,
 } = useFileActions({ tabsStore, workspace, fileOps, persistence, dialog, toast: toastStore, activeTab, currentTheme });
+
+// ===== 拖放打开（原生 drag-drop，issue #92）=====
+// 单个目录 → 走「打开文件夹」同一路径（同目录已开则聚焦，否则新窗口）；文件 → 当前窗口逐个开标签。
+// 图片本 PR 忽略（见 #288）。
+const {
+  dragging: dropDragging,
+  setup: setupDragDrop,
+  teardown: teardownDragDrop,
+} = useDragDrop({
+  openFile,
+  openFolder: openPathInNewWindow,
+});
 
 // ===== 复制为富文本 composable（issue #108，复用 exportHtml 管线，走剪贴板而非文件）=====
 const { copyRichText } = useCopyRichText({
@@ -457,6 +470,14 @@ onMounted(async () => {
   // 7. 注册图片粘贴处理（监听编辑器宿主元素的 paste 事件）
   imagePaste.setup();
 
+  // 7.5 注册原生拖放打开（Tauri drag-drop 事件，issue #92）
+  // 这是 IPC 边界：注册失败（权限/窗口未就绪）不应阻断 onMounted 后续接线，故自行吞掉并记录
+  try {
+    await setupDragDrop();
+  } catch (err) {
+    console.error("注册拖放监听失败:", err);
+  }
+
   // 8. 注入冲突解决器给 fileOps store（供文件树右键菜单使用）
   fileOps.setConflictResolver(askConflict);
 
@@ -522,6 +543,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("focus", onWindowFocus);
   fileWatcher.stop();
   imagePaste.teardown();
+  teardownDragDrop();
   fileOps.setConflictResolver(null);
 });
 
@@ -850,6 +872,21 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
     <!-- 右键菜单容器（全局唯一，数据驱动） -->
     <ContextMenuContainer />
 
+    <!-- 拖放遮罩：外部文件拖到窗口上时提示松开即打开（issue #92） -->
+    <Teleport to="body">
+      <div v-if="dropDragging" class="murasaki-drop-overlay" aria-hidden="true">
+        <div class="murasaki-drop-overlay-card">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12" />
+            <path d="m7 10 5 5 5-5" />
+            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+          </svg>
+          <div class="murasaki-drop-overlay-title">{{ $t('common.drop.overlayTitle') }}</div>
+          <div class="murasaki-drop-overlay-hint">{{ $t('common.drop.overlayHint') }}</div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- 设置页（单入口路由，覆盖主窗口） -->
     <SettingsApp v-if="settingsVisible" @close="settingsVisible = false" />
 
@@ -1056,6 +1093,42 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   font-weight: 600;
   color: var(--murasaki-primary);
   letter-spacing: -0.01em;
+}
+
+/* === 拖放遮罩（外部文件拖到窗口上，issue #92） === */
+.murasaki-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(147, 51, 234, 0.12);
+}
+
+.murasaki-drop-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 26px 40px;
+  border-radius: var(--murasaki-radius-lg);
+  border: 1.5px dashed var(--murasaki-primary);
+  background: var(--murasaki-surface);
+  color: var(--murasaki-primary);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  animation: murasaki-fade-in var(--murasaki-duration-fast) var(--murasaki-ease-out) both;
+}
+
+.murasaki-drop-overlay-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.murasaki-drop-overlay-hint {
+  font-size: 12.5px;
+  color: var(--murasaki-ink-3);
 }
 
 /* === Naive UI overrides for purple brand === */

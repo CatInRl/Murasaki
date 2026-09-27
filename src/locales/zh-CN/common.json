@@ -44,6 +44,10 @@
   "exportPdfTitle": "导出 PDF",
   "exportPdfSuccess": "已导出 PDF",
   "copyRichTextSuccess": "已复制富文本到剪贴板",
+  "drop": {
+    "overlayTitle": "松开以打开",
+    "overlayHint": "文件在当前窗口打开为标签，文件夹在新窗口打开为工作区"
+  },
   "fileFilter": {
     "markdown": "Markdown 文档",
     "textCode": "文本与代码文件",

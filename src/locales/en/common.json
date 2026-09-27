@@ -44,6 +44,10 @@
   "exportPdfTitle": "Export PDF",
   "exportPdfSuccess": "PDF exported",
   "copyRichTextSuccess": "Rich text copied to clipboard",
+  "drop": {
+    "overlayTitle": "Drop to open",
+    "overlayHint": "Files open as tabs here; folders open as a workspace in a new window"
+  },
   "fileFilter": {
     "markdown": "Markdown Documents",
     "textCode": "Text and Code Files",
