@@ -46,7 +46,7 @@
   "copyRichTextSuccess": "リッチテキストをクリップボードにコピーしました",
   "drop": {
     "overlayTitle": "ドロップして開く",
-    "overlayHint": "ファイルはタブ、フォルダーはワークスペースとして開きます"
+    "overlayHint": "ファイルはこのウィンドウでタブ、フォルダーは新しいウィンドウでワークスペースとして開きます"
   },
   "fileFilter": {
     "markdown": "Markdown ドキュメント",

@@ -46,7 +46,7 @@
   "copyRichTextSuccess": "Rich text copied to clipboard",
   "drop": {
     "overlayTitle": "Drop to open",
-    "overlayHint": "Files open as tabs; folders open as the workspace"
+    "overlayHint": "Files open as tabs here; folders open as a workspace in a new window"
   },
   "fileFilter": {
     "markdown": "Markdown Documents",

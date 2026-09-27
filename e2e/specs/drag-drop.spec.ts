@@ -224,6 +224,12 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await waitForPresent(browser, ".file-tree", 10000);
     expect(normalize(await tabPaths())).toEqual([]);
 
+    // 再拖一次同一目录 → 命中「同目录聚焦」：复用已有窗口，不再新开
+    const handlesBefore = (await browser.getWindowHandles()).length;
+    await dropPaths(browser, [wsPath]);
+    await browser.pause(1500);
+    expect((await browser.getWindowHandles()).length).toBe(handlesBefore);
+
     // 当前窗口（主窗口）的工作区保持不变 —— 仍在 null
     await browser.switchToWindow(mainHandle);
     await waitForPiniaInCurrentWindow(browser);

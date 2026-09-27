@@ -36,8 +36,6 @@ export interface UseDragDrop {
   setup(): Promise<void>;
   /** 移除监听（onBeforeUnmount 中调用） */
   teardown(): void;
-  /** 分类并执行一次拖放，返回规划结果（供 e2e / 直接调用） */
-  handleDropPaths(paths: string[]): Promise<DropPlan>;
 }
 
 export function useDragDrop(options: UseDragDropOptions): UseDragDrop {
@@ -81,5 +79,5 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDrop {
     dragging.value = false;
   }
 
-  return { dragging, setup, teardown, handleDropPaths };
+  return { dragging, setup, teardown };
 }
