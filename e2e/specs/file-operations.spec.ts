@@ -22,7 +22,7 @@ import {
   resetPersistenceSettings,
   callStoreAction,
 } from "../helpers/store";
-import { existsSync, statSync, readFileSync } from "node:fs";
+import { existsSync, statSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { isRenderedElement, textOfElement, waitForInBrowser, waitForPresent, waitForRendered } from "../helpers/wait";
 
@@ -144,6 +144,36 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // 不应包含只有目录才有的 "新建文件" / "新建文件夹"
     expect(labels).not.toContain("新建文件");
     expect(labels).not.toContain("新建文件夹");
+  });
+
+  it("应用打不开的文件（.pdf）只提供「用系统默认程序打开」（#307）", async () => {
+    // 这类文件此前右键只有通用项、**没有类型专属的「打开」**，点击也毫无反应，
+    // 是本次补的兜底出口。真去拉起系统程序无法在 CI 断言，故只断言菜单项出现。
+    writeFileSync(resolve(wsPath, "manual.pdf"), "%PDF-1.4\n% 仅用于菜单断言的假文件\n");
+    // 等文件监听把新文件刷进树，再等树安静（复用本文件既有的 helper：它会等节点渲染 +
+    // loading 归位 + 一段安静期，避免新节点带来的滚动把菜单收起）
+    await waitForInBrowser(
+      browser,
+      () =>
+        Array.from(document.querySelectorAll(".file-tree .node-name")).some(
+          (n) => n.textContent?.trim() === "manual.pdf"
+        ),
+      [],
+      { timeout: 8000, message: "文件树出现 manual.pdf" }
+    );
+    await waitForTreeSettled(browser);
+
+    await openTreeNodeContextMenu(browser, "manual.pdf");
+
+    const items = await browser.$$(".murasaki-context-menu-item");
+    const labels: string[] = [];
+    for (const item of items) {
+      const label = await item.$(".murasaki-context-menu-label");
+      labels.push(await textOfElement(browser, label));
+    }
+    expect(labels).toContain("用系统默认程序打开");
+    // 应用打不开它，就不该给应用内的「打开」
+    expect(labels).not.toContain("打开");
   });
 
   it("右键目录节点显示目录专属菜单项（新建文件/新建文件夹/粘贴）", async () => {

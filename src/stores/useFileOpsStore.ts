@@ -282,6 +282,19 @@ export const useFileOpsStore = defineStore("fileOps", () => {
   }
 
   /**
+   * 用系统默认程序打开（issue #307）。
+   * 供「应用打不开的文件」（pdf/zip/exe/未知后缀 等）兜底 —— 这类文件此前点击与右键都毫无反应。
+   */
+  async function openWithDefaultApp(path: string): Promise<void> {
+    try {
+      await fileSystem.openWithDefaultApp(path);
+    } catch (err) {
+      console.error("用系统默认程序打开失败:", err);
+      throw err;
+    }
+  }
+
+  /**
    * 复制绝对路径到系统剪贴板
    */
   async function copyAbsolutePath(path: string): Promise<void> {
@@ -419,6 +432,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     copy,
     paste,
     revealInExplorer,
+    openWithDefaultApp,
     copyAbsolutePath,
     copyRelativePath,
     moveInto,

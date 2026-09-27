@@ -360,3 +360,60 @@ pub fn reveal_in_explorer(path: String) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// 用系统默认程序打开文件或目录（应用打不开的文件的兜底出口，issue #307）
+///
+/// 不走 `plugin-shell` 的 `open`：能力集里的 `shell:default` 只放行 URL
+/// （http(s) / `tel:` / `mailto:`），要打开本地路径得把 `allow-open` 的 scope 放宽到 `**`，
+/// 为一个兜底入口扩大攻击面不划算。这里与 `reveal_in_explorer` 同形，用系统命令。
+#[tauri::command]
+pub fn open_with_default_app(path: String) -> Result<(), String> {
+    if !Path::new(&path).exists() {
+        return Err(format!("路径不存在: {}", path));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // 用 explorer.exe 而不是 `cmd /c start`：两者都能「按默认程序打开」，但走 cmd 有两个坑 ——
+        // ① 文件名里的 `&` `^` `%` `(` 在无空格时不会被 Rust 加引号，会被 cmd 当元字符解释
+        //    （拆命令 / 变量展开）；
+        // ② cmd 是控制台程序，从 GUI 子进程（main.rs 的 windows_subsystem="windows"）里起
+        //    会闪一下黑窗。
+        // explorer.exe 不经 shell，且与同文件的 reveal_in_explorer 用同一个程序。
+        std::process::Command::new("explorer.exe")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 只测错误分支：成功分支会真的拉起系统程序，不适合放进测试
+    #[test]
+    fn open_with_default_app_rejects_missing_path() {
+        let missing = if cfg!(windows) {
+            "Z:\\definitely\\not\\here\\murasaki-307.txt"
+        } else {
+            "/definitely/not/here/murasaki-307.txt"
+        };
+        let err = open_with_default_app(missing.to_string()).unwrap_err();
+        assert!(err.contains("路径不存在"), "unexpected error: {err}");
+    }
+}

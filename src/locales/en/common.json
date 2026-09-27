@@ -28,6 +28,7 @@
   "delete": "Delete",
   "deleteConfirm": "Delete \"{name}\"? (Moved to recycle bin)",
   "open": "Open",
+  "openWithDefaultApp": "Open with system default app",
   "revealInExplorer": "Reveal in File Explorer",
   "newFile": "New File",
   "newFolder": "New Folder",
@@ -85,6 +86,7 @@
     "copyPathFailed": "Failed to copy path: {error}",
     "copyRichTextFailed": "Failed to copy rich text: {error}",
     "revealFailed": "Unable to reveal in explorer: {error}",
+    "openWithDefaultFailed": "Unable to open with the system default app: {error}",
     "openSettingsFailed": "Failed to open settings: {error}",
     "quitFailed": "Failed to quit: {error}",
     "docsNotPublished": "Documentation is not yet published online",
@@ -114,6 +116,7 @@
   },
   "toast": {
     "regionAriaLabel": "Notifications",
-    "closeAriaLabel": "Close notification"
+    "closeAriaLabel": "Close notification",
+    "cannotOpenFile": "This file cannot be opened in Murasaki"
   }
 }
