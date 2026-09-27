@@ -24,7 +24,7 @@ import {
 } from "../helpers/store";
 import { existsSync, statSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { waitForInBrowser, waitForPresent, waitForRendered } from "../helpers/wait";
+import { isRenderedElement, waitForInBrowser, waitForPresent, waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -184,7 +184,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
       '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="new-file.md"]',
       5000
     );
-    expect(await newNode.isDisplayed()).toBe(true);
+    expect(await isRenderedElement(browser, newNode)).toBe(true);
   });
 
   it("新建文件夹：fileOps.createDirectory 后文件树刷新显示新目录", async () => {

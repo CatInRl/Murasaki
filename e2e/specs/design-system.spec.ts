@@ -15,7 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -142,9 +142,9 @@ describe("设计系统", () => {
     // 等待 sidebar 切换到 EmptyState
     await browser.pause(500);
 
-    const emptyState = await browser.$(".file-tree .empty-state");
     await waitForPresent(browser, ".file-tree .empty-state", 10000);
-    expect(await emptyState.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    expect(await isRendered(browser, ".file-tree .empty-state")).toBe(true);
 
     const title = await browser.$(".file-tree .empty-state .empty-title");
     expect((await title.getText()).trim()).toBe("未打开工作区");
@@ -180,7 +180,7 @@ describe("设计系统", () => {
 
     const actionBtn = await browser.$(".file-tree .empty-state .empty-action");
     await waitForPresent(browser, ".file-tree .empty-state .empty-action", 10000);
-    expect(await actionBtn.isDisplayed()).toBe(true);
+    expect(await isRendered(browser, ".file-tree .empty-state .empty-action")).toBe(true);
     expect((await actionBtn.getText()).trim()).toBe("打开文件夹");
   });
 });

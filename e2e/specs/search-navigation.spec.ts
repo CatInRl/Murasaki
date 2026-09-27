@@ -19,7 +19,7 @@ import {
   dismissAllDialogs,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 import { resolve } from "node:path";
 
 let browser: Browser;
@@ -148,7 +148,8 @@ describe("跨文件搜索结果跳转", () => {
     await browser.pause(300);
 
     const gsb = await browser.$(".gsb");
-    expect(await gsb.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    expect(await isRendered(browser, ".gsb")).toBe(true);
 
     // 关闭
     await browser.execute(() => {

@@ -18,7 +18,7 @@ import {
   waitForPinia,
   resetPersistenceSettings
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -148,9 +148,9 @@ describe("多 Tab 管理", () => {
     }, "# 修改后的内容\n");
 
     // 等待 dirty-dot 出现（TabBar.vue 用 .dirty-dot 不是 .dirty-mark）
-    const dirtyMark = await browser.$(".tab-bar-container .tab-item.active .dirty-dot");
     await waitForPresent(browser, ".tab-bar-container .tab-item.active .dirty-dot", 3000);
-    expect(await dirtyMark.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    expect(await isRendered(browser, ".tab-bar-container .tab-item.active .dirty-dot")).toBe(true);
 
     // store 中 isDirty 应为 true
     const state = await getTabsState(browser);

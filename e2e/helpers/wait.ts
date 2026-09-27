@@ -16,7 +16,11 @@
  * - `isDisplayed()` / `waitForDisplayed()` 会误判：实测 toast 元素 `display:flex`、
  *   `visibility:visible`、`getBoundingClientRect()` 为 138x42、且 store 中确实存在时，
  *   `isDisplayed()` 仍返回 `false`；`waitForDisplayed()` 在元素/菜单入场动画
- *   （`opacity 0 → 1`）阶段会直接超时报 `still not displayed`。
+ *   （`opacity 0 → 1`）阶段会直接超时报 `still not displayed`。该误判是**持久性**的
+ *   （重试救不回来，实测 `smoke.spec.ts` 的 `beforeEach` 因此空等 15s 超时，见 #284），
+ *   故 **e2e 里不再使用这两个 API**：要判「可见/已渲染」一律用本文件的 `isRendered`
+ *   （按选择器）/ `isRenderedElement`（按元素句柄）。浮层是例外——右键菜单之类的浮层
+ *   只判「存在」（`waitForPresent`）并读内容，不判几何与透明度，理由见上一条。
  * - `getText()` 会返回空串：实测 `.dialog-message` 的 `textContent` 是「第一个」时
  *   `getText()` 返回 `''`（`.murasaki-context-menu-shortcut` 首个元素同样如此）。
  *
@@ -28,23 +32,54 @@
 import type { Browser } from "webdriverio";
 
 /**
+ * 「已渲染」判定的**单一实现**（在浏览器上下文执行）。
+ *
+ * `browser.execute` 会把函数序列化后在页面里跑，函数体里引用不到模块作用域，
+ * 所以这段几何/样式判定只能写一次，由 `isRendered` 与 `isRenderedElement` 共用（#284）。
+ */
+async function renderedCheck(
+  browser: Browser,
+  kind: "selector" | "element",
+  target: unknown
+): Promise<boolean> {
+  return await browser.execute(
+    (k: string, t: unknown) => {
+      const el = (k === "selector" ? document.querySelector(t as string) : t) as HTMLElement | null;
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      const style = getComputedStyle(el);
+      if (style.display === "none") return false;
+      if (style.visibility === "hidden") return false;
+      if (style.opacity === "0") return false;
+      return true;
+    },
+    kind,
+    target
+  );
+}
+
+/**
  * 判断某选择器的首个元素是否「已渲染」：存在 + 非零尺寸 + 未被隐藏（display/visibility/opacity）
  */
 export async function isRendered(
   browser: Browser,
   selector: string
 ): Promise<boolean> {
-  return await browser.execute((sel: string) => {
-    const el = document.querySelector(sel) as HTMLElement | null;
-    if (!el) return false;
-    const rect = el.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return false;
-    const style = getComputedStyle(el);
-    if (style.display === "none") return false;
-    if (style.visibility === "hidden") return false;
-    if (style.opacity === "0") return false;
-    return true;
-  }, selector);
+  return await renderedCheck(browser, "selector", selector);
+}
+
+/**
+ * 判断某个**元素句柄**是否「已渲染」（判定口径与 `isRendered` 完全一致）。
+ *
+ * 用于选择器没法用 CSS 表达的句柄（文本选择器如 `.action-label=打开文件夹`、
+ * XPath 取到的节点）：webdriverio 会把句柄序列化成 WebElement 引用传进页面。
+ */
+export async function isRenderedElement(
+  browser: Browser,
+  element: unknown
+): Promise<boolean> {
+  return await renderedCheck(browser, "element", element);
 }
 
 /**

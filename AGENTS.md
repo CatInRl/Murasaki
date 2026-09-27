@@ -109,7 +109,7 @@ murasaki/
 
    `e2e` 于 **2026-09-26 提升为必过项**（此前只跑不拦，见 #261；提升的依据是修掉三类 flake 后连续 4 次跑绿：应用就绪未等 #266、元素等待不重试 #268、只等容器不等节点 #270。提升后它的第一次运行就拦下第四类 flake —— 右键菜单被滚动收起，见 #273）。代价是每个 PR 多等约 15–23 分钟；若某次确认是环境抖动而非回归，可 `gh run rerun <run-id> --failed` 重试，确需临时降级时改分支保护的 required status checks（`gh api repos/CatInRl/Murasaki/branches/main/protection/required_status_checks -X PATCH ...`）。
 
-   **e2e 的六个坑（都踩过，别再踩）**：
+   **e2e 的八个坑（都踩过，别再踩）**：
    - 被测二进制必须走 Tauri CLI（`npm run tauri:build` 或 `npx tauri build --no-bundle`）。裸 `cargo build --release` 产出的二进制**前端起不来**（webview 停在 `title="localhost"`），整套 e2e 会系统性失败、极易误判成代码回归。
    - 跑之前不能有残留的 tauri-driver / msedgedriver 占用 4444/4445：`e2e/setup.ts` 会复用外部 driver，若它是半死状态，之后所有 session 报 `ECONNRESET`。跑前先清进程。
    - **界面语言必须固定为 zh-CN**：e2e 断言全基于中文文案，而应用首次启动会按系统语言自动探测并持久化（CI runner 是 en-US）。`e2e/setup.ts` 的 globalSetup 会在启动前把 `%APPDATA%\com.murasaki.app\settings.json` 的 `language` 预置为 zh-CN，别把它删掉。
@@ -117,6 +117,7 @@ murasaki/
    - **元素等待命令不重试**：`waitForExist` / `waitForDisplayed` 等在本栈下是**单次判定**——对不存在的元素 `waitForExist({ timeout: 15000 })` 实测 **~10ms 就抛错**（错误文案却写「after 15000ms」，纯属文案）。本地跑得快所以一直没暴露，CI 慢就带来成片的「等不到元素」。**要等 UI 出现就用 `e2e/helpers/wait.ts` 的手写轮询**（`waitForPresent` / `waitForAbsent` / `waitForRendered` / `waitForInBrowser`），**别再用元素等待命令**（#268 已把全套 130 余处调用点换掉）；另外 `browser.waitUntil` 本身是正常重试的（实测 5s/300ms → 轮询 17 次），但预算要**大于被等对象自身的兜底**（例：等 `workspace.loading` 归位就得 >30s，因为 `refreshTree` 自己有 30s 超时兜底，给正好 30s 必然抢跑输——#266）。
    - **右键菜单会被任意滚动收起**：`ContextMenuContainer` 在 window 上以 **capture 阶段**注册了 `scroll` / `resize` → 关闭菜单。若用例刚 `openWorkspace`（刷新、把目标滚入视区都可能紧跟其后）就开菜单，菜单会被立刻收掉，表现为「等不到 `.murasaki-context-menu`」。**开菜单前先让树安静下来**（节点渲染 + `workspace.loading === false` + 一段安静期，见 `file-operations.spec.ts` 的 `waitForTreeSettled`），必要时按 #273 的做法**有界重派发**；另注意 `context-menu.spec.ts` 的 beforeEach 故意不调 `closeWorkspace`（会干扰 Teleport 渲染时机）。
    - **动画浮层别用 `waitForRendered` 判「已渲染」**：它把 `opacity: "0"` 判为未渲染，而淡入浮层过渡期就是这个值。右键菜单等浮层用 `waitForPresent`（存在）＋读元素内容断言即可；但 `toast.spec.ts` 那种「先等、**再断言** `isRendered`」的写法是有意为之（断言要求过渡已完成），别顺手统一（#273 实测过，换成 presence 会挂 2 条）。
+   - **别用 `isDisplayed()` / `getText()` 读元素**（同一类坑）：`isDisplayed()` 在本栈下会**持久性**误判——实测元素 `display:flex`、`visibility:visible`、`getBoundingClientRect()` 为 138x42、且 store 中确实存在时仍返回 `false`，**重试救不回来**（`smoke.spec.ts` 的 `beforeEach` 为此空等 15s 超时，CI 上随机变红）；`getText()` 则会对某些元素返回 `''`，而它**单次判定不重试**，于是「读太早」直接变成断言失败（`state-display.spec.ts` 曾间歇性挂在这上面）。**判「可见」用 `e2e/helpers/wait.ts` 的 `isRendered`（按选择器）/ `isRenderedElement`（按元素句柄），读文本用 `readText`（轮询到非空）**——`isDisplayed()` 的 32 处调用点已由 #284 清扫干净，`getText()` 的其余调用点尚未统一清扫（改到哪处用哪处，见 #282）。浮层仍是上一条的例外：只判「存在」＋读内容。
 5. **自查后再合**：合入前跑 `/code-review` skill，把结论贴在 PR 里；有阻断项先修掉。
 6. **合入**：**squash merge**（一个 PR = 一个 conventional commit），合入后自动删除头分支。Agent 可自主切分支 / 提交 / 推送 / 开 PR，但**squash 合入 main 前必须得到用户确认**。
 7. **main 受保护**：禁止直推、必须 CI 全绿、必须与 main 同步（Require branches to be up to date）；管理员豁免**仅用于紧急修复**；不设 required approving review（单人仓库无法自批自己的 PR）。

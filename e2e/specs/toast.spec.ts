@@ -49,11 +49,11 @@ describe("吐司系统", () => {
 
     // 使用轮询等待 + pause 替代元素可见性等待（后者在 tauri-driver 下
     // 与 transition-group 的 enter-from opacity:0 阶段交互不稳定）
-    const item = await browser.$(".toast-item.toast-success");
     await waitForPresent(browser, ".toast-item.toast-success", 5000);
     // 等待 enter transition 完成（200ms + 余量）
     await browser.pause(400);
-    expect(await item.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下对此类元素会持久性误判，与下方 error/warning 用例统一改用 isRendered
+    expect(await isRendered(browser, ".toast-item.toast-success")).toBe(true);
 
     await waitForPresent(browser, ".toast-success .toast-title", 5000);
     // tauri-driver 下 getText() 对小文本节点会返回空串，改读 textContent
