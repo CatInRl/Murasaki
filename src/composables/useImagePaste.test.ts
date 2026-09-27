@@ -1,5 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { EditorView } from "@codemirror/view";
+
+// ===== Mock @tauri-apps/api/core（insertDroppedImages 会调用 Rust 命令）=====
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(),
+}));
+
+import { invoke } from "@tauri-apps/api/core";
 import {
   relativePath,
   resolveInsertMode,
@@ -8,19 +15,34 @@ import {
   useImagePaste,
 } from "./useImagePaste";
 
+const mockedInvoke = invoke as unknown as ReturnType<typeof vi.fn>;
+
 /**
  * 最小 view 替身：`insertMarkdownImage` / `insertExistingImage` 只用到
  * `state.selection.main.head`、`dispatch`、`focus`
  */
-function fakeView(head = 0): { view: EditorView; dispatch: ReturnType<typeof vi.fn> } {
+function fakeView(
+  head = 0,
+  posAtCoords: (coords: { x: number; y: number }) => number | null = () => 0
+): {
+  view: EditorView;
+  dispatch: ReturnType<typeof vi.fn>;
+  posAtCoords: ReturnType<typeof vi.fn>;
+} {
   const dispatch = vi.fn();
+  const posAtCoordsFn = vi.fn(posAtCoords);
   const view = {
     state: { selection: { main: { head } } },
     dispatch,
     focus: vi.fn(),
+    posAtCoords: posAtCoordsFn,
   } as unknown as EditorView;
-  return { view, dispatch };
+  return { view, dispatch, posAtCoords: posAtCoordsFn };
 }
+
+beforeEach(() => {
+  mockedInvoke.mockReset();
+});
 
 describe("useImagePaste utilities", () => {
   describe("insertExistingImage（文件树拖入：不复制、不受插入方式影响）", () => {
@@ -53,6 +75,239 @@ describe("useImagePaste utilities", () => {
       expect(dispatch).toHaveBeenCalledWith(
         expect.objectContaining({
           changes: { from: 5, to: 5, insert: "![](../assets/pic.png)" },
+        })
+      );
+    });
+  });
+
+  describe("insertDroppedImages（外部拖入图片，issue #288）", () => {
+    interface MakeOpts {
+      mode?: "file" | "base64";
+      workspace?: string | null;
+      currentFile?: string | null;
+      head?: number;
+    }
+
+    function makePaste(opts: MakeOpts = {}) {
+      const { view, dispatch, posAtCoords } = fakeView(opts.head ?? 0, () => 7);
+      const paste = useImagePaste({
+        getEditorView: () => view,
+        getWorkspacePath: () => (opts.workspace === undefined ? "/ws" : opts.workspace),
+        getCurrentFilePath: () =>
+          opts.currentFile === undefined ? "/ws/a.md" : opts.currentFile,
+        getInsertMode: () => opts.mode ?? "file",
+        getImageDir: () => "assets/images",
+      });
+      return { paste, dispatch, posAtCoords };
+    }
+
+    it("无编辑器 view → 返回 false", async () => {
+      const paste = useImagePaste({
+        getEditorView: () => null,
+        getWorkspacePath: () => "/ws",
+        getCurrentFilePath: () => "/ws/a.md",
+        getInsertMode: () => "file",
+        getImageDir: () => "assets/images",
+      });
+      expect(await paste.insertDroppedImages(["/tmp/pic.png"])).toBe(false);
+      expect(mockedInvoke).not.toHaveBeenCalled();
+    });
+
+    it("file 模式：复制到工作区后插入相对当前 md 文件的路径", async () => {
+      mockedInvoke.mockResolvedValue({
+        absolutePath: "/ws/assets/images/20260726-153045-a1b2c3.png",
+        relativePath: "assets/images/20260726-153045-a1b2c3.png",
+        filename: "20260726-153045-a1b2c3.png",
+      });
+      const { paste, dispatch } = makePaste({ mode: "file" });
+      expect(await paste.insertDroppedImages(["/tmp/pic.png"])).toBe(true);
+
+      expect(mockedInvoke).toHaveBeenCalledWith("copy_image_to_workspace", {
+        sourcePath: "/tmp/pic.png",
+        workspace: "/ws",
+        dir: "assets/images",
+      });
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: {
+            from: 0,
+            to: 0,
+            insert: "![](assets/images/20260726-153045-a1b2c3.png)",
+          },
+        })
+      );
+    });
+
+    it("file 模式：当前 md 在子目录时算相对路径（带 ../）", async () => {
+      mockedInvoke.mockResolvedValue({
+        absolutePath: "/ws/assets/images/x.png",
+        relativePath: "assets/images/x.png",
+        filename: "x.png",
+      });
+      const { paste, dispatch } = makePaste({ mode: "file", currentFile: "/ws/docs/a.md" });
+      await paste.insertDroppedImages(["/tmp/pic.png"]);
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: { from: 0, to: 0, insert: "![](../assets/images/x.png)" },
+        })
+      );
+    });
+
+    it("base64 模式：读取字节内嵌，不落盘", async () => {
+      mockedInvoke.mockResolvedValue("Zm9v");
+      const { paste, dispatch } = makePaste({ mode: "base64" });
+      expect(await paste.insertDroppedImages(["/tmp/pic.png"])).toBe(true);
+
+      expect(mockedInvoke).toHaveBeenCalledWith("read_image_base64", { sourcePath: "/tmp/pic.png" });
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: { from: 0, to: 0, insert: "![](data:image/png;base64,Zm9v)" },
+        })
+      );
+    });
+
+    it("无工作区：即使配置 file 也回退 base64", async () => {
+      mockedInvoke.mockResolvedValue("Zm9v");
+      const { paste, dispatch } = makePaste({ mode: "file", workspace: null });
+      await paste.insertDroppedImages(["/tmp/pic.png"]);
+      expect(mockedInvoke).toHaveBeenCalledWith("read_image_base64", { sourcePath: "/tmp/pic.png" });
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: { from: 0, to: 0, insert: "![](data:image/png;base64,Zm9v)" },
+        })
+      );
+    });
+
+    it("file 落盘失败 → 回退内嵌 base64", async () => {
+      mockedInvoke.mockImplementation((cmd: string) => {
+        if (cmd === "copy_image_to_workspace") return Promise.reject(new Error("boom"));
+        return Promise.resolve("Zm9v");
+      });
+      const { paste, dispatch } = makePaste({ mode: "file" });
+      await paste.insertDroppedImages(["/tmp/pic.png"]);
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: { from: 0, to: 0, insert: "![](data:image/png;base64,Zm9v)" },
+        })
+      );
+    });
+
+    it("一次拖入多张：按顺序、用换行分隔，只插入一次 dispatch", async () => {
+      // 每张返回不同文件名
+      let n = 0;
+      mockedInvoke.mockImplementation(() =>
+        Promise.resolve({
+          absolutePath: `/ws/assets/images/img${++n}.png`,
+          relativePath: `assets/images/img${n}.png`,
+          filename: `img${n}.png`,
+        })
+      );
+      const { paste, dispatch } = makePaste({ mode: "file" });
+      expect(await paste.insertDroppedImages(["/tmp/a.png", "/tmp/b.jpg"])).toBe(true);
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: {
+            from: 0,
+            to: 0,
+            insert: "![](assets/images/img1.png)\n![](assets/images/img2.png)",
+          },
+        })
+      );
+    });
+
+    it("落点有效：posAtCoords 用换算后的视口坐标，插入在落点", async () => {
+      mockedInvoke.mockResolvedValue({
+        absolutePath: "/ws/assets/images/x.png",
+        relativePath: "assets/images/x.png",
+        filename: "x.png",
+      });
+      const { paste, dispatch, posAtCoords } = makePaste({ mode: "file" });
+      await paste.insertDroppedImages(["/tmp/pic.png"], { x: 400, y: 400 });
+      // jsdom 默认 devicePixelRatio = 1 → (400-8, 400-31)
+      expect(posAtCoords).toHaveBeenCalledWith({ x: 392, y: 369 });
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({ changes: { from: 7, to: 7, insert: "![](assets/images/x.png)" } })
+      );
+    });
+
+    it("落点无效（坐标为 0）→ 回退当前光标，不调 posAtCoords", async () => {
+      mockedInvoke.mockResolvedValue({
+        absolutePath: "/ws/assets/images/x.png",
+        relativePath: "assets/images/x.png",
+        filename: "x.png",
+      });
+      const { paste, dispatch, posAtCoords } = makePaste({ mode: "file", head: 3 });
+      await paste.insertDroppedImages(["/tmp/pic.png"], { x: 0, y: 0 });
+      expect(posAtCoords).not.toHaveBeenCalled();
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({ changes: { from: 3, to: 3, insert: "![](assets/images/x.png)" } })
+      );
+    });
+
+    it("按住 Alt 时临时取反（配置 file → 内嵌 base64）", async () => {
+      mockedInvoke.mockResolvedValue("Zm9v");
+      const { paste, dispatch } = makePaste({ mode: "file" });
+      paste.setup();
+      try {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Alt" }));
+        await paste.insertDroppedImages(["/tmp/pic.png"]);
+        expect(mockedInvoke).toHaveBeenCalledWith("read_image_base64", {
+          sourcePath: "/tmp/pic.png",
+        });
+        expect(dispatch).toHaveBeenCalledWith(
+          expect.objectContaining({
+            changes: { from: 0, to: 0, insert: "![](data:image/png;base64,Zm9v)" },
+          })
+        );
+      } finally {
+        paste.teardown();
+      }
+    });
+  });
+
+  describe("handlePaste（剪贴板图片，与外部拖入共用同一套插入方式逻辑）", () => {
+    /** 构造含一张图片的假粘贴事件（jsdom 无法真的把图片放进剪贴板） */
+    function pasteEvent(name = "shot.png", type = "image/png", bytes = [1, 2, 3]): ClipboardEvent {
+      const file = {
+        name,
+        type,
+        arrayBuffer: async () => new Uint8Array(bytes).buffer,
+      } as unknown as File;
+      const items = [{ kind: "file", type, getAsFile: () => file }];
+      return { clipboardData: { items } } as unknown as ClipboardEvent;
+    }
+
+    function makePaste(mode: "file" | "base64", currentFile: string | null) {
+      const { view, dispatch } = fakeView(0);
+      const paste = useImagePaste({
+        getEditorView: () => view,
+        getWorkspacePath: () => "/ws",
+        getCurrentFilePath: () => currentFile,
+        getInsertMode: () => mode,
+        getImageDir: () => "assets/images",
+      });
+      return { paste, dispatch };
+    }
+
+    it("file 模式：落盘后插入相对当前 md 文件的路径（与拖入同口径，issue #288 审查）", async () => {
+      mockedInvoke.mockResolvedValue({
+        absolutePath: "/ws/assets/images/shot.png",
+        // Rust 给的是工作区根相对路径；前端统一改成「相对当前文件」的口径
+        relativePath: "assets/images/shot.png",
+        filename: "shot.png",
+      });
+      const { paste, dispatch } = makePaste("file", "/ws/docs/a.md");
+      expect(await paste.handlePaste(pasteEvent())).toBe(true);
+      expect(mockedInvoke).toHaveBeenCalledWith("save_image_asset", {
+        workspace: "/ws",
+        bytes: [1, 2, 3],
+        ext: "png",
+        dir: "assets/images",
+      });
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          changes: { from: 0, to: 0, insert: "![](../assets/images/shot.png)" },
         })
       );
     });

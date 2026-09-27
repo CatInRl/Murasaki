@@ -4,19 +4,18 @@
  * 监听 Tauri 原生 drag-drop 事件（`getCurrentWebviewWindow().onDragDropEvent`），
  * 把从系统拖入窗口的文件/文件夹路径交给 Rust `classify_drop_paths` 分类，
  * 再由 `planDrop` 规划动作：单个目录 → 走「打开文件夹」同一路径（同目录已开则聚焦
- * 那个窗口，否则新窗口）；文件 → **在当前窗口**逐个开标签（与 `Ctrl+O` / 最近文件一致）。
+ * 那个窗口，否则新窗口）；文件 → **在当前窗口**逐个开标签（与 `Ctrl+O` / 最近文件一致）；
+ * 图片 → **在当前窗口**按插入方式插入编辑器（issue #288）。
  *
  * 机制说明：Tauri 的 `dragDropEnabled`（默认 true）会让 WebView2 拦截系统文件拖放，
  * 改以 `tauri://drag-enter|over|drop|leave` 事件告之——HTML5 的 `drop` 因此收不到系统
- * 文件拖放（图片链路的修复见 #288，本 PR 不碰 `useImagePaste.ts`）。
- *
- * 图片与不受支持的类型本 PR **不处理**（图片链路见 #288）：`planDrop` 已把它们排除在
- * `plan.files` 之外（既不进 `files`，也不设 `workspace`），这里只跑 `plan.files`。
+ * 文件拖放，故图片也走这条原生链路（`useImagePaste` 不再监听 HTML5 `drop`）。
  */
 import { ref, type Ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { planDrop, type DropEntry, type DropPlan } from "../utils/dropPlan";
+import type { PhysicalPoint } from "../utils/dropPosition";
 
 export interface UseDragDropOptions {
   /** 打开文件为标签（当前窗口） */
@@ -27,6 +26,11 @@ export interface UseDragDropOptions {
    * （与「打开文件夹」入口共用同一路径，见 ADR-0018）。
    */
   openFolder: (path: string) => Promise<void> | void;
+  /**
+   * 把外部拖入的图片插入当前窗口的编辑器（issue #288）：
+   * `position` 是 Tauri 给的物理像素落点（可空，取不到则落到光标处）。
+   */
+  insertImages: (paths: string[], position: PhysicalPoint | null) => Promise<void> | void;
 }
 
 export interface UseDragDrop {
@@ -42,17 +46,24 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDrop {
   const dragging = ref(false);
   let unlisten: (() => void) | null = null;
 
-  async function handleDropPaths(paths: string[]): Promise<DropPlan> {
+  async function handleDropPaths(
+    paths: string[],
+    position: PhysicalPoint | null
+  ): Promise<DropPlan> {
     const entries = await invoke<DropEntry[]>("classify_drop_paths", { paths });
     const plan = planDrop(entries);
 
     if (plan.workspace) {
       await options.openFolder(plan.workspace);
-      return plan;
+    } else {
+      // 逐个打开，保持拖入顺序
+      for (const path of plan.files) {
+        await options.openFile(path);
+      }
     }
-    // 逐个打开，保持拖入顺序；图片 / 缺失路径本 PR 忽略（图片见 #288）
-    for (const path of plan.files) {
-      await options.openFile(path);
+    // 图片在当前窗口插入编辑器（不打开标签、不设工作区）；无编辑器时实现方自行忽略
+    if (plan.images.length > 0) {
+      await options.insertImages(plan.images, position);
     }
     return plan;
   }
@@ -66,7 +77,7 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDrop {
         dragging.value = false;
       } else if (payload.type === "drop") {
         dragging.value = false;
-        void handleDropPaths(payload.paths).catch((err) => {
+        void handleDropPaths(payload.paths, payload.position).catch((err) => {
           console.error("处理拖放路径失败:", err);
         });
       }

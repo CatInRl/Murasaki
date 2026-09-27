@@ -1,16 +1,20 @@
 import type { EditorView } from "@codemirror/view";
 import { invoke } from "@tauri-apps/api/core";
 import { relativePath as computeRelativePath, extname } from "../utils/path";
-import { isImageFile } from "../utils/fileKind";
+import { toViewportCoords, type PhysicalPoint } from "../utils/dropPosition";
 import type { ImageInsertMode } from "../types";
 
 /**
  * 图片粘贴/拖入 composable
  *
- * 处理三种场景（spec：图片处理流程；issue #151 补「插入方式」策略）：
+ * 处理三种场景（spec：图片处理流程；issue #151 补「插入方式」策略，#288 修外部拖入）：
  * 1. 粘贴剪贴板图片 → 按插入方式处理
- * 2. 拖入外部图片文件 → 按插入方式处理，插入点在**落点**（取不到坐标时回退光标）
+ * 2. 从系统拖入外部图片 → 按插入方式处理，插入点在**落点**（取不到坐标时回退光标）
  * 3. 从文件树拖入已存在图片 → 计算相对当前 md 文件的相对路径（不复制，不受插入方式影响）
+ *
+ * 其中场景 2 由 Tauri 原生 drag-drop 事件驱动（`useDragDrop` → `insertDroppedImages`）：
+ * Tauri 的 `dragDropEnabled`（默认 true）会拦截系统文件拖放，HTML5 的 `drop` 收不到系统
+ * 文件拖放，故这里**不再**监听 window 级 HTML5 `drop`（#288 前那条入口在 Windows 上一直失效）。
  *
  * 插入方式（设置项 `imageInsertMode`）：
  * - `file`（默认）：复制到 `defaultImageDir` → 插入相对路径，如 `![](assets/images/20260726-153045-a1b2c3.png)`
@@ -37,7 +41,7 @@ export interface UseImagePasteOptions {
 }
 
 export interface UseImagePaste {
-  /** 注册 paste / drop 监听器（在 onMounted 中调用） */
+  /** 注册 paste 监听器（在 onMounted 中调用） */
   setup(): void;
   /** 移除监听器（在 onBeforeUnmount 中调用） */
   teardown(): void;
@@ -47,17 +51,23 @@ export interface UseImagePaste {
    */
   handlePaste(e: ClipboardEvent): Promise<boolean>;
   /**
-   * 处理拖放事件：检测是否为图片文件，若是则复制到 assets 并插入 markdown
-   * 返回 true 表示已处理
+   * 处理 Tauri 原生拖放带来的外部图片路径（issue #288）：
+   * 按 `paths` 顺序逐张按插入方式落图/内嵌，并插入到 `position`（物理像素落点）对应的位置，
+   * 取不到坐标时回退到当前光标。返回 true 表示至少插入了一张。
    */
-  handleDrop(e: DragEvent): Promise<boolean>;
+  insertDroppedImages(paths: string[], position?: PhysicalPoint | null): Promise<boolean>;
   /**
    * 从文件树拖入已有图片：使用相对当前 md 文件的路径写法（不复制）
    */
   insertExistingImage(absolutePath: string): boolean;
 }
 
-const IMAGE_EXT_FALLBACK = "png";
+/** Rust `copy_image_to_workspace` 的返回结构 */
+interface SaveImageResult {
+  absolutePath: string;
+  relativePath: string;
+  filename: string;
+}
 
 /** 计算从 fromFile 到 toPath 的相对路径（如 ../assets/foo.png） */
 export function relativePath(fromFile: string, toPath: string): string {
@@ -112,11 +122,10 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
     options;
 
   /**
-   * 在编辑器插入 markdown 图片引用
+   * 在编辑器插入一段 markdown
    * @param pos 插入位置（拖放的落点）；省略/取不到时用当前光标
    */
-  function insertMarkdownImage(view: EditorView, path: string, pos?: number | null): void {
-    const markdown = `![](${path})`;
+  function insertMarkdown(view: EditorView, markdown: string, pos?: number | null): void {
     const at = typeof pos === "number" ? pos : view.state.selection.main.head;
     view.dispatch({
       changes: { from: at, to: at, insert: markdown },
@@ -125,9 +134,60 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
     view.focus();
   }
 
+  /** 在编辑器插入 markdown 图片引用 `![](path)` */
+  function insertMarkdownImage(view: EditorView, path: string, pos?: number | null): void {
+    insertMarkdown(view, `![](${path})`, pos);
+  }
+
   /**
-   * 按插入方式落图：file → 写入工作区目录后插相对路径；base64 → 直接内嵌。
-   * file 模式下落盘失败（目录不可写等）回退内嵌，避免静默丢图。
+   * 落盘后的绝对路径 → markdown 引用串：统一相对**当前 md 文件**（无当前文件时用绝对路径）。
+   *
+   * 这是「相对当前文件」口径的唯一出处 —— 粘贴、文件树拖入、原生拖入三条入口共用，
+   * 避免同一张图经不同入口插入得到不同形式的链接（issue #288 审查）。
+   */
+  function refFromAbsolutePath(absolutePath: string): string {
+    const currentFile = getCurrentFilePath();
+    return currentFile ? relativePath(currentFile, absolutePath) : absolutePath;
+  }
+
+  /**
+   * 按插入方式落图并生成引用串 —— **粘贴与原生拖入两条入口共用**（issue #288 审查）。
+   *
+   * 统一口径：file → 落盘到工作区后用 `refFromAbsolutePath`（相对当前 md 文件）引用；
+   * base64（含无工作区、Alt 取反）→ 内嵌 data URI；file 落盘失败 → 回退内嵌，避免静默丢图。
+   *
+   * 两条入口的差异只体现在「字节从哪来」：`persist` 怎么落盘（粘贴给字节 / 原生拖入给绝对
+   * 路径）、`readAsBase64` 怎么取内嵌串；落点坐标由调用方各自处理。
+   *
+   * @param altKey 是否按住 Alt（本次临时取反插入方式）
+   * @param persist file 模式：把图片落盘到工作区，返回落盘后的**绝对路径**
+   * @param readAsBase64 base64 模式（或 file 落盘失败回退）：取内嵌 data URI；取不到返回 null
+   * @returns 引用串（相对路径或 data URI）；取不到时返回 null（调用方跳过该张）
+   */
+  async function persistAndBuildRef(opts: {
+    altKey: boolean;
+    persist: () => Promise<string>;
+    readAsBase64: () => Promise<string | null>;
+  }): Promise<string | null> {
+    const mode = resolveInsertMode({
+      configured: getInsertMode(),
+      altKey: opts.altKey,
+      hasWorkspace: Boolean(getWorkspacePath()),
+    });
+
+    if (mode === "base64") return opts.readAsBase64();
+
+    try {
+      return refFromAbsolutePath(await opts.persist());
+    } catch (err) {
+      console.warn("保存图片到工作区失败，回退为内嵌 Base64:", err);
+      return opts.readAsBase64();
+    }
+  }
+
+  /**
+   * 按插入方式落「字节」：file → 写入工作区目录后插相对**当前 md 文件**的路径；
+   * base64 → 直接内嵌；落盘失败回退内嵌。
    */
   async function insertImageBytes(
     view: EditorView,
@@ -136,37 +196,23 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
     altKey: boolean,
     pos?: number | null
   ): Promise<boolean> {
-    const workspace = getWorkspacePath();
-    const mode = resolveInsertMode({
-      configured: getInsertMode(),
+    const ref = await persistAndBuildRef({
       altKey,
-      hasWorkspace: Boolean(workspace),
+      persist: async () => {
+        const result = await invoke<SaveImageResult>("save_image_asset", {
+          workspace: getWorkspacePath(),
+          // 将 Uint8Array 转为 number[] 以匹配 Rust 的 Vec<u8>
+          bytes: Array.from(bytes),
+          ext,
+          dir: getImageDir(),
+        });
+        return result.absolutePath;
+      },
+      readAsBase64: async () => bytesToDataUri(bytes, ext),
     });
-
-    if (mode === "base64") {
-      insertMarkdownImage(view, bytesToDataUri(bytes, ext), pos);
-      return true;
-    }
-
-    try {
-      const result = await invoke<{
-        absolutePath: string;
-        relativePath: string;
-        filename: string;
-      }>("save_image_asset", {
-        workspace,
-        // 将 Uint8Array 转为 number[] 以匹配 Rust 的 Vec<u8>
-        bytes: Array.from(bytes),
-        ext,
-        dir: getImageDir(),
-      });
-      insertMarkdownImage(view, result.relativePath, pos);
-      return true;
-    } catch (err) {
-      console.warn("保存图片到工作区失败，回退为内嵌 Base64:", err);
-      insertMarkdownImage(view, bytesToDataUri(bytes, ext), pos);
-      return true;
-    }
+    if (!ref) return false;
+    insertMarkdownImage(view, ref, pos);
+    return true;
   }
 
   /**
@@ -198,24 +244,62 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
     return insertImageBytes(view, extracted.bytes, extracted.ext, altPressed);
   }
 
-  async function handleDrop(e: DragEvent): Promise<boolean> {
+  /** 读取本地图片文件字节并转为 data URI（走 Rust，前端不直接读文件）；失败返回 null */
+  async function readAsDataUri(path: string): Promise<string | null> {
+    try {
+      const base64 = await invoke<string>("read_image_base64", { sourcePath: path });
+      return `data:${mimeForImageExt(extname(path))};base64,${base64}`;
+    } catch (err) {
+      console.warn("读取拖入图片失败，跳过:", err);
+      return null;
+    }
+  }
+
+  /**
+   * 把单张拖入的图片落盘/内嵌为引用串（不含 `![]()` 外壳），复用与粘贴同一套插入方式逻辑。
+   *
+   * 与粘贴的唯一差异：图片来源是**绝对路径**（原生拖入 payload 只给路径），故 file 模式走
+   * `copy_image_to_workspace`；base64 模式走 `read_image_base64`。
+   */
+  async function droppedImageRef(path: string, altKey: boolean): Promise<string | null> {
+    return persistAndBuildRef({
+      altKey,
+      persist: async () => {
+        const result = await invoke<SaveImageResult>("copy_image_to_workspace", {
+          sourcePath: path,
+          workspace: getWorkspacePath(),
+          dir: getImageDir(),
+        });
+        return result.absolutePath;
+      },
+      readAsBase64: () => readAsDataUri(path),
+    });
+  }
+
+  async function insertDroppedImages(
+    paths: string[],
+    position?: PhysicalPoint | null
+  ): Promise<boolean> {
     const view = getEditorView();
     if (!view) return false;
 
-    const files = e.dataTransfer?.files;
-    if (!files || files.length === 0) return false;
+    // paths 已由 `dropPlan.planDrop` 单列为图片（`DropPlan.images`），这里不再重复
+    // `isImageFile` 过滤（issue #288 审查）；且本方法只被原生拖放入口调用，不含其它入口。
+    // Alt 在拖放事件里拿不到修饰键信息（payload 只带 paths/position），用键盘跟踪状态，
+    // 且在整批处理前取一次快照，保证一次拖入多张时方式一致
+    const altKey = altPressed;
+    const refs: string[] = [];
+    for (const path of paths) {
+      const ref = await droppedImageRef(path, altKey);
+      if (ref) refs.push(`![](${ref})`);
+    }
+    if (refs.length === 0) return false;
 
-    // 仅处理第一个图片文件（类型判定统一走 utils/fileKind，issue #151 起不再自建扩展名表）
-    const file = files[0];
-    if (!isImageFile(file.name)) return false;
-    const ext = extname(file.name) || IMAGE_EXT_FALLBACK;
-
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    e.preventDefault();
-
-    // 插入点取**落点**；坐标不可用（编辑器未挂载/被遮挡）时回退当前光标
-    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
-    return insertImageBytes(view, bytes, ext, e.altKey, pos);
+    const coords = toViewportCoords(position ?? null, window.devicePixelRatio);
+    const pos = coords ? view.posAtCoords(coords) : null;
+    // 多张按顺序插入：一次插入整块，避免后插的落到前一张的 alt 文本里
+    insertMarkdown(view, refs.join("\n"), pos);
+    return true;
   }
 
   /**
@@ -224,20 +308,12 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
   function insertExistingImage(absolutePath: string): boolean {
     const view = getEditorView();
     if (!view) return false;
-    const currentFile = getCurrentFilePath();
-    if (!currentFile) {
-      // 没有当前文件：直接用绝对路径
-      insertMarkdownImage(view, absolutePath);
-      return true;
-    }
-    const rel = relativePath(currentFile, absolutePath);
-    insertMarkdownImage(view, rel);
+    insertMarkdownImage(view, refFromAbsolutePath(absolutePath));
     return true;
   }
 
   // 监听器引用，便于卸载
   let pasteHandler: ((e: ClipboardEvent) => void) | null = null;
-  let dropHandler: ((e: DragEvent) => void) | null = null;
   let altDownHandler: ((e: KeyboardEvent) => void) | null = null;
   let altUpHandler: ((e: KeyboardEvent) => void) | null = null;
 
@@ -245,8 +321,7 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
    * Alt 是否按下。
    *
    * `ClipboardEvent` 不带修饰键信息（它不继承 `MouseEvent`，没有 `altKey`），
-   * 所以粘贴路径只能自己跟踪键盘状态；Drop 事件（`DragEvent extends MouseEvent`）
-   * 直接用 `e.altKey`，不需要这个。
+   * Tauri 的 drag-drop payload 也不带修饰键，所以这两条链路只能自己跟踪键盘状态。
    */
   let altPressed = false;
 
@@ -258,9 +333,6 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
         }
       });
     };
-    dropHandler = (e: DragEvent) => {
-      void handleDrop(e);
-    };
     altDownHandler = (e: KeyboardEvent) => {
       if (e.key === "Alt") altPressed = true;
     };
@@ -269,7 +341,6 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
     };
     // 监听 window 级 paste 事件（编辑器宿主元素）
     window.addEventListener("paste", pasteHandler);
-    window.addEventListener("drop", dropHandler);
     window.addEventListener("keydown", altDownHandler);
     window.addEventListener("keyup", altUpHandler);
     // 失焦时按键状态不可靠（Alt+Tab 切走不会收到 keyup），复位避免下一次粘贴被误判
@@ -284,10 +355,6 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
     if (pasteHandler) {
       window.removeEventListener("paste", pasteHandler);
       pasteHandler = null;
-    }
-    if (dropHandler) {
-      window.removeEventListener("drop", dropHandler);
-      dropHandler = null;
     }
     if (altDownHandler) {
       window.removeEventListener("keydown", altDownHandler);
@@ -304,7 +371,7 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
     setup,
     teardown,
     handlePaste,
-    handleDrop,
+    insertDroppedImages,
     insertExistingImage,
   };
 }
