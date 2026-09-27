@@ -30,34 +30,88 @@ describe("Murasaki 启动 smoke 测试", () => {
     // 「就绪」只看**存在性**，不判可见性/几何：tabs 为空时 App.vue 走 v-else 分支，
     // 欢迎页就是当前视图；而几何判定会受「视图切换那一瞬父容器尺寸为 0」影响 ——
     // #290 实测：换成 isRendered（要求 rect > 0）后 CI 上仍偶发 15s 超时。
-    // 超时错误里带上最后一次卡在哪一步，便于下次直接判读。
-    let lastReason = "（未进入轮询）";
+    //
+    // 失败诊断（#300）：这条前置条件在 CI 上偶发超时，而本地全量、以及按 CI 的真实
+    // 顺序（spec 文件大小降序）重放「前一个 spec 到 smoke」的窗口，都复现不了 ——
+    // 只报一句「最后一次：tabs 未清空」看不出卡在哪。故把每轮的关键状态累积下来，
+    // 超时时一并抛出：轮数与清理耗时、清理是否抛错、tabs 快照、启动恢复是否仍在飞、
+    // 是否有 dialog 排队、以及 waitUntil 被拒的原始原因（超时 or 某轮命令抛错）。
+    const diag = {
+      reason: "（未进入轮询）",
+      iterations: 0,
+      cleanupMs: 0,
+      cleanupError: "（本轮未抛错）",
+      tabs: "（未取到）",
+      restoring: "（未取到）",
+      dialogs: "（未取到）",
+      rejectReason: "（无）",
+    };
+
+    const waitStartedAt = Date.now();
     try {
       await browser.waitUntil(async () => {
+        diag.iterations += 1;
+
+        const cleanupStartedAt = Date.now();
         try {
           await closeAllTabs(browser);
           await closeWorkspace(browser);
+          diag.cleanupError = "（本轮未抛错）";
         } catch (err) {
           // 不再静默吞掉：清场失败本身就是最关键的诊断信息（#290）
+          diag.cleanupError = err instanceof Error ? err.message : String(err);
           console.warn("[smoke] 前置清理失败:", err);
         }
-        const noTabs = await browser.execute(() => {
+        diag.cleanupMs = Date.now() - cleanupStartedAt;
+
+        const snap = await browser.execute(() => {
           // @ts-ignore
-          return window.__pinia__._s.get("tabs").tabs.length === 0;
+          const pinia = window.__pinia__;
+          const tabsStore = pinia._s.get("tabs");
+          const dialogStore = pinia._s.get("dialog");
+          return {
+            count: tabsStore.tabs.length,
+            // 只留前 5 个，避免错误信息过长；content 只取长度（可能很大）
+            items: tabsStore.tabs.slice(0, 5).map((t: any) => ({
+              path: t.path,
+              isDirty: t.isDirty,
+              hasExternalChange: t.hasExternalChange,
+              contentLength: typeof t.content === "string" ? t.content.length : -1,
+            })),
+            restoring: tabsStore.restoring === true,
+            queuedDialogs: dialogStore?.queue?.length ?? 0,
+          };
         });
-        if (!noTabs) {
-          lastReason = "tabs 未清空";
+        diag.tabs = `count=${snap.count} items=${JSON.stringify(snap.items)}`;
+        diag.restoring = String(snap.restoring);
+        diag.dialogs = String(snap.queuedDialogs);
+
+        if (snap.count !== 0) {
+          diag.reason = "tabs 未清空";
           return false;
         }
         const hasWelcome = await browser.$(".welcome-page").isExisting();
         if (!hasWelcome) {
-          lastReason = "tabs 已空但欢迎页不在 DOM";
+          diag.reason = "tabs 已空但欢迎页不在 DOM";
           return false;
         }
         return true;
       }, { timeout: 20000 });
-    } catch {
-      throw new Error(`smoke 前置条件未就绪（最后一次：${lastReason}）`);
+    } catch (err) {
+      // 两种情况都走到这里：条件轮询到超时，或某一轮回调自身抛错（如驱动命令失败）。
+      // 把 reject 原文带上，否则会把后者误读成「一直没等到」。
+      diag.rejectReason = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        "smoke 前置条件未就绪\n" +
+          `  最后一次卡在：${diag.reason}\n` +
+          `  实际耗时：${Date.now() - waitStartedAt}ms（预算 20000ms）\n` +
+          `  轮数：${diag.iterations}（最后一轮清理耗时 ${diag.cleanupMs}ms）\n` +
+          `  清理抛错：${diag.cleanupError}\n` +
+          `  tabs：${diag.tabs}\n` +
+          `  启动恢复仍在进行：${diag.restoring}\n` +
+          `  排队中的 dialog 数：${diag.dialogs}\n` +
+          `  waitUntil 被拒原因：${diag.rejectReason}`
+      );
     }
   });
 

@@ -35,6 +35,16 @@ const DRIVER_PORT = 4444;
 // 4444 在线但 4445 不在线 = tauri-driver 孤立（msedgedriver 被 cleanup 杀掉了），无法恢复。
 const NATIVE_DRIVER_PORT = 4445;
 
+/**
+ * `browser.waitUntil` 的重试间隔 / 默认预算（#300）。
+ *
+ * `attach()` 不会合并 `remote()` 的那套默认配置，缺了这两个值时 `waitUntil` 会退化成
+ * **单次判定**（详见 createSession 里的实测记录）。给 session options 补上即可一次修好
+ * 所有只写 `{ timeout }` 的调用点。
+ */
+const WAITFOR_INTERVAL = 200;
+const WAITFOR_TIMEOUT = 5000;
+
 export function getBinaryPath(): string {
   return process.env.MURASAKI_BINARY ?? DEFAULT_BINARY;
 }
@@ -178,6 +188,28 @@ export async function createSession(
           }
         } as any
       } as any);
+
+      // 关键（#300）：补上 waitUntil 的重试间隔默认值。
+      //
+      // `attach()` 是复用既有 session，不会走 `remote()` 那套默认配置合并，于是
+      // `browser.options.waitforInterval` / `waitforTimeout` 都是 undefined。
+      // 而 webdriverio 的 `waitUntil`（node_modules/webdriverio/build/index.js:6435-6448）
+      // 是「解构默认值 + typeof 二次兜底」：
+      //     interval = this.options.waitforInterval      // 解构默认
+      //     if (typeof interval !== "number") interval = this.options.waitforInterval
+      // 两者都取不到数时 interval 是 NaN，Timer 的 `_hasTime(NaN)` 为 false →
+      // **首轮条件返回 false 就直接 reject**，并抛出
+      // `waitUntil condition timed out after <timeout>ms`（消息里的耗时是假的）。
+      //
+      // 实测（条件恒返回 false）：
+      //   `{ timeout: 20000 }`                        → 1 次，0–15ms
+      //   `{ timeout: 20000, interval: 200 }`         → 101 次，20008ms
+      //   设本默认值后 `{ timeout: 20000 }`            → 100 次，20000ms（符合预期）
+      //
+      // 因此在这里补默认值，而不是去 90 个 `waitUntil` 调用点逐个加 `interval`
+      // （`e2e/specs` 里 90 处，其中只有 25 处带了 `interval`）。
+      browser.options.waitforInterval = WAITFOR_INTERVAL;
+      browser.options.waitforTimeout = WAITFOR_TIMEOUT;
       break;
     } catch (err) {
       lastError = err;
