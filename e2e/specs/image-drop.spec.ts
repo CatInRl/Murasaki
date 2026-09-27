@@ -15,7 +15,7 @@
  * 其中 `position` 是构造值（e2e 无法真的从桌面拖文件），换算不出时前端会回退光标 ——
  * 断言只依赖「引用出现且各出现一次」，不依赖具体插入位置。
  *
- * 遵守 AGENTS.md「e2e 的八个坑」：等 UI 用 `waitForPresent` / `waitForInBrowser`，
+ * 遵守 AGENTS.md「e2e 的九个坑」：等 UI 用 `waitForPresent` / `waitForInBrowser`，
  * 判「视图就绪」用存在性（`.cm-content` 存在即编辑器已挂载），不用元素等待命令 /
  * `isDisplayed()` / `getText()`。
  */

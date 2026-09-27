@@ -19,7 +19,7 @@ import { execSync } from "node:child_process";
 import http from "node:http";
 import { createConnection } from "node:net";
 import { existsSync, rmSync } from "node:fs";
-import { waitForPinia } from "./store";
+import { clearPersistedTabs, waitForPinia } from "./store";
 
 const DEFAULT_BINARY = resolve(
   process.cwd(),
@@ -258,6 +258,20 @@ export async function createSession(
  * active window 不是主窗口（title != "Murasaki"），__pinia__ 也不可见。
  */
 export async function closeSession(browser: Browser): Promise<void> {
+  // 先断掉跨 spec 的标签泄漏（#303）：本 spec 结束时若还开着标签，它们会随 tabs.json
+  // 留给下一个 spec —— 后者启动时 App.vue 的 `onMounted` 会 `restore()` 出这批标签，
+  // 而它的 `beforeEach` 往往又 `resetWorkspace` 把这些**仍处于打开状态**的文件删掉，
+  // 于是触发「文件已被外部删除」模态告警遮挡后续点击（#297 的 CI 失败、#300 排查时
+  // 实测 editor-preview 留下 3 个 tab，都是这条路）。
+  //
+  // 之所以放在这里而不是各 spec 的 afterEach：全部 42 个 spec 都经 closeSession 收尾，
+  // 一处即可覆盖；且「本文件最后一个用例」同样会留标签，逐个 spec 补 hook 容易漏。
+  try {
+    await clearPersistedTabs(browser);
+  } catch {
+    // 忽略：session 可能已失效，或应用还没就绪（createSession 的就绪失败分支会调本函数）
+  }
+
   try {
     await browser.deleteSession();
   } catch {
