@@ -28,6 +28,7 @@
   "delete": "削除",
   "deleteConfirm": "「{name}」を削除しますか？（ゴミ箱に移動します）",
   "open": "開く",
+  "openWithDefaultApp": "既定のアプリで開く",
   "revealInExplorer": "エクスプローラーで表示",
   "newFile": "新規ファイル",
   "newFolder": "新規フォルダー",
@@ -85,6 +86,7 @@
     "copyPathFailed": "パスのコピーに失敗しました: {error}",
     "copyRichTextFailed": "リッチテキストのコピーに失敗しました: {error}",
     "revealFailed": "エクスプローラーで表示できません: {error}",
+    "openWithDefaultFailed": "既定のアプリで開けません: {error}",
     "openSettingsFailed": "設定ウィンドウを開けませんでした: {error}",
     "quitFailed": "終了に失敗しました: {error}",
     "docsNotPublished": "ドキュメントはまだ公開されていません",
@@ -114,6 +116,7 @@
   },
   "toast": {
     "regionAriaLabel": "通知",
-    "closeAriaLabel": "通知を閉じる"
+    "closeAriaLabel": "通知を閉じる",
+    "cannotOpenFile": "このファイルは Murasaki では開けません"
   }
 }

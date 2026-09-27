@@ -90,6 +90,13 @@ export const fileSystem = {
     await invoke("reveal_in_explorer", { path });
   },
 
+  /**
+   * 用系统默认程序打开（issue #307：应用打不开的文件——pdf/zip/exe/未知后缀 等——的兜底出口）
+   */
+  async openWithDefaultApp(path: string): Promise<void> {
+    await invoke("open_with_default_app", { path });
+  },
+
   // ===== 草稿专用 =====
 
   /** 检查草稿是否存在 */

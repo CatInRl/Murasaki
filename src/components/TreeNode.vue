@@ -14,14 +14,17 @@ import {
   Link,
   FileText,
   Image as ImageIcon,
+  ExternalLink,
 } from "lucide-vue-next";
 import { NInput } from "naive-ui";
 import { useFileOpsStore } from "../stores/useFileOpsStore";
 import { useDialogStore } from "../stores/useDialogStore";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
+import { useToastStore } from "../stores/useToastStore";
 import type { MenuItem } from "../stores/useContextMenuStore";
 import { useFileTreeNav } from "../composables/useFileTreeNav";
+import { basename } from "../utils/path";
 import type { TreeNode } from "../types";
 import {
   isMarkdownFile,
@@ -53,8 +56,26 @@ const fileOps = useFileOpsStore();
 const dialog = useDialogStore();
 const contextMenu = useContextMenuStore();
 const persistence = usePersistenceStore();
+const toast = useToastStore();
+
 const fileTreeNav = useFileTreeNav();
 const { t } = useI18n();
+
+/**
+ * 用系统默认程序打开（issue #307）。
+ * 应用打不开的文件（pdf / docx / zip / exe / 未知后缀 等）此前点击与右键都毫无反应，
+ * 这里给唯一实际出口；失败时用 dialog 说明，不静默。
+ */
+async function openWithDefaultApp(path: string): Promise<void> {
+  try {
+    await fileOps.openWithDefaultApp(path);
+  } catch (err) {
+    dialog.alert({
+      message: t("common.error.openWithDefaultFailed", { error: err }),
+      variant: "error",
+    });
+  }
+}
 
 /** 长条目显示方案：wrap=自动换行 / hover=省略号+悬停显示完整 */
 const wrapMode = computed(() => persistence.settings.entryOverflowMode === "wrap");
@@ -104,6 +125,17 @@ function onClick(): void {
     } else if (isEditableTextFile(props.node.name, props.node.size)) {
       // 文本/代码文件（含 html、含 <1MB 无后缀）→ 按文本打开编辑
       emit("select-file", props.node.path);
+    } else {
+      // 应用打不开的文件（pdf / docx / zip / exe / 未知后缀…）：此前是**静默无反应**
+      // （issue #307）。给一次说明 + 兜底动作，别让「点了没反应」成为用户的结论。
+      toast.info(t("toast.cannotOpenFile"), {
+        description: basename(props.node.path),
+        duration: 6000,
+        action: {
+          label: t("common.openWithDefaultApp"),
+          onClick: () => void openWithDefaultApp(props.node.path),
+        },
+      });
     }
   } else {
     toggle();
@@ -236,6 +268,15 @@ function buildMenuItems(): MenuItem[] {
         label: t("common.preview"),
         icon: ImageIcon,
         action: () => emit("preview-image", props.node.path),
+      });
+    } else {
+      // 应用打不开的文件（pdf / docx / zip / exe / 未知后缀 等）：此前右键只有通用项
+      // （重命名/剪切/复制/删除/在资源管理器中显示…），**没有类型专属的「打开」**，
+      // 点击也毫无反应（issue #307）。这里补上唯一实际出口 —— 交给系统默认程序。
+      items.push({
+        label: t("common.openWithDefaultApp"),
+        icon: ExternalLink,
+        action: () => void openWithDefaultApp(props.node.path),
       });
     }
   }
