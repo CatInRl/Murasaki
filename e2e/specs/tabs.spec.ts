@@ -109,6 +109,18 @@ describe("多 Tab 管理", () => {
     expect(titles).toEqual(expect.arrayContaining(["intro.md", "notes.md"]));
   });
 
+  it("同一文件的两种路径写法（\\ 与 /）只开一个 Tab", async () => {
+    // 回归 #304：openFile 原先按路径字面量查重，把同一文件的不同分隔符写法当成两个文件。
+    // `ws` 是 Windows 路径（反斜杠），所以下面两个字符串分别对应「混斜杠」与「全反斜杠」。
+    const ws = resetWorkspace(defaultFixtureFiles());
+    await openFileInTab(browser, `${ws}/intro.md`);
+    await openFileInTab(browser, `${ws}\\intro.md`);
+
+    const state = await getTabsState(browser);
+    expect(state.tabs.length).toBe(1);
+    expect(state.tabs[0].title).toBe("intro.md");
+  });
+
   it("点击 Tab 切换激活态", async () => {
     const ws = resetWorkspace(defaultFixtureFiles());
     await openFileInTab(browser, `${ws}/intro.md`);

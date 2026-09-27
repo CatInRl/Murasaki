@@ -8,6 +8,8 @@ import {
   extname,
   resolveRelative,
   relativePath,
+  canonicalPath,
+  isSamePath,
   isPathUnder,
   isTabOutOfWorkspace,
 } from "./path";
@@ -121,6 +123,46 @@ describe("utils/path", () => {
     });
     it("Windows 反斜杠路径", () => {
       expect(relativePath("C:\\docs\\sub\\a.md", "C:\\docs\\b.md")).toBe("../b.md");
+    });
+  });
+
+  describe("canonicalPath", () => {
+    it("反斜杠归一为正斜杠", () => {
+      expect(canonicalPath("C:\\docs\\a.md")).toBe("c:/docs/a.md");
+    });
+    it("去掉末尾分隔符", () => {
+      expect(canonicalPath("C:/docs/")).toBe("c:/docs");
+    });
+    it("同一文件的不同写法得到同一个键", () => {
+      expect(canonicalPath("C:\\docs\\A.MD")).toBe(canonicalPath("c:/docs/a.md"));
+    });
+  });
+
+  describe("isSamePath", () => {
+    it("同一路径返回 true", () => {
+      expect(isSamePath("C:/docs/a.md", "C:/docs/a.md")).toBe(true);
+    });
+    it("分隔符不同视为同一路径（反斜杠 vs 正斜杠）", () => {
+      expect(isSamePath("C:\\docs\\a.md", "C:/docs/a.md")).toBe(true);
+    });
+    it("混合分隔符视为同一路径", () => {
+      expect(isSamePath("C:\\docs/a.md", "C:/docs\\a.md")).toBe(true);
+    });
+    it("大小写不同视为同一路径（与 isPathUnder 同口径）", () => {
+      expect(isSamePath("C:/Docs/A.MD", "c:/docs/a.md")).toBe(true);
+    });
+    it("末尾分隔符忽略", () => {
+      expect(isSamePath("C:/docs/", "C:/docs")).toBe(true);
+    });
+    it("不同文件返回 false", () => {
+      expect(isSamePath("C:/docs/a.md", "C:/docs/b.md")).toBe(false);
+    });
+    it("前缀相同但不同文件（a.md vs a.md2）返回 false", () => {
+      expect(isSamePath("C:/docs/a.md", "C:/docs/a.md2")).toBe(false);
+    });
+    it("空路径返回 false", () => {
+      expect(isSamePath("", "C:/docs/a.md")).toBe(false);
+      expect(isSamePath("", "")).toBe(false);
     });
   });
 
