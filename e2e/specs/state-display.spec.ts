@@ -29,7 +29,7 @@ import {
   resetPersistenceSettings,
 } from "../helpers/store";
 import { resolve } from "node:path";
-import { waitForPresent } from "../helpers/wait";
+import { waitForPresent, readText } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -86,8 +86,8 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     // EmptyState 应有 empty-title
     const title = await browser.$(".empty-state .empty-title");
     expect(await title.isExisting()).toBe(true);
-    const titleText = (await title.getText()).trim();
-    expect(titleText.length).toBeGreaterThan(0);
+    // getText() 在本栈下会偶发返回空串（见 helpers/wait.ts 头部），改用轮询读 textContent（#282）
+    expect(await readText(browser, ".empty-state .empty-title")).toBe("暂无最近文件");
   });
 
   it("统一搜索条搜索无结果显示 EmptyState", async () => {
@@ -114,12 +114,11 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     });
 
     // 等待搜索完成 + 空态渲染
-    const empty = await browser.$(".gsb__empty");
     await waitForPresent(browser, ".gsb__empty", 10000);
 
-    const titleText = (await empty.getText()).trim();
     // GlobalSearchBar.vue 空态标题 = "未找到匹配项"
-    expect(titleText).toContain("未找到");
+    // getText() 在本栈下会偶发返回空串（见 helpers/wait.ts 头部），改用轮询读 textContent（#282）
+    expect(await readText(browser, ".gsb__empty")).toContain("未找到");
   });
 
   it("OutlinePanel 无标题段落显示 EmptyState", async () => {
@@ -160,8 +159,10 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     const title = await empty.$(".empty-title");
     expect(await title.isExisting()).toBe(true);
     // OutlinePanel.vue EmptyState title="无标题"
-    const titleText = (await title.getText()).trim();
-    expect(titleText).toBe("无标题");
+    // getText() 在本栈下会偶发返回空串（见 helpers/wait.ts 头部），改用轮询读 textContent（#282）
+    expect(
+      await readText(browser, ".outline-pane .empty-title, [class*='outline'] .empty-title")
+    ).toBe("无标题");
   });
 
   // ============ Skeleton 场景 ============

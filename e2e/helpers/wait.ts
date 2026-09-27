@@ -103,6 +103,35 @@ export async function waitForAbsent(
 }
 
 /**
+ * 读元素文本并**轮询到非空**，替代 `getText()` 的单次判定。
+ *
+ * 背景（见文件头注释）：`getText()` 在本栈下会偶发返回空串 —— 元素明明存在，但
+ * 它不重试，于是「元素刚进 DOM、文本还没被 WebDriver 读到」会直接变成断言失败。
+ * #282 实测：`state-display.spec.ts` 的 `.empty-state .empty-title` 在全量跑时
+ * 间歇性返回 `''`（同一二进制、同一 spec 单独跑必过）。
+ *
+ * 这里在浏览器上下文读 `textContent` 并轮询，把「读太早」从失败变成等待。
+ *
+ * 注意：返回的是**首个非空**结果，适合「文本非空即可断言」的场景；若断言要求
+ * 文本等于某个确定值，先用本函数等到非空、再断言该值即可（不要直接断言返回值，
+ * 否则一旦读到「还在过渡中的中间文案」会给出误导性失败）。
+ */
+export async function readText(
+  browser: Browser,
+  selector: string,
+  timeout = 5000,
+  interval = 100
+): Promise<string> {
+  return await waitForInBrowser<string>(
+    browser,
+    (sel: string) =>
+      ((document.querySelector(sel) as HTMLElement | null)?.textContent ?? "").trim(),
+    [selector],
+    { timeout, interval, message: `"${selector}" 文本非空` }
+  );
+}
+
+/**
  * 手写轮询等待「浏览器上下文里返回真值的条件」，返回首次为真的结果。
  *
  * 用于等 UI 状态出现（如「tab 栏出现名为 intro.md 的标签」）：这类断言不能用
