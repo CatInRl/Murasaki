@@ -32,19 +32,16 @@
 import type { Browser } from "webdriverio";
 
 /**
- * 「已渲染」判定的**单一实现**（在浏览器上下文执行）。
+ * 「已渲染」判定的**单一实现**（在浏览器上下文执行），入参是选择器字符串或元素句柄。
  *
  * `browser.execute` 会把函数序列化后在页面里跑，函数体里引用不到模块作用域，
  * 所以这段几何/样式判定只能写一次，由 `isRendered` 与 `isRenderedElement` 共用（#284）。
  */
-async function renderedCheck(
-  browser: Browser,
-  kind: "selector" | "element",
-  target: unknown
-): Promise<boolean> {
+async function renderedCheck(browser: Browser, target: unknown): Promise<boolean> {
   return await browser.execute(
-    (k: string, t: unknown) => {
-      const el = (k === "selector" ? document.querySelector(t as string) : t) as HTMLElement | null;
+    (t: unknown) => {
+      // 选择器字符串 → 取首个匹配；元素句柄 → webdriverio 已还原成 DOM 节点
+      const el = (typeof t === "string" ? document.querySelector(t) : t) as HTMLElement | null;
       if (!el) return false;
       const rect = el.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return false;
@@ -54,7 +51,6 @@ async function renderedCheck(
       if (style.opacity === "0") return false;
       return true;
     },
-    kind,
     target
   );
 }
@@ -66,7 +62,7 @@ export async function isRendered(
   browser: Browser,
   selector: string
 ): Promise<boolean> {
-  return await renderedCheck(browser, "selector", selector);
+  return await renderedCheck(browser, selector);
 }
 
 /**
@@ -79,7 +75,7 @@ export async function isRenderedElement(
   browser: Browser,
   element: unknown
 ): Promise<boolean> {
-  return await renderedCheck(browser, "element", element);
+  return await renderedCheck(browser, element);
 }
 
 /**

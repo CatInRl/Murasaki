@@ -190,8 +190,8 @@ describe("大纲视图切换 + 标题跳转", () => {
     });
     await browser.pause(300);
 
-    // 文件树应可见
-    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    // 文件树应可见（存在性用轮询等，几何用 isRendered：isDisplayed() 在本栈下会持久性误判）
+    await waitForPresent(browser, ".file-tree", 10000);
     expect(await isRendered(browser, ".file-tree")).toBe(true);
   });
 

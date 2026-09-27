@@ -267,8 +267,8 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
     await openFileInTab(browser, `${wsPath}\\intro.md`);
     await browser.pause(500);
 
-    // CodeMirror 6 行号 gutter
-    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    // CodeMirror 6 行号 gutter（存在性用轮询等，几何用 isRendered：isDisplayed 在本栈下会持久性误判）
+    await waitForPresent(browser, ".cm-lineNumbers", 10000);
     expect(await isRendered(browser, ".cm-lineNumbers")).toBe(true);
   });
 

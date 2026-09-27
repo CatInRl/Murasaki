@@ -148,7 +148,8 @@ describe("跨文件搜索结果跳转", () => {
     await browser.pause(300);
 
     const gsb = await browser.$(".gsb");
-    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    // 存在性用轮询等，几何用 isRendered：isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts）
+    await waitForPresent(browser, ".gsb", 5000);
     expect(await isRendered(browser, ".gsb")).toBe(true);
 
     // 关闭
