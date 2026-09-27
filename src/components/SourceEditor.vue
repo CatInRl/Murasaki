@@ -62,7 +62,7 @@ const murasakiHighlightStyle = HighlightStyle.define([
   { tag: tags.link, color: "var(--murasaki-purple-700)", textDecoration: "underline" },
   { tag: tags.url, color: "var(--murasaki-state-info)" },
   // Inline code & code blocks
-  { tag: tags.monospace, color: "var(--murasaki-purple-800)", backgroundColor: "rgba(147, 51, 234, 0.08)" },
+  { tag: tags.monospace, color: "var(--murasaki-purple-800)", backgroundColor: "var(--murasaki-primary-soft)" },
   // Lists: purple marker
   { tag: tags.list, color: "var(--murasaki-purple-600)" },
   // Quotes: purple-600 italic
@@ -120,7 +120,9 @@ const murasakiTheme = EditorView.theme({
     padding: "0 16px",
   },
   ".cm-activeLine": {
-    backgroundColor: "rgba(147, 51, 234, 0.05)",
+    // 原值 rgba(147, 51, 234, 0.05)——比 primary-soft 的 12% 淡得多，就地写 6%
+    // 以保住视觉近等，同时仍与主色联动（issue #294 裁断）
+    backgroundColor: "color-mix(in srgb, var(--murasaki-primary) 6%, transparent)",
     boxShadow: "inset 2px 0 0 var(--murasaki-primary)",
   },
   ".cm-selectionBackground, ::selection": {
@@ -132,7 +134,7 @@ const murasakiTheme = EditorView.theme({
   },
   ".cm-matchingBracket, .cm-nonmatchingBracket": {
     color: "inherit",
-    backgroundColor: "rgba(147, 51, 234, 0.12)",
+    backgroundColor: "var(--murasaki-primary-soft)",
     outline: "1px solid var(--murasaki-purple-300)",
   },
   ".cm-foldPlaceholder": {
@@ -155,12 +157,12 @@ const murasakiTheme = EditorView.theme({
     // 字体由 fontComp 动态应用（buildFontTheme），统一各编辑模式使用阅读字体
   },
   ".cm-searchMatch": {
-    backgroundColor: "rgba(192, 132, 252, 0.25)",
+    backgroundColor: "color-mix(in srgb, var(--murasaki-purple-400) 25%, transparent)",
     outline: "1px solid var(--murasaki-purple-300)",
   },
   ".cm-searchMatch-selected": {
     backgroundColor: "var(--murasaki-purple-300)",
-    color: "#fff",
+    color: "var(--murasaki-primary-foreground)",
   },
   ".cm-panels": {
     backgroundColor: "var(--murasaki-surface-2)",

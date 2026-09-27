@@ -27,33 +27,41 @@
   --murasaki-neutral-900: #171717;
   --murasaki-neutral-950: #0a0a0a;
 
-  /* Semantic Tokens */
-  --murasaki-background: #ffffff;
-  --murasaki-foreground: #171717;
-  --murasaki-card: #fafafa;
-  --murasaki-card-foreground: #171717;
-  --murasaki-popover: #ffffff;
-  --murasaki-popover-foreground: #171717;
-  --murasaki-primary: #9333ea;
+  /* Semantic Tokens
+     能从上面色阶取到值的逐项引用色阶（同一颜色只写一遍）；色阶没有
+     对应值、或不该进色阶的，保留字面值并就地注明（issue #293）。 */
+  --murasaki-background: #ffffff; /* 纯白，色阶无对应值 */
+  --murasaki-foreground: var(--murasaki-neutral-900);
+  --murasaki-card: var(--murasaki-neutral-50);
+  --murasaki-card-foreground: var(--murasaki-neutral-900);
+  --murasaki-popover: #ffffff; /* 纯白，色阶无对应值 */
+  --murasaki-popover-foreground: var(--murasaki-neutral-900);
+  --murasaki-primary: var(--murasaki-purple-600);
+  /* 彩色底上的白色前景，不是紫色阶/中性阶的值，不进色阶（issue #293） */
   --murasaki-primary-foreground: #ffffff;
-  --murasaki-muted: #f5f5f5;
-  --murasaki-muted-foreground: #737373;
-  --murasaki-border: #e5e5e5;
-  --murasaki-input: #e5e5e5;
-  --murasaki-ring: #c084fc;
+  --murasaki-muted: var(--murasaki-neutral-100);
+  --murasaki-muted-foreground: var(--murasaki-neutral-500);
+  --murasaki-border: var(--murasaki-neutral-200);
+  --murasaki-input: var(--murasaki-neutral-200);
+  --murasaki-ring: var(--murasaki-purple-400);
+  /* 半透明主色三档：选中底 / hover 加深 / 焦点环。统一用 color-mix 派生一次，
+     改 --murasaki-primary 时覆盖层自动跟随（issue #294）。 */
+  --murasaki-primary-soft: color-mix(in srgb, var(--murasaki-primary) 12%, transparent);
+  --murasaki-primary-soft-hover: color-mix(in srgb, var(--murasaki-primary) 20%, transparent);
+  --murasaki-primary-ring-soft: color-mix(in srgb, var(--murasaki-primary) 30%, transparent);
   --murasaki-radius-sm: 4px;
   --murasaki-radius-md: 8px;
   --murasaki-radius-lg: 16px;
 
   /* Surface System */
-  --murasaki-surface: #f9fafb;
-  --murasaki-surface-2: #f3f4f6;
-  --murasaki-ink: #171717;
-  --murasaki-ink-2: #525252;
-  --murasaki-ink-3: #a3a3a3;
-  --murasaki-line: #e5e5e5;
+  --murasaki-surface: #f9fafb; /* 色阶无对应值 */
+  --murasaki-surface-2: #f3f4f6; /* 色阶无对应值 */
+  --murasaki-ink: var(--murasaki-neutral-900);
+  --murasaki-ink-2: var(--murasaki-neutral-600);
+  --murasaki-ink-3: var(--murasaki-neutral-400);
+  --murasaki-line: var(--murasaki-neutral-200);
 
-  /* State Colors */
+  /* State Colors —— 语义状态色，不进紫色阶（issue #293） */
   --murasaki-state-success: #16a34a;
   --murasaki-state-warning: #d97706;
   --murasaki-state-error: #dc2626;

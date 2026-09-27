@@ -39,7 +39,7 @@ defineExpose({
 .html-preview {
   height: 100%;
   width: 100%;
-  background: #fff;
+  background: var(--murasaki-background);
   color: var(--murasaki-ink);
 }
 .html-preview::-webkit-scrollbar {
@@ -55,6 +55,6 @@ defineExpose({
   width: 100%;
   height: 100%;
   border: none;
-  background: #fff;
+  background: var(--murasaki-background);
 }
 </style>

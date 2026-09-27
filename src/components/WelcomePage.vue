@@ -232,6 +232,7 @@ const shortcutHints = computed(() => [
 .bg-grid {
   position: absolute;
   inset: 0;
+  /* 装饰性网格：主色 4% 细线，纯装饰，不进 token */
   background-image:
     linear-gradient(to right, rgba(147, 51, 234, 0.04) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(147, 51, 234, 0.04) 1px, transparent 1px);
@@ -277,7 +278,7 @@ const shortcutHints = computed(() => [
   background: linear-gradient(135deg, var(--murasaki-purple-50), var(--murasaki-purple-100));
   border: 1px solid var(--murasaki-purple-200);
   box-shadow:
-    0 8px 24px rgba(147, 51, 234, 0.15),
+    0 8px 24px rgba(147, 51, 234, 0.15), /* 品牌图标光晕，纯装饰，不进 token */
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
   margin-bottom: 16px;
 }
@@ -359,7 +360,7 @@ const shortcutHints = computed(() => [
 }
 .action-card.is-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(147, 51, 234, 0.32);
+  box-shadow: 0 12px 28px rgba(147, 51, 234, 0.32); /* CTA hover 光晕，纯装饰，不进 token */
   border-color: transparent;
 }
 .action-card.is-primary .action-desc {
@@ -378,7 +379,7 @@ const shortcutHints = computed(() => [
 }
 .action-card.is-primary .action-icon {
   background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  color: var(--murasaki-primary-foreground);
 }
 .action-text {
   display: flex;

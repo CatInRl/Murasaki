@@ -280,7 +280,7 @@ function onRenameInput(e: Event): void {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.4);
+  background: rgba(15, 23, 42, 0.4); /* 模态遮罩：slate-900，非色阶值，无对应 token */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -368,7 +368,7 @@ function onRenameInput(e: Event): void {
 }
 .dialog-input:focus {
   border-color: var(--murasaki-primary);
-  box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.15);
+  box-shadow: 0 0 0 2px var(--murasaki-primary-soft);
 }
 
 .dialog-error {
@@ -422,11 +422,11 @@ function onRenameInput(e: Event): void {
 
 .dialog-btn.danger {
   background: var(--murasaki-state-error);
-  color: #fff;
+  color: var(--murasaki-primary-foreground);
   border-color: var(--murasaki-state-error);
 }
 .dialog-btn.danger:hover {
-  background: #b91c1c;
+  background: #b91c1c; /* danger hover：比 state-error 更深以保对比度，非 token 值 */
 }
 
 .murasaki-dialog-enter-active,

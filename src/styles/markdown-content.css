@@ -336,13 +336,13 @@
   box-shadow: var(--murasaki-shadow-sm);
 }
 .markdown-body .code-lang-label {
-  background: var(--murasaki-neutral-800, #262626);
-  color: var(--murasaki-neutral-400, #a3a3a3);
+  background: var(--murasaki-neutral-800);
+  color: var(--murasaki-neutral-400);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 4px 12px;
-  border-bottom: 1px solid var(--murasaki-neutral-700, #404040);
+  border-bottom: 1px solid var(--murasaki-neutral-700);
 }
 /* wrapper 内的 pre 取消自身外边距与圆角（由 wrapper 统一控制） */
 .markdown-body .code-block-wrapper pre {
@@ -401,7 +401,7 @@
 
 /* === Mermaid diagrams (issue #88 / T5: 紫色主题 + 白色卡片包裹) === */
 .markdown-body .mermaid {
-  background: var(--murasaki-background, #ffffff);
+  background: var(--murasaki-background);
   border: 1px solid var(--murasaki-border);
   border-radius: var(--murasaki-radius-md);
   padding: 0.75rem;
@@ -415,7 +415,7 @@
 /* === PlantUML diagrams（官方 TeaVM 纯浏览器产物，本地渲染） ===
  * 与 .mermaid 同款卡片包裹，SVG 居中展示。 */
 .markdown-body .plantuml-block {
-  background: var(--murasaki-background, #ffffff);
+  background: var(--murasaki-background);
   border: 1px solid var(--murasaki-border);
   border-radius: var(--murasaki-radius-md);
   padding: 0.75rem;
@@ -431,9 +431,11 @@
   height: auto;
 }
 
-/* === KaTeX math (issue #88 / T5: 蓝色斜体 + 块级居中) === */
+/* === KaTeX math (issue #88 / T5: 斜体 + 块级居中；#295 改随主题内容色) ===
+ * 公式是内容，不是告警类强调：不再借用 --murasaki-state-info（信息蓝），改用主题
+ * 内容前景色（.markdown-body em/strong 同源的 --md-fg，默认主题即 ink 系）。 */
 .markdown-body .katex {
-  color: var(--murasaki-state-info, #2563eb);
+  color: var(--md-fg);
   font-style: italic;
 }
 .markdown-body .katex-display {
@@ -501,7 +503,7 @@
 .markdown-body .front-matter-card .fm-tag {
   display: inline-block;
   background: var(--md-fm-tag-bg);
-  color: #fff;
+  color: var(--murasaki-primary-foreground);
   padding: 2px 10px;
   border-radius: 12px;
   font-size: 11px;
@@ -519,7 +521,7 @@
   line-height: 0;
 }
 .markdown-body .footnote-ref a {
-  color: var(--md-primary, var(--murasaki-primary, #9333ea));
+  color: var(--md-primary, var(--murasaki-primary));
   text-decoration: none;
 }
 .markdown-body .footnote-ref a:hover {
@@ -528,14 +530,14 @@
 .markdown-body .footnote-def {
   margin: 12px 0;
   padding: 8px 16px;
-  border-left: 3px solid var(--md-primary, var(--murasaki-primary, #9333ea));
-  background: var(--md-surface-2, var(--murasaki-surface-2, #f3f4f6));
+  border-left: 3px solid var(--md-primary, var(--murasaki-primary));
+  background: var(--md-surface-2, var(--murasaki-surface-2));
   border-radius: 0 var(--murasaki-radius-sm, 4px) var(--murasaki-radius-sm, 4px) 0;
   font-size: 0.9em;
-  color: var(--md-text-color, var(--murasaki-ink-2, #525252));
+  color: var(--md-text-color, var(--murasaki-ink-2));
 }
 .markdown-body .footnote-def .footnote-backref {
-  color: var(--md-primary, var(--murasaki-primary, #9333ea));
+  color: var(--md-primary, var(--murasaki-primary));
   text-decoration: none;
   margin-left: 4px;
 }

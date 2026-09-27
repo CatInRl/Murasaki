@@ -407,12 +407,12 @@ function confirmTable(): void {
 }
 
 .tb-btn.active {
-  background: rgba(147, 51, 234, 0.1);
+  background: var(--murasaki-primary-soft);
   color: var(--murasaki-primary);
 }
 
 .tb-btn.active:hover {
-  background: rgba(147, 51, 234, 0.16);
+  background: var(--murasaki-primary-soft-hover);
   color: var(--murasaki-primary);
 }
 

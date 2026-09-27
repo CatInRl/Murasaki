@@ -3,8 +3,8 @@
  *
  * 验证：
  * - 点击文件后 .node-row.is-selected 样式应用
- * - 选中态背景色为 primary/10 (rgba(147, 51, 234, 0.1))
- * - 内容命中高亮颜色为紫色 (rgba(147, 51, 234, 0.2))
+ * - 选中态底色为半透明主色（--murasaki-primary-soft）
+ * - 内容命中高亮底色为半透明主色（--murasaki-primary-soft-hover）
  * - 搜索结果渲染 gsb-hl <mark> 元素
  * - 文件名匹配（前端模糊匹配）渲染
  *
@@ -16,6 +16,22 @@ import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
 import { isRendered, readText, textOfElement, waitForPresent } from "../helpers/wait";
+
+/**
+ * 半透明主色底色的判定（issue #294）。
+ *
+ * 底色改用 `--murasaki-primary-soft` / `--murasaki-primary-soft-hover`，
+ * 它们由 `color-mix(in srgb, var(--murasaki-primary) α%, transparent)` 派生；
+ * Chromium 会把 color-mix 结果序列化为 `color(srgb 0.576471 0.2 0.917647 / α)`，
+ * 而历史硬编码 rgba 则序列化为 `rgba(147, 51, 234, α)`。两种写法的颜色一致
+ * （即 #9333ea 的 rgba 形式），这里按通道值判定以兼容两种序列化。
+ */
+function isPrimaryTint(color: string): boolean {
+  return (
+    color.includes("147, 51, 234") ||
+    /color\(srgb\s+0\.576471\s+0\.2\s+0\.917647/.test(color)
+  );
+}
 
 let browser: Browser;
 
@@ -66,10 +82,8 @@ describe("文件树选中态 & 搜索高亮", () => {
       if (!el) return "NOT_FOUND";
       return window.getComputedStyle(el).backgroundColor;
     });
-    // rgba(147, 51, 234, 0.1) — 浏览器可能解析为 rgba(147, 51, 234, 0.1)
-    expect(bg).toContain("147");
-    expect(bg).toContain("51");
-    expect(bg).toContain("234");
+    // 底色 = --murasaki-primary-soft（半透明主色），兼容 rgba / color(srgb) 两种序列化
+    expect(isPrimaryTint(String(bg))).toBe(true);
   });
 
   it("搜索高亮颜色为紫色", async () => {
@@ -127,10 +141,8 @@ describe("文件树选中态 & 搜索高亮", () => {
       if (!mark) return "NOT_FOUND";
       return window.getComputedStyle(mark).backgroundColor;
     });
-    // rgba(147, 51, 234, 0.2)
-    expect(bgColor).toContain("147");
-    expect(bgColor).toContain("51");
-    expect(bgColor).toContain("234");
+    // 底色 = --murasaki-primary-soft-hover（半透明主色），兼容两种序列化
+    expect(isPrimaryTint(String(bgColor))).toBe(true);
   });
 
   it("搜索结果渲染 gsb-hl mark 元素", async () => {

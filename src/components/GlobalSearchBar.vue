@@ -572,7 +572,7 @@ watch(
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(15, 23, 42, 0.28);
+  background: rgba(15, 23, 42, 0.28); /* 搜索条遮罩：slate-900，非色阶值，无对应 token */
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -740,7 +740,7 @@ watch(
   height: 13px;
   border-radius: 50%;
   background: var(--murasaki-background);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); /* 开关滑块投影，一次性，无对应 token */
   transition: transform var(--murasaki-duration-fast);
   pointer-events: none;
 }
@@ -787,8 +787,8 @@ watch(
   cursor: pointer;
   transition: background var(--murasaki-duration-fast) var(--murasaki-ease);
 }
-.gsb__item:hover { background: rgba(147, 51, 234, 0.08); }
-.gsb__item.is-active { background: rgba(147, 51, 234, 0.1); }
+.gsb__item:hover { background: var(--murasaki-primary-soft); }
+.gsb__item.is-active { background: var(--murasaki-primary-soft); }
 .gsb__item.is-active .gsb__item__title { color: var(--murasaki-primary); font-weight: 500; }
 .gsb__item.is-active .gsb__item__sub,
 .gsb__item.is-active .gsb__snippet { color: var(--murasaki-ink-2); }
@@ -835,7 +835,7 @@ watch(
 
 /* 匹配高亮（对齐 SearchPanel .match-highlight） */
 .gsb-hl {
-  background: rgba(147, 51, 234, 0.2);
+  background: var(--murasaki-primary-soft-hover);
   color: var(--murasaki-purple-800);
   border-radius: 2px;
   padding: 0 1px;
@@ -900,7 +900,7 @@ watch(
   white-space: nowrap;
 }
 .gsb-chip--tab { background: var(--murasaki-purple-100); color: var(--murasaki-purple-700); }
-.gsb__item.is-active .gsb-chip--tab { background: var(--murasaki-purple-600); color: #fff; }
+.gsb__item.is-active .gsb-chip--tab { background: var(--murasaki-purple-600); color: var(--murasaki-primary-foreground); }
 .gsb__item.is-active .gsb-chip { background: var(--murasaki-purple-100); color: var(--murasaki-purple-700); }
 
 /* —— 空态 / 加载态 —— */

@@ -207,7 +207,7 @@ function disableOne(cmdId: string): void {
 <style scoped>
 .settings-page-description {
   margin: -12px 0 20px;
-  color: var(--murasaki-ink-3, #999);
+  color: var(--murasaki-ink-3);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -215,9 +215,9 @@ function disableOne(cmdId: string): void {
   margin: 0 0 16px;
   padding: 8px 12px;
   font-size: 13px;
-  color: var(--murasaki-error, #d93025);
-  background: color-mix(in srgb, var(--murasaki-error, #d93025) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--murasaki-error, #d93025) 35%, transparent);
+  color: var(--murasaki-state-error);
+  background: color-mix(in srgb, var(--murasaki-state-error) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--murasaki-state-error) 35%, transparent);
   border-radius: var(--murasaki-radius-md, 6px);
 }
 .shortcut-list {
@@ -235,10 +235,10 @@ function disableOne(cmdId: string): void {
   transition: background-color 0.15s ease;
 }
 .shortcut-row:hover {
-  background-color: var(--murasaki-surface-2, #f5f5f5);
+  background-color: var(--murasaki-surface-2);
 }
 .shortcut-row.is-recording {
-  background-color: var(--murasaki-purple-50, #f3f0ff);
+  background-color: var(--murasaki-purple-50);
 }
 .shortcut-info {
   display: flex;
@@ -248,11 +248,11 @@ function disableOne(cmdId: string): void {
 }
 .shortcut-label {
   font-size: 14px;
-  color: var(--murasaki-ink, #333);
+  color: var(--murasaki-ink);
 }
 .shortcut-conflict {
   font-size: 12px;
-  color: var(--murasaki-error, #d93025);
+  color: var(--murasaki-state-error);
 }
 .shortcut-actions {
   display: inline-flex;
@@ -270,29 +270,29 @@ function disableOne(cmdId: string): void {
   font-family: var(--murasaki-font-mono, monospace);
   font-size: 12px;
   font-weight: 500;
-  color: var(--murasaki-ink-2, #666);
-  background: var(--murasaki-surface, #fff);
-  border: 1px solid var(--murasaki-border, #e0e0e0);
+  color: var(--murasaki-ink-2);
+  background: var(--murasaki-surface);
+  border: 1px solid var(--murasaki-border);
   border-radius: 4px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05); /* 一次性键帽下沿投影，无色 token 对应 */
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 .shortcut-key-btn:hover {
-  border-color: var(--murasaki-ring, #7c6cf0);
-  color: var(--murasaki-ink, #333);
+  border-color: var(--murasaki-ring);
+  color: var(--murasaki-ink);
 }
 .shortcut-key-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--murasaki-ring, #7c6cf0);
+  box-shadow: 0 0 0 2px var(--murasaki-ring);
 }
 .shortcut-key-btn.recording {
-  border-color: var(--murasaki-primary, #7c6cf0);
-  color: var(--murasaki-primary, #7c6cf0);
-  background: var(--murasaki-purple-50, #f3f0ff);
+  border-color: var(--murasaki-primary);
+  color: var(--murasaki-primary);
+  background: var(--murasaki-purple-50);
 }
 .shortcut-key-btn .unset {
-  color: var(--murasaki-ink-3, #999);
+  color: var(--murasaki-ink-3);
   font-family: var(--murasaki-font-ui, sans-serif);
   font-weight: 400;
 }
@@ -303,7 +303,7 @@ function disableOne(cmdId: string): void {
   width: 24px;
   height: 24px;
   padding: 0;
-  color: var(--murasaki-ink-3, #999);
+  color: var(--murasaki-ink-3);
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--murasaki-radius-sm, 4px);
@@ -311,11 +311,11 @@ function disableOne(cmdId: string): void {
   transition: color 0.15s ease, background 0.15s ease;
 }
 .icon-button:hover {
-  color: var(--murasaki-ink, #333);
-  background: var(--murasaki-surface-2, #f5f5f5);
+  color: var(--murasaki-ink);
+  background: var(--murasaki-surface-2);
 }
 .icon-button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--murasaki-ring, #7c6cf0);
+  box-shadow: 0 0 0 2px var(--murasaki-ring);
 }
 </style>

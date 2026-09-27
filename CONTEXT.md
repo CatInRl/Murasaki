@@ -755,6 +755,16 @@ issue #104 范围：性能修复 + UX 导航。
 
 间距/字重/行高保留硬编码（不 token 化，避免 token 膨胀）。
 
+### 设计系统与配色 (Design Tokens & Color)
+
+0.9.x 起把配色收敛为「色阶 → 语义 token → 组件引用」三层（issue #293–#296），全部定义在 [theme.css](src/styles/theme.css)。
+
+- **色阶 (Palette)** —— 两族基础色，只定义一次、只被语义 token 引用：紫色阶 `--murasaki-purple-50…900`、中性阶 `--murasaki-neutral-50…950`。
+- **语义 token (Semantic Tokens)** —— 能从色阶取值的逐项引用色阶（如 `--murasaki-primary: var(--murasaki-purple-600)`、`--murasaki-border: var(--murasaki-neutral-200)`），同一颜色只写一遍；色阶没有对应值、或不应进色阶的（纯白 `--murasaki-background`/`-popover`、`--murasaki-surface`/`-surface-2`、彩色底上的白 `--murasaki-primary-foreground`、状态四色 `--murasaki-state-success/warning/error/info`）保留字面值并就地注明。改一处色阶即改全套。
+- **半透明覆盖层三档** —— 选中底 / hover 加深 / 焦点环统一由 `color-mix` 从主色派生，改主色自动跟随：`--murasaki-primary-soft`（12%）、`--murasaki-primary-soft-hover`（20%）、`--murasaki-primary-ring-soft`（30%）。例外：源码编辑器当前行底色比三档都淡，[SourceEditor.vue](src/components/SourceEditor.vue) 就地写 `color-mix(in srgb, var(--murasaki-primary) 6%, transparent)` 保住视觉近等。
+- **图表配色来源** —— Mermaid 的 `themeVariables`（[mermaidTheme.ts](src/utils/mermaidTheme.ts)）、PlantUML 注入的最小 skinparam（[plantuml.ts](src/utils/plantuml.ts)）、导出 HTML 的 `:root` token（[useHtmlExport.ts](src/composables/useHtmlExport.ts)）都在**运行时**读 `getComputedStyle(document.documentElement)` 的 token 解析值，改主色即跟随；Mermaid 仍按需懒加载，分栏预览与 WYSIWYG 共用一个初始化入口（不再依赖「PreviewPane 先 initialize」的隐式副作用）。KaTeX 公式用主题内容色 `--md-fg`，不借用信息蓝。
+- **硬编码政策** —— `src/**` 里引用的 `--murasaki-*` 必须在 `theme.css` 有定义、且不再带死 fallback，由 [tokenGuard.test.ts](src/styles/tokenGuard.test.ts) 守卫（写错变量名即测试失败）；[useNaiveTheme.ts](src/composables/useNaiveTheme.ts) 的 TS 常量与 `theme.css` 的一致性由单测逐项断言（引用关系，非字面值）；无法 token 化的判断类——第三方 token、`--md-*` 阅读主题特有值、装饰渐变——就地保留。
+
 ### 图标库 (Icon Library)
 
 统一使用 **`lucide-vue-next`**（Vue 3 组件形式的 lucide 图标集），替换所有 emoji + 内联 SVG + naive-ui NIcon。详见 [ADR-0004](docs/adr/0004-lucide-vue-next-as-unified-icon-library.md)。

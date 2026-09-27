@@ -15,7 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { isRendered, readText, textOfElement, waitForPresent } from "../helpers/wait";
+import { isRendered, readText, textOfElement, waitForPresent, waitForInBrowser } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -179,5 +179,43 @@ describe("设计系统", () => {
     await waitForPresent(browser, ".file-tree .empty-state .empty-action", 10000);
     expect(await isRendered(browser, ".file-tree .empty-state .empty-action")).toBe(true);
     expect(await readText(browser, ".file-tree .empty-state .empty-action", "打开文件夹")).toBe("打开文件夹");
+  });
+
+  it("文件树选中底色的半透明覆盖层跟随 --murasaki-primary-soft（color-mix 生效）", async () => {
+    const wsPath = resetWorkspace(defaultFixtureFiles());
+    await openFileInTab(browser, `${wsPath}\\intro.md`);
+    await browser.pause(500);
+
+    // 通过 store 选中节点（与 misc-visual 同一手法）
+    await browser.execute((path: string) => {
+      // @ts-ignore
+      window.__pinia__._s.get("workspace").selectedFilePath = path;
+    }, `${wsPath}\\intro.md`);
+    await waitForPresent(browser, ".file-tree .node-row.is-selected", 10000);
+
+    // 选中底色带 120ms 过渡，读太早会拿到过渡中的中间值；轮询到与
+    // --murasaki-primary-soft 的解析值一致再断言（引用关系，改主色自动跟随）
+    const result = await waitForInBrowser(
+      browser,
+      () => {
+        const el = document.querySelector(".file-tree .node-row.is-selected") as HTMLElement | null;
+        if (!el) return null;
+        const probe = document.createElement("div");
+        probe.style.backgroundColor = "var(--murasaki-primary-soft)";
+        document.body.appendChild(probe);
+        const expected = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        const actual = getComputedStyle(el).backgroundColor;
+        if (actual !== expected) return null;
+        return { actual, expected, width: el.getBoundingClientRect().width };
+      },
+      [],
+      { message: "选中底色未稳定到 --murasaki-primary-soft", timeout: 10000 }
+    );
+
+    expect(result!.width).toBeGreaterThan(0);
+    expect(result!.actual).toBe(result!.expected);
+    // 半透明（非不透明纯色）：color-mix(..., transparent) 的产物
+    expect(result!.actual).not.toMatch(/^rgb\(/);
   });
 });

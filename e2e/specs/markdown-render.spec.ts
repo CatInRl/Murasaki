@@ -21,7 +21,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { openWorkspace, closeWorkspace, openFileInTab, getTabsState, waitForPinia, ensureSplitMode } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { waitForPresent, waitForInBrowser } from "../helpers/wait";
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -132,6 +132,15 @@ gantt
     section 阶段一
     设计 :done, des1, 2026-01-01, 7d
     编码 :active, des2, after des1, 10d
+\`\`\`
+`,
+  "render/plantuml.md": `# PlantUML 图表
+
+\`\`\`plantuml
+@startuml
+Alice -> Bob: 你好
+Bob --> Alice: 你好
+@enduml
 \`\`\`
 `,
   "render/emoji.md": `# Emoji 测试
@@ -887,3 +896,84 @@ graph LR
     expect(await previewQuery(browser, "em")).toBeGreaterThanOrEqual(1);
   });
 });
+
+// ===== 测试组 15：图表配色跟随 token（issue #295） =====
+describe("15. 图表配色跟随 token", () => {
+  /**
+   * 用探针元素把任意 CSS 颜色值解析为「同一浏览器环境下」的计算值（rgb / color(srgb ...)）。
+   * 这样断言的是**引用关系**（图表描边 == `--murasaki-primary` 的解析值），而非字面色值：
+   * 改主色时断言自动跟随（issue #296）。
+   * `container` 用于读作用域在主题容器上的 `--md-*` 变量（默认挂在 body，读 `:root` 变量）。
+   */
+  async function resolveCssColor(
+    browser: Browser,
+    value: string,
+    container = "body"
+  ): Promise<string> {
+    return browser.execute((v: string, c: string) => {
+      const host = document.querySelector(c) ?? document.body;
+      const probe = document.createElement("div");
+      probe.style.position = "fixed";
+      probe.style.left = "-9999px";
+      probe.style.color = v;
+      host.appendChild(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    }, value, container);
+  }
+
+  /** 收集容器内 SVG 后代元素的计算描边色（过滤 none / 空） */
+  async function svgStrokes(browser: Browser, selector: string): Promise<string[]> {
+    return browser.execute((sel: string) => {
+      const svg = document.querySelector(sel);
+      if (!svg) return [] as string[];
+      return Array.from(svg.querySelectorAll("*"))
+        .map((el) => getComputedStyle(el).stroke)
+        .filter((s) => s && s !== "none");
+    }, selector);
+  }
+
+  it("15.1 Mermaid SVG 的线条采用 --murasaki-primary", async () => {
+    await openAndWait(browser, "render/mermaid.md", 15000);
+    await waitForInBrowser(
+      browser,
+      () => document.querySelectorAll(".preview-pane .mermaid svg *").length > 0,
+      [],
+      { message: "mermaid SVG 未渲染", timeout: 20000 }
+    );
+    const expected = await resolveCssColor(browser, "var(--murasaki-primary)");
+    const strokes = await svgStrokes(browser, ".preview-pane .mermaid svg");
+    expect(strokes).toContain(expected);
+  });
+
+  it("15.2 PlantUML SVG 的边框/线条采用 --murasaki-primary", async () => {
+    await openAndWait(browser, "render/plantuml.md", 15000);
+    await waitForInBrowser(
+      browser,
+      () => document.querySelectorAll(".preview-pane .plantuml-block svg *").length > 0,
+      [],
+      { message: "plantuml SVG 未渲染", timeout: 45000 }
+    );
+    const expected = await resolveCssColor(browser, "var(--murasaki-primary)");
+    const strokes = await svgStrokes(browser, ".preview-pane .plantuml-block svg");
+    expect(strokes).toContain(expected);
+  });
+
+  it("15.3 KaTeX 公式颜色跟随主题内容色（--md-fg，非信息蓝）", async () => {
+    await openAndWait(browser, "render/math.md");
+    await waitForInBrowser(
+      browser,
+      () => !!document.querySelector(".preview-pane .katex"),
+      [],
+      { message: "KaTeX 未渲染" }
+    );
+    const expected = await resolveCssColor(browser, "var(--md-fg)", ".preview-pane");
+    const actual = await browser.execute(() => {
+      const el = document.querySelector(".preview-pane .katex");
+      return el ? getComputedStyle(el).color : null;
+    });
+    expect(actual).toBe(expected);
+  });
+});
+
