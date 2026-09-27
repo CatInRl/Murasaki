@@ -392,8 +392,8 @@ function confirmTable(): void {
   background: transparent;
   color: var(--murasaki-muted-foreground);
   cursor: pointer;
-  transition: background-color var(--murasaki-duration-fast, 120ms) ease,
-              color var(--murasaki-duration-fast, 120ms) ease;
+  transition: background-color var(--murasaki-duration-fast) ease,
+              color var(--murasaki-duration-fast) ease;
 }
 
 .tb-btn:hover {

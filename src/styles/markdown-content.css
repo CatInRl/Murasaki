@@ -36,7 +36,7 @@
   --md-table-border: var(--murasaki-line);
   --md-table-row-hover-bg: var(--murasaki-purple-50);
   --md-codeblock-bg: var(--murasaki-neutral-900);
-  --md-codeblock-color: #e5e7eb;
+  --md-codeblock-color: var(--murasaki-neutral-200);
   --md-bg: var(--murasaki-background);
   --md-fg: var(--murasaki-ink);
   --md-heading-color: var(--murasaki-ink);
@@ -70,7 +70,7 @@
   --md-table-border: var(--murasaki-line);
   --md-table-row-hover-bg: var(--murasaki-purple-50);
   --md-codeblock-bg: var(--murasaki-neutral-900);
-  --md-codeblock-color: #e5e7eb;
+  --md-codeblock-color: var(--murasaki-neutral-200);
   --md-bg: var(--murasaki-background);
   --md-fg: var(--murasaki-ink);
   --md-heading-color: var(--murasaki-ink);
@@ -104,7 +104,7 @@
   --md-table-border: var(--murasaki-line);
   --md-table-row-hover-bg: var(--murasaki-purple-50);
   --md-codeblock-bg: var(--murasaki-neutral-900);
-  --md-codeblock-color: #e5e7eb;
+  --md-codeblock-color: var(--murasaki-neutral-200);
   --md-bg: #f5f5f0;
   --md-fg: #2a2a2a;
   --md-heading-color: #2a2a2a;
@@ -138,7 +138,7 @@
   --md-table-border: var(--murasaki-line);
   --md-table-row-hover-bg: var(--murasaki-purple-50);
   --md-codeblock-bg: var(--murasaki-neutral-900);
-  --md-codeblock-color: #e5e7eb;
+  --md-codeblock-color: var(--murasaki-neutral-200);
   --md-bg: #fffdf7;
   --md-fg: #1a1a1a;
   --md-heading-color: #1a1a1a;
@@ -172,7 +172,7 @@
   --md-table-border: #30363d;
   --md-table-row-hover-bg: rgba(126, 34, 206, 0.12);
   --md-codeblock-bg: var(--murasaki-neutral-900);
-  --md-codeblock-color: #e5e7eb;
+  --md-codeblock-color: var(--murasaki-neutral-200);
   --md-bg: #0d1117;
   --md-fg: #c9d1d9;
   --md-heading-color: #c9d1d9;
@@ -532,7 +532,7 @@
   padding: 8px 16px;
   border-left: 3px solid var(--md-primary, var(--murasaki-primary));
   background: var(--md-surface-2, var(--murasaki-surface-2));
-  border-radius: 0 var(--murasaki-radius-sm, 4px) var(--murasaki-radius-sm, 4px) 0;
+  border-radius: 0 var(--murasaki-radius-sm) var(--murasaki-radius-sm) 0;
   font-size: 0.9em;
   color: var(--md-text-color, var(--murasaki-ink-2));
 }

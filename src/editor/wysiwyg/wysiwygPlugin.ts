@@ -1052,7 +1052,7 @@ export const wysiwygTheme = EditorView.theme({
     background: "var(--md-code-bg, var(--murasaki-surface-2))",
     color: "var(--md-code-color, var(--murasaki-primary))",
     padding: "0.125rem 0.375rem",
-    borderRadius: "var(--murasaki-radius-sm, 4px)",
+    borderRadius: "var(--murasaki-radius-sm)",
   },
   // 中性化 CM 高亮 token span（class 以 ͼ 前缀开头）对 render 装饰内部文本的干扰：
   // 标题/引用/行内代码的视觉由 --md-* 变量统一提供，否则高亮样式（紫色、em 字号）
@@ -1081,7 +1081,7 @@ export const wysiwygTheme = EditorView.theme({
     paddingLeft: "16px",
     paddingRight: "16px",
     lineHeight: "1.8",
-    borderRadius: "0 var(--murasaki-radius-sm, 4px) var(--murasaki-radius-sm, 4px) 0",
+    borderRadius: "0 var(--murasaki-radius-sm) var(--murasaki-radius-sm) 0",
   },
   ".murasaki-wysiwyg-bullet": {
     color: "var(--md-list-marker-color, var(--murasaki-primary))",
@@ -1175,9 +1175,9 @@ export const wysiwygTheme = EditorView.theme({
     gap: "3px",
     alignItems: "center",
     padding: "2px 6px",
-    background: "var(--murasaki-card, var(--murasaki-surface))",
-    border: "1px solid var(--murasaki-border, var(--murasaki-line))",
-    borderRadius: "var(--murasaki-radius-md, 8px)",
+    background: "var(--murasaki-card)",
+    border: "1px solid var(--murasaki-border)",
+    borderRadius: "var(--murasaki-radius-md)",
     boxShadow: "var(--murasaki-shadow-sm)",
     width: "max-content",
     maxWidth: "100%",
@@ -1191,13 +1191,13 @@ export const wysiwygTheme = EditorView.theme({
   ".murasaki-wysiwyg-table-tool-label": {
     fontSize: "11px",
     fontWeight: "600",
-    color: "var(--murasaki-muted-foreground, var(--murasaki-ink-3))",
+    color: "var(--murasaki-muted-foreground)",
     padding: "0 2px",
   },
   ".murasaki-wysiwyg-table-tool-divider": {
     width: "1px",
     height: "16px",
-    background: "var(--murasaki-border, var(--murasaki-line))",
+    background: "var(--murasaki-border)",
     margin: "0 2px",
   },
   ".murasaki-wysiwyg-table-tool": {
@@ -1208,14 +1208,14 @@ export const wysiwygTheme = EditorView.theme({
     lineHeight: "1",
     padding: "3px 5px",
     border: "none",
-    borderRadius: "var(--murasaki-radius-sm, 5px)",
+    borderRadius: "var(--murasaki-radius-sm)",
     background: "transparent",
     color: "var(--murasaki-ink-2)",
     cursor: "pointer",
     transition: "background 120ms, color 120ms",
   },
   ".murasaki-wysiwyg-table-tool:hover": {
-    background: "var(--murasaki-muted, var(--murasaki-surface-2))",
+    background: "var(--murasaki-muted)",
     color: "var(--murasaki-primary)",
   },
   ".murasaki-wysiwyg-table-tool.active": {
@@ -1275,9 +1275,9 @@ export const wysiwygTheme = EditorView.theme({
   ".murasaki-wysiwyg-diagram-preview": {
     margin: "4px 0 12px",
     border: "1px solid var(--md-pre-border, var(--murasaki-line))",
-    borderRadius: "var(--murasaki-radius-sm, 6px)",
+    borderRadius: "var(--murasaki-radius-sm)",
     overflow: "hidden",
-    background: "var(--murasaki-surface, var(--md-pre-bg))",
+    background: "var(--murasaki-surface)",
   },
   ".murasaki-wysiwyg-diagram-preview-head": {
     fontSize: "11px",

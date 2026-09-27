@@ -114,7 +114,6 @@ describe("设计 token 守卫：引用的 --murasaki-* 必须在 theme.css 定�
     if (unreferenced.length > 0) {
       console.info(`[tokenGuard] 已定义但零引用的 token（${unreferenced.length}）：\n${unreferenced.join("\n")}`);
     }
-    expect(Array.isArray(unreferenced)).toBe(true);
   });
 
   it("守卫本身能识别未定义 token（样例验证）", () => {

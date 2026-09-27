@@ -218,7 +218,7 @@ function disableOne(cmdId: string): void {
   color: var(--murasaki-state-error);
   background: color-mix(in srgb, var(--murasaki-state-error) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--murasaki-state-error) 35%, transparent);
-  border-radius: var(--murasaki-radius-md, 6px);
+  border-radius: var(--murasaki-radius-md);
 }
 .shortcut-list {
   display: flex;
@@ -231,7 +231,7 @@ function disableOne(cmdId: string): void {
   align-items: center;
   gap: 16px;
   padding: 8px 12px;
-  border-radius: var(--murasaki-radius-sm, 4px);
+  border-radius: var(--murasaki-radius-sm);
   transition: background-color 0.15s ease;
 }
 .shortcut-row:hover {
@@ -267,7 +267,7 @@ function disableOne(cmdId: string): void {
   min-height: 24px;
   justify-content: center;
   padding: 2px 10px;
-  font-family: var(--murasaki-font-mono, monospace);
+  font-family: var(--murasaki-font-mono);
   font-size: 12px;
   font-weight: 500;
   color: var(--murasaki-ink-2);
@@ -293,7 +293,7 @@ function disableOne(cmdId: string): void {
 }
 .shortcut-key-btn .unset {
   color: var(--murasaki-ink-3);
-  font-family: var(--murasaki-font-ui, sans-serif);
+  font-family: var(--murasaki-font-ui);
   font-weight: 400;
 }
 .icon-button {
@@ -306,7 +306,7 @@ function disableOne(cmdId: string): void {
   color: var(--murasaki-ink-3);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--murasaki-radius-sm, 4px);
+  border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
   transition: color 0.15s ease, background 0.15s ease;
 }

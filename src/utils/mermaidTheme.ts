@@ -29,17 +29,19 @@ function readToken(styles: CSSStyleDeclaration, name: string): string {
 export function buildMermaidThemeVariables(): Record<string, string> {
   if (themeVariablesCache) return themeVariablesCache;
   const styles = getComputedStyle(document.documentElement);
+  // #fdf4ff 不在色阶/语义 token 内，就地保留（issue #294 判断类保留）。
+  // secondaryColor 与 secondBkg 同值，提成具名常量避免同一字面值写两遍。
+  const secondarySurface = "#fdf4ff";
   themeVariablesCache = {
     primaryColor: readToken(styles, "--murasaki-purple-100"),
     primaryBorderColor: readToken(styles, "--murasaki-primary"),
     primaryTextColor: readToken(styles, "--murasaki-purple-900"),
     lineColor: readToken(styles, "--murasaki-primary"),
-    // #fdf4ff 不在色阶/语义 token 内，就地保留（issue #294 判断类保留）
-    secondaryColor: "#fdf4ff",
+    secondaryColor: secondarySurface,
     tertiaryColor: readToken(styles, "--murasaki-purple-50"),
     background: readToken(styles, "--murasaki-background"),
     mainBkg: readToken(styles, "--murasaki-purple-100"),
-    secondBkg: "#fdf4ff",
+    secondBkg: secondarySurface,
     borderColor: readToken(styles, "--murasaki-primary"),
     edgeLabelBackground: readToken(styles, "--murasaki-purple-50"),
     clusterBkg: readToken(styles, "--murasaki-purple-50"),

@@ -61,7 +61,7 @@ async function renderMermaid(container: HTMLElement) {
       const { svg } = await mermaid.render(id, code);
       block.innerHTML = svg;
     } catch (err) {
-      block.innerHTML = `<pre style="color:#c00">${(err as Error).message}</pre>`;
+      block.innerHTML = `<pre style="color:var(--murasaki-state-error)">${(err as Error).message}</pre>`;
     }
   }
 }
@@ -327,7 +327,7 @@ defineExpose({
   padding: 28px 36px;
   background: var(--md-bg, var(--murasaki-background));
   color: var(--md-fg, var(--murasaki-ink));
-  font-family: var(--murasaki-font-reading, var(--murasaki-font-ui));
+  font-family: var(--murasaki-font-reading);
   font-size: 14px;
   line-height: 1.75;
   transition: padding var(--murasaki-duration-base) var(--murasaki-ease);

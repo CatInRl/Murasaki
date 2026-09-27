@@ -113,6 +113,6 @@ export async function renderPlantUmlCode(
     target.id = id;
     plantuml.render([injectSkinparam(code)], id, { dark: false });
   } catch (err) {
-    target.innerHTML = `<pre style="color:#c00">${(err as Error).message}</pre>`;
+    target.innerHTML = `<pre style="color:var(--murasaki-state-error)">${(err as Error).message}</pre>`;
   }
 }

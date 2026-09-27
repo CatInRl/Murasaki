@@ -199,7 +199,7 @@ body,
   .tab-item .close-btn,
   .sidebar-tab,
   .tree-node .node-row {
-    min-height: var(--murasaki-touch-target, 36px);
+    min-height: var(--murasaki-touch-target, 36px); /* 条件定义 token：仅在本 @media (pointer: coarse) 内声明，保留 fallback 以防该媒体查询未命中定义 */
   }
 }
 

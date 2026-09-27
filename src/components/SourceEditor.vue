@@ -378,14 +378,13 @@ function buildLanguageExtension(): Extension {
 
 /**
  * 构建字体主题（EditorView.theme）。
- * 把 fontSize/lineHeight/fontFamily props 转换为 .cm-content / .cm-scroller 的 CSS。
+ * 把 fontSize/lineHeight 与阅读字体 token 转换为 .cm-content / .cm-scroller 的 CSS。
  * 通过 fontComp 在设置变更时重新应用，无需销毁编辑器实例。
  *
  * 所有编辑模式（source/split/wysiwyg）统一使用阅读字体（与预览一致）。
- * 用户配置的等宽字体作为 fallback（阅读字体缺失时兜底）。
  */
 function buildFontTheme() {
-  const fontFamily = `var(--murasaki-font-reading, ${props.fontFamily})`;
+  const fontFamily = "var(--murasaki-font-reading)";
   const fontCss = `${fontFamily}, ui-monospace, monospace`;
   const sizePx = `${props.fontSize}px`;
   return EditorView.theme({
@@ -782,7 +781,7 @@ defineExpose({
 .source-editor.mode-wysiwyg {
   background: var(--md-bg, var(--murasaki-background));
   color: var(--md-fg, var(--murasaki-ink));
-  font-family: var(--murasaki-font-reading, var(--murasaki-font-ui));
+  font-family: var(--murasaki-font-reading);
   font-size: 14px;
   line-height: 1.75;
 }

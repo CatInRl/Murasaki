@@ -71,7 +71,7 @@ function collectRuntimeTokens(): string {
  *   - --murasaki-* 设计 token 在导出文件内未定义，需在 :root 内联运行时值（issue #295）
  *   - 容器布局（padding/background/font）镜像 PreviewPane 的 .preview-pane 样式
  */
-function getThemeCss(_theme: string): string {
+function getThemeCss(): string {
   return `
 :root {
 ${collectRuntimeTokens()}
@@ -269,7 +269,7 @@ export async function exportHtml(options: ExportHtmlOptions): Promise<string> {
   //   - markdown-body 让 markdown-content.css 的 .markdown-body 后代选择器生效
   //   - data-md-theme 触发 [data-md-theme="X"] 块定义的 --md-* 主题变量
   //   - 不再需要内层 .markdown-body div 包裹（body 本身即容器）
-  const css = getThemeCss(theme);
+  const css = getThemeCss();
   const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>

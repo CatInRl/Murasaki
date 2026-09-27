@@ -122,6 +122,6 @@ function onConfirm(): void {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: var(--murasaki-font-mono, "JetBrains Mono", monospace);
+  font-family: var(--murasaki-font-mono);
 }
 </style>
