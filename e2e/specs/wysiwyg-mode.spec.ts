@@ -15,7 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -109,9 +109,9 @@ describe("WYSIWYG 模式切换", () => {
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
     // 等待工具栏渲染
-    const toolbar = await browser.$(".editor-toolbar");
     await waitForPresent(browser, ".editor-toolbar", 10000);
-    expect(await toolbar.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    expect(await isRendered(browser, ".editor-toolbar")).toBe(true);
 
     // 切换到 source 模式
     await browser.execute(() => {
@@ -120,7 +120,7 @@ describe("WYSIWYG 模式切换", () => {
       editorBridge.setEditorMode("source");
     });
     await browser.pause(300);
-    expect(await toolbar.isDisplayed()).toBe(true);
+    expect(await isRendered(browser, ".editor-toolbar")).toBe(true);
 
     // 切换到 wysiwyg 模式
     await browser.execute(() => {
@@ -129,7 +129,7 @@ describe("WYSIWYG 模式切换", () => {
       editorBridge.setEditorMode("wysiwyg");
     });
     await browser.pause(300);
-    expect(await toolbar.isDisplayed()).toBe(true);
+    expect(await isRendered(browser, ".editor-toolbar")).toBe(true);
   });
 
   it("wysiwyg 模式下标题标记被隐藏", async () => {

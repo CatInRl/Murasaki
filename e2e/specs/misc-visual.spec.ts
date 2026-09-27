@@ -24,7 +24,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -267,10 +267,9 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
     await openFileInTab(browser, `${wsPath}\\intro.md`);
     await browser.pause(500);
 
-    // CodeMirror 6 行号 gutter
-    const lineNumbers = await browser.$(".cm-lineNumbers");
-    expect(await lineNumbers.isExisting()).toBe(true);
-    expect(await lineNumbers.isDisplayed()).toBe(true);
+    // CodeMirror 6 行号 gutter（存在性用轮询等，几何用 isRendered：isDisplayed 在本栈下会持久性误判）
+    await waitForPresent(browser, ".cm-lineNumbers", 10000);
+    expect(await isRendered(browser, ".cm-lineNumbers")).toBe(true);
   });
 
   it("关闭行号后 .cm-lineNumbers 消失", async () => {

@@ -15,7 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -203,7 +203,9 @@ describe("文件树选中态 & 搜索高亮", () => {
     await browser.pause(300);
 
     const gsb = await browser.$(".gsb");
-    expect(await gsb.isDisplayed()).toBe(true);
+    // 存在性用轮询等，几何用 isRendered：isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts）
+    await waitForPresent(browser, ".gsb", 5000);
+    expect(await isRendered(browser, ".gsb")).toBe(true);
 
     // 关闭统一搜索条
     await browser.execute(() => {

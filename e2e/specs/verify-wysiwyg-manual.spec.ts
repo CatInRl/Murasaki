@@ -14,7 +14,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
 import { openWorkspace, openFileInTab, waitForPinia } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 
 describe("WYSIWYG 模式真实用户路径验证", () => {
   let browser: Browser;
@@ -239,7 +239,8 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // 综合验证：编辑器内容区可见且非空，包含标题和正文文本
     const content = await browser.$(".cm-content");
     expect(await content.isExisting()).toBe(true);
-    expect(await content.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    expect(await isRendered(browser, ".cm-content")).toBe(true);
 
     const text = await content.getText();
     expect(text.length).toBeGreaterThan(0);

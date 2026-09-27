@@ -15,7 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, dismissAllDialogs } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -132,7 +132,8 @@ describe("状态栏", () => {
     // 等待未保存指示出现
     const unsaved = await browser.$(".status-unsaved");
     await waitForPresent(browser, ".status-unsaved", 5000);
-    expect(await unsaved.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    expect(await isRendered(browser, ".status-unsaved")).toBe(true);
     expect((await unsaved.getText()).trim()).toBe("未保存");
   });
 
@@ -144,7 +145,7 @@ describe("状态栏", () => {
     // 文件刚打开，isDirty 应为 false → 显示"已保存"
     const saved = await browser.$(".status-saved");
     await waitForPresent(browser, ".status-saved", 10000);
-    expect(await saved.isDisplayed()).toBe(true);
+    expect(await isRendered(browser, ".status-saved")).toBe(true);
     expect((await saved.getText()).trim()).toBe("已保存");
   });
 });

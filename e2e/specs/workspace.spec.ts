@@ -11,7 +11,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { waitForInBrowser, waitForPresent } from "../helpers/wait";
+import { isRendered, waitForInBrowser, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -42,9 +42,9 @@ describe("工作区 + 文件树", () => {
     const wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
 
-    const tree = await browser.$(".file-tree");
     await waitForPresent(browser, ".file-tree", 10000);
-    expect(await tree.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    expect(await isRendered(browser, ".file-tree")).toBe(true);
   });
 
   it("文件树显示工作区名作为标题", async () => {
@@ -113,9 +113,8 @@ describe("工作区 + 文件树", () => {
   it("关闭工作区后侧栏消失", async () => {
     const wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
-    const tree = await browser.$(".file-tree");
     await waitForPresent(browser, ".file-tree", 10000);
-    expect(await tree.isDisplayed()).toBe(true);
+    expect(await isRendered(browser, ".file-tree")).toBe(true);
 
     await closeWorkspace(browser);
 

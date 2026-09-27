@@ -29,7 +29,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 /** 当前测试用工作区路径（由 beforeEach 设置，it 块直接复用，避免重复 resetWorkspace） */
@@ -368,30 +368,25 @@ describe("快捷键", () => {
     });
     // 等待切换到大纲视图生效（文件树消失）
     await browser.waitUntil(async () => {
-      const tree = await browser.$(".file-tree");
-      const displayed = await tree.isDisplayed().catch(() => false);
-      return !displayed;
+      return !(await isRendered(browser, ".file-tree"));
     }, { timeout: 3000, interval: 100 });
 
     // Ctrl+Shift+E 切换回文件树
     await pressShortcut(browser, "e", { ctrl: true, shift: true });
     // 等待文件树重新可见
     await browser.waitUntil(async () => {
-      const tree = await browser.$(".file-tree");
-      return await tree.isDisplayed().catch(() => false);
+      return await isRendered(browser, ".file-tree");
     }, { timeout: 3000, interval: 100 });
 
     // 文件树应可见
-    const fileTree = await browser.$(".file-tree");
-    expect(await fileTree.isDisplayed()).toBe(true);
+    expect(await isRendered(browser, ".file-tree")).toBe(true);
   });
 
   // ============ M8: Ctrl+Shift+M 切换到大纲侧栏 ============
 
   it("Ctrl+Shift+M 切换到大纲侧栏", async () => {
     // 起始应为文件树视图
-    const fileTree = await browser.$(".file-tree");
-    expect(await fileTree.isDisplayed()).toBe(true);
+    expect(await isRendered(browser, ".file-tree")).toBe(true);
 
     // Ctrl+Shift+M 切换到大纲
     await pressShortcut(browser, "m", { ctrl: true, shift: true });

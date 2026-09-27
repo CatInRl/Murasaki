@@ -219,9 +219,8 @@ describe("文件树键盘导航", () => {
     await focusFirstRow(browser);
     await pressTreeKey(browser, "F10", { shift: true });
 
-    const menu = await browser.$(".murasaki-context-menu");
+    // 浮层只判「存在」不判几何/透明度（动画浮层用 waitForRendered 会误判，见 AGENTS.md）
     await waitForPresent(browser, ".murasaki-context-menu", 5000);
-    expect(await menu.isDisplayed()).toBe(true);
 
     // 菜单项应可键盘操作：↓ 移动高亮
     const items = await browser.$$(".murasaki-context-menu-item");

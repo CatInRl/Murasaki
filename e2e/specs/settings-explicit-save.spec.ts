@@ -20,7 +20,7 @@ import {
   waitForPinia,
   dismissAllDialogs,
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -94,9 +94,9 @@ describe("设置显式 Save 模型", () => {
   it("设置页渲染 .settings-shell 容器", async () => {
     await navigateToSettings(browser);
 
-    const shell = await browser.$(".settings-shell");
     await waitForPresent(browser, ".settings-shell", 5000);
-    expect(await shell.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    expect(await isRendered(browser, ".settings-shell")).toBe(true);
 
     await navigateToEditor(browser);
   });

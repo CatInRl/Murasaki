@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { closeWorkspace, closeAllTabs, waitForPinia } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, isRenderedElement, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -39,8 +39,7 @@ describe("Murasaki 启动 smoke 测试", () => {
         return window.__pinia__._s.get("tabs").tabs.length === 0;
       });
       if (!noTabs) return false;
-      const wp = await browser.$(".welcome-page");
-      return await wp.isDisplayed().catch(() => false);
+      return await isRendered(browser, ".welcome-page");
     }, { timeout: 15000 });
   });
 
@@ -50,9 +49,9 @@ describe("Murasaki 启动 smoke 测试", () => {
   });
 
   it("显示欢迎页（.welcome-page 存在且可见）", async () => {
-    const el = await browser.$(".welcome-page");
     await waitForPresent(browser, ".welcome-page", 15000);
-    expect(await el.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    expect(await isRendered(browser, ".welcome-page")).toBe(true);
   });
 
   it("欢迎页包含 'Murasaki' 标题文本", async () => {
@@ -72,12 +71,12 @@ describe("Murasaki 启动 smoke 测试", () => {
     // button=TEXT 选择器只匹配直接文本节点，不匹配嵌套 span，所以用 .action-label
     const label = await browser.$(".action-label=打开文件夹");
     await waitForPresent(browser, ".action-label=打开文件夹", 10000);
-    // 元素出现只保证它在 DOM 中，不等同于可见；改为轮询 isDisplayed，
-    // 避免读到欢迎页切换过程中的瞬时状态。
+    // 元素出现只保证它在 DOM 中，不等同于可见；轮询 isRendered，
+    // 避免读到欢迎页切换过程中的瞬时状态（isDisplayed 在本栈下会持久性误判）
     await browser.waitUntil(async () => {
-      return await label.isDisplayed().catch(() => false);
+      return await isRenderedElement(browser, label);
     }, { timeout: 5000 });
-    expect(await label.isDisplayed()).toBe(true);
+    expect(await isRenderedElement(browser, label)).toBe(true);
   });
 
   it("欢迎页提供'打开文件'和'新建文件'入口", async () => {
@@ -85,7 +84,7 @@ describe("Murasaki 启动 smoke 测试", () => {
     const newFile = await browser.$(".action-label=新建文件");
     await waitForPresent(browser, ".action-label=打开文件", 10000);
     await waitForPresent(browser, ".action-label=新建文件", 10000);
-    expect(await openFile.isDisplayed()).toBe(true);
-    expect(await newFile.isDisplayed()).toBe(true);
+    expect(await isRenderedElement(browser, openFile)).toBe(true);
+    expect(await isRenderedElement(browser, newFile)).toBe(true);
   });
 });

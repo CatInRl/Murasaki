@@ -22,7 +22,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 import { resolve } from "node:path";
 
 let browser: Browser;
@@ -190,9 +190,9 @@ describe("大纲视图切换 + 标题跳转", () => {
     });
     await browser.pause(300);
 
-    // 文件树应可见
-    const fileTree = await browser.$(".file-tree");
-    expect(await fileTree.isDisplayed()).toBe(true);
+    // 文件树应可见（存在性用轮询等，几何用 isRendered：isDisplayed() 在本栈下会持久性误判）
+    await waitForPresent(browser, ".file-tree", 10000);
+    expect(await isRendered(browser, ".file-tree")).toBe(true);
   });
 
   it("无文件打开时大纲为空", async () => {

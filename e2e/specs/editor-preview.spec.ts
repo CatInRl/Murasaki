@@ -18,7 +18,7 @@ import {
   ensureSplitMode,
   resetPersistenceSettings
 } from "../helpers/store";
-import { waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -50,18 +50,17 @@ describe("编辑器 + 预览 同步", () => {
     const ws = resetWorkspace(defaultFixtureFiles());
     await openFileInTab(browser, `${ws}/intro.md`);
 
-    const cm = await browser.$(".pane-left .cm-editor");
     await waitForPresent(browser, ".pane-left .cm-editor", 10000);
-    expect(await cm.isDisplayed()).toBe(true);
+    // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
+    expect(await isRendered(browser, ".pane-left .cm-editor")).toBe(true);
   });
 
   it("预览面板可见且包含 markdown-body", async () => {
     const ws = resetWorkspace(defaultFixtureFiles());
     await openFileInTab(browser, `${ws}/intro.md`);
 
-    const preview = await browser.$(".pane-right .markdown-body");
     await waitForPresent(browser, ".pane-right .markdown-body", 10000);
-    expect(await preview.isDisplayed()).toBe(true);
+    expect(await isRendered(browser, ".pane-right .markdown-body")).toBe(true);
   });
 
   it("预览渲染一级标题", async () => {
@@ -100,9 +99,8 @@ describe("编辑器 + 预览 同步", () => {
     ]);
     await openFileInTab(browser, `${ws}/tasks.md`);
 
-    const checkbox = await browser.$(".pane-right .markdown-body input[type=checkbox]");
     await waitForPresent(browser, ".pane-right .markdown-body input[type=checkbox]", 10000);
-    expect(await checkbox.isDisplayed()).toBe(true);
+    expect(await isRendered(browser, ".pane-right .markdown-body input[type=checkbox]")).toBe(true);
   });
 
   it("切换主题后预览根元素主题属性变化", async () => {
