@@ -99,6 +99,34 @@ export function resolveRelative(base: string, relative: string): string {
 }
 
 /**
+ * 路径的**归一化比较键**：分隔符统一为 `/`、去尾分隔符、小写。
+ *
+ * 凡是用路径做「是否同一个」的判断、或拿路径当 Map/Set 的键，都应先过这里 ——
+ * 同一个文件可能以不同写法到达（外部入口 / 命令行参数 / 拖放 / 手工拼接的字符串），
+ * 字面量比较会把它当成两个文件。
+ *
+ * 已知取舍：小写化是**无条件**的（macOS/Windows 的默认文件系统本就不区分大小写，
+ * 与 `isPathUnder` 的既有口径一致）。代价是在大小写敏感的 Linux 上，仅大小写不同的
+ * 两个文件会被视为同一个。若将来要精确化，应连同 `isPathUnder` 一起按平台区分
+ * （`utils/platform.ts` 已有 `detectPlatform()`），而不是只改这一处。
+ */
+export function canonicalPath(path: string): string {
+  return stripTrailingSep(normalizePath(path)).toLowerCase();
+}
+
+/**
+ * 判断两个路径是否指向同一个文件（`canonicalPath` 的相等判断）
+ *
+ * 例如：isSamePath("C:\\docs\\a.md", "C:/docs/a.md") → true
+ *      isSamePath("C:/docs/A.MD", "C:/docs/a.md") → true
+ *      isSamePath("C:/docs/a.md", "C:/docs/b.md") → false
+ */
+export function isSamePath(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  return canonicalPath(a) === canonicalPath(b);
+}
+
+/**
  * 判断 target 路径是否位于 base 目录之下（工作区归属判定）
  * - 前缀匹配 + 目录边界：target 必须是 base 下某个子文件/子目录，兄弟前缀目录不算
  * - Windows 大小写不敏感（盘符与目录均不区分大小写）

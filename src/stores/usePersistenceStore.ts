@@ -9,6 +9,7 @@ import {
   DEFAULT_SETTINGS,
 } from "../types";
 import { isMainWindow, tabsStoreKey } from "../utils/windowContext";
+import { isSamePath } from "../utils/path";
 
 /**
  * 持久化 Store
@@ -103,7 +104,8 @@ export const usePersistenceStore = defineStore("persistence", () => {
   }
 
   async function addRecent(path: string, type: "file" | "folder"): Promise<void> {
-    const filtered = recentEntries.value.filter((e) => e.path !== path);
+    // 按归一化路径去重：同一文件的不同分隔符写法不该在列表里出现两次
+    const filtered = recentEntries.value.filter((e) => !isSamePath(e.path, path));
     filtered.unshift({
       path,
       type,
@@ -115,7 +117,7 @@ export const usePersistenceStore = defineStore("persistence", () => {
   }
 
   async function removeRecent(path: string): Promise<void> {
-    recentEntries.value = recentEntries.value.filter((e) => e.path !== path);
+    recentEntries.value = recentEntries.value.filter((e) => !isSamePath(e.path, path));
     await saveRecent();
   }
 

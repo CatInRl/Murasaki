@@ -3,7 +3,7 @@ import { ref, computed } from "vue";
 import type { Tab, PersistedTab } from "../types";
 import { usePersistenceStore } from "./usePersistenceStore";
 import { fileSystem } from "../services/fileSystem";
-import { basename } from "../utils/path";
+import { basename, isSamePath } from "../utils/path";
 
 /**
  * 标签页 Store
@@ -62,8 +62,9 @@ export const useTabsStore = defineStore("tabs", () => {
    */
   async function openFile(path: string, options: { activate?: boolean } = {}): Promise<Tab> {
     const activate = options.activate ?? true;
-    // 检查是否已打开
-    const existing = tabs.value.find((t) => t.path === path);
+    // 检查是否已打开。走 getTabByPath（按归一化路径比较）—— 同一文件可能以 `\` 或 `/`
+    // 的写法到达（外部入口 / 命令行参数 / 手工拼接），字面量比较会重复开 tab
+    const existing = getTabByPath(path);
     if (existing) {
       if (activate) activeTabId.value = existing.id;
       return existing;
@@ -192,9 +193,10 @@ export const useTabsStore = defineStore("tabs", () => {
     return { needsConfirm: false, tab };
   }
 
-  /** 按路径查找 tab（消除 App.vue 中的 message chain） */
+  /** 按路径查找 tab（消除 App.vue 中的 message chain）。
+   *  同样按归一化路径比较 —— 外部修改事件的路径写法未必与打开时一致（见 isSamePath）。 */
   function getTabByPath(filePath: string): Tab | null {
-    return tabs.value.find((t) => t.path === filePath) ?? null;
+    return tabs.value.find((t) => t.path !== null && isSamePath(t.path, filePath)) ?? null;
   }
 
   /**

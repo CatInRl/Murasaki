@@ -9,7 +9,7 @@
  *
  * 两者均为纯函数，便于单元测试（议题簇 1 / 4）。
  */
-import { dirname } from "../utils/path";
+import { canonicalPath, dirname } from "../utils/path";
 
 // ===== 匹配 =====
 
@@ -161,6 +161,10 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
   const empty = query.length === 0;
   const groups: SearchGroup[] = [];
   const shown = new Set<string>();
+  /** 跨组去重键：有路径走归一化路径（同一文件的不同分隔符写法不该重复出现），
+   *  未命名标签没有路径可归一化，退回其 id */
+  const dedupeKey = (path: string | null, fallbackId = ""): string =>
+    path ? canonicalPath(path) : `__unsaved:${fallbackId}`;
   let seq = 0;
   const nextId = (kind: SearchGroupKind) => `${kind}-${seq++}`;
 
@@ -169,7 +173,7 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
   for (const t of ctx.tabs) {
     if (tabItems.length >= SEARCH_LIMITS.tabs) break;
     if (!empty && !entryMatches(t.title, t.path, query)) continue;
-    const key = t.path ?? `__unsaved:${t.id}`;
+    const key = dedupeKey(t.path, t.id);
     shown.add(key);
     tabItems.push({
       id: nextId("tabs"),
@@ -188,9 +192,9 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
   const recentItems: SearchEntry[] = [];
   for (const r of ctx.recents) {
     if (recentItems.length >= SEARCH_LIMITS.recent) break;
-    if (shown.has(r.path)) continue;
+    if (shown.has(dedupeKey(r.path))) continue;
     if (!empty && !entryMatches(r.title, r.path, query)) continue;
-    shown.add(r.path);
+    shown.add(dedupeKey(r.path));
     recentItems.push({
       id: nextId("recent"),
       group: "recent",
@@ -210,7 +214,7 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
   if (ctx.files.length) {
     const firstKw = empty ? "" : query.split(/\s+/)[0].toLowerCase();
     const matched = ctx.files
-      .filter((f) => !shown.has(f.path))
+      .filter((f) => !shown.has(dedupeKey(f.path)))
       .filter((f) => empty || entryMatches(f.title, f.path, query))
       .sort((a, b) => {
         const ap = firstKw && a.title.toLowerCase().startsWith(firstKw) ? 0 : 1;
@@ -220,7 +224,7 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
       })
       .slice(0, SEARCH_LIMITS.files);
     const fileItems: SearchEntry[] = matched.map((f) => {
-      shown.add(f.path);
+      shown.add(dedupeKey(f.path));
       return {
         id: nextId("files"),
         group: "files",
@@ -241,10 +245,10 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
     let filesUsed = 0;
     for (const c of ctx.content) {
       if (filesUsed >= SEARCH_LIMITS.contentFiles) break;
-      if (shown.has(c.path)) continue;
+      if (shown.has(dedupeKey(c.path))) continue;
       const hits = c.hits.slice(0, SEARCH_LIMITS.contentPerFile);
       if (!hits.length) continue;
-      shown.add(c.path);
+      shown.add(dedupeKey(c.path));
       filesUsed++;
       for (const h of hits) {
         contentItems.push({

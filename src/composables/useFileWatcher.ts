@@ -4,7 +4,7 @@ import { type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useTabsStore } from "../stores/useTabsStore";
-import { isPathUnder } from "../utils/path";
+import { canonicalPath, isPathUnder, isSamePath } from "../utils/path";
 
 /** 外部变更事件的合并窗口（毫秒）：同一爆发期的多个事件合并为一次处理 */
 const EXTERNAL_CHANGE_THROTTLE_MS = 300;
@@ -91,11 +91,13 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcher {
     }, TREE_REFRESH_DEBOUNCE_MS);
   }
 
-  /** 同一路径的多次事件归并：结构变化优先于内容修改（如重命名会伴随 modify） */
+  /** 同一路径的多次事件归并：结构变化优先于内容修改（如重命名会伴随 modify）。
+   *  键用归一化路径 —— 同一文件的事件写法未必一致，否则会被当成两个文件重复处理。 */
   function mergeChange(change: FileChangePayload): void {
-    const prev = pendingChanges.get(change.path);
+    const key = canonicalPath(change.path);
+    const prev = pendingChanges.get(key);
     if (prev && prev.kind !== "modify") return;
-    pendingChanges.set(change.path, change);
+    pendingChanges.set(key, change);
   }
 
   function scheduleFlush(): void {
@@ -105,8 +107,11 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcher {
       const changes = Array.from(pendingChanges.values());
       pendingChanges.clear();
       for (const change of changes) {
-        // 仅处理当前已打开的 tab 对应的文件
-        const isOpened = tabsStore.tabs.some((t) => t.path === change.path);
+        // 仅处理当前已打开的 tab 对应的文件（按归一化路径比较：事件里的路径写法未必
+        // 与打开时一致，字面量比较会漏掉本该处理的改动，见 isSamePath）
+        const isOpened = tabsStore.tabs.some(
+          (t) => t.path !== null && isSamePath(t.path, change.path)
+        );
         if (isOpened) {
           void options.onExternalChange(change.path);
         }
