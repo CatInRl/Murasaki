@@ -5,7 +5,8 @@
  * 把从系统拖入窗口的文件/文件夹路径交给 Rust `classify_drop_paths` 分类，
  * 再由 `planDrop` 规划动作：单个目录 → 走「打开文件夹」同一路径（同目录已开则聚焦
  * 那个窗口，否则新窗口）；文件 → **在当前窗口**逐个开标签（与 `Ctrl+O` / 最近文件一致）；
- * 图片 → **在当前窗口**按插入方式插入编辑器（issue #288）。
+ * 图片 → **在当前窗口**按插入方式插入编辑器（issue #288）；应用打不开的文件 →
+ * 一次提示（恰好 1 个时附「用系统默认程序打开」动作，issue #317）。
  *
  * 机制说明：Tauri 的 `dragDropEnabled`（默认 true）会让 WebView2 拦截系统文件拖放，
  * 改以 `tauri://drag-enter|over|drop|leave` 事件告之——HTML5 的 `drop` 因此收不到系统
@@ -31,6 +32,12 @@ export interface UseDragDropOptions {
    * `position` 是 Tauri 给的物理像素落点（可空，取不到则落到光标处）。
    */
   insertImages: (paths: string[], position: PhysicalPoint | null) => Promise<void> | void;
+  /**
+   * 拖入的条目里有「应用打不开的文件」时调用一次（issue #317）：
+   * 恰好 1 个 → 实现方应附上「用系统默认程序打开」动作；≥2 个 → 只报计数。
+   * 缺失路径与多投时被忽略的目录**不会**进这里。
+   */
+  notifyUnsupportedFiles: (paths: string[]) => void;
 }
 
 export interface UseDragDrop {
@@ -64,6 +71,10 @@ export function useDragDrop(options: UseDragDropOptions): UseDragDrop {
     // 图片在当前窗口插入编辑器（不打开标签、不设工作区）；无编辑器时实现方自行忽略
     if (plan.images.length > 0) {
       await options.insertImages(plan.images, position);
+    }
+    // 打不开的文件：不静默丢弃，交给实现方提示（issue #317）
+    if (plan.unsupportedFiles.length > 0) {
+      options.notifyUnsupportedFiles(plan.unsupportedFiles);
     }
     return plan;
   }

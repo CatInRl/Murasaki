@@ -164,9 +164,9 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     expect(labels).not.toContain("新建文件夹");
   });
 
-  it("应用打不开的文件（.pdf）只提供「用系统默认程序打开」（#307）", async () => {
+  it("应用打不开的文件（.pdf）：右键给兜底项、点击给说明 + 兜底动作（#307）", async () => {
     // 这类文件此前右键只有通用项、**没有类型专属的「打开」**，点击也毫无反应，
-    // 是本次补的兜底出口。真去拉起系统程序无法在 CI 断言，故只断言菜单项出现。
+    // 是本次补的兜底出口。真去拉起系统程序无法在 CI 断言，故只断言菜单项 / 提示出现。
     writeFileSync(resolve(wsPath, "manual.pdf"), "%PDF-1.4\n% 仅用于菜单断言的假文件\n");
     // 等文件监听把新文件刷进树，再等树安静（复用本文件既有的 helper：它会等节点渲染 +
     // loading 归位 + 一段安静期，避免新节点带来的滚动把菜单收起）
@@ -184,6 +184,23 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     expect(labels).toContain("用系统默认程序打开");
     // 应用打不开它，就不该给应用内的「打开」
     expect(labels).not.toContain("打开");
+
+    // 点击同一文件：此前是静默无反应，现在给一次说明 + 同一兜底动作。
+    // （清一次吐司，避免上一条用例的提示混进断言；文案 key 曾漏写 `common.` 前缀
+    // 而原样显示 key 本身，已由 i18nKeyGuard 守卫修掉）
+    await browser.keys(["Escape"]);
+    await waitForAbsent(browser, ".murasaki-context-menu", 5000);
+    await browser.execute(() => {
+      // @ts-ignore
+      const toast = window.__pinia__._s.get("toast");
+      if (toast) toast.dismissAll();
+    });
+    await clickTreeNode(browser, "manual.pdf");
+    expect(await readText(browser, ".toast-info .toast-title")).toBe(
+      "此文件无法在 Murasaki 中打开"
+    );
+    await waitForPresent(browser, ".toast-info .toast-action-btn", 5000);
+    expect(await readText(browser, ".toast-info .toast-action-btn")).toBe("用系统默认程序打开");
   });
 
   it("无后缀大文件：点开前先确认，取消则不打开、确认后打开（#308）", async () => {

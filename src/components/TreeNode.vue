@@ -128,7 +128,7 @@ function onClick(): void {
     } else {
       // 应用打不开的文件（pdf / docx / zip / exe / 未知后缀…）：此前是**静默无反应**
       // （issue #307）。给一次说明 + 兜底动作，别让「点了没反应」成为用户的结论。
-      toast.info(t("toast.cannotOpenFile"), {
+      toast.info(t("common.toast.cannotOpenFile"), {
         description: basename(props.node.path),
         duration: 6000,
         action: {

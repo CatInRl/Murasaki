@@ -44,10 +44,11 @@ export interface FileActionsDeps {
     alert: (opts: { message: string; variant?: "info" | "warning" | "error"; title?: string }) => void;
     confirm: (opts: { message: string; danger?: boolean }) => Promise<boolean>;
   };
-  /** toast 反馈（PDF 导出成功/失败、打开失败兜底提示） */
+  /** toast 反馈（PDF 导出成功/失败、打开失败兜底提示、拖入打不开的文件提示） */
   toast: {
     success: (title: string) => void;
     error: (title: string, opts?: ToastOptions) => void;
+    info: (title: string, opts?: ToastOptions) => void;
   };
   /** 当前激活 tab（computed 或 getter） */
   activeTab: { value: Tab | null };
@@ -139,6 +140,31 @@ export function useFileActions(deps: FileActionsDeps) {
         });
       }
     }
+  }
+
+  /**
+   * 拖入窗口的文件里「应用打不开」的那些：不再静默丢弃，给一次提示（issue #317）。
+   *
+   * 恰好 1 个时附「用系统默认程序打开」动作（与上面打开失败的兜底同一出口）；
+   * ≥2 个时只报计数 —— 不提供「全部打开」，一个动作拉起 N 个外部程序太跳脱。
+   * 缺失路径与多投时被忽略的目录不会走到这里（见 `planDrop`）。
+   */
+  function notifyUnsupportedDropFiles(paths: string[]): void {
+    const [onlyPath] = paths;
+    const single = paths.length === 1 && onlyPath !== undefined;
+    toast.info(t("common.toast.unsupportedDropFiles", { count: paths.length }), {
+      duration: 6000,
+      ...(single
+        ? {
+            action: {
+              label: t("common.openWithDefaultApp"),
+              onClick: () => {
+                void openWithDefaultApp(onlyPath);
+              },
+            },
+          }
+        : {}),
+    });
   }
 
   async function openFileViaDialog(): Promise<void> {
@@ -319,6 +345,7 @@ export function useFileActions(deps: FileActionsDeps) {
     openFile,
     openFileViaDialog,
     openPathInNewWindow,
+    notifyUnsupportedDropFiles,
     saveCurrentFile,
     saveAsCurrentFile,
     reloadCurrentFile,

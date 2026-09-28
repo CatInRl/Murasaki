@@ -343,13 +343,25 @@ Rust 端使用 `lexical-sort` crate 或调用 Windows `StrCmpLogicalW` API。应
 
 目录默认折叠，点击展开。
 
+## 文档类文件 (Document File)
+
+指 **markdown 或 HTML** 文件（代码侧判定名 `fileKind.isDocumentFile`）。这个术语只回答「该文件能否挂预览面板与大纲」，**不**表示「预览长什么样」—— 两者的预览形态不同（见「沙箱预览」）。非文档类文件（`fileKind.isSourceOnlyFile`）一律以源码模式打开。
+
+## 沙箱预览 (Sandboxed Preview)
+
+HTML 文件的预览形态：源码放进隔离的 iframe 里当作网页执行（`HtmlPreview`）。与 markdown 的**渲染预览**（按 Markdown 语法渲染成文档，`PreviewPane`）是两种不同的东西 —— 因而不提供大纲，也不参与所见即所得。
+
 ## 非 markdown 文件处理 (Non-Markdown File Handling)
 
 文件树中点击非 markdown 文件时按扩展名分流：
 
-- **markdown 文件**（`.md`、`.markdown`）—— 在新标签页打开编辑。
-- **图片文件**（`.png`、`.jpg`、`.jpeg`、`.gif`、`.svg`、`.webp`）—— 应用内弹出轻量预览窗。
-- **其他类型** —— 暂不支持，提示"无法打开此文件类型"。
+- **markdown 文件**（`.md`、`.markdown`、`.mdown`、`.mkd`）—— 在新标签页打开编辑。
+- **HTML 文件**（`.html`、`.htm`）—— 在新标签页打开，左源码 + 右沙箱 iframe 预览（不提供大纲）。
+- **图片文件**（`.png`、`.jpg`、`.jpeg`、`.gif`、`.svg`、`.webp`、`.bmp`）—— 应用内弹出轻量预览窗。
+- **可编辑文本 / 代码文件**（`.txt` / `.json` / `.py` / `.rs` 等白名单，以及**无后缀**文件）—— 在新标签页以源码模式打开 + 语言高亮；无后缀文件一律允许试读，达到 1MB 的先确认一次。
+- **其他类型**（`.pdf`、`.zip`、`.exe` 等）—— Murasaki 内不打开，改**交给系统默认程序**：点击时提示并提供「用系统默认程序打开」，右键菜单亦有该项。
+
+完整的「类型 → 打开方式」矩阵与取舍理由见 [ADR-0020](docs/adr/0020-file-open-strategy-and-fallbacks.md)。
 
 ## 文件树右键菜单 (Tree Context Menu)
 

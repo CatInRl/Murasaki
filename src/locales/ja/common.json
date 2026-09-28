@@ -118,6 +118,7 @@
   "toast": {
     "regionAriaLabel": "通知",
     "closeAriaLabel": "通知を閉じる",
-    "cannotOpenFile": "このファイルは Murasaki では開けません"
+    "cannotOpenFile": "このファイルは Murasaki では開けません",
+    "unsupportedDropFiles": "開けないファイルを {count} 件無視しました"
   }
 }

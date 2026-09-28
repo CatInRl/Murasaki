@@ -80,6 +80,7 @@ function makeDeps(overrides: Partial<FileActionsDeps> = {}): FileActionsDeps {
     toast: {
       success: vi.fn(),
       error: vi.fn(),
+      info: vi.fn(),
     } as never,
     activeTab: { value: makeTab() },
     currentTheme: ref("github"),
@@ -230,6 +231,32 @@ describe("useFileActions - openFile（#308 无后缀文件）", () => {
       danger: true,
     });
     expect(deps.toast.error).not.toHaveBeenCalled();
+  });
+});
+
+describe("useFileActions - notifyUnsupportedDropFiles（#317 拖入打不开的文件）", () => {
+  it("恰好 1 个 → 提示计数并附「用系统默认程序打开」动作，点动作走同一兜底出口", () => {
+    const deps = makeDeps();
+    const { notifyUnsupportedDropFiles } = useFileActions(deps);
+    notifyUnsupportedDropFiles(["/ws/manual.pdf"]);
+
+    const [title, opts] = asMock(deps.toast.info).mock.calls[0];
+    expect(title).toBe("已忽略 1 个无法打开的文件");
+    expect(opts.action.label).toBe("用系统默认程序打开");
+
+    opts.action.onClick();
+    expect(deps.fileOps.openWithDefaultApp).toHaveBeenCalledWith("/ws/manual.pdf");
+  });
+
+  it("≥2 个 → 只报计数，不给动作（一个动作拉起 N 个外部程序太跳脱）", () => {
+    const deps = makeDeps();
+    const { notifyUnsupportedDropFiles } = useFileActions(deps);
+    notifyUnsupportedDropFiles(["/ws/a.zip", "/ws/b.exe"]);
+
+    const [title, opts] = asMock(deps.toast.info).mock.calls[0];
+    expect(title).toBe("已忽略 2 个无法打开的文件");
+    expect(opts.action).toBeUndefined();
+    expect(deps.fileOps.openWithDefaultApp).not.toHaveBeenCalled();
   });
 });
 

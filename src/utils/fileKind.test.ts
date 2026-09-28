@@ -7,8 +7,70 @@ import {
   isImageFile,
   isEditableTextFile,
   isLargeExtensionlessFile,
+  isMarkdownFile,
+  isHtmlFile,
+  isDocumentFile,
+  isSourceOnlyFile,
   EXTENSIONLESS_TEXT_MAX_SIZE,
 } from "./fileKind";
+
+describe("isMarkdownFile", () => {
+  it("识别 markdown 扩展名（md/markdown/mdown/mkd，大小写不敏感）", () => {
+    expect(isMarkdownFile("a.md")).toBe(true);
+    expect(isMarkdownFile("a.markdown")).toBe(true);
+    expect(isMarkdownFile("a.mdown")).toBe(true);
+    expect(isMarkdownFile("a.mkd")).toBe(true);
+    expect(isMarkdownFile("README.MD")).toBe(true);
+  });
+
+  it("接受路径，而不只是文件名", () => {
+    expect(isMarkdownFile("/ws/docs/readme.mkd")).toBe(true);
+    expect(isMarkdownFile("C:\\ws\\docs\\readme.md")).toBe(true);
+  });
+
+  it("非 markdown 返回 false（含 html 与其它文本）", () => {
+    expect(isMarkdownFile("a.html")).toBe(false);
+    expect(isMarkdownFile("a.txt")).toBe(false);
+    expect(isMarkdownFile("noext")).toBe(false);
+  });
+});
+
+describe("isHtmlFile", () => {
+  it("只认 html / htm（大小写不敏感，接受路径）", () => {
+    expect(isHtmlFile("a.html")).toBe(true);
+    expect(isHtmlFile("a.htm")).toBe(true);
+    expect(isHtmlFile("/ws/page.HTML")).toBe(true);
+  });
+
+  it("非 html 返回 false", () => {
+    expect(isHtmlFile("a.md")).toBe(false);
+    expect(isHtmlFile("a.vue")).toBe(false);
+    expect(isHtmlFile("a.xhtml")).toBe(false);
+    expect(isHtmlFile("noext")).toBe(false);
+  });
+});
+
+describe("isDocumentFile / isSourceOnlyFile", () => {
+  it("markdown 与 html 属文档类：可参与预览/大纲，不是源码-only", () => {
+    for (const name of ["a.md", "a.markdown", "a.html", "a.htm", "README.MD"]) {
+      expect(isDocumentFile(name)).toBe(true);
+      expect(isSourceOnlyFile(name)).toBe(false);
+    }
+  });
+
+  it("其它文本/代码/无后缀一律源码-only：强制源码模式，不挂预览卡", () => {
+    for (const name of ["a.txt", "a.json", "a.vue", "a.py", "Makefile", ".gitignore"]) {
+      expect(isDocumentFile(name)).toBe(false);
+      expect(isSourceOnlyFile(name)).toBe(true);
+    }
+  });
+
+  it("两者互斥（文档类 ⟺ 非源码-only）", () => {
+    for (const name of ["a.md", "a.html", "a.txt", "a.pdf", "noext"]) {
+      expect(isSourceOnlyFile(name)).toBe(!isDocumentFile(name));
+    }
+  });
+});
 
 describe("isImageFile", () => {
   it("识别常见图片扩展名", () => {
