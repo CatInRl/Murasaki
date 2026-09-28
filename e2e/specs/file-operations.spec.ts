@@ -25,7 +25,7 @@ import {
 } from "../helpers/store";
 import { existsSync, statSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { isRenderedElement, readText, textOfElement, waitForAbsent, waitForInBrowser, waitForPresent } from "../helpers/wait";
+import { readText, textOfElement, waitForAbsent, waitForInBrowser, waitForPresent, waitForRendered } from "../helpers/wait";
 import { waitForTreeSettled } from "../helpers/tree";
 
 let browser: Browser;
@@ -274,16 +274,13 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     const filePath = resolve(wsPath, "new-file.md");
     expect(existsSync(filePath)).toBe(true);
 
-    // 文件树应显示新文件
-    const newNode = await browser.$(
-      '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="new-file.md"]'
-    );
-    await waitForPresent(
+    // 文件树应显示新文件（XPath 选择器走 waitForRendered：它每轮重新取句柄，
+    // 不会踩「句柄取在等待之前」的坑，见 helpers/wait.ts 头部与 #320）
+    await waitForRendered(
       browser,
       '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="new-file.md"]',
       5000
     );
-    expect(await isRenderedElement(browser, newNode)).toBe(true);
   });
 
   it("新建文件夹：fileOps.createDirectory 后文件树刷新显示新目录", async () => {

@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { closeWorkspace, closeAllTabs, waitForPinia } from "../helpers/store";
-import { isRenderedElement, readText, waitForPresent, waitForRendered } from "../helpers/wait";
+import { readText, waitForPresent, waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 
@@ -137,22 +137,15 @@ describe("Murasaki 启动 smoke 测试", () => {
   it("欢迎页提供'打开文件夹'入口", async () => {
     // WelcomePage 用 .action-card > .action-label 结构渲染按钮
     // button=TEXT 选择器只匹配直接文本节点，不匹配嵌套 span，所以用 .action-label
-    const label = await browser.$(".action-label=打开文件夹");
-    await waitForPresent(browser, ".action-label=打开文件夹", 10000);
-    // 元素出现只保证它在 DOM 中，不等同于可见；轮询 isRendered，
-    // 避免读到欢迎页切换过程中的瞬时状态（isDisplayed 在本栈下会持久性误判）
-    await browser.waitUntil(async () => {
-      return await isRenderedElement(browser, label);
-    }, { timeout: 5000 });
-    expect(await isRenderedElement(browser, label)).toBe(true);
+    //
+    // 文本选择器只有 WebDriver 认，`isRendered`（走 document.querySelector）吃不下，
+    // 所以走 `waitForRendered` —— 它每轮重新取句柄，不像「先取句柄、再等待」那样拿到
+    // 一个 elementId 为 undefined 的旧句柄（#320）
+    await waitForRendered(browser, ".action-label=打开文件夹", 10000);
   });
 
   it("欢迎页提供'打开文件'和'新建文件'入口", async () => {
-    const openFile = await browser.$(".action-label=打开文件");
-    const newFile = await browser.$(".action-label=新建文件");
-    await waitForPresent(browser, ".action-label=打开文件", 10000);
-    await waitForPresent(browser, ".action-label=新建文件", 10000);
-    expect(await isRenderedElement(browser, openFile)).toBe(true);
-    expect(await isRenderedElement(browser, newFile)).toBe(true);
+    await waitForRendered(browser, ".action-label=打开文件", 10000);
+    await waitForRendered(browser, ".action-label=新建文件", 10000);
   });
 });
