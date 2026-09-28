@@ -17,7 +17,7 @@
  *   现在 `helpers/driver.ts` 的 `createSession` 会给 session options 补
  *   `waitforInterval` / `waitforTimeout` 默认值，所以只写 `{ timeout }` 也照常轮询；
  *   但**不要绕过 `createSession` 自建 session**，否则又退回单次判定。
- *   这里仍统一用手写轮询（`browser.execute` + `browser.pause`），不依赖这套默认值。
+ *   这里仍统一用手写轮询（`browser.$()` / `browser.execute` + `browser.pause`），不依赖这套默认值。
  * - **带动画的浮层（右键菜单等）用 `waitForPresent`，不要用 `waitForRendered`**：后者把
  *   `opacity: "0"` 判为「未渲染」，而淡入浮层（`opacity 0 → 1`）在过渡进行中就是这个值；
  *   CI runner 上窗口未重绘时 CSS 过渡甚至可能完全不推进，于是每次都判 false、直到超时
@@ -42,10 +42,11 @@
  *   或直接用按选择器的 `isRendered`。
  *
  * 因此这里不使用 WebDriver 的等待/可见性 API：几何与样式判定在浏览器上下文里用
- * `getBoundingClientRect()` + `getComputedStyle`（`renderedCheck`，由 `isRendered` 按
- * **选择器**、`isRenderedElement` 按**句柄**、`waitForRendered` 按选择器轮询共用）；
- * `waitForPresent` / `waitForAbsent` 则由我们**自己**按间隔调 `browser.$().isExisting()`
- * 轮询（用的是 WebDriver 元素 API，但轮询控制权在我们手里，不依赖它的等待命令是否重试）。
+ * `getBoundingClientRect()` + `getComputedStyle`（`renderedCheck`，`isRendered` 按
+ * **选择器**、`isRenderedElement` 按**句柄**调用它）；「等出现」与「等渲染」都由我们
+ * **自己**按间隔轮询 —— `waitForPresent` / `waitForAbsent` 调 `browser.$().isExisting()`，
+ * `waitForRendered` 每轮**重取句柄**后走 `isRenderedElement`（用的是 WebDriver 元素 API，
+ * 但轮询控制权在我们手里，不依赖它的等待命令是否重试）。
  */
 import type { Browser } from "webdriverio";
 
