@@ -576,6 +576,10 @@ function onWindowFocus(): void {
   const now = Date.now();
   if (now - lastFocusTreeRefreshAt < FOCUS_TREE_REFRESH_THROTTLE_MS) return;
   lastFocusTreeRefreshAt = now;
+  // 顺带把文件监听重新装一遍：watcher 可能已经哑掉（工作区目录在外部被删 / 重建，
+  // 见 #311），而「路径没变」不足以证明它还活着 —— 重新注册是前端唯一可靠的判据。
+  // 目录被换掉时不会触发任何 workspacePath 变化，只能借这里（或下次打开工作区）恢复。
+  void fileWatcher.start();
   void workspace.refreshTree();
 }
 

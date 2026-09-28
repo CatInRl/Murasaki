@@ -175,4 +175,63 @@ describe("useFileWatcher 事件编排", () => {
 
     expect(onTreeChange).not.toHaveBeenCalled();
   });
+
+  // ===== 工作区切换时的注册时机（issue #311）=====
+  // 背景：watcher 盯的是**注册那一刻的目录句柄**，目录被外部删除 / 重建后它就哑了。
+  // 旧实现用 `wsPath !== currentWatchedPath` 做幂等，于是「关掉工作区再打开同一个文件夹」
+  // 会被判成「路径没变」而跳过注册，此后文件树静默不再自动刷新。
+
+  it("关闭工作区再打开同一路径：仍会重新注册监听（#311）", async () => {
+    const { watcher } = makeWatcher();
+    await watcher.start();
+    expect(mockedInvoke).toHaveBeenCalledTimes(1);
+    expect(mockedInvoke).toHaveBeenCalledWith("start_watching", { path: "C:/ws" });
+
+    workspaceState.workspacePath = null;
+    await watcher.start();
+
+    workspaceState.workspacePath = "C:/ws";
+    await watcher.start();
+
+    // 关键：不能因为「路径与上次相同」跳过 —— 必须先停后启拿一个盯新目录的新 watcher
+    expect(mockedInvoke).toHaveBeenCalledWith("stop_watching", { path: "C:/ws" });
+    expect(
+      mockedInvoke.mock.calls.filter(([cmd]) => cmd === "start_watching")
+    ).toHaveLength(2);
+    // 且顺序必须是「先停后启」（Rust 侧 start_watching 对同路径会幂等早返回）
+    expect(mockedInvoke.mock.calls.map(([cmd]) => cmd).slice(-2)).toEqual([
+      "stop_watching",
+      "start_watching",
+    ]);
+  });
+
+  it("关闭工作区时不摘掉监听（tab 还开着，仍需外部修改提醒）", async () => {
+    const { watcher } = makeWatcher();
+    await watcher.start();
+
+    mockedInvoke.mockClear();
+    workspaceState.workspacePath = null;
+    await watcher.start();
+
+    expect(mockedInvoke).not.toHaveBeenCalled();
+  });
+
+  it("停旧监听期间工作区又变了 → 本次放弃注册（不把 watcher 装到已作废的路径上）", async () => {
+    const { watcher } = makeWatcher();
+    await watcher.start(); // 已注册 C:/ws
+
+    mockedInvoke.mockClear();
+    mockedInvoke.mockImplementation(async (cmd: string) => {
+      // 模拟「停旧监听期间用户又切了工作区」
+      if (cmd === "stop_watching") workspaceState.workspacePath = "C:/ws2";
+    });
+
+    workspaceState.workspacePath = "C:/ws3";
+    await watcher.start();
+
+    // 只断言「本次没有注册」；由真实 watch 触发的「更晚那次 start() 会注册 C:/ws2」
+    // 在组件测试里跑不到（store 是 mock 的普通对象，watch 不会触发）
+    expect(mockedInvoke).toHaveBeenCalledWith("stop_watching", { path: "C:/ws" });
+    expect(mockedInvoke).not.toHaveBeenCalledWith("start_watching", expect.anything());
+  });
 });

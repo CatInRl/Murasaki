@@ -12,6 +12,9 @@ import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
 import { isRendered, readText, textOfElement, waitForInBrowser, waitForPresent } from "../helpers/wait";
+import { waitForTreeSettled } from "../helpers/tree";
+import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 let browser: Browser;
 
@@ -121,6 +124,32 @@ describe("工作区 + 文件树", () => {
     await browser.waitUntil(
       async () => !(await browser.$(".file-tree").isExisting()),
       { timeout: 5000 }
+    );
+  });
+
+  it("关闭工作区后重开同一目录：外部新建的文件仍会刷进文件树（#311）", async () => {
+    // watcher 盯的是**注册那一刻的目录句柄**，而 fixtures 每轮都「删目录再重建」；
+    // 若「重开同一路径」被判成「路径没变」而跳过注册，旧 watcher 就哑了 ——
+    // 此后所有结构变化都不再刷树（修复前本用例会挂在下面那步 8s 超时上）。
+    const wsPath = resetWorkspace(defaultFixtureFiles());
+    await openWorkspace(browser, wsPath);
+    await waitForTreeSettled(browser);
+
+    // 关掉再打开同一个文件夹
+    await closeWorkspace(browser);
+    await openWorkspace(browser, wsPath);
+    await waitForTreeSettled(browser);
+
+    // 外部新建文件 → 靠 file-changed 事件刷进树（等不到就说明监听已失效）
+    writeFileSync(resolve(wsPath, "watcher-probe.md"), "# probe\n");
+    await waitForInBrowser(
+      browser,
+      () =>
+        Array.from(document.querySelectorAll(".file-tree .node-name")).some(
+          (n) => n.textContent?.trim() === "watcher-probe.md"
+        ),
+      [],
+      { timeout: 8000, message: "文件树出现 watcher-probe.md（文件监听已失效？）" }
     );
   });
 
