@@ -23,6 +23,7 @@ import {
   getTabsState,
 } from "../helpers/store";
 import { waitForPresent, waitForRendered } from "../helpers/wait";
+import { waitForTreeSettled } from "../helpers/tree";
 
 let browser: Browser;
 let wsPath: string;
@@ -82,6 +83,37 @@ async function focusFirstRow(b: Browser): Promise<void> {
   // 错误表象（菜单/焦点不对）离真因很远（#270）
   if (!focused) throw new Error("focusFirstRow: 未找到 .node-row（文件树节点未渲染）");
   await b.pause(200);
+}
+
+/**
+ * 在焦点行上按 Shift+F10 并等菜单出现，**有界重派发**。
+ *
+ * 为什么要重派发：`ContextMenuContainer` 在 window 上以 **capture 阶段**监听
+ * `scroll` / `resize` 关菜单，而 `focusFirstRow()` 把焦点行滚入视区、以及工作区刚打开时
+ * 紧跟其后的文件树刷新，都可能落在菜单弹出之后 —— 菜单刚出来就被收掉，表现为
+ * 「5s 内等不到 `.murasaki-context-menu`」（#310；同 AGENTS.md 里「右键菜单会被任意滚动
+ * 收起」那条 / #273，`file-operations.spec.ts` 的 `openTreeNodeContextMenu` 用同一手法）。
+ *
+ * 每轮顺序是「聚焦 → 等树安静 → 按键」：焦点引发的滚动落在按键之前，才不会把菜单收掉。
+ * 重派发的是**用户动作**，不是放宽断言 —— 仍要求菜单真的出现、菜单项数 > 0。
+ */
+async function pressShiftF10ForMenu(b: Browser): Promise<void> {
+  const attempts = 3;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    await focusFirstRow(b);
+    await waitForTreeSettled(b);
+    await pressTreeKey(b, "F10", { shift: true });
+    try {
+      await waitForPresent(b, ".murasaki-context-menu", 3000);
+      return;
+    } catch (err) {
+      // 失败信息带上「重派发了几次」，别只留一句等超时（AGENTS.md 的同款要求）
+      if (attempt === attempts) {
+        throw new Error(`Shift+F10 重派发 ${attempts} 次仍未弹出右键菜单：${String(err)}`);
+      }
+      await b.pause(300);
+    }
+  }
 }
 
 describe("文件树键盘导航", () => {
@@ -216,11 +248,9 @@ describe("文件树键盘导航", () => {
   });
 
   it("Shift+F10 在焦点行弹出右键菜单", async () => {
-    await focusFirstRow(browser);
-    await pressTreeKey(browser, "F10", { shift: true });
-
-    // 浮层只判「存在」不判几何/透明度（动画浮层用 waitForRendered 会误判，见 AGENTS.md）
-    await waitForPresent(browser, ".murasaki-context-menu", 5000);
+    // 聚焦 → 等树安静 → 按键（含开菜单前的安静期，否则滚动会把刚弹出的菜单收掉，#310）。
+    // 等菜单本身只判「存在」不判几何/透明度（动画浮层用 waitForRendered 会误判，见 AGENTS.md）
+    await pressShiftF10ForMenu(browser);
 
     // 菜单项应可键盘操作：↓ 移动高亮
     const items = await browser.$$(".murasaki-context-menu-item");
