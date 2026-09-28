@@ -33,11 +33,19 @@
  *   只判「存在」（`waitForPresent`）并读内容，不判几何与透明度，理由见上一条。
  * - `getText()` 会返回空串：实测 `.dialog-message` 的 `textContent` 是「第一个」时
  *   `getText()` 返回 `''`（`.murasaki-context-menu-shortcut` 首个元素同样如此）。
+ * - **元素句柄要「等到了再取」**：`browser.$()` 对不存在的元素**不抛错**，返回的句柄
+ *   `elementId` 是 undefined；拿它去 `browser.execute`（`isRenderedElement` / `textOfElement`）
+ *   才抛 `The element with selector "..." ... wasn't found`。所以「先取句柄 → `waitForPresent`
+ *   → 对那个旧句柄断言」是死路：等待那一步白做，首次查询早于渲染就必挂（#320，
+ *   `file-operations.spec.ts` 与 `smoke.spec.ts` 各中一处，都是 #284 收尾留下的）。
+ *   要判「已渲染」就每轮重新取句柄（`waitForRendered` 已按这个改法实现），
+ *   或直接用按选择器的 `isRendered`。
  *
- * 因此这里不使用 WebDriver 的等待/可见性 API：`isRendered` / `waitForRendered` 在浏览器
- * 上下文用 `getBoundingClientRect()` + `getComputedStyle` 判定「已渲染」；`waitForPresent`
- * / `waitForAbsent` 则由我们**自己**按间隔调 `browser.$().isExisting()` 轮询（用的是
- * WebDriver 元素 API，但轮询控制权在我们手里，不依赖它的等待命令是否重试）。
+ * 因此这里不使用 WebDriver 的等待/可见性 API：几何与样式判定在浏览器上下文里用
+ * `getBoundingClientRect()` + `getComputedStyle`（`renderedCheck`，由 `isRendered` 按
+ * **选择器**、`isRenderedElement` 按**句柄**、`waitForRendered` 按选择器轮询共用）；
+ * `waitForPresent` / `waitForAbsent` 则由我们**自己**按间隔调 `browser.$().isExisting()`
+ * 轮询（用的是 WebDriver 元素 API，但轮询控制权在我们手里，不依赖它的等待命令是否重试）。
  */
 import type { Browser } from "webdriverio";
 
@@ -92,6 +100,15 @@ export async function isRenderedElement(
  * 轮询等待元素「已渲染」，超时抛错（错误信息带选择器与超时时间）
  *
  * 轮询间隔 100ms；不使用元素等待命令（`waitForExist` 等在本栈下不重试，见文件头注释）。
+ *
+ * 每轮**重新取句柄**（`browser.$(selector)`）再判定，这一点有两个作用：
+ * - 吃下 WebDriver 才认的选择器 —— XPath（`//div[...]`）与文本选择器（`.cls=文本`）没法交给
+ *   页面里的 `document.querySelector`（`isRendered` 走的就是它）；
+ * - 避开「先取句柄、再等出现、然后对那个旧句柄断言」的死路（#320）：`browser.$()` 在元素
+ *   不存在时**不抛错**，只返回一个 `elementId` 为 undefined 的句柄，拿它去 `execute` 才抛
+ *   `wasn't found` —— 于是「等待」那一步白做，首次查询早于渲染就必挂。
+ *   故先 `isExisting()` 过一道（对不存在的句柄返回 false 而不抛），确认存在才交给
+ *   `isRenderedElement`。
  */
 export async function waitForRendered(
   browser: Browser,
@@ -100,7 +117,8 @@ export async function waitForRendered(
 ): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
-    if (await isRendered(browser, selector)) return;
+    const el = await browser.$(selector);
+    if ((await el.isExisting()) && (await isRenderedElement(browser, el))) return;
     await browser.pause(100);
   }
   throw new Error(
