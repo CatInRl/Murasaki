@@ -10,8 +10,9 @@
  *
  * 动作策略（见 `planDrop` 的 JSDoc）：不支持的类型 / 缺失路径 / 多投时被忽略的目录
  * 一律**不进 `files`、也不设 `workspace`**；其中「不支持类型的文件」另收进
- * `unsupportedFiles`，由调用方给出可见反馈（issue #317）—— 拖入路径此前是四个入口里
- * 唯一「什么都不发生」的（文件树点击 / 右键 / 打开失败都已有兜底出口，见 #307/#308）。
+ * `unsupportedFiles`、「被忽略的目录」另收进 `ignoredFolders`，由调用方给出可见反馈
+ * （issue #317 / #318）—— 拖入路径此前是四个入口里唯一「什么都不发生」的
+ * （文件树点击 / 右键 / 打开失败都已有兜底出口，见 #307/#308）。
  */
 import { isEditableTextFile, isImageFile } from "./fileKind";
 
@@ -35,19 +36,27 @@ export interface DropPlan {
    * 但**要**让调用方给出提示（issue #317）。不含缺失路径，也不含多投时被忽略的目录。
    */
   unsupportedFiles: string[];
+  /**
+   * 被忽略的目录 —— 多个目录、或目录与文件混投时，目录不进 `workspace` 也不打开，
+   * 但**要**让调用方给出提示（issue #318）。不含缺失路径。
+   *
+   * 单个目录**被用作工作区**时不在其中（那是正常动作，不是被忽略）。
+   */
+  ignoredFolders: string[];
 }
 
 /**
  * 把拖放分类结果规划成打开动作。
  *
  * `workspace` 仅在「恰好一个目录且没有可打开文件」时给出：多个目录或目录与文件混投时，
- * 只打开文件，目录被忽略（避免一次拖放静默切换工作区或吞掉文件）。
+ * 只打开文件，目录被忽略（避免一次拖放静默切换工作区或吞掉文件）—— 一个窗口只能有一个
+ * 工作区（见 ADR-0018），所以这些目录只能被忽略，但会被记进 `ignoredFolders` 让调用方
+ * 提示一句（#318）。若要让多目录各开一个窗口，那是另一件事：会改掉上面这个取舍，需单议。
  *
  * 图片记为 `images`（不进 `files`、也不设 `workspace`）；不支持的类型 / 缺失路径 /
- * 多投时被忽略的目录：不产生任何打开动作。其中**不支持类型的文件**会记进
- * `unsupportedFiles` 供调用方提示（#317），缺失路径与目录则保持静默 ——
- * 前者是「不该发生」（OS 给的路径），后者是「一个窗口只能开一个工作区」的另一件事
- * （待办见 issue #318）。
+ * 多投时被忽略的目录：不产生任何打开动作。其中**不支持类型的文件**记进
+ * `unsupportedFiles`（#317）、**被忽略的目录**记进 `ignoredFolders`（#318）供调用方提示；
+ * 缺失路径保持静默 —— 那是「不该发生」（路径由 OS 给出，拖入到落下之间被删掉）。
  */
 export function planDrop(entries: DropEntry[]): DropPlan {
   const folders: string[] = [];
@@ -73,6 +82,8 @@ export function planDrop(entries: DropEntry[]): DropPlan {
   }
 
   const workspace = folders.length === 1 && files.length === 0 ? folders[0] : null;
+  // 没被用作工作区的目录都是「被忽略」的（多目录，或目录与文件混投）
+  const ignoredFolders = workspace ? [] : folders;
 
-  return { workspace, files, images, unsupportedFiles };
+  return { workspace, files, images, unsupportedFiles, ignoredFolders };
 }

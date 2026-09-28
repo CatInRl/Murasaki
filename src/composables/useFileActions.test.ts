@@ -260,6 +260,30 @@ describe("useFileActions - notifyUnsupportedFiles（#317 拖入打不开的文�
   });
 });
 
+describe("useFileActions - notifyIgnoredFolders（#318 拖入被忽略的目录）", () => {
+  it("多目录 → 报计数并说明「一个窗口只能打开一个工作区」，且**不给**动作", () => {
+    const deps = makeDeps();
+    const { notifyIgnoredFolders } = useFileActions(deps);
+    notifyIgnoredFolders(["/ws/a", "/ws/b"]);
+
+    const [title, opts] = asMock(deps.toast.info).mock.calls[0];
+    expect(title).toBe("已忽略 2 个文件夹（一个窗口只能打开一个工作区）");
+    expect(opts.action).toBeUndefined();
+    expect(deps.toast.success).not.toHaveBeenCalled();
+  });
+
+  it("单个目录（目录与文件混投里的那个）→ 同样只提示，不提供「打开它」动作", () => {
+    const deps = makeDeps();
+    const { notifyIgnoredFolders } = useFileActions(deps);
+    notifyIgnoredFolders(["/ws/docs"]);
+
+    const [title, opts] = asMock(deps.toast.info).mock.calls[0];
+    expect(title).toBe("已忽略 1 个文件夹（一个窗口只能打开一个工作区）");
+    expect(opts.action).toBeUndefined();
+    expect(deps.fileOps.openWithDefaultApp).not.toHaveBeenCalled();
+  });
+});
+
 describe("useFileActions - exportCurrentPdf", () => {
   it("无激活 tab → dialog.alert 警告，不调用 exportHtml/exportPdf", async () => {
     const deps = makeDeps({ activeTab: { value: null } });

@@ -166,6 +166,19 @@ export function useFileActions(deps: FileActionsDeps) {
     });
   }
 
+  /**
+   * 拖入窗口的条目里「被忽略的目录」：一个窗口只能有一个工作区，多目录 / 目录与文件混投时
+   * 目录只能被忽略，但不再一声不吭（issue #318）。
+   *
+   * 只提示、**不给动作** —— 多个目录时「打开哪一个」没有自然答案，给其中一个会误导；
+   * 真要一次开多个工作区是另一件事（会改掉「不静默切换工作区」的取舍，需单议）。
+   */
+  function notifyIgnoredFolders(paths: string[]): void {
+    toast.info(t("common.toast.ignoredDropFolders", { count: paths.length }), {
+      duration: 6000,
+    });
+  }
+
   async function openFileViaDialog(): Promise<void> {
     const selected = await openDialog({
       multiple: false,
@@ -345,6 +358,7 @@ export function useFileActions(deps: FileActionsDeps) {
     openFileViaDialog,
     openPathInNewWindow,
     notifyUnsupportedFiles,
+    notifyIgnoredFolders,
     saveCurrentFile,
     saveAsCurrentFile,
     reloadCurrentFile,

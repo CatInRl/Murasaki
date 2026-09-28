@@ -2,7 +2,8 @@
  * 拖拽打开 E2E（issue #92）
  *
  * 验证 Tauri 原生 drag-drop 事件驱动「拖入文件开标签 / 拖入目录在新窗口打开工作区 /
- * 缺失路径静默忽略」，拖拽经过窗口时的遮罩提示，以及拖入打不开的文件时的提示（#317）。
+ * 缺失路径静默忽略」，拖拽经过窗口时的遮罩提示，拖入打不开的文件时的提示（#317），
+ * 以及拖入被忽略的目录时的提示（#318）。
  *
  * 驱动方式（已实测，结论见下）：
  *   真实场景里由 WebView2 从 OS 拖放产生 `tauri://drag-enter|over|drop|leave` 事件，
@@ -344,11 +345,38 @@ describe("拖拽打开（原生 drag-drop）", () => {
     expect(await workspacePath()).toBeNull();
   });
 
-  it("目录与文件混投 → 当前窗口只多出文件标签，不新开窗口", async () => {
+  it("拖入多个目录 → 提示已忽略 N 个文件夹，不新开窗口也不设工作区（#318）", async () => {
+    const dirA = wsPath;
+    const dirB = join(wsPath, "sub");
+    const before = await browser.getWindowHandles();
+
+    await dropPaths(browser, [dirA, dirB]);
+
+    // 一个窗口只能有一个工作区：两个目录都只能被忽略，但不再一声不吭
+    expect(await readText(browser, ".toast-info .toast-title")).toBe(
+      "已忽略 2 个文件夹（一个窗口只能打开一个工作区）"
+    );
+    // 纯提示，不给动作 —— 多目录时「打开哪一个」没有自然答案
+    await browser.pause(800);
+    expect(await browser.$$(".toast-action-btn")).toHaveLength(0);
+
+    // 负向断言：留一段静默期，确认既没开标签、也没切工作区、也没新开窗口
+    await browser.pause(1200);
+    expect(await tabPaths()).toEqual([]);
+    expect(await workspacePath()).toBeNull();
+    expect((await browser.getWindowHandles()).length).toBe(before.length);
+  });
+
+  it("目录与文件混投 → 当前窗口只多出文件标签、不新开窗口，并提示目录被忽略（#318）", async () => {
     const md = join(wsPath, "intro.md");
     const before = await browser.getWindowHandles();
 
     await dropPaths(browser, [wsPath, md]);
+
+    // 先断言提示（读取即轮询），避免后面的等待把 6s 的吐司耗掉
+    expect(await readText(browser, ".toast-info .toast-title")).toBe(
+      "已忽略 1 个文件夹（一个窗口只能打开一个工作区）"
+    );
 
     await waitForInBrowser(
       browser,
