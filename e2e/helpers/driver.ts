@@ -19,7 +19,7 @@ import { execSync } from "node:child_process";
 import http from "node:http";
 import { createConnection } from "node:net";
 import { existsSync, rmSync } from "node:fs";
-import { clearPersistedTabs, waitForPinia } from "./store";
+import { clearPersistedTabs, waitForAppReady, waitForPinia } from "./store";
 
 const DEFAULT_BINARY = resolve(
   process.cwd(),
@@ -231,6 +231,9 @@ export async function createSession(
   //    会顶穿 beforeAll 的 60s hook 超时）。
   try {
     await waitForPinia(browser);
+    // __pinia__ 就绪 ≠ 应用恢复完毕：`onMounted` 里还有一串 await（恢复上次设置 / 工作区 / 标签）。
+    // 不等它，spec 的清场可能被这些恢复覆盖（#315）。两者放同一个 try：任一超时都走下面的收尾。
+    await waitForAppReady(browser);
   } catch (err) {
     // 就绪超时：调用方的 `browser = await createSession()` 还没赋值，spec 的
     // afterAll 会跳过 closeSession —— 这里自行收尾，否则残留的 murasaki 进程与
