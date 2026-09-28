@@ -21,10 +21,11 @@ import {
   dismissAllDialogs,
   resetPersistenceSettings,
   callStoreAction,
+  getTabsState,
 } from "../helpers/store";
 import { existsSync, statSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { isRenderedElement, textOfElement, waitForInBrowser, waitForPresent, waitForRendered } from "../helpers/wait";
+import { isRenderedElement, readText, textOfElement, waitForAbsent, waitForInBrowser, waitForPresent, waitForRendered } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -93,6 +94,47 @@ async function openTreeNodeContextMenu(b: Browser, nodeName: string): Promise<vo
   }
 }
 
+/**
+ * 点击文件树里指定名字的节点（合成 click，冒泡到节点行的 `@click`）。
+ *
+ * 节点没渲染出来时**显式失败**，而不是静默不点（否则错误表象会跑成「对话框没出现」）。
+ */
+async function clickTreeNode(b: Browser, nodeName: string): Promise<void> {
+  const clicked = await b.execute((name: string) => {
+    const nodes = document.querySelectorAll(".file-tree .tree-node .node-name");
+    const node = Array.from(nodes).find((n) => n.textContent?.trim() === name);
+    if (!node) return false;
+    const row = node.closest(".node-row");
+    if (!row) return false;
+    row.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    return true;
+  }, nodeName);
+  expect(clicked).toBe(true);
+}
+
+/** 等文件树里出现指定名字的节点（文件监听刷新是异步的） */
+async function waitForTreeNode(b: Browser, nodeName: string): Promise<void> {
+  try {
+    await waitForInBrowser(
+      b,
+      (name: string) =>
+        Array.from(document.querySelectorAll(".file-tree .node-name")).some(
+          (n) => n.textContent?.trim() === name
+        ),
+      [nodeName],
+      { timeout: 8000, message: `文件树出现 ${nodeName}` }
+    );
+  } catch (err) {
+    // 超时错误里带上「树里实际有什么」，否则只看到「没出现」无从判断是刷新没来还是名字不对
+    const names = await b.execute(() =>
+      Array.from(document.querySelectorAll(".file-tree .node-name")).map((n) =>
+        (n.textContent ?? "").trim()
+      )
+    );
+    throw new Error(`${String(err)}；树中现有节点：${JSON.stringify(names)}`);
+  }
+}
+
 describe("文件树右键菜单 + 文件操作安全", () => {
   beforeAll(async () => {
     browser = await createSession();
@@ -152,15 +194,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     writeFileSync(resolve(wsPath, "manual.pdf"), "%PDF-1.4\n% 仅用于菜单断言的假文件\n");
     // 等文件监听把新文件刷进树，再等树安静（复用本文件既有的 helper：它会等节点渲染 +
     // loading 归位 + 一段安静期，避免新节点带来的滚动把菜单收起）
-    await waitForInBrowser(
-      browser,
-      () =>
-        Array.from(document.querySelectorAll(".file-tree .node-name")).some(
-          (n) => n.textContent?.trim() === "manual.pdf"
-        ),
-      [],
-      { timeout: 8000, message: "文件树出现 manual.pdf" }
-    );
+    await waitForTreeNode(browser, "manual.pdf");
     await waitForTreeSettled(browser);
 
     await openTreeNodeContextMenu(browser, "manual.pdf");
@@ -174,6 +208,65 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     expect(labels).toContain("用系统默认程序打开");
     // 应用打不开它，就不该给应用内的「打开」
     expect(labels).not.toContain("打开");
+  });
+
+  it("无后缀大文件：点开前先确认，取消则不打开、确认后打开（#308）", async () => {
+    // 1.16MB 的无后缀文本：此前「无后缀 ≥1MB」被直接判定为打不开，点击毫无反应。
+    // 文件写进**夹具**再打开工作区，不走「中途写文件等监听刷树」—— 那条路在本 harness
+    // 里只在 session 的首个工作区有效（#311），会让用例带上顺序依赖。
+    const bigContent = Array.from({ length: 15000 }, (_, i) =>
+      `line ${i} `.padEnd(80, "x")
+    ).join("\n");
+    wsPath = resetWorkspace([
+      ...defaultFixtureFiles(),
+      { path: "build-log", content: bigContent },
+    ]);
+    await openWorkspace(browser, wsPath);
+    await waitForTreeSettled(browser);
+    await waitForTreeNode(browser, "build-log");
+
+    // 1) 先弹确认，而不是直接打开、也不是直接拒绝
+    await clickTreeNode(browser, "build-log");
+    await waitForPresent(browser, ".dialog-overlay", 5000);
+    // 文案按选择器轮询读（单次读会读太早/读到空串，见 AGENTS「e2e 的九个坑」）
+    const message = await readText(browser, ".dialog-message", /build-log/);
+    expect(message).toContain("MB");
+
+    // 2) 取消 → 不打开
+    const cancelBtn = await browser.$(".dialog-footer .dialog-btn:not(.primary)");
+    await cancelBtn.click();
+    await waitForAbsent(browser, ".dialog-overlay", 5000);
+    expect((await getTabsState(browser)).tabs.length).toBe(0);
+
+    // 3) 再点一次并确认 → 打开为 tab
+    await clickTreeNode(browser, "build-log");
+    await waitForPresent(browser, ".dialog-overlay", 5000);
+    const confirmBtn = await browser.$(".dialog-footer .dialog-btn.primary");
+    await confirmBtn.click();
+    await waitForInBrowser(
+      browser,
+      () => window.__pinia__._s.get("tabs").tabs.length > 0,
+      [],
+      { timeout: 10000, message: "确认后打开为标签" }
+    );
+  });
+
+  it("无后缀二进制文件（非 UTF-8）：打开失败给出「用系统默认程序打开」兜底（#308）", async () => {
+    // 0xff/0xfe 非法 UTF-8 → Rust read_text_file 直接报错，不再只有一句「打开文件失败」。
+    // 夹具写入器只写文本，所以这里写完显式刷树（`refreshTree` 正是监听里调用的那个动作；
+    // 本用例测的是打开失败的兜底，不是监听本身）。
+    writeFileSync(resolve(wsPath, "raw-bin"), Buffer.from([0x00, 0xff, 0xfe, 0x01, 0x02, 0x80, 0x81]));
+    await callStoreAction(browser, "workspace", "refreshTree");
+    await waitForTreeNode(browser, "raw-bin");
+    await waitForTreeSettled(browser);
+
+    await clickTreeNode(browser, "raw-bin");
+
+    await waitForPresent(browser, ".toast-item.toast-error", 8000);
+    expect(await readText(browser, ".toast-error .toast-action-btn", "用系统默认程序打开")).toBe(
+      "用系统默认程序打开"
+    );
+    expect((await getTabsState(browser)).tabs.length).toBe(0);
   });
 
   it("右键目录节点显示目录专属菜单项（新建文件/新建文件夹/粘贴）", async () => {

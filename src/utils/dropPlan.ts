@@ -55,7 +55,8 @@ export function planDrop(entries: DropEntry[]): DropPlan {
       continue;
     }
     // 只开「应用能打开的文件」（口径见 fileKind.isEditableTextFile）。
-    // 无后缀文件要拿到大小才能判定是否按文本处理，拖放这里给不出 → 按不支持忽略。
+    // 无后缀文件自 #308 起不再按大小拦截（拖放拿不到大小，此前一律被忽略），
+    // 一并交给打开路径按文本试探读。
     if (isEditableTextFile(entry.path)) files.push(entry.path);
   }
 

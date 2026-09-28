@@ -55,9 +55,9 @@ describe("planDrop", () => {
     expect(plan.workspace).toBeNull();
   });
 
-  it("无后缀文件 → 不当标签打开（判文本要文件大小，拖放给不出）", () => {
+  it("无后缀文件 → 当标签打开（#308：不再按大小拦截）", () => {
     const plan = planDrop([file("/ws/Makefile")]);
-    expect(plan.files).toEqual([]);
+    expect(plan.files).toEqual(["/ws/Makefile"]);
     expect(plan.images).toEqual([]);
     expect(plan.workspace).toBeNull();
   });

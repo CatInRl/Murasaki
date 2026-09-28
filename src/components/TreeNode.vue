@@ -31,6 +31,8 @@ import {
   isHtmlFile,
   isImageFile,
   isEditableTextFile,
+  isLargeExtensionlessFile,
+  EXTENSIONLESS_TEXT_MAX_SIZE,
 } from "../utils/fileKind";
 
 interface Props {
@@ -117,14 +119,12 @@ function onClick(): void {
   if (renaming.value || creating.value) return;
   fileTreeNav.setActive(props.node.path);
   if (props.node.type === "file") {
-    if (isMarkdownFile(props.node.name)) {
+    if (canOpenInApp(props.node.name)) {
+      // markdown / html / 文本代码 / 无后缀（#308 起不再按大小拦截）→ 按文本打开编辑
       emit("select-file", props.node.path);
     } else if (isImageFile(props.node.name)) {
       // 图片文件点击 → 弹预览窗
       emit("preview-image", props.node.path);
-    } else if (isEditableTextFile(props.node.name, props.node.size)) {
-      // 文本/代码文件（含 html、含 <1MB 无后缀）→ 按文本打开编辑
-      emit("select-file", props.node.path);
     } else {
       // 应用打不开的文件（pdf / docx / zip / exe / 未知后缀…）：此前是**静默无反应**
       // （issue #307）。给一次说明 + 兜底动作，别让「点了没反应」成为用户的结论。
@@ -142,12 +142,31 @@ function onClick(): void {
   }
 }
 
-/** 文本/代码文件类（排除 markdown 与 html，用于图标分类） */
+/**
+ * 该文件能否在应用内打开为标签（markdown / html / 白名单文本代码 / 无后缀）
+ *
+ * 点击与右键菜单的「打开」共用同一口径，避免两处判定漂移（#308 改口径时两边都要动）。
+ * 图片不在此列 —— 它走预览窗，见 `isImageFile`。
+ */
+function canOpenInApp(name: string): boolean {
+  return isMarkdownFile(name) || isEditableTextFile(name);
+}
+
+/**
+ * 文本/代码文件类（排除 markdown 与 html，用于图标分类）
+ *
+ * 与「能不能打开」的口径**故意不同**：无后缀文件即使能打开，只要不小（≥1MB）就仍按
+ * 通用文件图标显示（更可能是二进制产物）；大小未知时也不按文本显示 —— 即图标继续沿用
+ * #308 之前的判定，这是 issue #308 明确列为非目标的一条（图标不放宽）。
+ */
 function isTextFile(name: string): boolean {
   return (
     !isMarkdownFile(name) &&
     !isHtmlFile(name) &&
-    isEditableTextFile(name, props.node.size)
+    isEditableTextFile(name) &&
+    // 大小未知时按「大」处理：`isLargeExtensionlessFile` 对 ≥ 阈值返回 true，
+    // 用阈值本身当哨兵即可让「未知」落到「不判为文本」那一边
+    !isLargeExtensionlessFile(name, props.node.size ?? EXTENSIONLESS_TEXT_MAX_SIZE)
   );
 }
 
@@ -257,7 +276,7 @@ function buildMenuItems(): MenuItem[] {
 
   // 文件类型专属：打开 / 预览
   if (isFile) {
-    if (isMarkdownFile(props.node.name) || isEditableTextFile(props.node.name, props.node.size)) {
+    if (canOpenInApp(props.node.name)) {
       items.push({
         label: t("common.open"),
         icon: FileText,

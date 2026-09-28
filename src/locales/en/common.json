@@ -80,6 +80,7 @@
     "fileDeletedExternalDraftKept": "File has been deleted externally (draft kept): {path}",
     "fileNotFoundRemove": "File \"{name}\" does not exist or has been moved.\n\nRemove it from the \"Recent\" list?",
     "folderNotFoundRemove": "Folder \"{name}\" does not exist or has been moved.\n\nRemove it from the \"Recent\" list?",
+    "openLargeFileConfirm": "The file \"{name}\" is large ({size} MB). Opening it as text may be slow. Open it anyway?",
     "openFileFirst": "Open a file first"
   },
   "error": {

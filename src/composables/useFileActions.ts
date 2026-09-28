@@ -1,12 +1,17 @@
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { basename } from "../utils/path";
+import { basename, extname } from "../utils/path";
 import { exportHtml } from "./useHtmlExport";
 import { fileSystem } from "../services/fileSystem";
-import { EDITABLE_TEXT_EXTENSIONS, MARKDOWN_EXTENSIONS } from "../utils/fileKind";
+import {
+  EDITABLE_TEXT_EXTENSIONS,
+  MARKDOWN_EXTENSIONS,
+  isLargeExtensionlessFile,
+} from "../utils/fileKind";
 import { i18n } from "../i18n";
 import type { Ref } from "vue";
 import type { Tab } from "../types";
+import type { ToastOptions } from "../stores/useToastStore";
 
 /** useFileActions 依赖的 store/状态切片 */
 export interface FileActionsDeps {
@@ -28,6 +33,8 @@ export interface FileActionsDeps {
   /** 文件操作 store 切片（含文件树根目录内联新建状态） */
   fileOps: {
     beginRootCreate: (type: "file" | "directory") => void;
+    /** 用系统默认程序打开（打开失败时的兜底出口，issue #307/#308） */
+    openWithDefaultApp: (path: string) => Promise<void>;
   };
   persistence: {
     addRecent: (path: string, type: "file" | "folder") => Promise<void>;
@@ -37,10 +44,10 @@ export interface FileActionsDeps {
     alert: (opts: { message: string; variant?: "info" | "warning" | "error"; title?: string }) => void;
     confirm: (opts: { message: string; danger?: boolean }) => Promise<boolean>;
   };
-  /** toast 反馈（PDF 导出成功/失败提示） */
+  /** toast 反馈（PDF 导出成功/失败、打开失败兜底提示） */
   toast: {
     success: (title: string) => void;
-    error: (title: string) => void;
+    error: (title: string, opts?: ToastOptions) => void;
   };
   /** 当前激活 tab（computed 或 getter） */
   activeTab: { value: Tab | null };
@@ -58,6 +65,41 @@ export function useFileActions(deps: FileActionsDeps) {
   const t = i18n.global.t.bind(i18n.global);
 
   /**
+   * 无后缀大文件打开前先确认（issue #308）。
+   *
+   * 无后缀文件一律允许尝试打开，但达到 1MB 的先问一句 —— 几百 MB 的内容读进来
+   * 会把编辑器卡死。只有无后缀才问：有后缀的白名单文件（`.log` 等）本来就是
+   * 用户明确选择的文本类型，大文件的历史行为保持不变。
+   *
+   * @returns 是否继续打开（false = 用户取消）
+   */
+  async function confirmLargeExtensionlessOpen(path: string): Promise<boolean> {
+    // 有后缀直接放行：既跳过确认，也省掉一次 get_file_size 往返（绝大多数打开都走这里）
+    if (extname(path)) return true;
+    // 取不到大小（文件不存在等）时按 0 处理 → 不拦，交给后面的打开失败路径报错
+    const size = await fileSystem.getSize(path);
+    if (!isLargeExtensionlessFile(path, size)) return true;
+    return dialog.confirm({
+      message: t("common.dialog.openLargeFileConfirm", {
+        name: basename(path),
+        size: (size / 1024 / 1024).toFixed(1),
+      }),
+    });
+  }
+
+  /** 兜底出口：交给系统默认程序（失败时说明原因） */
+  async function openWithDefaultApp(path: string): Promise<void> {
+    try {
+      await fileOps.openWithDefaultApp(path);
+    } catch (err) {
+      dialog.alert({
+        message: t("common.error.openWithDefaultFailed", { error: err }),
+        variant: "error",
+      });
+    }
+  }
+
+  /**
    * 在当前窗口打开文件为 tab。
    *
    * 注意：**不**自动把文件所在目录设为工作区（多窗口改造，spec #194 决策 ①）。
@@ -66,6 +108,7 @@ export function useFileActions(deps: FileActionsDeps) {
    */
   async function openFile(path: string): Promise<void> {
     try {
+      if (!(await confirmLargeExtensionlessOpen(path))) return;
       await tabsStore.openFile(path);
       workspace.selectFile(path);
       await persistence.addRecent(path, "file");
@@ -82,7 +125,18 @@ export function useFileActions(deps: FileActionsDeps) {
           await persistence.removeRecent(path);
         }
       } else {
-        dialog.alert({ message: t("common.error.openFileFailed", { error: err }), variant: "error" });
+        // 文件在，但读不出来（无后缀二进制、非 UTF-8、权限…）：不再只弹一句
+        // 「打开文件失败」就结束，给一个真实出口 —— 交给系统默认程序（#308/#149 T1）。
+        toast.error(t("common.error.openFileFailed", { error: err }), {
+          description: basename(path),
+          duration: 8000,
+          action: {
+            label: t("common.openWithDefaultApp"),
+            onClick: () => {
+              void openWithDefaultApp(path);
+            },
+          },
+        });
       }
     }
   }
