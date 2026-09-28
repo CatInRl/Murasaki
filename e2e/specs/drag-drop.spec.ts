@@ -2,7 +2,7 @@
  * 拖拽打开 E2E（issue #92）
  *
  * 验证 Tauri 原生 drag-drop 事件驱动「拖入文件开标签 / 拖入目录在新窗口打开工作区 /
- * 缺失路径静默忽略」，以及拖拽经过窗口时的遮罩提示。
+ * 缺失路径静默忽略」，拖拽经过窗口时的遮罩提示，以及拖入打不开的文件时的提示（#317）。
  *
  * 驱动方式（已实测，结论见下）：
  *   真实场景里由 WebView2 从 OS 拖放产生 `tauri://drag-enter|over|drop|leave` 事件，
@@ -169,6 +169,13 @@ describe("拖拽打开（原生 drag-drop）", () => {
     }
     // 复位拖拽遮罩状态（前一用例可能停在 enter 态）
     await emitDragEvent(browser, "tauri://drag-leave", {}).catch(() => {});
+    // 清空吐司：拖入打不开的文件会弹提示，上一个用例的提示不该影响下一条的断言
+    await browser.execute(() => {
+      // @ts-ignore
+      const toast = window.__pinia__._s.get("toast");
+      if (toast) toast.dismissAll();
+    });
+    await browser.pause(100);
     wsPath = resetWorkspace(defaultFixtureFiles());
   });
 
@@ -236,12 +243,14 @@ describe("拖拽打开（原生 drag-drop）", () => {
     expect(await workspacePath()).toBeNull();
   }, 90000);
 
-  it("拖入不存在的路径 → 静默忽略，不打开标签也不设工作区", async () => {
+  it("拖入不存在的路径 → 静默忽略，不打开标签也不设工作区，且不弹提示", async () => {
     await dropPaths(browser, [join(wsPath, "no-such-file.md")]);
     // 负向断言：留一段静默期让异步处理落定（正常处理很快）
     await browser.pause(1500);
     expect(await tabPaths()).toEqual([]);
     expect(await workspacePath()).toBeNull();
+    // 缺失路径不属于「打不开的文件」，不该弹提示（口径见 planDrop，issue #317）
+    expect(await browser.$$(".toast-item")).toHaveLength(0);
     // 应用仍存活
     expect(await browser.execute(() => !!window.__pinia__)).toBe(true);
   });
@@ -276,12 +285,18 @@ describe("拖拽打开（原生 drag-drop）", () => {
     expect(await workspacePath()).toBeNull();
   });
 
-  it("混合拖入：只打开受支持的文件，不支持的类型忽略", async () => {
+  it("混合拖入：只打开受支持的文件，不支持的类型忽略并提示（#317）", async () => {
     const md = join(wsPath, "intro.md");
     const zip = join(wsPath, "archive.zip");
     writeFileSync(zip, Buffer.from([0x50, 0x4b, 0x03, 0x04]));
 
     await dropPaths(browser, [md, zip]);
+
+    // 被忽略的 zip 不再静默：提示计数，且恰好 1 个时附兜底动作。
+    // 先断言提示（读取即轮询），避免后面的等待把 6s 的吐司耗掉。
+    expect(await readText(browser, ".toast-info .toast-title")).toBe("已忽略 1 个无法打开的文件");
+    await waitForPresent(browser, ".toast-info .toast-action-btn", 5000);
+    expect(await readText(browser, ".toast-info .toast-action-btn")).toBe("用系统默认程序打开");
 
     await waitForInBrowser(
       browser,
@@ -297,6 +312,36 @@ describe("拖拽打开（原生 drag-drop）", () => {
     const opened = await tabPaths();
     expect(normalize(opened)).toEqual(normalize([md]));
     expect(normalize(opened)).not.toContain(normalize([zip])[0]);
+  });
+
+  it("拖入多个打不开的文件 → 只报计数，不给兜底动作（#317）", async () => {
+    const zip = join(wsPath, "a.zip");
+    const exe = join(wsPath, "b.exe");
+    writeFileSync(zip, Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+    writeFileSync(exe, Buffer.from([0x4d, 0x5a]));
+
+    await dropPaths(browser, [zip, exe]);
+
+    expect(await readText(browser, ".toast-info .toast-title")).toBe("已忽略 2 个无法打开的文件");
+    // 一次性拖入多个时不给动作：让一个动作拉起 N 个外部程序太跳脱
+    // 负向断言：留一段静默期，确认动作按钮始终没出现
+    await browser.pause(1000);
+    expect(await browser.$$(".toast-action-btn")).toHaveLength(0);
+    expect(await tabPaths()).toEqual([]);
+    expect(await workspacePath()).toBeNull();
+  });
+
+  it("拖入单个打不开的文件（.pdf）→ 提示并附兜底动作（#317）", async () => {
+    const pdf = join(wsPath, "manual.pdf");
+    writeFileSync(pdf, Buffer.from([0x25, 0x50, 0x44, 0x46]));
+
+    await dropPaths(browser, [pdf]);
+
+    expect(await readText(browser, ".toast-info .toast-title")).toBe("已忽略 1 个无法打开的文件");
+    await waitForPresent(browser, ".toast-info .toast-action-btn", 5000);
+    expect(await readText(browser, ".toast-info .toast-action-btn")).toBe("用系统默认程序打开");
+    expect(await tabPaths()).toEqual([]);
+    expect(await workspacePath()).toBeNull();
   });
 
   it("目录与文件混投 → 当前窗口只多出文件标签，不新开窗口", async () => {

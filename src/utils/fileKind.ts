@@ -6,6 +6,9 @@
  * 2. 是否 HTML 文件（html/htm）—— 源码可编辑 + 右侧沙箱 iframe 预览（不提供大纲）
  * 3. 是否可编辑文本/代码文件 —— 源码模式 + CodeMirror 语言高亮；
  *    无后缀名一律允许尝试打开（#308：大小不再是「能不能打开」的门槛）
+ *
+ * 本文件只负责**判定**；各类型「怎么打开」（含打不开时的兜底出口）见
+ * docs/adr/0020-file-open-strategy-and-fallbacks.md。
  */
 import { extname, basename } from "./path";
 
