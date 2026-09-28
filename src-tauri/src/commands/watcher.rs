@@ -25,7 +25,11 @@ pub struct WatcherState {
 }
 
 impl WatcherState {
-    /// 移除并销毁某窗口的监听器（窗口销毁 / 关闭工作区时调用）
+    /// 移除并销毁某窗口的监听器（窗口销毁时调用）。
+    ///
+    /// 注意：**关闭工作区不会走这里** —— 工作区关了但标签还开着，那些文件仍需要外部修改
+    /// 提醒，所以前端有意保留 watcher；等下一次打开工作区时，前端会先调本命令再重新注册
+    /// （务必先停后启：watcher 盯的是注册那一刻的目录句柄，目录被删/重建后它就哑了，#311）
     pub fn remove_window(&self, label: &str) {
         let mut map = self.watchers.lock().unwrap_or_else(|e| e.into_inner());
         map.remove(label);

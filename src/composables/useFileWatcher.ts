@@ -18,7 +18,9 @@ const TREE_REFRESH_DEBOUNCE_MS = 500;
  * - 收到 `file-changed` 事件后分两路处理：
  *   1. 已打开 tab 的外部内容修改 → `onExternalChange`（弹窗/重载）
  *   2. 工作区内的结构变化（新建/删除/重命名）→ 合并后 `onTreeChange`（刷新文件树）
- * - 工作区关闭/切换时停止监听
+ * - 打开 / 切换工作区时**重新注册**监听（一律先停后启，见 `start()` 的说明）
+ * - 关闭工作区时**保留**监听：工作区关了但 tab 还开着，那些文件仍需要外部修改提醒；
+ *   那个 watcher 可能已经随目录被删/重建而哑掉，由下次打开时的重新注册兜住（#311）
  *
  * 注意：spec 要求"应用获得焦点/tab 切换时检测外部修改"。
  * 这里通过 notify 实时推送 + 节流避免抖动。
@@ -69,7 +71,13 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcher {
   const tabsStore = useTabsStore();
 
   let unlistenFileChanged: UnlistenFn | null = null;
-  let currentWatchedPath: string | null = null;
+  /**
+   * Rust 侧当前已注册监听的路径；`null` = 没有已注册的监听。
+   *
+   * 关闭工作区后**保持原值**（那个 watcher 并没有被摘掉，见文件头说明），
+   * 所以它不总等于当前工作区 —— 判断「该不该重新注册」时不要拿它跟 `workspacePath` 比。
+   */
+  let registeredPath: string | null = null;
 
   /** 节流：避免短时间内对同一文件多次回调 */
   const pendingChanges = new Map<string, FileChangePayload>();
@@ -123,6 +131,13 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcher {
     }, EXTERNAL_CHANGE_THROTTLE_MS);
   }
 
+  /** 摘掉已注册的监听（没有则什么都不做） */
+  async function unregister(): Promise<void> {
+    if (!registeredPath) return;
+    await invoke("stop_watching", { path: registeredPath }).catch(() => {});
+    registeredPath = null;
+  }
+
   async function start(): Promise<void> {
     // 监听 file-changed 事件
     if (!unlistenFileChanged) {
@@ -139,25 +154,31 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcher {
 
     // 启动工作区监听
     const wsPath = workspace.workspacePath;
-    if (wsPath && wsPath !== currentWatchedPath) {
-      // 先停止旧监听
-      if (currentWatchedPath) {
-        await invoke("stop_watching", { path: currentWatchedPath }).catch(() => {});
-      }
-      try {
-        await invoke("start_watching", { path: wsPath });
-        currentWatchedPath = wsPath;
-      } catch (err) {
-        console.error("启动文件监听失败:", err);
-      }
+    // 工作区被关闭：**有意保留**已有监听 —— 工作区关了但 tab 还开着，那些文件仍需要
+    // 「被外部修改 / 删除」的提醒。代价是它可能盯上一个已被外部删掉的目录（哑掉），
+    // 这由下面「打开时无条件重新注册」兜住。
+    if (!wsPath) return;
+
+    // 打开 / 切换工作区：**无条件先停后启**。
+    // 不能拿「路径字符串没变」当作「watcher 还活着」：watcher 盯的是**注册那一刻的目录句柄**，
+    // 目录被外部删除 / 重建后它就再也收不到事件，而「关掉工作区再打开同一个文件夹」
+    // （或目录被 git clean / 重挂载整体换掉）正好会命中 —— 症状是文件树此后**静默**不再自动刷新
+    // （#311：e2e 里 `resetWorkspace` 每轮都删目录重建，于是只有 session 首个工作区能收到事件）。
+    await unregister();
+    // 停旧监听期间工作区可能又变了：那次变更会触发另一次 start()，本次不该再注册
+    // （否则会把 watcher 装到已经作废的路径上，并把 registeredPath 记成错的）
+    if (workspace.workspacePath !== wsPath) return;
+
+    try {
+      await invoke("start_watching", { path: wsPath });
+      registeredPath = wsPath;
+    } catch (err) {
+      console.error("启动文件监听失败:", err);
     }
   }
 
   async function stop(): Promise<void> {
-    if (currentWatchedPath) {
-      await invoke("stop_watching", { path: currentWatchedPath }).catch(() => {});
-      currentWatchedPath = null;
-    }
+    await unregister();
     if (unlistenFileChanged) {
       unlistenFileChanged();
       unlistenFileChanged = null;
