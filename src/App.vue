@@ -483,6 +483,13 @@ onMounted(async () => {
   fileOps.setConflictResolver(askConflict);
 
   initialized.value = true;
+  // E2E 就绪信号：走到这里说明「恢复上次设置 / 工作区 / 标签」（402 / 437 / 443 行）已全部落地。
+  // 测试侧必须等它置位再动手 —— 否则这些恢复可能晚于测试的清场落地，把刚重置的视图 / 标签
+  // 又覆盖回去（#315：表现为 `.file-tree` 永不出现、或欢迎页不在 DOM，CI 上约 10% 概率）。
+  // 判据放在 initialized 置位处（而不是下面那个「E2E test hooks」区块）：语义就是「初始化完成」，
+  // 与区块里那些与启动流程无关的测试辅助分开；两处之间没有 await，放哪对时序没有影响。
+  // @ts-ignore
+  window.__appReady__ = true;
 
   // 9. 打开本窗口的待打开路径（多窗口，spec #194）
   //    路径已在 1.5 处提前取走（take-and-clear，不能二次 take），此处只消费。

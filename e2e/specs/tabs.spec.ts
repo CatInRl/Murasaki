@@ -61,7 +61,39 @@ describe("多 Tab 管理", () => {
   /** 点击前清掉可能残留的模态遮罩（外部修改告警等），避免点击被 .dialog-overlay 拦截 */
   async function clearOverlays(): Promise<void> {
     await dismissAllDialogs(browser);
-    await waitForAbsent(browser, ".dialog-overlay", 3000).catch(() => {});
+    // 不吞错：遮罩还在就说明这一轮点下去必然被拦截，让上层去重试（#315）
+    await waitForAbsent(browser, ".dialog-overlay", 3000);
+  }
+
+  /**
+   * 点击元素：若被残留模态遮罩（`.dialog-overlay`）拦截，**清一次遮罩再重试**。
+   *
+   * 为什么不能只「点前清一次」：遮罩可能在本用例进行中（打开文件之后）才被异步弹出来，
+   * 正好落在「清」与「点」之间 —— CI 上实测的 `element click intercepted` 就是这条（#315）。
+   * 重试的是**用户动作**，断言不放宽；耗尽时把遮罩上的文案带进错误，便于定位是哪个弹窗。
+   */
+  async function clickWithOverlayGuard(selector: string): Promise<void> {
+    const attempts = 3;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        // 清遮罩也放进 try：它自己也会因遮罩清不掉而超时（此时同样该重试，而不是直接抛）
+        await clearOverlays();
+        await (await browser.$(selector)).click();
+        return;
+      } catch (err) {
+        if (attempt === attempts) {
+          const overlayText = await browser
+            .execute(
+              () => document.querySelector(".dialog-overlay")?.textContent?.trim() ?? "（无遮罩）"
+            )
+            .catch(() => "（读取遮罩失败）");
+          throw new Error(
+            `点击 ${selector} 连续被拦截 ${attempts} 次；遮罩内容：${overlayText}｜原始错误：${String(err)}`
+          );
+        }
+        await browser.pause(200);
+      }
+    }
   }
 
   it("点击 + 按钮新建未命名 Tab", async () => {
@@ -73,9 +105,7 @@ describe("多 Tab 管理", () => {
     const initial = await getTabsState(browser);
     const initialCount = initial.tabs.length;
 
-    const newBtn = await browser.$(".new-tab-btn");
-    await clearOverlays();
-    await newBtn.click();
+    await clickWithOverlayGuard(".new-tab-btn");
 
     // 等待 tab 出现
     await browser.waitUntil(
@@ -133,9 +163,7 @@ describe("多 Tab 管理", () => {
     );
 
     // 点击 intro.md tab
-    const introTab = await browser.$(".tab-title=intro.md");
-    await clearOverlays();
-    await introTab.click();
+    await clickWithOverlayGuard(".tab-title=intro.md");
 
     // activeTabId 应对应 intro.md 的 tab
     const state = await getTabsState(browser);
@@ -158,9 +186,7 @@ describe("多 Tab 管理", () => {
     const before = (await getTabsState(browser)).tabs.length;
 
     // 关闭 intro.md tab（第一个 .close-btn）
-    const closeBtn = await browser.$(".tab-bar-container .tab-item .close-btn");
-    await clearOverlays();
-    await closeBtn.click();
+    await clickWithOverlayGuard(".tab-bar-container .tab-item .close-btn");
 
     await browser.waitUntil(
       async () => (await getTabsState(browser)).tabs.length === before - 1,

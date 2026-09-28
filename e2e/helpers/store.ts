@@ -3,6 +3,7 @@
  * 依赖 main.ts 中暴露的 window.__pinia__
  */
 import type { Browser } from "webdriverio";
+import { waitForInBrowser } from "./wait";
 
 /**
  * 等待主窗口加载完成并暴露 __pinia__
@@ -63,6 +64,35 @@ export async function waitForPinia(
     ` title="${title}", readyState="${state}", handles=${handles.length}.` +
     ` 可能原因：上一次测试遗留 WebView2 窗口状态（如 settings 窗口）。`
   );
+}
+
+/**
+ * 等应用**初始化完成**（可以开始动手了）。
+ *
+ * 为什么需要：`App.vue` 的 `onMounted` 里「恢复上次设置 / 工作区 / 标签」是一串 `await`，
+ * 而各 spec 建好 session 后**立刻清场**。若清场早于这些恢复落地，恢复会把刚重置的视图 / 标签
+ * 又覆盖回去 —— 实测表现为 `.file-tree` 10s 不出现（global-search）、欢迎页不在 DOM（smoke），
+ * CI 上约 10% 概率、本地几乎不复现（纯时序，#315）。
+ *
+ * 判据是 `App.vue` 在 `initialized.value = true` 处挂的 `window.__appReady__` ——
+ * 它一定晚于上面那三处恢复。`createSession()` 已调用本函数，各 spec 不必自己等。
+ */
+export async function waitForAppReady(
+  browser: Browser,
+  timeout = 30000
+): Promise<void> {
+  try {
+    await waitForInBrowser(
+      browser,
+      () => !!(window as any).__appReady__,
+      [],
+      { timeout, interval: 200, message: "应用初始化完成（window.__appReady__）" }
+    );
+  } catch (err) {
+    throw new Error(
+      `${String(err)}。可能原因：应用启动恢复（设置 / 工作区 / 标签）卡住，或 onMounted 提前抛错。`
+    );
+  }
 }
 
 /**
@@ -295,6 +325,10 @@ export async function resetPersistenceSettings(browser: Browser): Promise<void> 
     Promise.resolve(persistence.updateSettings({
       editorMode: "split",
       sidebarView: "files",
+      // 侧栏折叠 / 显示隐藏文件也一并复位：目前没有 spec 依赖它们，但漏掉就等于
+      // 把「前序 spec 的遗留状态」留给后面的用例（#315）
+      sidebarCollapsed: false,
+      showHiddenFiles: false,
       showLineNumbers: true,
       softWrap: true,
     }))
@@ -302,14 +336,34 @@ export async function resetPersistenceSettings(browser: Browser): Promise<void> 
       .catch((err: unknown) => done(err ? String(err) : null));
   });
   // 同步 sidebarView ref（App.vue 的本地 ref 不会随 persistence.settings 自动同步，
-  // 前序 spec 切到 outline 后必须显式重置回 files，否则 .file-tree 不渲染）
+  // 前序 spec 切到 outline 后必须显式重置回 files，否则 .file-tree 不渲染）。
+  // 应用就绪（`createSession` 里的 `waitForAppReady`）保证钩子已经挂上；缺了就是时序出了问题 → 直接报错，
+  // 不要静默跳过（那会退化成本函数看似成功、后续却等不到 `.file-tree`）。
   await browser.execute(() => {
     // @ts-ignore
-    if (typeof (window as any).__setSidebarView__ === "function") {
-      (window as any).__setSidebarView__("files");
+    const setSidebarView = (window as any).__setSidebarView__;
+    if (typeof setSidebarView !== "function") {
+      throw new Error(
+        "__setSidebarView__ 未注册：应用似乎还没初始化完成（绕过了 createSession 的 waitForAppReady？）"
+      );
     }
+    setSidebarView("files");
   });
-  await browser.pause(300);
+  // 校验写入确实生效（原先固定 `pause(300)` 只是赌它够，CI 慢一点就把脏状态漏给用例，#315）。
+  // 注意这里校验的是 **settings 里的值**；UI 是否真的切回 files 由各 spec 自己等 `.file-tree` 兜住
+  // —— 重置时通常还没有工作区，侧栏不渲染，此处无法从 DOM 校验。
+  await waitForInBrowser(
+    browser,
+    () => {
+      // @ts-ignore
+      const p = window.__pinia__?._s?.get("persistence");
+      return p?.settings?.sidebarView === "files";
+    },
+    [],
+    { timeout: 5000, interval: 100, message: "sidebarView 已重置为 files" }
+  );
+  // 再留一拍让 Vue 把侧栏渲染到 files 视图（渲染是异步的）
+  await browser.pause(100);
 }
 
 /**
