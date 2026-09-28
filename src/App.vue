@@ -167,13 +167,13 @@ watch(currentFilePath, (path) => {
 const {
   openFile, openFileViaDialog, openPathInNewWindow, saveCurrentFile, saveAsCurrentFile,
   reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, onNewTab, onNewFile,
-  onOpenFolder, onOpenFile, onOpenRecent, notifyUnsupportedDropFiles,
+  onOpenFolder, onOpenFile, onOpenRecent, notifyUnsupportedFiles,
 } = useFileActions({ tabsStore, workspace, fileOps, persistence, dialog, toast: toastStore, activeTab, currentTheme });
 
 // ===== 拖放打开（原生 drag-drop，issue #92）=====
 // 单个目录 → 走「打开文件夹」同一路径（同目录已开则聚焦，否则新窗口）；文件 → 当前窗口逐个开标签。
 // 图片 → 当前窗口编辑器按插入方式插入（issue #288，见 onDropImages）。
-// 打不开的文件 → 一次提示 +（单个时）兜底出口（issue #317，见 notifyUnsupportedDropFiles）。
+// 打不开的文件 → 一次提示 +（单个时）兜底出口（issue #317，见 notifyUnsupportedFiles）。
 const {
   dragging: dropDragging,
   setup: setupDragDrop,
@@ -182,7 +182,7 @@ const {
   openFile,
   openFolder: openPathInNewWindow,
   insertImages: onDropImages,
-  notifyUnsupportedFiles: notifyUnsupportedDropFiles,
+  notifyUnsupportedFiles,
 });
 
 // ===== 复制为富文本 composable（issue #108，复用 exportHtml 管线，走剪贴板而非文件）=====

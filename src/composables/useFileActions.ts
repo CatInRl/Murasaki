@@ -101,6 +101,19 @@ export function useFileActions(deps: FileActionsDeps) {
   }
 
   /**
+   * 「用系统默认程序打开」的 toast 动作。两个兜底出口共用：打开文件失败（#308）、
+   * 拖入打不开的文件（#317）。
+   */
+  function openWithDefaultAction(path: string): NonNullable<ToastOptions["action"]> {
+    return {
+      label: t("common.openWithDefaultApp"),
+      onClick: () => {
+        void openWithDefaultApp(path);
+      },
+    };
+  }
+
+  /**
    * 在当前窗口打开文件为 tab。
    *
    * 注意：**不**自动把文件所在目录设为工作区（多窗口改造，spec #194 决策 ①）。
@@ -131,12 +144,7 @@ export function useFileActions(deps: FileActionsDeps) {
         toast.error(t("common.error.openFileFailed", { error: err }), {
           description: basename(path),
           duration: 8000,
-          action: {
-            label: t("common.openWithDefaultApp"),
-            onClick: () => {
-              void openWithDefaultApp(path);
-            },
-          },
+          action: openWithDefaultAction(path),
         });
       }
     }
@@ -149,21 +157,12 @@ export function useFileActions(deps: FileActionsDeps) {
    * ≥2 个时只报计数 —— 不提供「全部打开」，一个动作拉起 N 个外部程序太跳脱。
    * 缺失路径与多投时被忽略的目录不会走到这里（见 `planDrop`）。
    */
-  function notifyUnsupportedDropFiles(paths: string[]): void {
+  function notifyUnsupportedFiles(paths: string[]): void {
     const [onlyPath] = paths;
     const single = paths.length === 1 && onlyPath !== undefined;
     toast.info(t("common.toast.unsupportedDropFiles", { count: paths.length }), {
       duration: 6000,
-      ...(single
-        ? {
-            action: {
-              label: t("common.openWithDefaultApp"),
-              onClick: () => {
-                void openWithDefaultApp(onlyPath);
-              },
-            },
-          }
-        : {}),
+      ...(single ? { action: openWithDefaultAction(onlyPath) } : {}),
     });
   }
 
@@ -345,7 +344,7 @@ export function useFileActions(deps: FileActionsDeps) {
     openFile,
     openFileViaDialog,
     openPathInNewWindow,
-    notifyUnsupportedDropFiles,
+    notifyUnsupportedFiles,
     saveCurrentFile,
     saveAsCurrentFile,
     reloadCurrentFile,

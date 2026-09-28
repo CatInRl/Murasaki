@@ -56,6 +56,14 @@ describe("planDrop", () => {
     expect(plan.unsupportedFiles).toEqual(["/ws/archive.zip", "/ws/setup.exe"]);
   });
 
+  it("只拖入一个打不开的文件 → 不打开标签，unsupportedFiles 只有它（提示时才带兜底动作）", () => {
+    const plan = planDrop([file("/ws/manual.pdf")]);
+    expect(plan.workspace).toBeNull();
+    expect(plan.files).toEqual([]);
+    expect(plan.images).toEqual([]);
+    expect(plan.unsupportedFiles).toEqual(["/ws/manual.pdf"]);
+  });
+
   it("混投里只混进一个打不开的 → unsupportedFiles 只有它（此时提示才带兜底动作）", () => {
     const plan = planDrop([file("/ws/a.md"), file("/ws/pic.png"), file("/ws/manual.pdf")]);
     expect(plan.files).toEqual(["/ws/a.md"]);
