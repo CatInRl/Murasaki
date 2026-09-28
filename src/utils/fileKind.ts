@@ -5,11 +5,11 @@
  * 1. 是否 Markdown 文件（md/markdown/mdown/mkd）—— 走完整预览/所见即所得/大纲
  * 2. 是否 HTML 文件（html/htm）—— 源码可编辑 + 右侧沙箱 iframe 预览（不提供大纲）
  * 3. 是否可编辑文本/代码文件 —— 源码模式 + CodeMirror 语言高亮；
- *    无后缀名 && 大小 < 阈值（默认 1MB）按文本文档处理
+ *    无后缀名一律允许尝试打开（#308：大小不再是「能不能打开」的门槛）
  */
 import { extname, basename } from "./path";
 
-/** 无后缀文件按文本处理的字节阈值（默认 1MB） */
+/** 无后缀文件达到该大小时打开前先确认（默认 1MB）；不再是「能不能打开」的门槛 */
 export const EXTENSIONLESS_TEXT_MAX_SIZE = 1024 * 1024;
 
 /** Markdown 扩展名（不含点，小写） */
@@ -71,18 +71,32 @@ export function isImageFile(name: string): boolean {
 /**
  * 是否可按文本/代码打开的"可编辑文本文件"：
  * - 有后缀：在 TEXT_CODE_EXTS 白名单内（或本身就是 markdown）→ 可编辑
- * - 无后缀：大小 < 阈值（默认 1MB）→ 按文本文档处理
+ * - 无后缀：**一律允许尝试**（#308）
+ *
+ * 「无后缀 + 大小」曾经是**拦截**条件（≥1MB 直接判定打不开），结果是最大的那些
+ * 无后缀文件（构建日志、纯文本产物）反而永远点不开。而有没有更可靠的判据 ——
+ * 真正的失败点在后端读取（非 UTF-8 时 `read_text_file` 报错），所以改成
+ * 「先让试读发生，读不动再由打开失败路径兜底」（见 useFileActions.openFile）。
  *
  * @param name 文件名或路径
- * @param size 文件大小（字节）；未知时可传 undefined，无后缀文件将按"不可判定"返回 false
  */
-export function isEditableTextFile(name: string, size?: number): boolean {
+export function isEditableTextFile(name: string): boolean {
   const ext = extname(name);
-  if (ext) {
-    return TEXT_CODE_EXTS.has(ext);
-  }
-  // 无后缀：仅在大小明确且低于阈值时按文本处理
-  return typeof size === "number" && size >= 0 && size < EXTENSIONLESS_TEXT_MAX_SIZE;
+  return ext ? TEXT_CODE_EXTS.has(ext) : true;
+}
+
+/**
+ * 无后缀文件是否「大到需要先确认」（≥ EXTENSIONLESS_TEXT_MAX_SIZE）。
+ *
+ * 只用于两处（#308）：
+ * - 打开前确认：避免误点几百 MB 的文件把编辑器卡死
+ * - 文件树图标分级：大而无后缀更可能是二进制，仍走通用文件图标
+ *
+ * 语义上**不是**「能不能打开」——能打开，只是要先问一句。
+ */
+export function isLargeExtensionlessFile(name: string, size?: number): boolean {
+  if (extname(name)) return false;
+  return typeof size === "number" && size >= EXTENSIONLESS_TEXT_MAX_SIZE;
 }
 
 /**

@@ -80,6 +80,7 @@
     "fileDeletedExternalDraftKept": "文件已被外部删除（草稿已保留）：{path}",
     "fileNotFoundRemove": "文件 \"{name}\" 不存在或已被移动。\n\n是否从\"最近打开\"列表中移除？",
     "folderNotFoundRemove": "文件夹 \"{name}\" 不存在或已被移动。\n\n是否从\"最近打开\"列表中移除？",
+    "openLargeFileConfirm": "文件 \"{name}\" 体积较大（{size} MB），按文本打开可能较慢。仍要打开吗？",
     "openFileFirst": "请先打开一个文件"
   },
   "error": {

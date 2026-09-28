@@ -327,6 +327,20 @@ pub fn path_type(path: String) -> Result<String, String> {
     }
 }
 
+/// 获取文件大小（字节）
+///
+/// 前端用它决定「无后缀文件是否大到打开前先确认」（issue #308）—— 判断必须在
+/// 读取**之前**做，否则几百 MB 的文件已经把内容读进内存了。
+#[tauri::command]
+pub fn get_file_size(path: String) -> Result<u64, String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err(format!("文件不存在: {}", path));
+    }
+    let metadata = fs::metadata(p).map_err(|e| e.to_string())?;
+    Ok(metadata.len())
+}
+
 /// 在系统资源管理器中显示文件（Windows: explorer.exe /select,）
 #[tauri::command]
 pub fn reveal_in_explorer(path: String) -> Result<(), String> {
@@ -415,5 +429,31 @@ mod tests {
         };
         let err = open_with_default_app(missing.to_string()).unwrap_err();
         assert!(err.contains("路径不存在"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn get_file_size_returns_bytes() {
+        let dir = std::env::temp_dir().join("murasaki-308-get-file-size");
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("Makefile");
+        let content = "all:\n\techo hi\n";
+        fs::write(&file, content).unwrap();
+
+        let size = get_file_size(file.to_string_lossy().to_string()).unwrap();
+        assert_eq!(size, content.len() as u64);
+
+        let _ = fs::remove_file(&file);
+        let _ = fs::remove_dir(&dir);
+    }
+
+    #[test]
+    fn get_file_size_rejects_missing_path() {
+        let missing = if cfg!(windows) {
+            "Z:\\definitely\\not\\here\\murasaki-308"
+        } else {
+            "/definitely/not/here/murasaki-308"
+        };
+        let err = get_file_size(missing.to_string()).unwrap_err();
+        assert!(err.contains("文件不存在"), "unexpected error: {err}");
     }
 }

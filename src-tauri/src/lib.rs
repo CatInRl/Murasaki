@@ -447,6 +447,7 @@ pub fn run() {
             files::write_text_file,
             files::path_exists,
             files::path_type,
+            files::get_file_size,
             files::reveal_in_explorer,
             files::open_with_default_app,
             launch::take_pending_open_path,

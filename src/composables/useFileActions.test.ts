@@ -13,6 +13,7 @@ vi.mock("../services/fileSystem", () => ({
   fileSystem: {
     writeText: vi.fn(),
     exists: vi.fn().mockResolvedValue(false),
+    getSize: vi.fn().mockResolvedValue(0),
     exportPdf: vi.fn(),
   },
 }));
@@ -29,6 +30,8 @@ import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialo
 
 const mockedExportHtml = exportHtml as unknown as ReturnType<typeof vi.fn>;
 const mockedExportPdf = fileSystem.exportPdf as unknown as ReturnType<typeof vi.fn>;
+const mockedGetSize = fileSystem.getSize as unknown as ReturnType<typeof vi.fn>;
+const mockedExists = fileSystem.exists as unknown as ReturnType<typeof vi.fn>;
 const mockedOpenDialog = openDialog as unknown as ReturnType<typeof vi.fn>;
 const mockedSaveDialog = saveDialog as unknown as ReturnType<typeof vi.fn>;
 
@@ -62,6 +65,10 @@ function makeDeps(overrides: Partial<FileActionsDeps> = {}): FileActionsDeps {
       openFolderDialog: vi.fn(),
       hasWorkspace: true,
     } as never,
+    fileOps: {
+      beginRootCreate: vi.fn(),
+      openWithDefaultApp: vi.fn().mockResolvedValue(undefined),
+    } as never,
     persistence: {
       addRecent: vi.fn().mockResolvedValue(undefined),
       removeRecent: vi.fn().mockResolvedValue(undefined),
@@ -85,6 +92,8 @@ beforeEach(() => {
   mockedExportPdf.mockReset();
   mockedOpenDialog.mockReset();
   mockedSaveDialog.mockReset();
+  mockedGetSize.mockReset().mockResolvedValue(0);
+  mockedExists.mockReset().mockResolvedValue(false);
 });
 
 describe("useFileActions - openFileViaDialog", () => {
@@ -118,6 +127,109 @@ describe("useFileActions - openFileViaDialog", () => {
 
     expect(deps.tabsStore.openFile).toHaveBeenCalledWith("/test/page.html");
     expect(deps.persistence.addRecent).toHaveBeenCalledWith("/test/page.html", "file");
+  });
+});
+
+/** 取 mock 化后的依赖句柄（deps 是结构化类型，断言需要 vi.fn 的具体形态） */
+function asMock<T>(fn: T): ReturnType<typeof vi.fn> {
+  return fn as unknown as ReturnType<typeof vi.fn>;
+}
+
+describe("useFileActions - openFile（#308 无后缀文件）", () => {
+  it("无后缀小文件 → 不确认，直接打开", async () => {
+    mockedGetSize.mockResolvedValue(1024);
+    const deps = makeDeps();
+    const { openFile } = useFileActions(deps);
+    await openFile("/ws/Makefile");
+
+    expect(deps.dialog.confirm).not.toHaveBeenCalled();
+    expect(deps.tabsStore.openFile).toHaveBeenCalledWith("/ws/Makefile");
+    expect(deps.persistence.addRecent).toHaveBeenCalledWith("/ws/Makefile", "file");
+  });
+
+  it("无后缀大文件 → 先确认，确认后打开", async () => {
+    mockedGetSize.mockResolvedValue(2 * 1024 * 1024);
+    const deps = makeDeps();
+    asMock(deps.dialog.confirm).mockResolvedValue(true);
+    const { openFile } = useFileActions(deps);
+    await openFile("/ws/build-log");
+
+    expect(deps.dialog.confirm).toHaveBeenCalledWith({
+      message: expect.stringContaining("2.0 MB"),
+    });
+    expect(deps.tabsStore.openFile).toHaveBeenCalledWith("/ws/build-log");
+  });
+
+  it("无后缀大文件 → 用户取消则不打开、不记最近", async () => {
+    mockedGetSize.mockResolvedValue(2 * 1024 * 1024);
+    const deps = makeDeps(); // dialog.confirm 默认返回 false
+    const { openFile } = useFileActions(deps);
+    await openFile("/ws/build-log");
+
+    expect(deps.dialog.confirm).toHaveBeenCalled();
+    expect(deps.tabsStore.openFile).not.toHaveBeenCalled();
+    expect(deps.persistence.addRecent).not.toHaveBeenCalled();
+  });
+
+  it("有后缀文件 → 不查大小也不确认（.log 等大文件行为不变）", async () => {
+    const deps = makeDeps();
+    const { openFile } = useFileActions(deps);
+    await openFile("/ws/huge.log");
+
+    expect(mockedGetSize).not.toHaveBeenCalled();
+    expect(deps.dialog.confirm).not.toHaveBeenCalled();
+    expect(deps.tabsStore.openFile).toHaveBeenCalledWith("/ws/huge.log");
+  });
+
+  it("文件在但读不出来 → toast.error 带「用系统默认程序打开」兜底", async () => {
+    mockedGetSize.mockResolvedValue(1024);
+    mockedExists.mockResolvedValue(true);
+    const deps = makeDeps();
+    asMock(deps.tabsStore.openFile).mockRejectedValue(
+      new Error("stream did not contain valid UTF-8")
+    );
+    const fallback = asMock(deps.fileOps.openWithDefaultApp);
+    const { openFile } = useFileActions(deps);
+    await openFile("/ws/raw-binary");
+
+    expect(deps.dialog.alert).not.toHaveBeenCalled();
+    const [title, opts] = asMock(deps.toast.error).mock.calls[0];
+    expect(title).toContain("打开文件失败");
+    expect(opts.action.label).toBe("用系统默认程序打开");
+
+    opts.action.onClick();
+    expect(fallback).toHaveBeenCalledWith("/ws/raw-binary");
+  });
+
+  it("兜底本身也失败 → 弹对话框说明原因", async () => {
+    mockedGetSize.mockResolvedValue(1024);
+    mockedExists.mockResolvedValue(true);
+    const deps = makeDeps();
+    asMock(deps.tabsStore.openFile).mockRejectedValue(new Error("read fail"));
+    asMock(deps.fileOps.openWithDefaultApp).mockRejectedValue(new Error("no handler"));
+    const { openFile } = useFileActions(deps);
+    await openFile("/ws/raw-binary");
+
+    asMock(deps.toast.error).mock.calls[0][1].action.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(deps.dialog.alert).toHaveBeenCalledWith({
+      message: expect.stringContaining("无法用系统默认程序打开"),
+      variant: "error",
+    });
+  });
+
+  it("文件不存在 → 仍是「从最近打开中移除」确认（行为不变）", async () => {
+    const deps = makeDeps(); // fileSystem.exists 默认 false
+    asMock(deps.tabsStore.openFile).mockRejectedValue(new Error("文件不存在"));
+    const { openFile } = useFileActions(deps);
+    await openFile("/ws/gone.md");
+
+    expect(deps.dialog.confirm).toHaveBeenCalledWith({
+      message: expect.stringContaining("gone.md"),
+      danger: true,
+    });
+    expect(deps.toast.error).not.toHaveBeenCalled();
   });
 });
 

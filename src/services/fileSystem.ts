@@ -53,6 +53,11 @@ export const fileSystem = {
     return invoke<boolean>("path_exists", { path }).catch(() => false);
   },
 
+  /** 获取文件大小（字节），失败返回 0 */
+  async getSize(path: string): Promise<number> {
+    return invoke<number>("get_file_size", { path }).catch(() => 0);
+  },
+
   /** 获取路径类型（"file" | "directory" | "none"），失败返回 "none" */
   async pathType(path: string): Promise<string> {
     return invoke<string>("path_type", { path }).catch(() => "none");

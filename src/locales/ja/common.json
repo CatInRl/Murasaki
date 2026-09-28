@@ -80,6 +80,7 @@
     "fileDeletedExternalDraftKept": "ファイルが外部で削除されました（下書きを保持）：{path}",
     "fileNotFoundRemove": "ファイル「{name}」が見つからないか、移動されました。\n\n「最近開いたファイル」リストから削除しますか？",
     "folderNotFoundRemove": "フォルダー「{name}」が見つからないか、移動されました。\n\n「最近開いたフォルダー」リストから削除しますか？",
+    "openLargeFileConfirm": "ファイル「{name}」はサイズが大きいため（{size} MB）、テキストとして開くと時間がかかる場合があります。開きますか？",
     "openFileFirst": "先にファイルを開いてください"
   },
   "error": {
