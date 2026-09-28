@@ -119,6 +119,7 @@
     "regionAriaLabel": "Notifications",
     "closeAriaLabel": "Close notification",
     "cannotOpenFile": "This file cannot be opened in Murasaki",
-    "unsupportedDropFiles": "Ignored {count} file(s) that Murasaki cannot open"
+    "unsupportedDropFiles": "Ignored {count} file(s) that Murasaki cannot open",
+    "ignoredDropFolders": "Ignored {count} folder(s) (a window can only open one workspace)"
   }
 }

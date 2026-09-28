@@ -100,7 +100,7 @@
 
 - 判定：[src/utils/fileKind.ts](../../src/utils/fileKind.ts)（文件头指向本 ADR）
 - 兜底出口：`src-tauri/src/commands/files.rs`（`open_with_default_app`）、`src/services/fileSystem.ts`、[src/stores/useFileOpsStore.ts](../../src/stores/useFileOpsStore.ts)（#307）
-- 四个入口：[TreeNode.vue](../../src/components/TreeNode.vue)（点击 toast / 右键项）、[dropPlan.ts](../../src/utils/dropPlan.ts)（`unsupportedFiles`）+ [useDragDrop.ts](../../src/composables/useDragDrop.ts) + [useFileActions.ts](../../src/composables/useFileActions.ts)（`notifyUnsupportedDropFiles`，拖入反馈 #317）、`App.vue`（`effectiveEditorMode`、接线）
+- 四个入口：[TreeNode.vue](../../src/components/TreeNode.vue)（点击 toast / 右键项）、[dropPlan.ts](../../src/utils/dropPlan.ts)（`unsupportedFiles`）+ [useDragDrop.ts](../../src/composables/useDragDrop.ts) + [useFileActions.ts](../../src/composables/useFileActions.ts)（`notifyUnsupportedFiles`，拖入反馈 #317）、`App.vue`（`effectiveEditorMode`、接线）
 - 文档：本 ADR、[CONTEXT.md](../../CONTEXT.md)（「非 markdown 文件处理」一节 + 术语表）、`CHANGELOG.md`
 
 ### 测试
