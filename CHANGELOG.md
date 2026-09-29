@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-29
+
+本版本围绕「文件打开与拖放体验补全」与「配色单一来源」两条线：拖入窗口即可打开文件 / 文件夹，应用打不开的文件（pdf / zip / exe…）给出兜底出口与拖入提示，图片插入方式可配置，标签栏新增常驻「全部标签」面板；配色收敛为「色阶 → 语义 token」单一来源并让 Mermaid / PlantUML / KaTeX 与 HTML 导出跟随主色，新增 i18n key 与设计 token 两道静态守卫；同时彻底移除自 0.5.0 起就已关闭的 AI Agent 功能，并修掉一批静默失效（重开工作区不再刷树、无后缀大文件点不开、路径写法不同重复开 tab、Windows 上拖入图片失效、导出 HTML 丢图）。
+
 ### Added
 
 - **打不开的文件有了兜底出口（#307）**：pdf / docx / zip / exe / 未知后缀这类文件此前在文件树里**点击无反应**、右键只有通用项（重命名/剪切/复制/删除…）而**没有「打开」**（拖入窗口也只是静默忽略），现在右键给「用系统默认程序打开」，点击则弹一次说明（附同一个动作），不再让人以为「点了没坏也没用」。实现走新增的 Rust 命令 `open_with_default_app`（Windows 用 `explorer.exe`、macOS `open`、Linux `xdg-open`；与既有的「在资源管理器中显示」同形，不经 shell），**不走 `plugin-shell`**：能力集里的 `shell:default` 只放行 URL，打开本地路径需要把 `allow-open` 的 scope 放宽到 `**`，为兜底入口扩大攻击面不划算。
@@ -401,7 +405,8 @@ Murasaki 首个正式版本：基于 Tauri 2.x + Vue 3 的本地 Markdown 文件
 - 系统设置（编辑分类含行号 / 软折行开关、AI Provider 配置）。
 - 全屏 F11 自动隐藏状态栏；Ctrl+Shift+E 文件树 / Ctrl+Shift+M 大纲侧栏切换。
 
-[Unreleased]: https://github.com/CatInRl/Murasaki/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/CatInRl/Murasaki/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/CatInRl/Murasaki/compare/v0.9.0...v0.10.0
 [0.8.0]: https://github.com/CatInRl/Murasaki/compare/v0.7.1...v0.8.0
 [0.3.0]: https://github.com/CatInRl/Murasaki/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/CatInRl/Murasaki/compare/v0.1.0...v0.2.0

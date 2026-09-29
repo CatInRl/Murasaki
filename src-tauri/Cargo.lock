@@ -2265,7 +2265,7 @@ dependencies = [
 
 [[package]]
 name = "murasaki"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "dirs 5.0.1",
  "lexical-sort",
