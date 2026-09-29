@@ -195,9 +195,23 @@ milestone 可以并存（例如 `0.9.5` 与 `1.0.0` 各挂各的 issue），但*
 
 完整 changelog 详见 [CHANGELOG.md](CHANGELOG.md)。版本发布时必须同步更新该文件。
 
-### 当前版本：0.9.0（2026-09-25）
+### 当前版本：0.10.0（2026-09-29）
 
-**易用性提升 + 多窗口改造**：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存与显示模式下拉，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘，文件树与右键菜单键盘可达、外部结构变更自动刷新；并把应用从「单窗口 + 单工作区」改造为**多窗口 = 多工作区**——外部入口（双击文件关联 / 命令行传文件 / 拖到任务栏）一律**新开窗口且不恢复上次工作区与标签**；「打开文件夹」总是新开窗口（同一文件夹已在某窗口打开则聚焦那个窗口）；每个窗口各自静默落盘、**关掉最后一个窗口才退出应用**；并去掉「打开单个文件自动把所在目录设为工作区」的隐式副作用；同时修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。
+**文件打开与拖放体验补全 + 配色单一来源**：拖入窗口即可打开文件 / 文件夹，应用打不开的文件（pdf / zip / exe…）给出兜底出口与拖入提示，图片插入方式可配置，标签栏新增常驻「全部标签」面板；配色收敛为「色阶 → 语义 token」单一来源并让 Mermaid / PlantUML / KaTeX 与 HTML 导出跟随主色，新增 i18n key 与设计 token 两道静态守卫；同时彻底移除自 0.5.0 起就已关闭的 AI Agent 功能，并修掉一批静默失效。
+
+- 打不开的文件有兜底出口（#307/#317/#318）：新增 Rust 命令 `open_with_default_app`（Windows `explorer.exe` / macOS `open` / Linux `xdg-open`，不经 shell）；文件树右键给「用系统默认程序打开」、点击弹说明、拖入时恰好 1 个附同一动作（≥2 个只报计数）；拖入多目录 / 目录与文件混投时提示「已忽略 N 个文件夹（一个窗口只能打开一个工作区）」。取舍与完整打开矩阵写入 [ADR-0020](docs/adr/0020-file-open-strategy-and-fallbacks.md)
+- 拖拽打开文件 / 文件夹（#92）：走 Tauri 原生 drag-drop（`onDragDropEvent`）而非 HTML5 拖放（原生事件会拦截系统文件拖放）；恰好一个目录 → 新窗口打开（同目录已在某窗口打开则聚焦），文件逐个在当前窗口开为标签，拖拽经过窗口显示「松开以打开」遮罩
+- 图片插入方式可配置（#151）：设置 → 常规新增「图片插入方式」（本地文件 / Base64 内嵌），`Alt` 临时取反，无工作区或落盘失败自动回退内嵌；拖入外部图片插在落点处，文件树内拖入仍是相对路径引用。顺带修「默认图片目录」此前未生效（一直固定写 `<工作区>/assets/`），现按设置落盘并限制为工作区内相对路径
+- 全部标签面板（#168）：标签栏右端（「+」左侧）常驻「全部标签」入口 + 计数徽标，弹出可搜索纵向列表（标题 / 所在目录 / 未保存圆点 / 工作区外角标），`↓` / `↑` / `Enter` / `Esc` 键盘可达；命令 `open-all-tabs` 已登记但默认不绑定
+- 移除 AI Agent（#264）：自 0.5.0 起由 `AGENT_ENABLED = false` 整体关闭、无任何入口的功能彻底删除（前端引擎 / 右侧面板 / AI 设置分类 / Rust 侧 agent 工具与 provider），运行期依赖 `openai` 与 Rust `reqwest` / `flate2` / `base64` 一并移除；磁盘上既有 secrets / 聊天记录不迁移、不删除
+- 配色与设计 token 收敛（#152/#293~#296）：语义 token 改为引用紫色阶 / 中性阶（同一颜色只写一遍）；新增 `--murasaki-primary-soft` / `-soft-hover` / `-ring-soft` 由主色 `color-mix` 派生；Mermaid `themeVariables` 运行时从 token 派生（新增 `src/utils/mermaidTheme.ts`，分栏预览与 WYSIWYG 共用同一初始化入口），PlantUML / KaTeX 与导出 HTML 一并跟随主色；清理 `src/**` 全部指向已定义 token 的死 fallback；新增 `tokenGuard.test.ts`（引用未定义 token 即失败）
+- 依赖：`vue-i18n` 9.14.4 → 11.1.11（跨 v10/v11 两个大版本，应用侧无需改动）、`sha1` 0.10 → 0.11（摘要十六进制编码抽为 `commands::sha1_hex()`，输出逐字符不变）、`mermaid` 11.16.0 → 11.16.1（修 [CVE-2026-71438](https://github.com/advisories/GHSA-c4c3-pg64-4m4v) 低危原型污染）
+- 修复（#311/#308/#304/#288/#258/#255）：重开同一工作区重新注册文件监听（此前目录句柄失效后不再刷树且无提示）；无后缀文件不再按大小拦截、读不出来时给系统默认程序兜底；按归一化路径（`canonicalPath()`）判定「同一文件」，修重复 tab / 最近列表 / 搜索结果重复项；外部拖入图片改由原生拖放驱动，修 Windows 上失效；导出 HTML 把 asset 协议 URL 回解为本地路径后再内联 Base64；e2e 读 `WEBVIEW2_USER_DATA_FOLDER`，修 msedgedriver 建不了 session
+- 静态守卫（#186/#296/#317）：i18n 硬编码 CJK 文案守卫、i18n key 字面量存在性守卫（`i18nKeyGuard.test.ts`）、设计 token 引用守卫
+
+### 历史版本
+
+- 0.9.0（2026-09-25）：**易用性提升 + 多窗口改造**：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存与显示模式下拉，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘，文件树与右键菜单键盘可达、外部结构变更自动刷新；并把应用从「单窗口 + 单工作区」改造为**多窗口 = 多工作区**——外部入口（双击文件关联 / 命令行传文件 / 拖到任务栏）一律**新开窗口且不恢复上次工作区与标签**；「打开文件夹」总是新开窗口（同一文件夹已在某窗口打开则聚焦那个窗口）；每个窗口各自静默落盘、**关掉最后一个窗口才退出应用**；并去掉「打开单个文件自动把所在目录设为工作区」的隐式副作用；同时修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。
 
 - 多窗口基础设施（#194/#195）：新增 [commands/windows.rs](src-tauri/src/commands/windows.rs)（`WindowRegistry` 窗口↔工作区注册表 + `next_label`/`set_workspace`/`window_for_workspace`/`begin_exit`，路径归一化比较支撑「同目录聚焦」）与 `src/utils/windowContext.ts`（`currentWindowLabel`/`isMainWindow`/`tabsStoreKey`）；新增命令 `open_path_in_new_window` / `set_window_workspace` / `close_window`；`exit_if_no_other_windows` 由 `close_window` 与 `Destroyed` 双向兜底。详见 [ADR-0018](docs/adr/0018-multi-window-multi-workspace.md)
 - 进程级状态按窗口分片（#194/#196~#199）：`WatcherState` 改 `HashMap<label, WatcherEntry>`（原 `*guard = Some(watcher)` 会顶掉前一个窗口的监听）；`PendingOpenState` 改按 label 分槽；`ClosingState` 改 `HashSet<label>`；`RecentMenuState` 新增 `window_ui: HashMap<label, WindowUiState>` + `active_window_label` / `apply_checked_for_window`，勾选命令 `set_theme_checked`/`set_mode_checked`/`set_sidebar_view_checked` 改带 `window` 参数按窗口存储、非焦点窗口不抢菜单显示
