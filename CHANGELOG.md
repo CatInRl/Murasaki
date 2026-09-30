@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- 修复**菜单项右侧的快捷键提示直接显示内部写法 `CmdOrCtrl`**（#341）：accelerator 用的是 Tauri 的跨平台 token `CmdOrCtrl`（表达「macOS 上是 ⌘、其余平台是 Ctrl」），而本项目菜单项**没有注册原生 accelerator**（快捷键实际由前端的全局 keydown 处理），这段字符串纯粹是提示文本 —— 原样拼进菜单项文本就会显示成 `CmdOrCtrl+Shift+E`（Win32 还会把 `\t` 之后的部分右对齐显示，于是它正对着用户的视线）。现在 `with_accel()` 统一按平台转换：Windows / Linux 显示 `Ctrl+Shift+E`，macOS 显示 `⌘+Shift+E`，口径与前端 `formatShortcutForDisplay()` 一致（只换主修饰键，其余键位与 `+` 原样保留）。
 - 修复**视图菜单的「文件树视图 / 大纲视图」点了没有任何反应**（#340），三处一起改：
   - **勾选同步传错了 ID**：`set_sidebar_view_checked` 把**视图名**（`files` / `outline`）当成**菜单项 ID** 传给 `set_checked_by_ids`，而它是按 `item.id() == active_id` 比较的（两个菜单项 ID 是 `toggle-sidebar` / `toggle-outline`）—— 永不相等，于是每次切换后**两项勾选被一起清空**。改为经既有的 `sidebar_menu_id()` 转换（焦点重放路径一直是这么做的，`#194` 修的就是同类问题，这条命令当时漏改）。
   - **折叠态下切换视图看不到任何变化**：菜单 / 快捷键路径只写 `sidebarView`，**不会展开**侧栏（`expandSidebar()` 只挂在细条的图标按钮上），而折叠态下文件树与大纲共用同一排图标 —— 现在两条路径都走新的 `selectSidebarView()`：先展开再切换。
