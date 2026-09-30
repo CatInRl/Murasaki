@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Linux e2e 支持**：CI 新增 `e2e (linux)` job——tauri-driver + WebKitWebDriver（webkit2gtk-driver）驱动真实 WebKitGTK，经 Xvfb 无头运行，与 Windows 的 WebView2 e2e 共用同一套 spec；Rust 侧 `is_e2e_mode()` 增加 Linux 判定通道（tauri-driver 经 WebKitWebDriver 启动应用时注入的 `TAURI_WEBVIEW_AUTOMATION` / `TAURI_AUTOMATION` 环境变量），e2e harness（进程清理、driver 查找、settings.json 路径、预检脚本）跨平台化，预检由 PowerShell 脚本改为跨平台 Node 实现。
+
 ## [0.10.0] - 2026-09-29
 
 本版本围绕「文件打开与拖放体验补全」与「配色单一来源」两条线：拖入窗口即可打开文件 / 文件夹，应用打不开的文件（pdf / zip / exe…）给出兜底出口与拖入提示，图片插入方式可配置，标签栏新增常驻「全部标签」面板；配色收敛为「色阶 → 语义 token」单一来源并让 Mermaid / PlantUML / KaTeX 与 HTML 导出跟随主色，新增 i18n key 与设计 token 两道静态守卫；同时彻底移除自 0.5.0 起就已关闭的 AI Agent 功能，并修掉一批静默失效（重开工作区不再刷树、无后缀大文件点不开、路径写法不同重复开 tab、Windows 上拖入图片失效、导出 HTML 丢图）。
