@@ -1,39 +1,29 @@
 /**
- * 拖放落点换算测试（issue #288）
+ * 拖放落点换算测试（issue #288 / #344）
  *
  * `toViewportCoords` 是纯函数：把 Tauri 给的窗口物理像素落点换算成 CodeMirror
  * `posAtCoords` 需要的视口 CSS 像素；换算不出时返回 null（调用方回退光标）。
+ *
+ * 口径（#344）：Tauri 的 `position` 已经过 wry 的 `ScreenToClient`，是**相对 webview
+ * 客户区**的物理像素 —— 与 `clientX/clientY` 同源，只差一次 DPR 折算，**不再减窗口装饰**。
  */
 import { describe, it, expect } from "vitest";
-import {
-  toViewportCoords,
-  WINDOW_DECORATION_OFFSET_X,
-  WINDOW_DECORATION_OFFSET_Y,
-} from "./dropPosition";
+import { toViewportCoords } from "./dropPosition";
 
 describe("toViewportCoords", () => {
-  it("DPR=1 时按装饰偏移平移", () => {
-    expect(toViewportCoords({ x: 200, y: 200 }, 1)).toEqual({
-      x: 200 - WINDOW_DECORATION_OFFSET_X,
-      y: 200 - WINDOW_DECORATION_OFFSET_Y,
-    });
+  it("DPR=1 时原样返回（不再减任何窗口装饰偏移）", () => {
+    expect(toViewportCoords({ x: 200, y: 200 }, 1)).toEqual({ x: 200, y: 200 });
   });
 
-  it("DPR>1 时先折成 CSS 像素再减装饰偏移", () => {
-    expect(toViewportCoords({ x: 400, y: 400 }, 2)).toEqual({
-      x: 200 - WINDOW_DECORATION_OFFSET_X,
-      y: 200 - WINDOW_DECORATION_OFFSET_Y,
-    });
+  it("DPR>1 时折成 CSS 像素", () => {
+    expect(toViewportCoords({ x: 400, y: 400 }, 2)).toEqual({ x: 200, y: 200 });
+    expect(toViewportCoords({ x: 300, y: 150 }, 1.5)).toEqual({ x: 200, y: 100 });
   });
 
   it("DPR 非法（0 / NaN / 负数）时按 1 处理", () => {
-    const expected = {
-      x: 200 - WINDOW_DECORATION_OFFSET_X,
-      y: 200 - WINDOW_DECORATION_OFFSET_Y,
-    };
-    expect(toViewportCoords({ x: 200, y: 200 }, 0)).toEqual(expected);
-    expect(toViewportCoords({ x: 200, y: 200 }, Number.NaN)).toEqual(expected);
-    expect(toViewportCoords({ x: 200, y: 200 }, -3)).toEqual(expected);
+    expect(toViewportCoords({ x: 200, y: 200 }, 0)).toEqual({ x: 200, y: 200 });
+    expect(toViewportCoords({ x: 200, y: 200 }, Number.NaN)).toEqual({ x: 200, y: 200 });
+    expect(toViewportCoords({ x: 200, y: 200 }, -3)).toEqual({ x: 200, y: 200 });
   });
 
   it("缺省 / NaN / Infinity / 负值 → null（回退光标）", () => {
@@ -45,24 +35,15 @@ describe("toViewportCoords", () => {
     expect(toViewportCoords({ x: 200, y: -1 }, 1)).toBeNull();
   });
 
-  it("坐标 0 是合法落点（不再按 0 提前作废；issue #288 审查）", () => {
-    // 关闭装饰偏移时可直接观察：0/0 与 1/1 都应换算成有效视口坐标，而非 null
-    expect(toViewportCoords({ x: 0, y: 0 }, 1, 0, 0)).toEqual({ x: 0, y: 0 });
-    expect(toViewportCoords({ x: 1, y: 1 }, 1, 0, 0)).toEqual({ x: 1, y: 1 });
+  it("坐标 0 是合法落点（贴近内容区左上角；issue #288 审查）", () => {
+    expect(toViewportCoords({ x: 0, y: 0 }, 1)).toEqual({ x: 0, y: 0 });
+    expect(toViewportCoords({ x: 1, y: 1 }, 1)).toEqual({ x: 1, y: 1 });
   });
 
-  it("坐标 0 但减掉装饰偏移后为负 → null（落点在非客户区，视口内无对应位置）", () => {
-    expect(toViewportCoords({ x: 0, y: 200 }, 1)).toBeNull();
-    expect(toViewportCoords({ x: 200, y: 0 }, 1)).toBeNull();
-  });
-
-  it("减掉装饰偏移后为负 → null（落点在非客户区，视口内无对应位置）", () => {
-    expect(toViewportCoords({ x: 4, y: 200 }, 1)).toBeNull();
-    expect(toViewportCoords({ x: 200, y: 10 }, 1)).toBeNull();
-  });
-
-  it("可传入自定义装饰偏移", () => {
-    expect(toViewportCoords({ x: 100, y: 100 }, 1, 0, 0)).toEqual({ x: 100, y: 100 });
-    expect(toViewportCoords({ x: 100, y: 100 }, 1, 10, 20)).toEqual({ x: 90, y: 80 });
+  it("贴近内容区左上角的小坐标不再被误判为无效（#344 的关键回归点）", () => {
+    // 旧实现默认减 (8, 31)：y=10 会变成 -21 → 判为非法 → 回退插入光标。
+    // 现在应当原样折算（DPR=2 时折半）。
+    expect(toViewportCoords({ x: 4, y: 10 }, 1)).toEqual({ x: 4, y: 10 });
+    expect(toViewportCoords({ x: 4, y: 10 }, 2)).toEqual({ x: 2, y: 5 });
   });
 });
