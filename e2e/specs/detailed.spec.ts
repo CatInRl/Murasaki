@@ -17,6 +17,7 @@ import {
   dismissAllDialogs,
 } from "../helpers/store";
 import { waitForPresent } from "../helpers/wait";
+import { toAppPath } from "../helpers/platform";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -187,7 +188,7 @@ async function readDiskFile(browser: Browser, path: string): Promise<string> {
     // @ts-ignore
     window.__TAURI_INTERNALS__.invoke("read_text_file", { path: p })
       .then((c: string) => done(c), (e: unknown) => done("ERR:" + String(e)));
-  }, path);
+  }, toAppPath(path));
 }
 
 /** 等待 tab 出现在 TabBar 中 */

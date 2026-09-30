@@ -22,6 +22,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { openWorkspace, closeWorkspace, openFileInTab, getTabsState, waitForPinia, ensureSplitMode } from "../helpers/store";
 import { waitForPresent, waitForInBrowser } from "../helpers/wait";
+import { toAppPath } from "../helpers/platform";
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -848,7 +849,7 @@ describe("13. 行内格式", () => {
 describe("14. 综合渲染", () => {
   it("14.1 单文档含表格+公式+代码+mermaid 全部正常渲染", async () => {
     // 重新构造一个混合文档
-    const mixedPath = `${WS1}\\render\\mixed.md`;
+    const mixedPath = toAppPath(`${WS1}\\render\\mixed.md`);
     const mixedContent = `# 综合文档
 
 ## 表格

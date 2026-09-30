@@ -4,6 +4,7 @@
  */
 import type { Browser } from "webdriverio";
 import { waitForInBrowser } from "./wait";
+import { toAppPath } from "./platform";
 
 /**
  * 等待主窗口加载完成并暴露 __pinia__
@@ -201,7 +202,7 @@ export async function openFileInTab(
     Promise.resolve(tabs.openFile(filePath))
       .then(() => done(null))
       .catch((err: unknown) => done(err ? String(err) : null));
-  }, path);
+  }, toAppPath(path));
 }
 
 /**

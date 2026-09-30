@@ -6,7 +6,7 @@
 
 ### Added
 
-- **Linux e2e 支持**：CI 新增 `e2e (linux)` job——tauri-driver + WebKitWebDriver（webkit2gtk-driver）驱动真实 WebKitGTK，经 Xvfb 无头运行，与 Windows 的 WebView2 e2e 共用同一套 spec；Rust 侧 `is_e2e_mode()` 增加 Linux 判定通道（tauri-driver 经 WebKitWebDriver 启动应用时注入的 `TAURI_WEBVIEW_AUTOMATION` / `TAURI_AUTOMATION` 环境变量），e2e harness（进程清理、driver 查找、settings.json 路径、预检脚本）跨平台化，预检由 PowerShell 脚本改为跨平台 Node 实现。
+- **Linux e2e 支持**：CI 新增 `e2e (linux)` job——tauri-driver + WebKitWebDriver（webkit2gtk-driver）驱动真实 WebKitGTK，经 Xvfb 无头运行，与 Windows 的 WebView2 e2e 共用同一套 spec；Rust 侧 `is_e2e_mode()` 增加 Linux 判定通道（tauri-driver 经 WebKitWebDriver 启动应用时注入的 `TAURI_WEBVIEW_AUTOMATION` / `TAURI_AUTOMATION` 环境变量），e2e harness（进程清理、driver 查找、settings.json 路径、预检脚本）跨平台化，预检由 PowerShell 脚本改为跨平台 Node 实现。首跑即拦下一类真问题：spec 里 `${WS1}\\file.md` 式的反斜杠拼接在 Linux 上产生混合分隔符路径，应用打不开文件且 `executeAsync` 永不返回、整套挂起——现统一在接收路径的边界按平台归一化（Windows 原样保留，其余平台 `\` → `/`）。
 
 ## [0.10.0] - 2026-09-29
 
