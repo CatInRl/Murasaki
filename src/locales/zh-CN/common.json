@@ -66,6 +66,8 @@
     "batchCloseTitle": "批量关闭 · 未保存的修改",
     "batchCloseMessage": "以下 {count} 个文档有未保存的修改：\n{names}\n\n关闭前是否保存？",
     "batchCloseUntitledWarning": "注意：未命名文档中未保存的内容无法恢复。",
+    "unsavedBeforeExitTitle": "退出 · 未保存的修改",
+    "unsavedBeforeExitMessage": "以下 {count} 个文档有未保存的修改：\n{names}\n\n退出前是否保存？",
     "conflictTitle": "文件冲突",
     "conflictRenameTitle": "重命名冲突",
     "conflictCopyTitle": "复制冲突",

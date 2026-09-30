@@ -42,7 +42,7 @@ import { useCommands } from "./composables/useCommands";
 import { useShortcuts } from "./shortcuts/useShortcuts";
 import { toMenuAccelerators } from "./shortcuts/shortcutsLogic";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
-import { useExitFlush } from "./composables/useExitFlush";
+import { useExitFlush, type ExitFlushTab } from "./composables/useExitFlush";
 import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
 import { setLocale } from "./i18n";
 import { mapSystemLocale } from "./utils/systemLocale";
@@ -205,6 +205,7 @@ const {
 // ===== Tab 关闭逻辑 composable（对话框改走 dialog store）=====
 const {
   onCloseTabRequest, onCloseOthers, onCloseRight, onCloseLeft, onCloseAllTabs,
+  saveBeforeClose,
 } = useTabClose({ tabsStore, dialog, workspace });
 
 // ===== 侧栏视图（受控） =====
@@ -370,8 +371,42 @@ let cleanupListeners: (() => void) | null = null;
 // 退出拦截监听 cleanup（Rust 拦截主窗口关闭 → 前端落盘 → exit_app，ADR-0017）
 let cleanupExitListener: (() => void) | null = null;
 
-// 退出前落盘：未保存改动写草稿 + 刷新 tabs.json，完成后再真正退出
-const { onExitRequested } = useExitFlush(tabsStore);
+/**
+ * 退出前的未保存改动确认（issue #346 / ADR-0017 修订）。
+ *
+ * 把本窗口所有 dirty tab **一次性汇总**成一个三选一对话框（与批量关闭 tab 同款），
+ * 返回 `false` = 取消退出：窗口不关、也不落盘。
+ *
+ * - 选「保存」：逐个写回（已命名走写盘、未命名走另存为），任一取消或失败即**中止退出**
+ * - 选「不保存」：不回写文件；退出时的草稿兜底照旧（ADR-0017，保证崩溃/异常仍有得恢复）
+ */
+async function resolveUnsavedOnExit(dirty: readonly ExitFlushTab[]): Promise<boolean> {
+  const names = dirty
+    .map((tab) => (tab.path ? basename(tab.path) : t("common.untitled")))
+    .join("、");
+  // 注意：这里的「不保存」不等于丢内容 —— 未命名 tab 的正文随 tabs.json 保留、下次启动会恢复，
+  // 所以不像「批量关闭 tab」那样需要额外警告（那条路径下 tab 真的被移除了）
+  const choice = await dialog.unsavedChanges({
+    title: t("common.dialog.unsavedBeforeExitTitle"),
+    message: t("common.dialog.unsavedBeforeExitMessage", { count: dirty.length, names }),
+    saveText: t("common.saveAllAndClose"),
+    discardText: t("common.closeWithoutSaving"),
+    cancelText: t("common.cancel"),
+  });
+  if (choice === "cancel") return false;
+  if (choice === "discard") return true;
+
+  for (const tab of dirty) {
+    const ok = await saveBeforeClose(tab.id, tab);
+    if (!ok) return false;
+  }
+  return true;
+}
+
+// 退出前：先问未保存改动（上面），再写草稿 + 刷新 tabs.json，最后真正关窗
+const { onExitRequested } = useExitFlush(tabsStore, {
+  resolveUnsaved: resolveUnsavedOnExit,
+});
 
 onMounted(async () => {
   // 1. 加载持久化状态

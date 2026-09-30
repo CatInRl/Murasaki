@@ -31,13 +31,17 @@ murasaki/
 
 ### 退出落盘 (Flush on Exit)
 
-0.9.0 起按窗口各自落盘。用户点击窗口关闭（或菜单「退出」/`Ctrl+Q`）时**静默落盘、不弹对话框**：
+0.9.0 起按窗口各自落盘；**0.10.0 起（#346）有未保存改动时会先问一次**。用户点击窗口关闭（或菜单「退出」/`Ctrl+Q`）时：
 
 - Rust 侧 `Builder::on_window_event` 拦截 `WindowEvent::CloseRequested`，调用 `api.prevent_close()` 阻止默认关闭，并向**该窗口**推送 `app-close-requested` 事件；`ClosingState(HashSet<label>)` 保证每个窗口的重复请求仍被拦截。
-- 前端收到事件后：所有脏且已命名的 tab 落盘草稿 → 持久化 settings 与本窗口的 tabs，随后调用 `close_window` 命令销毁本窗口。关掉最后一个窗口时由 Rust 侧 `exit_if_no_other_windows` 退出应用。
-- 菜单「退出」走 `quit_app`：通知所有窗口各自落盘，最后一个关完才退出。
+- 前端收到事件后：**本窗口有 dirty tab → 先弹一次汇总确认**（「全部保存并关闭」/「不保存关闭」/「取消」，`useExitFlush` 的 `resolveUnsaved` 由 [App.vue](src/App.vue) 注入）：
+  - 选「保存」逐个写回（已命名写盘、未命名另存为），任一取消或失败即**中止退出**；
+  - 选「取消」中止退出：窗口不关、也不落盘，且下次仍能触发；
+  - 无 dirty tab 则不打搅，直接走下一步。
+- 随后：所有脏且已命名的 tab 落盘草稿 → 持久化 settings 与本窗口的 tabs，最后调用 `close_window` 销毁本窗口。关掉最后一个窗口时由 Rust 侧 `exit_if_no_other_windows` 退出应用。
+- 菜单「退出」走 `quit_app`：通知所有窗口各自处理（因此多窗口下每个窗口各自弹自己的确认），最后一个关完才退出。
 - 落盘有 3 秒超时兜底（`Promise.race`），超时也强制关闭，避免关不掉窗口。
-- 未命名 tab（`path === null`）无磁盘位置，不落盘、不提示；下次启动不恢复。
+- 未命名 tab（`path === null`）没有磁盘位置、不写草稿；但**正文随 `tabs.json` 保留，下次启动会恢复**（`useTabsStore.restore()` 用 `persisted.content` 重建）。
 
 详见 [ADR-0017](docs/adr/0017-close-interception-with-draft-flush-on-exit.md)、[ADR-0018](docs/adr/0018-multi-window-multi-workspace.md)。
 
