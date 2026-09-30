@@ -224,21 +224,22 @@ describe("useImagePaste utilities", () => {
       });
       const { paste, dispatch, posAtCoords } = makePaste({ mode: "file" });
       await paste.insertDroppedImages(["/tmp/pic.png"], { x: 400, y: 400 });
-      // jsdom 默认 devicePixelRatio = 1 → (400-8, 400-31)
-      expect(posAtCoords).toHaveBeenCalledWith({ x: 392, y: 369 });
+      // jsdom 默认 devicePixelRatio = 1，且 Tauri 的落点已是相对内容区的物理像素（#344）
+      // → 只做 DPR 折算，不再减窗口装饰偏移
+      expect(posAtCoords).toHaveBeenCalledWith({ x: 400, y: 400 });
       expect(dispatch).toHaveBeenCalledWith(
         expect.objectContaining({ changes: { from: 7, to: 7, insert: "![](assets/images/x.png)" } })
       );
     });
 
-    it("落点无效（坐标为 0）→ 回退当前光标，不调 posAtCoords", async () => {
+    it("落点无效（负坐标）→ 回退当前光标，不调 posAtCoords", async () => {
       mockedInvoke.mockResolvedValue({
         absolutePath: "/ws/assets/images/x.png",
         relativePath: "assets/images/x.png",
         filename: "x.png",
       });
       const { paste, dispatch, posAtCoords } = makePaste({ mode: "file", head: 3 });
-      await paste.insertDroppedImages(["/tmp/pic.png"], { x: 0, y: 0 });
+      await paste.insertDroppedImages(["/tmp/pic.png"], { x: 0, y: -1 });
       expect(posAtCoords).not.toHaveBeenCalled();
       expect(dispatch).toHaveBeenCalledWith(
         expect.objectContaining({ changes: { from: 3, to: 3, insert: "![](assets/images/x.png)" } })
