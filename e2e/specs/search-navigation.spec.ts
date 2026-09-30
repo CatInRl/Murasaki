@@ -117,25 +117,42 @@ describe("跨文件搜索结果跳转", () => {
     const input = await browser.$(".gsb__input input");
     await input.setValue("abc123");
 
-    // 等待内容命中结果渲染
-    const firstResult = await browser.$(".gsb__item");
+    // 等待内容命中结果渲染（等待在先、取句柄在后：browser.$ 对不存在的元素不抛错，
+    // 先取句柄会把等待整步做废 —— #320）
     await waitForPresent(browser, ".gsb__item", 10000);
 
-    // 点击结果项打开文件
-    await firstResult.click();
-    await browser.pause(500);
-
-    // 验证 tab 已打开且为内容命中的文件之一
-    const tabsState = await browser.execute(() => {
-      // @ts-ignore
-      const tabs = window.__pinia__._s.get("tabs");
-      return {
-        count: tabs.tabs.length,
-        activePath: tabs.activeTab?.path,
-      };
-    });
-    expect(tabsState.count).toBeGreaterThanOrEqual(1);
-    expect(tabsState.activePath).toContain("file-a.md");
+    // 点击结果项打开文件。内容命中按文件流式到达（search-result-chunk，每命中一个
+    // 文件就追加一次并重渲染列表），「取句柄 → 点击落地」之间若下一个 chunk 到达，
+    // 点击会落在已被替换的节点上变成 no-op；openFile 又是 async 的 IPC 链
+    // （read_text_file + get_file_mtime），WebKitWebDriver 上每条命令都更慢，
+    // 固定 sleep 等不到 tab。按 #273 的有界重派发手法：点击后短窗轮询 tabs store，
+    // 未打开则重取句柄再点，共 3 次。
+    const attempts = 3;
+    let tabsState: { count: number; activePath: string | null } | null = null;
+    for (let attempt = 1; attempt <= attempts && !tabsState; attempt++) {
+      const item = await browser.$(".gsb__item");
+      await item.click();
+      const deadline = Date.now() + 3000;
+      while (Date.now() < deadline) {
+        await browser.pause(300);
+        const s = await browser.execute(() => {
+          // @ts-ignore
+          const tabs = window.__pinia__._s.get("tabs");
+          return {
+            count: tabs.tabs.length as number,
+            activePath: (tabs.activeTab?.path ?? null) as string | null,
+          };
+        });
+        if (s.count >= 1 && (s.activePath ?? "").includes("file-a.md")) {
+          tabsState = s;
+          break;
+        }
+      }
+    }
+    // 验证 tab 已打开且为内容命中的文件之一（首个内容命中是 file-a）
+    expect(tabsState).not.toBeNull();
+    expect(tabsState!.count).toBeGreaterThanOrEqual(1);
+    expect(tabsState!.activePath).toContain("file-a.md");
   });
 
   it("统一搜索条可见性切换", async () => {
