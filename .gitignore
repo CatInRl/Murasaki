@@ -39,7 +39,7 @@ tauri-driver.pid
 
 # E2E one-off debug scripts (keep only env-check + installer)
 e2e/scripts/*
-!e2e/scripts/check-env.ps1
+!e2e/scripts/check-env.mjs
 !e2e/scripts/install-msedgedriver.ps1
 
 # Scratch / debugging scripts (local dev only)

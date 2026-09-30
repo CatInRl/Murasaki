@@ -106,7 +106,7 @@ jobs:
         run: cargo install tauri-driver --locked
 
       # 下载与本地 WebView2 Runtime 版本匹配的 msedgedriver，
-      # 装到 %USERPROFILE%\.cargo\bin（check-env.ps1 与 setup.ts 的默认查找位置）
+      # 装到 %USERPROFILE%\.cargo\bin（check-env.mjs 与 setup.ts 的默认查找位置）
       - name: 安装匹配版本的 msedgedriver
         run: powershell -ExecutionPolicy Bypass -File e2e/scripts/install-msedgedriver.ps1
 
