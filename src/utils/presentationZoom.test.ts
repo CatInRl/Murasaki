@@ -10,6 +10,7 @@ import {
   PRESENTATION_ZOOM_MIN,
   PRESENTATION_ZOOM_STEP,
   clampPresentationZoom,
+  presentationZoomStyle,
   stepPresentationZoom,
 } from "./presentationZoom";
 
@@ -64,5 +65,24 @@ describe("presentationZoom - stepPresentationZoom", () => {
 
   it("入参非法时先回落默认再步进", () => {
     expect(stepPresentationZoom(Number.NaN, 1)).toBe(110);
+  });
+});
+
+describe("presentationZoom - presentationZoomStyle", () => {
+  it("100% 时不产出样式（无需缩放）", () => {
+    expect(presentationZoomStyle(100)).toBeUndefined();
+  });
+
+  it("只产出 zoom，不再反向除宽高（#337）", () => {
+    expect(presentationZoomStyle(200)).toEqual({ zoom: "2" });
+    expect(presentationZoomStyle(110)).toEqual({ zoom: "1.1" });
+    expect(presentationZoomStyle(50)).toEqual({ zoom: "0.5" });
+  });
+
+  it("绝不产出自带反向补偿的 width / height", () => {
+    for (const percent of [50, 70, 110, 150, 200]) {
+      const style = presentationZoomStyle(percent) ?? {};
+      expect(Object.keys(style)).toEqual(["zoom"]);
+    }
   });
 });

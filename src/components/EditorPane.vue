@@ -6,6 +6,7 @@ import PreviewPane from "./PreviewPane.vue";
 import HtmlPreview from "./HtmlPreview.vue";
 import { useScrollSync } from "../composables/useScrollSync";
 import { isHtmlFile } from "../utils/fileKind";
+import { presentationZoomStyle } from "../utils/presentationZoom";
 import type { EditorMode } from "../types";
 
 interface Props {
@@ -82,13 +83,16 @@ const cursorKey = ref(0);
 /** 是否演示模式（仅预览、只读） */
 const isPresentation = computed(() => props.editorMode === "presentation");
 
-/** 演示模式缩放样式：zoom 会把布局尺寸一并放大，故宽高反向除缩放比 */
-const zoomStyle = computed<Record<string, string> | undefined>(() => {
-  if (!isPresentation.value) return undefined;
-  const z = props.zoom / 100;
-  if (!Number.isFinite(z) || z === 1) return undefined;
-  return { zoom: String(z), width: `calc(100% / ${z})`, height: `calc(100% / ${z})` };
-});
+/**
+ * 演示模式缩放样式：只设 `zoom`。
+ *
+ * 不要再反向除宽高（此前是 `width: calc(100% / z)`）—— `zoom` 会让百分比尺寸按
+ * 「缩放后的包含块」解析，`width: 100%` 就已经填满，再除一次等于重复补偿，
+ * 放大后预览会缩成面板的 1/z 宽（issue #337）。逻辑抽在 `presentationZoomStyle`。
+ */
+const zoomStyle = computed<Record<string, string> | undefined>(() =>
+  isPresentation.value ? presentationZoomStyle(props.zoom) : undefined
+);
 
 /** Ctrl+滚轮缩放（仅演示模式接管，preventDefault 拦截 WebView2 浏览器缩放） */
 function onWheel(e: WheelEvent): void {
