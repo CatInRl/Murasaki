@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- 修复**按 `F11`（或菜单「视图 → 全屏」）毫无反应**（#338）：前端 `toggleFullscreen()` 调的是 `plugin:window|set_fullscreen`，但 capability 只声明了 `core:default` + `core:window:allow-close` / `allow-destroy`，而 `core:window:default` 的权限清单里**没有** `allow-set-fullscreen`（只有 `allow-is-fullscreen`），于是该调用被 ACL 拒绝；异常又被 `toggleFullscreen` 的 `try/catch` 吞成一条 `console.error`，对外表现为「按键无效、也不报错」。现补上 `core:window:allow-is-fullscreen` 与 `core:window:allow-set-fullscreen`；顺带把全屏状态改为以 `win.isFullscreen()` 为准（不再自己记一个 ref —— 状态被其它入口改过时本地 ref 会失真，下次按下方向就相反），并补一条 e2e 直接断言该命令未被 ACL 拒绝。
 - **Linux/macOS 本地图片失图（预览与 HTML 导出）**：`sanitizeInlineHtml`（useMarkdownRenderer.render 的统一出口）依赖 DOMPurify 默认 URI 白名单，其中没有 Tauri 的 asset 协议——Windows 上 `convertFileSrc` 产出 `https://asset.localhost/...` 天然命中白名单，Linux/macOS 产出 `asset://localhost/...` 则被 DOMPurify 把 `<img>` 的 `src` 属性整个剥掉，导致这两个平台的预览与 HTML 导出中所有本地图片失图。现以 `ALLOWED_URI_REGEXP` 在默认白名单基础上放行 `asset:`；data URI（Base64 内嵌图）走 DOMPurify 的 DATA_URI_TAGS 单独分支不受影响。同批落地的 Linux e2e 用 3 条 spec（markdown-render 两条 + html-export 一条）坐实该 bug（#339）。
 
 ## [0.10.0] - 2026-09-29

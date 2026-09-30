@@ -440,7 +440,27 @@ describe("快捷键", () => {
     expect(await gsb.isExisting()).toBe(true);
   });
 
-  // ============ M11: F11 全屏切换（弱断言） ============
+  // ============ M11: F11 全屏切换 ============
+
+  it("全屏命令未被 ACL 拒绝（#338：capability 需含 core:window:allow-set-fullscreen）", async () => {
+    // 回归点：capability 少 `core:window:allow-set-fullscreen` 时，前端 `setFullscreen()`
+    // 会被 ACL 拒（`Command plugin:window|set_fullscreen not allowed by ACL`），异常又被
+    // `toggleFullscreen` 的 try/catch 吞成一条 console.error —— 表现为「按 F11 毫无反应」。
+    // 这里直接调窗口插件命令断言「可调用」；不依赖 OS 是否真的进入全屏（CI 上不稳定），
+    // 调用后立刻还原，避免影响后续用例。
+    const err = await browser.executeAsync((done: (e: string | null) => void) => {
+      // @ts-ignore
+      const internals = window.__TAURI_INTERNALS__;
+      const md = internals?.metadata ?? {};
+      const label = md.currentWindow?.label ?? md.currentWebview?.label ?? "main";
+      internals
+        .invoke("plugin:window|set_fullscreen", { label, value: true })
+        .then(() => internals.invoke("plugin:window|set_fullscreen", { label, value: false }))
+        .then(() => done(null))
+        .catch((e: unknown) => done(String(e)));
+    });
+    expect(err).toBeNull();
+  });
 
   it("F11 触发全屏切换（不验证实际 OS 全屏状态）", async () => {
     // F11 在 tauri-driver 下可能无法真正切换 OS 全屏，且全屏后 WebView2

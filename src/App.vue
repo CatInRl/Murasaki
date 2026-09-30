@@ -267,7 +267,6 @@ function startResize(e: PointerEvent): void {
 
 // ===== 状态栏 / 全屏 =====
 const statusBarVisible = ref(true);
-const isFullscreen = ref(false);
 
 // ===== 光标位置与字数统计 =====
 const cursorLine = ref(1);
@@ -625,18 +624,12 @@ const {
 async function toggleFullscreen(): Promise<void> {
   try {
     const win = getCurrentWebviewWindow();
-    const newIsFull = !isFullscreen.value;
-    if (newIsFull) {
-      await win.setFullscreen(true);
-      isFullscreen.value = true;
-      // 全屏时自动隐藏状态栏（spec 要求）
-      statusBarVisible.value = false;
-    } else {
-      await win.setFullscreen(false);
-      isFullscreen.value = false;
-      // 退出全屏时恢复状态栏
-      statusBarVisible.value = true;
-    }
+    // 以窗口的真实全屏状态为准，而不是自己记一个 ref —— 一旦状态被别的入口改过
+    // （系统快捷键、其它窗口操作），本地 ref 就会失真，表现为「按了没反应」。
+    const next = !(await win.isFullscreen());
+    await win.setFullscreen(next);
+    // 全屏时自动隐藏状态栏、退出全屏时恢复（spec 第 51 条）
+    statusBarVisible.value = !next;
   } catch (err) {
     console.error("切换全屏失败:", err);
   }
