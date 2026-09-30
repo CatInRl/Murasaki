@@ -9,6 +9,11 @@ name: Test
 #   ② 跑之前不能有残留的 tauri-driver / msedgedriver 占用 4444 / 4445，否则 setup 会
 #      静默复用一个半死的 driver，所有 session 报 ECONNRESET。
 # 目前 e2e 只跑不拦（未加入 required status checks），避免拖慢每个 PR（见 #261）。
+#
+# Linux e2e（e2e-linux job）用 tauri-driver + WebKitWebDriver（webkit2gtk-driver 包）
+# 驱动真实 WebKitGTK，经 Xvfb 无头运行；应用侧 E2E 判定来自 tauri-driver 注入的
+# TAURI_WEBVIEW_AUTOMATION 环境变量（见 src-tauri/src/lib.rs 的 is_e2e_mode）。
+# 首期不加入 required status checks，稳定后再提升（同 #261 的路径）。
 on:
   pull_request:
   push:
@@ -132,5 +137,72 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-logs
+          path: ${{ runner.temp }}/murasaki-devtools.log
+          if-no-files-found: ignore
+
+  e2e-linux:
+    name: e2e (linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: 安装 Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Rust 构建
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # 系统库清单与 release.yml 的 Linux 构建一致；webkit2gtk-driver 提供
+      # tauri-driver 在 Linux 上驱动的 WebKitWebDriver，xvfb 提供无头 X server
+      - name: 安装 Linux 系统库与 WebKitWebDriver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            webkit2gtk-driver \
+            xvfb
+
+      - name: 安装 npm 依赖
+        run: npm ci
+
+      - name: 安装 tauri-driver
+        run: cargo install tauri-driver --locked
+
+      # 用 Tauri CLI 构建（不能用裸 cargo build —— 前端起不来，见文件头注释 ①）
+      - name: 构建应用
+        run: npx tauri build --no-bundle
+
+      # 必须经 Xvfb 跑 GTK/WebKit 应用；-screen 显式给足分辨率，避免 640x480 默认
+      # 值引发「元素滚不入视区」一类几何 flake。
+      # WEBKIT_DISABLE_DMABUF_RENDERER=1 规避 DMABUF 渲染在部分驱动下的黑屏（官方建议）。
+      # TMPDIR 指到 runner.temp：应用侧 e2e_trace 写 temp_dir()/murasaki-devtools.log，
+      # Linux 下 temp_dir() 取 TMPDIR，与 artifact 路径保持一致。
+      - name: 运行 E2E（Xvfb）
+        run: xvfb-run -a --server-args="-screen 0 1280x1024x24" npm run test:e2e
+        env:
+          TMPDIR: ${{ runner.temp }}
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
+
+      # 失败时留诊断日志（与 Windows job 同名文件，artifact 名必须不同）
+      - name: 上传失败诊断日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-linux
           path: ${{ runner.temp }}/murasaki-devtools.log
           if-no-files-found: ignore
