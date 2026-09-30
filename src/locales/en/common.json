@@ -66,6 +66,8 @@
     "batchCloseTitle": "Batch Close · Unsaved Changes",
     "batchCloseMessage": "{count} document(s) have unsaved changes:\n{names}\n\nSave before closing?",
     "batchCloseUntitledWarning": "Note: unsaved content in untitled documents cannot be recovered.",
+    "unsavedBeforeExitTitle": "Exit · Unsaved changes",
+    "unsavedBeforeExitMessage": "The following {count} document(s) have unsaved changes:\n{names}\n\nSave before exiting?",
     "conflictTitle": "File Conflict",
     "conflictRenameTitle": "Rename Conflict",
     "conflictCopyTitle": "Copy Conflict",

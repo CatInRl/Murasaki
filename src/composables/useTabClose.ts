@@ -192,5 +192,8 @@ export function useTabClose(deps: TabCloseDeps) {
     onCloseRight,
     onCloseLeft,
     onCloseAllTabs,
+    /** 退出前保存单个 tab（已命名走写回、未命名走另存为）；返回 false = 取消或失败。
+     *  与「关闭 tab 前保存」共用同一套语义（issue #346 的退出确认复用它）。 */
+    saveBeforeClose,
   };
 }

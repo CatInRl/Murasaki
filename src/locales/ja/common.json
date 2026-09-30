@@ -66,6 +66,8 @@
     "batchCloseTitle": "一括クローズ · 保存されていない変更",
     "batchCloseMessage": "{count} 件のドキュメントに保存されていない変更があります：\n{names}\n\n閉じる前に保存しますか？",
     "batchCloseUntitledWarning": "注意：無題ドキュメントの保存されていない内容は復元できません。",
+    "unsavedBeforeExitTitle": "終了 · 未保存の変更",
+    "unsavedBeforeExitMessage": "次の {count} 件のドキュメントに未保存の変更があります：\n{names}\n\n終了前に保存しますか？",
     "conflictTitle": "ファイルの競合",
     "conflictRenameTitle": "名前の変更の競合",
     "conflictCopyTitle": "コピーの競合",

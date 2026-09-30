@@ -8,6 +8,10 @@
 
 - **Linux e2e 支持**：CI 新增 `e2e (linux)` job——tauri-driver + WebKitWebDriver（webkit2gtk-driver）驱动真实 WebKitGTK，经 Xvfb 无头运行，与 Windows 的 WebView2 e2e 共用同一套 spec；Rust 侧 `is_e2e_mode()` 增加 Linux 判定通道（tauri-driver 经 WebKitWebDriver 启动应用时注入的 `TAURI_WEBVIEW_AUTOMATION` / `TAURI_AUTOMATION` 环境变量），e2e harness（进程清理、driver 查找、settings.json 路径、预检脚本）跨平台化，预检由 PowerShell 脚本改为跨平台 Node 实现。首跑即拦下一类真问题：spec 里 `${WS1}\\file.md` 式的反斜杠拼接在 Linux 上产生混合分隔符路径，应用打不开文件且 `executeAsync` 永不返回、整套挂起——现统一在接收路径的边界按平台归一化（Windows 原样保留，其余平台 `\` → `/`）。
 
+### Changed
+
+- **关闭窗口 / 退出应用时，有未保存改动会先问一次**（#346，[ADR-0017](docs/adr/0017-close-interception-with-draft-flush-on-exit.md) 部分修订）：此前是**静默落盘**（写草稿 + `tabs.json`，不弹任何对话框）—— 用户既看不到「还有东西没保存」，也没机会在退出前把它落到真实文件。现在把本窗口所有未保存 tab **一次性汇总**成一个三选一确认（与「批量关闭标签」同款：「全部保存并关闭」/「不保存关闭」/「取消」）：选「保存」逐个写回（已命名写盘、未命名走另存为），任一取消或失败即**中止退出**；选「取消」窗口不关、也不落盘（防重入标志会复位，下次仍能触发）；**没有未保存改动时照旧不打扰**。退出时的草稿兜底保留；多窗口下每个窗口各自询问自己的未保存改动（不做跨窗口聚合，已记入 ADR「范围外」）。顺带修正 `CONTEXT.md` 里「未命名 tab 下次启动不恢复」的旧说法 —— 它的正文一直随 `tabs.json` 保留、`restore()` 会用 `persisted.content` 重建。
+
 ### Fixed
 
 - 修复**拖入图片的插入位置不准确**（#344）：`toViewportCoords()` 把 Tauri 给的落点当成「相对整个窗口（含标题栏与边框）」的坐标，于是额外减掉一个**经验值**装饰偏移（8 / 31 CSS 像素）。但 wry 在把 OLE 的落点交给上层之前已经调过 `ScreenToClient(hwnd, pt)`（`wry/src/webview2/drag_drop.rs` 的 `DragEnter` / `DragOver` / `Drop`）—— 拿到的是**相对 webview 客户区**的物理像素，与 `clientX/clientY` 同源，只差一次 DPR 折算。现只做 DPR 折算、不再减装饰（插入点此前整体偏上约一个标题栏高度、偏左约一个边框宽）；顺带修掉连带问题：贴近内容区左上角拖入时 `y - 31` 变成负数被判为非法坐标，会静默回退成「插入当前光标」。

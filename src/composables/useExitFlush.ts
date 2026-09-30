@@ -1,14 +1,15 @@
 /**
- * 关闭前落盘（issue #185 / ADR-0017；多窗口见 spec #194）
+ * 关闭前落盘（issue #185 / ADR-0017；多窗口见 spec #194；退出确认见 issue #346）
  *
  * 关闭窗口时 Rust 侧拦截 CloseRequested 并向**该窗口**发来 `app-close-requested`，
- * 前端在此把本窗口的未保存改动静默落盘（不弹对话框），完成后调用 `close_window`
- * 真正销毁本窗口：
+ * 前端在此处理本窗口的未保存改动，完成后调用 `close_window` 真正销毁本窗口：
+ * - 有未保存改动且注入了 `resolveUnsaved` → 先弹一次汇总确认（保存 / 不保存 / 取消），
+ *   选「取消」则**中止退出**（窗口留着，也不落盘），见 [ADR-0017](../../docs/adr/0017-close-interception-with-draft-flush-on-exit.md)
  * - 已命名且 dirty 的 tab → 写草稿（沿用 ADR-0001 草稿恢复机制）
  * - 全部 tab → 刷新本窗口的 tabs.json 槽位（未命名 tab 的内容只能靠这里保留）
  *
  * 关掉最后一个窗口时由 Rust 侧 `exit_if_no_other_windows` 退出应用，
- * 因此「关闭窗口」与「退出应用」不再需要前端区分。
+ * 因此「关闭窗口」与「退出应用」不再需要前端区分；多窗口下每个窗口各自询问自己的未保存改动。
  *
  * 任何一步失败都不能让窗口关不掉：落盘异常只记日志，invoke 失败再兜底销毁窗口。
  */
@@ -18,6 +19,7 @@ import { fileSystem } from "../services/fileSystem";
 
 /** 退出落盘所需的 tab 最小切片 */
 export interface ExitFlushTab {
+  id: string;
   path: string | null;
   content: string;
   lastMtime: number | null;
@@ -61,16 +63,44 @@ export interface ExitFlushStoreSlice {
   persist(): Promise<unknown>;
 }
 
+export interface ExitFlushOptions {
+  /**
+   * 有未保存改动时询问用户（返回 `false` = 取消退出，窗口不关也不落盘）。
+   * 未注入则保持旧行为：不询问、静默落盘。
+   */
+  resolveUnsaved?: (dirty: readonly ExitFlushTab[]) => Promise<boolean>;
+}
+
 /**
  * 退出落盘接线：注册给 `app-close-requested` 事件使用。
- * 重复触发（用户连点关闭）只执行一次。
+ * 重复触发（用户连点关闭）只执行一次 —— 但如果用户选了「取消」，要复位让下次还能触发。
  */
-export function useExitFlush(tabsStore: ExitFlushStoreSlice) {
+export function useExitFlush(
+  tabsStore: ExitFlushStoreSlice,
+  options: ExitFlushOptions = {}
+) {
   let inFlight = false;
 
   async function onExitRequested(): Promise<void> {
     if (inFlight) return;
     inFlight = true;
+
+    // 未保存改动确认（issue #346）：这是「正常退出」的路径，让用户自己决定要不要保存；
+    // 确认本身出差错时按「取消退出」处理 —— 宁可关不掉，也不要静默丢掉改动。
+    const dirty = tabsStore.tabs.filter((tab) => tab.isDirty);
+    if (dirty.length > 0 && options.resolveUnsaved) {
+      let proceed = false;
+      try {
+        proceed = await options.resolveUnsaved(dirty);
+      } catch (err) {
+        console.error("[Murasaki] 退出前的未保存确认失败，按「取消退出」处理:", err);
+      }
+      if (!proceed) {
+        inFlight = false;
+        return;
+      }
+    }
+
     try {
       await Promise.race([
         flushUnsavedOnExit({
