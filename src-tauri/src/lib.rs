@@ -16,24 +16,39 @@ use commands::settings;
 use commands::watcher::{self, WatcherState};
 use commands::windows::{self, WindowRegistry};
 
-/// E2E 测试模式标志：msedgedriver 启动 murasaki.exe 时会附加 `--remote-debugging-port=PORT`
-/// 检测到该参数即表示运行在 tauri-driver E2E 环境下
+/// E2E 测试模式标志，按平台各有一条判定通道：
 ///
-/// WebView2 Runtime 150 之后，msedgedriver 不再把 `--remote-debugging-port` 作为
-/// 命令行参数传给应用，而是通过 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 环境变量注入，
-/// 因此两种来源都需检测。
-///
-/// 环境变量来源要求 `--remote-debugging-port=` 与 `--test-type=webdriver` 同时出现：
-/// 只认前者会把「用户自己恰好设了调试端口环境变量」误判成 E2E，从而错误地禁用单实例锁。
+/// - **Windows**：msedgedriver 启动 murasaki.exe 时附加 `--remote-debugging-port=PORT`；
+///   WebView2 Runtime 150 之后不再走 argv，改由 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`
+///   环境变量注入（要求与 `--test-type=webdriver` 同时出现：只认前者会把「用户自己
+///   恰好设了调试端口环境变量」误判成 E2E，从而错误地禁用单实例锁）。
+/// - **Linux**：tauri-driver 启动 WebKitWebDriver 时设置 `TAURI_WEBVIEW_AUTOMATION=true`
+///   （tauri-driver 1.x 为 `TAURI_AUTOMATION=true`），WebKitWebDriver 再拉起应用时
+///   环境被继承，因此应用侧直接读环境变量即可判定。WebKitGTK 没有 WebView2 那套
+///   additional-browser-arguments 通道，也不需要。
 fn is_e2e_mode() -> bool {
     let argv: Vec<String> = std::env::args().collect();
     let env_additional_args = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").ok();
-    is_e2e_mode_from(&argv, env_additional_args.as_deref())
+    let automation_env = std::env::var("TAURI_WEBVIEW_AUTOMATION")
+        .or_else(|_| std::env::var("TAURI_AUTOMATION"))
+        .ok();
+    is_e2e_mode_from(
+        &argv,
+        env_additional_args.as_deref(),
+        automation_env.as_deref(),
+    )
 }
 
 /// [`is_e2e_mode`] 的纯函数版本，便于单测
-fn is_e2e_mode_from(argv: &[String], env_additional_args: Option<&str>) -> bool {
+fn is_e2e_mode_from(
+    argv: &[String],
+    env_additional_args: Option<&str>,
+    automation_env: Option<&str>,
+) -> bool {
     if argv.iter().any(|a| a.starts_with("--remote-debugging-port=")) {
+        return true;
+    }
+    if automation_env == Some("true") {
         return true;
     }
     env_additional_args
@@ -667,18 +682,22 @@ mod tests {
         assert_eq!(resolve_user_data_dir(&argv(&[]), None, None), None);
     }
 
-    /// 旧通道：msedgedriver 直接把调试参数放在命令行里
+    /// 旧通道（Windows）：msedgedriver 直接把调试参数放在命令行里
     #[test]
     fn e2e_mode_detects_debug_port_in_argv() {
-        assert!(is_e2e_mode_from(&argv(&["--remote-debugging-port=9222"]), None));
+        assert!(is_e2e_mode_from(
+            &argv(&["--remote-debugging-port=9222"]),
+            None,
+            None
+        ));
     }
 
-    /// 新通道：Runtime 150+ 的 msedgedriver 通过环境变量注入，
+    /// 新通道（Windows）：Runtime 150+ 的 msedgedriver 通过环境变量注入，
     /// 实测同时带 `--remote-debugging-port=0` 与 `--test-type=webdriver`
     #[test]
     fn e2e_mode_detects_env_injection() {
         let env = "--enable-automation --remote-debugging-port=0 --test-type=webdriver";
-        assert!(is_e2e_mode_from(&argv(&[]), Some(env)));
+        assert!(is_e2e_mode_from(&argv(&[]), Some(env), None));
     }
 
     /// 只含调试端口、缺 `--test-type=webdriver` 时不判 E2E，
@@ -687,16 +706,35 @@ mod tests {
     fn e2e_mode_ignores_env_without_webdriver_test_type() {
         assert!(!is_e2e_mode_from(
             &argv(&[]),
-            Some("--remote-debugging-port=9222")
+            Some("--remote-debugging-port=9222"),
+            None
         ));
     }
 
     #[test]
     fn e2e_mode_false_for_plain_launch() {
-        assert!(!is_e2e_mode_from(&argv(&[]), None));
+        assert!(!is_e2e_mode_from(&argv(&[]), None, None));
         assert!(!is_e2e_mode_from(
             &argv(&["--user-data-dir=C:\\tmp\\x"]),
+            None,
             None
         ));
+    }
+
+    /// Linux：tauri-driver 2.x 启动 WebKitWebDriver 时注入
+    /// `TAURI_WEBVIEW_AUTOMATION=true`（1.x 为 `TAURI_AUTOMATION=true`），
+    /// WebKitWebDriver 启动应用时环境被继承 —— 应用侧读环境变量即可判定
+    #[test]
+    fn e2e_mode_detects_tauri_automation_env() {
+        assert!(is_e2e_mode_from(&argv(&[]), None, Some("true")));
+    }
+
+    /// automation 标志严格匹配 "true"：其它值（"1"/"false"/空串）不判 E2E，
+    /// 与 Windows 通道防误判的设计一致
+    #[test]
+    fn e2e_mode_ignores_automation_env_not_true() {
+        assert!(!is_e2e_mode_from(&argv(&[]), None, Some("false")));
+        assert!(!is_e2e_mode_from(&argv(&[]), None, Some("1")));
+        assert!(!is_e2e_mode_from(&argv(&[]), None, Some("")));
     }
 }

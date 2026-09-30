@@ -148,6 +148,20 @@ describe("sanitizeInlineHtml — 白名单标签保留", () => {
     expect(out).toContain('alt="alt text"');
   });
 
+  it("<img src=\"asset://...\"> Tauri asset 协议图片保留（Linux/macOS 本地图）", () => {
+    const html = `<img src="asset://localhost/home/user/pic.png" alt="local">`;
+    const out = sanitizeInlineHtml(html);
+    expect(out).toContain('src="asset://localhost/home/user/pic.png"');
+    expect(out).toContain('alt="local"');
+  });
+
+  it("<img src=\"http://asset.localhost/...\"> Windows asset 域名图片保留", () => {
+    const html = `<img src="http://asset.localhost/C%3A%2Fpic.png" alt="local">`;
+    const out = sanitizeInlineHtml(html);
+    expect(out).toContain('src="http://asset.localhost/C%3A%2Fpic.png"');
+    expect(out).toContain('alt="local"');
+  });
+
   it("<table> 结构保留（含 thead / tbody / tr / td）", () => {
     const html = `<table><thead><tr><th>H</th></tr></thead><tbody><tr><td>D</td></tr></tbody></table>`;
     const out = sanitizeInlineHtml(html);

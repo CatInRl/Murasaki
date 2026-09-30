@@ -26,8 +26,26 @@
  * - DOMPurify 默认白名单已对齐 CommonMark + GFM 渲染需求
  * - 显式白名单易遗漏（如 mathjax/katex 输出包含自定义标签），反而引入风险
  * - 如未来需要收紧（如禁用 style），可在此处添加 ADD_ATTR/FORBID_ATTR 配置
+ *
+ * 唯一例外是 ALLOWED_URI_REGEXP：在 DOMPurify 默认 URI 白名单基础上放行
+ * Tauri asset 协议（见下方常量注释）。
  */
 import DOMPurify from "dompurify";
+
+/**
+ * DOMPurify 默认 URI 白名单（purify.es.mjs 的 IS_ALLOWED_URI）+ Tauri asset 协议。
+ *
+ * 本地图片经 convertFileSrc 转换后的 src：
+ * - Windows：https://asset.localhost/...（https 天然命中默认白名单）
+ * - Linux / macOS：asset://localhost/...（asset: 不在默认白名单）
+ *
+ * 不放行 asset: 时 DOMPurify 会把 <img> 的 src 属性整个剥掉，导致 Linux/macOS
+ * 构建的预览与 HTML 导出中所有本地图片失图（Linux e2e #339 首跑抓出的
+ * 跨平台 bug：Windows 单平台 CI 无法发现）。data: URI 不受影响——DOMPurify
+ * 对 img 等 DATA_URI_TAGS 的 src 走单独放行分支，不经此正则。
+ */
+const ALLOWED_URI_REGEXP =
+  /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix|asset):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
 
 /**
  * 净化 HTML 字符串，清除 XSS payload 并保留白名单标签。
@@ -53,6 +71,8 @@ export function sanitizeInlineHtml(html: string): string {
     // 保留 <a href> 与 <img src>，DOMPurify 默认会清除 javascript: 协议
     // 允许 data: URI（Base64 图片合法）
     ALLOW_DATA_ATTR: true,
+    // 默认 URI 白名单 + Tauri asset 协议（见常量注释）
+    ALLOWED_URI_REGEXP,
   }) as string;
 }
 

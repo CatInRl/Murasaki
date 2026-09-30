@@ -16,6 +16,7 @@ import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
 import { isRendered, readText, textOfElement, waitForPresent, waitForInBrowser } from "../helpers/wait";
+import { toAppPath } from "../helpers/platform";
 
 let browser: Browser;
 
@@ -190,7 +191,7 @@ describe("设计系统", () => {
     await browser.execute((path: string) => {
       // @ts-ignore
       window.__pinia__._s.get("workspace").selectedFilePath = path;
-    }, `${wsPath}\\intro.md`);
+    }, toAppPath(`${wsPath}\\intro.md`));
     await waitForPresent(browser, ".file-tree .node-row.is-selected", 10000);
 
     // 选中底色带 120ms 过渡，读太早会拿到过渡中的中间值；轮询到与

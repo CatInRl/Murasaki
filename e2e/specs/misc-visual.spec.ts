@@ -25,6 +25,7 @@ import {
   resetPersistenceSettings,
 } from "../helpers/store";
 import { isRendered, waitForPresent } from "../helpers/wait";
+import { toAppPath } from "../helpers/platform";
 
 let browser: Browser;
 
@@ -176,7 +177,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
       // @ts-ignore
       const ws = window.__pinia__._s.get("workspace");
       ws.selectedFilePath = path;
-    }, `${wsPath}\\intro.md`);
+    }, toAppPath(`${wsPath}\\intro.md`));
     await browser.pause(300);
 
     // 应有 .is-selected 节点
@@ -198,7 +199,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
       // @ts-ignore
       const ws = window.__pinia__._s.get("workspace");
       ws.selectedFilePath = path;
-    }, `${wsPath}\\intro.md`);
+    }, toAppPath(`${wsPath}\\intro.md`));
     await browser.pause(300);
 
     // 获取选中节点的计算样式
@@ -232,7 +233,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
       // @ts-ignore
       const ws = window.__pinia__._s.get("workspace");
       ws.selectedFilePath = path;
-    }, `${wsPath}\\intro.md`);
+    }, toAppPath(`${wsPath}\\intro.md`));
     await browser.pause(300);
 
     let selected = await browser.$(".file-tree .node-row.is-selected");
@@ -243,7 +244,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
       // @ts-ignore
       const ws = window.__pinia__._s.get("workspace");
       ws.selectedFilePath = path;
-    }, `${wsPath}\\notes.md`);
+    }, toAppPath(`${wsPath}\\notes.md`));
     await browser.pause(300);
 
     // 应仍有且仅有一个 .is-selected（应为 notes.md）

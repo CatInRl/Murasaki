@@ -1,13 +1,15 @@
 /**
- * Vitest globalSetup：
+ * Vitest globalSetup（Windows / Linux 双平台）：
  * 1. 重定向 APPDATA 到 e2e/.appdata/，保证每次测试干净启动
  * 2. 启动 tauri-driver 子进程，监听 4444 端口
  * 3. teardown 时关闭 driver
  */
-import { spawn, execSync, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createConnection } from "node:net";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { IS_WINDOWS } from "./helpers/platform";
+import { killProcessesByName } from "./helpers/processes";
 
 const DRIVER_PORT = 4444;
 // tauri-driver 默认把 msedgedriver 监听在这个端口（cli.rs --native-port 默认 4445）。
@@ -28,26 +30,12 @@ let driverProcess: ChildProcessWithoutNullStreams | null = null;
  * (JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE) 会自动带走它的 msedgedriver 子进程。
  */
 function killStaleProcesses(): void {
-  try {
-    execSync(
-      'powershell -NoProfile -Command "Get-Process -Name murasaki -ErrorAction SilentlyContinue | Stop-Process -Force"',
-      { timeout: 10000, stdio: "ignore" }
-    );
-  } catch {
-    // 忽略：可能没有残留进程
-  }
+  killProcessesByName("murasaki");
 }
 
-/** 杀掉残留的 tauri-driver（Job Object 会带走 msedgedriver 子进程） */
+/** 杀掉残留的 tauri-driver（Windows Job Object 会带走 msedgedriver 子进程） */
 function killStaleDriver(): void {
-  try {
-    execSync(
-      'powershell -NoProfile -Command "Get-Process -Name tauri-driver -ErrorAction SilentlyContinue | Stop-Process -Force"',
-      { timeout: 10000, stdio: "ignore" }
-    );
-  } catch {
-    // 忽略
-  }
+  killProcessesByName("tauri-driver");
 }
 
 /** 轮询等待端口可连 */
@@ -80,19 +68,30 @@ async function waitForPort(
   throw new Error(`tauri-driver 未在 ${timeout}ms 内监听 ${port}`);
 }
 
-/** 查找 tauri-driver 二进制路径（优先 .cargo\bin） */
+/** 查找 tauri-driver 二进制路径（优先 TAURI_DRIVER_PATH，其次 ~/.cargo/bin） */
 function findDriverPath(): string {
   if (process.env.TAURI_DRIVER_PATH) return process.env.TAURI_DRIVER_PATH;
-  if (process.env.USERPROFILE) {
-    const p = `${process.env.USERPROFILE}\\.cargo\\bin\\tauri-driver.exe`;
+  const home = IS_WINDOWS ? process.env.USERPROFILE : process.env.HOME;
+  if (home) {
+    const p = join(
+      home,
+      ".cargo",
+      "bin",
+      IS_WINDOWS ? "tauri-driver.exe" : "tauri-driver"
+    );
     if (existsSync(p)) return p;
   }
-  // Windows 上 spawn 不会查 PATH，回退到 'tauri-driver' 让系统查找
-  return "tauri-driver.exe";
+  // Windows 上 spawn 不查 PATH，返回裸名让系统查找；POSIX 上 spawn 会查 PATH
+  return IS_WINDOWS ? "tauri-driver.exe" : "tauri-driver";
 }
 
-/** 查找 msedgedriver 二进制路径 */
+/**
+ * 查找原生 driver 二进制路径。
+ * Windows = msedgedriver（tauri-driver 不自带，需 --native-driver 显式指定）；
+ * Linux = WebKitWebDriver，tauri-driver 自行在 PATH 中查找，无需传参。
+ */
 function findNativeDriverPath(): string | null {
+  if (!IS_WINDOWS) return null;
   if (process.env.MSEDGEDRIVER_PATH) return process.env.MSEDGEDRIVER_PATH;
   if (process.env.USERPROFILE) {
     const p = `${process.env.USERPROFILE}\\.cargo\\bin\\msedgedriver.exe`;
@@ -122,6 +121,22 @@ async function isPortListening(port: number, host = "127.0.0.1"): Promise<boolea
 }
 
 /**
+ * 应用数据根目录（tauri-plugin-store 的 app_data_dir，settings.json 在
+ * <这里>/com.murasaki.app/ 下）：Windows = %APPDATA%，
+ * macOS = ~/Library/Application Support，Linux = $XDG_DATA_HOME 或 ~/.local/share
+ */
+function appDataDir(): string | null {
+  if (IS_WINDOWS) return process.env.APPDATA ?? null;
+  if (process.platform === "darwin") {
+    return process.env.HOME
+      ? join(process.env.HOME, "Library", "Application Support")
+      : null;
+  }
+  if (process.env.XDG_DATA_HOME) return process.env.XDG_DATA_HOME;
+  return process.env.HOME ? join(process.env.HOME, ".local", "share") : null;
+}
+
+/**
  * 固定界面语言为 zh-CN。
  *
  * e2e 断言全部基于中文文案（`打开文件夹` / `加粗` / `已保存` …），而应用首次启动会按
@@ -131,10 +146,10 @@ async function isPortListening(port: number, host = "127.0.0.1"): Promise<boolea
  * 的其它设置）。
  */
 function ensureChineseLocale(): void {
-  const appData = process.env.APPDATA;
-  if (!appData) return;
+  const base = appDataDir();
+  if (!base) return;
 
-  const dir = join(appData, "com.murasaki.app");
+  const dir = join(base, "com.murasaki.app");
   const file = join(dir, "settings.json");
 
   let state: Record<string, unknown> = {};

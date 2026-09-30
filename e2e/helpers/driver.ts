@@ -15,15 +15,18 @@
  */
 import { attach, type Browser } from "webdriverio";
 import { resolve } from "node:path";
-import { execSync } from "node:child_process";
 import http from "node:http";
 import { createConnection } from "node:net";
 import { existsSync, rmSync } from "node:fs";
 import { clearPersistedTabs, waitForAppReady, waitForPinia } from "./store";
+import { IS_WINDOWS } from "./platform";
+import { isProcessAlive, killProcessesByName } from "./processes";
 
 const DEFAULT_BINARY = resolve(
   process.cwd(),
-  "src-tauri/target/release/murasaki.exe"
+  IS_WINDOWS
+    ? "src-tauri/target/release/murasaki.exe"
+    : "src-tauri/target/release/murasaki"
 );
 
 // tauri-driver 监听地址。attach() 必须显式传入这些参数 —— webdriverio 9.x 的
@@ -283,28 +286,16 @@ export async function closeSession(browser: Browser): Promise<void> {
   // 等待 murasaki 进程退出（最多 8 秒）
   let exited = false;
   for (let i = 0; i < 16; i++) {
-    try {
-      execSync(
-        'powershell -NoProfile -Command "if (Get-Process -Name murasaki -ErrorAction SilentlyContinue) { exit 1 } else { exit 0 }"',
-        { timeout: 2000, stdio: "ignore" }
-      );
+    if (!isProcessAlive("murasaki")) {
       exited = true;
       break;
-    } catch {
-      await new Promise((r) => setTimeout(r, 500));
     }
+    await new Promise((r) => setTimeout(r, 500));
   }
   if (!exited) {
     // 超时后强制清理 murasaki（不要杀 msedgedriver —— 会孤立 tauri-driver，
     // 而 tauri-driver 只在启动时 spawn 一次 msedgedriver，无法恢复）。
-    try {
-      execSync(
-        'powershell -NoProfile -Command "Get-Process -Name murasaki -ErrorAction SilentlyContinue | Stop-Process -Force"',
-        { timeout: 5000, stdio: "ignore" }
-      );
-    } catch {
-      // 忽略
-    }
+    killProcessesByName("murasaki", 5000);
   }
   // 等待文件句柄释放（无论正常退出还是强杀）
   await new Promise((r) => setTimeout(r, 1200));
@@ -312,19 +303,26 @@ export async function closeSession(browser: Browser): Promise<void> {
   // 清理 WebView2 用户数据目录：避免下一次 session 恢复上次的窗口状态
   // （例如 settings 窗口）。目录在 %LOCALAPPDATA%\com.murasaki.app\EBWebView\
   //
+  // 仅 Windows 执行：Linux 上 Tauri 的 WebKitGTK 数据目录直接就是应用数据目录
+  // （~/.local/share/com.murasaki.app/），settings.json（含 zh-CN 预置）也在其中，
+  // 整体删除会破坏语言保证；且 WebKitGTK 没有 WebView2 那种窗口状态恢复行为，
+  // 无需清理。跨 spec 的持久化设置泄漏仍由各 spec 的 resetPersistenceSettings 处理。
+  //
   // 注意：tauri-plugin-store 的持久化设置（sidebarView/editorMode 等）不在此时清理。
   // TRAE Sandbox 会阻止 Node.js 和 PowerShell 子进程删除 %APPDATA%\com.murasaki.app\，
   // 直接 kill 进程。持久化设置泄漏通过 resetPersistenceSettings(browser) 在
   // 各 spec 的 beforeEach 中重置（走 Pinia store API，不涉及文件操作）。
-  const identifier = "com.murasaki.app";
-  const localAppData = `${process.env.USERPROFILE}\\AppData\\Local`;
-  const webviewDir = resolve(localAppData, identifier, "EBWebView");
-  if (existsSync(webviewDir)) {
-    try {
-      rmSync(webviewDir, { recursive: true, force: true });
-    } catch (err) {
-      // 忽略：偶发 EPERM（WebView2 子进程残留句柄）
-      console.warn(`[driver] failed to clean EBWebView:`, err instanceof Error ? err.message : String(err));
+  if (IS_WINDOWS) {
+    const identifier = "com.murasaki.app";
+    const localAppData = `${process.env.USERPROFILE}\\AppData\\Local`;
+    const webviewDir = resolve(localAppData, identifier, "EBWebView");
+    if (existsSync(webviewDir)) {
+      try {
+        rmSync(webviewDir, { recursive: true, force: true });
+      } catch (err) {
+        // 忽略：偶发 EPERM（WebView2 子进程残留句柄）
+        console.warn(`[driver] failed to clean EBWebView:`, err instanceof Error ? err.message : String(err));
+      }
     }
   }
 }
