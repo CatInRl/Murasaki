@@ -178,6 +178,7 @@
   "commands": {
     "needWorkspace": "Please open a workspace first",
     "openFileFirst": "Please open a file first",
+    "outlineNeedsMarkdown": "Outline is only available for Markdown files",
     "insertLinkUrlPrompt": "Enter the link URL:",
     "insertLinkTextPrompt": "Enter the link text:",
     "insertImageUrlPrompt": "Enter the image URL:",

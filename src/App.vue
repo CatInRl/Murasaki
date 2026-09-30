@@ -238,6 +238,21 @@ function expandSidebar(view: SidebarView): void {
   sidebarView.value = view;
 }
 
+/**
+ * 侧栏视图切换的统一入口（菜单 / 快捷键，issue #340）。
+ *
+ * - 折叠态下先展开：否则视图换了但只剩一排图标，用户看不到任何变化（表现为「点了没反应」）
+ * - 大纲只对 Markdown 有意义：当前文件不是 md 时给出说明，而不是静默留在文件树
+ */
+function selectSidebarView(view: SidebarView): void {
+  if (view === "outline" && !canShowOutline.value) {
+    expandSidebar("files");
+    dialog.alert({ message: t("editor.commands.outlineNeedsMarkdown"), variant: "warning" });
+    return;
+  }
+  expandSidebar(view);
+}
+
 /** 侧栏右缘拖拽调宽（pointer events，Drag 期间禁止过渡与文本选择） */
 function startResize(e: PointerEvent): void {
   if (sidebarCollapsed.value) return;
@@ -643,7 +658,7 @@ const { handleMenuEvent, onKeyDown } = useCommands({
   reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, copyRichText,
   onCloseTabRequest,
   workspace, tabsStore, searchStore, fileOps, dialog,
-  editorRef, currentTheme, sidebarView, statusBarVisible,
+  editorRef, currentTheme, selectSidebarView, statusBarVisible,
   tableDialogVisible, allTabsOpen,
   openSettings, toggleFullscreen,
   updater: { check: checkForUpdate },

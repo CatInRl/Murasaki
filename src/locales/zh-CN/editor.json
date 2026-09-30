@@ -178,6 +178,7 @@
   "commands": {
     "needWorkspace": "请先打开一个工作区",
     "openFileFirst": "请先打开一个文件",
+    "outlineNeedsMarkdown": "大纲仅对 Markdown 文件可用",
     "insertLinkUrlPrompt": "请输入链接地址：",
     "insertLinkTextPrompt": "请输入链接文字：",
     "insertImageUrlPrompt": "请输入图片地址：",

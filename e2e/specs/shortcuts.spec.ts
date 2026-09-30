@@ -18,7 +18,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
-import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
+import { resetWorkspace, defaultFixtureFiles, type FixtureFile } from "../helpers/fixtures";
 import {
   openWorkspace,
   closeWorkspace,
@@ -29,11 +29,19 @@ import {
   ensureSplitMode,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { isRendered, waitForPresent } from "../helpers/wait";
+import { isRendered, waitForPresent, waitForAbsent } from "../helpers/wait";
 
 let browser: Browser;
 /** 当前测试用工作区路径（由 beforeEach 设置，it 块直接复用，避免重复 resetWorkspace） */
 let wsPath: string;
+
+/**
+ * 侧栏视图用例需要一个**非 markdown** 文件：大纲对它不可用，切换时应给出说明
+ * 而不是静默留在文件树（issue #340）。
+ */
+function sidebarFixtures(): FixtureFile[] {
+  return [...defaultFixtureFiles(), { path: "plain.txt", content: "纯文本内容。" }];
+}
 
 /** 通过 dispatchEvent 触发 keydown（App.vue 的 onKeyDown 监听 window） */
 async function pressShortcut(
@@ -122,7 +130,7 @@ describe("快捷键", () => {
       // @ts-ignore
       (window as any).__setSidebarView__("files");
     });
-    wsPath = resetWorkspace(defaultFixtureFiles());
+    wsPath = resetWorkspace(sidebarFixtures());
     try {
       await closeAllTabs(browser);
     } catch {
@@ -403,6 +411,47 @@ describe("快捷键", () => {
     const fileTreeVisible = await browser.$(".file-tree").isExisting();
     // 切换后文件树应消失或大纲面板成为主视图
     // （Sidebar.vue 通过 activeView prop 控制显示）
+  });
+
+  // ============ 侧栏视图切换的可见反馈（#340） ============
+
+  it("侧栏折叠时切换视图：先展开侧栏再切到大纲", async () => {
+    await openFileInTab(browser, `${wsPath}\\intro.md`);
+    await waitForPresent(browser, ".file-tree", 10000);
+
+    // 折叠侧栏（点「收起」按钮，与真实用户操作一致）
+    await browser.execute(() => {
+      document.querySelector<HTMLElement>(".murasaki-sidebar-collapse")?.click();
+    });
+    await waitForPresent(browser, ".sidebar-collapsed-rail", 5000);
+
+    // Ctrl+Shift+M：视图切换必须连带展开侧栏 —— 折叠态下文件树与大纲共用同一排图标，
+    // 只换视图不展开，用户看到的就是「点了没有任何反应」
+    await pressShortcut(browser, "m", { ctrl: true, shift: true });
+
+    await waitForAbsent(browser, ".sidebar-collapsed-rail", 5000);
+    await waitForPresent(browser, ".outline-panel", 5000);
+    await waitForAbsent(browser, ".file-tree", 5000);
+  });
+
+  it("非 Markdown 文件下切换到大纲：给出说明而不是静默留在文件树", async () => {
+    await openFileInTab(browser, `${wsPath}\\plain.txt`);
+    await waitForPresent(browser, ".file-tree", 10000);
+
+    await pressShortcut(browser, "m", { ctrl: true, shift: true });
+
+    // 应弹出一条说明（alert 入队），而不是静默什么都不做
+    await browser.waitUntil(async () => {
+      const kinds = await browser.execute(() => {
+        // @ts-ignore
+        const dialog = window.__pinia__._s.get("dialog");
+        return ((dialog.queue ?? []) as { kind: string }[]).map((item) => item.kind);
+      });
+      return kinds.includes("alert");
+    }, { timeout: 5000, interval: 100 });
+
+    // 视图仍是文件树（大纲对非 md 不可用，不做无意义的切换）
+    expect(await (await browser.$(".file-tree")).isExisting()).toBe(true);
   });
 
   // ============ M10: Ctrl+Shift+F 打开统一搜索条 ============
