@@ -216,6 +216,43 @@ describe("演示模式", () => {
     expect(await readText(browser, ".status-zoom-chip", /100%/)).toContain("100%");
   });
 
+  it("放大后预览仍占满编辑区宽度（#337）", async () => {
+    await openWorkspace(browser, wsPath);
+    await openFileInTab(browser, `${wsPath}\\intro.md`);
+    await pressShortcut(browser, "$", { ctrl: true, shift: true });
+    await waitForPresent(browser, ".preview-zoom", 10000);
+
+    // 放大到 200%
+    for (let i = 0; i < 10; i++) {
+      await pressShortcut(browser, "=", { ctrl: true });
+    }
+    await browser.waitUntil(async () => (await getZoom(browser)) === 200, {
+      timeout: 5000,
+      interval: 100,
+    });
+
+    // 用视觉命中测试（elementFromPoint 按**缩放后的视觉布局**判定）：面板左右边缘都应落在
+    // 缩放包裹层内。此前包裹层还额外写了 `width: calc(100% / z)`，等于重复补偿 —— 放大后
+    // 只剩面板宽度的 1/z，右缘会落到 .pane-right 上而不是 .preview-zoom 里。
+    const hits = (await browser.execute(() => {
+      const pane = document.querySelector(".pane-right") as HTMLElement | null;
+      if (!pane) return null;
+      const rect = pane.getBoundingClientRect();
+      const y = Math.round(rect.top + rect.height / 2);
+      const left = document.elementFromPoint(Math.round(rect.left + 6), y);
+      const right = document.elementFromPoint(Math.round(rect.right - 6), y);
+      return {
+        paneW: Math.round(rect.width),
+        leftInBox: !!left && !!left.closest(".preview-zoom"),
+        rightInBox: !!right && !!right.closest(".preview-zoom"),
+      };
+    })) as { paneW: number; leftInBox: boolean; rightInBox: boolean } | null;
+
+    expect(hits?.paneW ?? 0).toBeGreaterThan(100);
+    expect(hits?.leftInBox).toBe(true);
+    expect(hits?.rightInBox).toBe(true);
+  });
+
   it("非演示模式下缩放快捷键不生效", async () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);

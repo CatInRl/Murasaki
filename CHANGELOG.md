@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- 修复**演示模式放大后预览不再占满编辑区宽度（右侧留白，放大越多留白越大）**（#337）：缩放包裹层此前写的是 `zoom: z; width: calc(100% / z); height: calc(100% / z)`，注释里的假设是「`zoom` 会把布局尺寸一并放大」。实测（headless Chromium + 视觉命中测试）恰好相反：`zoom` 下百分比尺寸本就按**缩放后的包含块**解析，`width: 100%` 自己就会填满父容器 —— 再除一次 `z` 等于**重复补偿**，包裹层实际只剩面板宽度的 `1/z`（z = 1.1 / 1.5 / 2 时内容右缘分别只到面板的 88% / 61% / 40%）。现在只设 `zoom`，并把这段逻辑抽成纯函数 `presentationZoomStyle()` 以便单测拦住「又加回反向除宽高」；e2e 补一条用 `elementFromPoint` 的视觉命中断言（面板左右边缘都必须落在缩放包裹层内）。
 - 修复**菜单项右侧的快捷键提示直接显示内部写法 `CmdOrCtrl`**（#341）：accelerator 用的是 Tauri 的跨平台 token `CmdOrCtrl`（表达「macOS 上是 ⌘、其余平台是 Ctrl」），而本项目菜单项**没有注册原生 accelerator**（快捷键实际由前端的全局 keydown 处理），这段字符串纯粹是提示文本 —— 原样拼进菜单项文本就会显示成 `CmdOrCtrl+Shift+E`（Win32 还会把 `\t` 之后的部分右对齐显示，于是它正对着用户的视线）。现在 `with_accel()` 统一按平台转换：Windows / Linux 显示 `Ctrl+Shift+E`，macOS 显示 `⌘+Shift+E`，口径与前端 `formatShortcutForDisplay()` 一致（只换主修饰键，其余键位与 `+` 原样保留）。
 - 修复**视图菜单的「文件树视图 / 大纲视图」点了没有任何反应**（#340），三处一起改：
   - **勾选同步传错了 ID**：`set_sidebar_view_checked` 把**视图名**（`files` / `outline`）当成**菜单项 ID** 传给 `set_checked_by_ids`，而它是按 `item.id() == active_id` 比较的（两个菜单项 ID 是 `toggle-sidebar` / `toggle-outline`）—— 永不相等，于是每次切换后**两项勾选被一起清空**。改为经既有的 `sidebar_menu_id()` 转换（焦点重放路径一直是这么做的，`#194` 修的就是同类问题，这条命令当时漏改）。

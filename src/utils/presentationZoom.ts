@@ -25,3 +25,22 @@ export function clampPresentationZoom(value: number): number {
 export function stepPresentationZoom(current: number, direction: 1 | -1): number {
   return clampPresentationZoom(clampPresentationZoom(current) + direction * PRESENTATION_ZOOM_STEP);
 }
+
+/**
+ * 演示模式缩放包裹层的行内样式（issue #337）。
+ *
+ * **只设 `zoom`，不要再反向除宽高等**：Chromium 下 `zoom` 会让该元素的百分比尺寸
+ * 按「缩放后的包含块」解析 —— `width: 100%` 本身就会填满父容器。此前写法是
+ * `zoom: z; width: calc(100% / z)`，等于**重复补偿**：包裹层实际只剩面板宽度的 1/z，
+ * 放大后右侧留出越来越大的空白（实测 z=1.1/1.5/2 时内容右缘分别只到面板的 88% / 61% / 40%）。
+ *
+ * @param percent 缩放百分比（100 = 不缩放，此时不产出样式）
+ * @returns 行内样式；无 zoom 需要时返回 undefined
+ */
+export function presentationZoomStyle(
+  percent: number
+): Record<string, string> | undefined {
+  const z = percent / 100;
+  if (!Number.isFinite(z) || z === 1) return undefined;
+  return { zoom: String(z) };
+}
