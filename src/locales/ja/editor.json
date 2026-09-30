@@ -178,6 +178,7 @@
   "commands": {
     "needWorkspace": "先にワークスペースを開いてください",
     "openFileFirst": "先にファイルを開いてください",
+    "outlineNeedsMarkdown": "アウトラインは Markdown ファイルでのみ利用できます",
     "insertLinkUrlPrompt": "リンク URL を入力してください：",
     "insertLinkTextPrompt": "リンクテキストを入力してください：",
     "insertImageUrlPrompt": "画像 URL を入力してください：",

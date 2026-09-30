@@ -10,6 +10,10 @@
 
 ### Fixed
 
+- 修复**视图菜单的「文件树视图 / 大纲视图」点了没有任何反应**（#340），三处一起改：
+  - **勾选同步传错了 ID**：`set_sidebar_view_checked` 把**视图名**（`files` / `outline`）当成**菜单项 ID** 传给 `set_checked_by_ids`，而它是按 `item.id() == active_id` 比较的（两个菜单项 ID 是 `toggle-sidebar` / `toggle-outline`）—— 永不相等，于是每次切换后**两项勾选被一起清空**。改为经既有的 `sidebar_menu_id()` 转换（焦点重放路径一直是这么做的，`#194` 修的就是同类问题，这条命令当时漏改）。
+  - **折叠态下切换视图看不到任何变化**：菜单 / 快捷键路径只写 `sidebarView`，**不会展开**侧栏（`expandSidebar()` 只挂在细条的图标按钮上），而折叠态下文件树与大纲共用同一排图标 —— 现在两条路径都走新的 `selectSidebarView()`：先展开再切换。
+  - **非 Markdown 文件下点「大纲视图」是静默回退**：`Sidebar.effectiveView()` 会把大纲强制成文件树，用户只看到「点了没反应」；现在改为给出「大纲仅对 Markdown 文件可用」的说明。
 - 修复**按 `F11`（或菜单「视图 → 全屏」）毫无反应**（#338）：前端 `toggleFullscreen()` 调的是 `plugin:window|set_fullscreen`，但 capability 只声明了 `core:default` + `core:window:allow-close` / `allow-destroy`，而 `core:window:default` 的权限清单里**没有** `allow-set-fullscreen`（只有 `allow-is-fullscreen`），于是该调用被 ACL 拒绝；异常又被 `toggleFullscreen` 的 `try/catch` 吞成一条 `console.error`，对外表现为「按键无效、也不报错」。现补上 `core:window:allow-is-fullscreen` 与 `core:window:allow-set-fullscreen`；顺带把全屏状态改为以 `win.isFullscreen()` 为准（不再自己记一个 ref —— 状态被其它入口改过时本地 ref 会失真，下次按下方向就相反），并补一条 e2e 直接断言该命令未被 ACL 拒绝。
 - **Linux/macOS 本地图片失图（预览与 HTML 导出）**：`sanitizeInlineHtml`（useMarkdownRenderer.render 的统一出口）依赖 DOMPurify 默认 URI 白名单，其中没有 Tauri 的 asset 协议——Windows 上 `convertFileSrc` 产出 `https://asset.localhost/...` 天然命中白名单，Linux/macOS 产出 `asset://localhost/...` 则被 DOMPurify 把 `<img>` 的 `src` 属性整个剥掉，导致这两个平台的预览与 HTML 导出中所有本地图片失图。现以 `ALLOWED_URI_REGEXP` 在默认白名单基础上放行 `asset:`；data URI（Base64 内嵌图）走 DOMPurify 的 DATA_URI_TAGS 单独分支不受影响。同批落地的 Linux e2e 用 3 条 spec（markdown-render 两条 + html-export 一条）坐实该 bug（#339）。
 

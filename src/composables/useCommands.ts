@@ -82,7 +82,11 @@ export interface CommandsDeps {
   // 响应式状态（commands 读写）
   editorRef: Ref<EditorPaneLike | null>;
   currentTheme: Ref<string>;
-  sidebarView: Ref<SidebarView>;
+  /**
+   * 切换侧栏视图（文件树 / 大纲）。由 App.vue 提供，因为「折叠态先展开」与
+   * 「大纲仅对 Markdown 可用」两条规则都归它管（issue #340）。
+   */
+  selectSidebarView: (view: SidebarView) => void;
   statusBarVisible: Ref<boolean>;
   tableDialogVisible: Ref<boolean>;
   /** 「全部标签」面板展开状态（受控于 App.vue，TabBar 只读 + 双向绑定，issue #168） */
@@ -121,7 +125,7 @@ export function useCommands(deps: CommandsDeps) {
     reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, copyRichText,
     onCloseTabRequest,
     workspace, tabsStore, searchStore, fileOps, dialog,
-    editorRef, currentTheme, sidebarView, statusBarVisible,
+    editorRef, currentTheme, selectSidebarView, statusBarVisible,
     tableDialogVisible, allTabsOpen,
     openSettings, toggleFullscreen, updater,
     zoomIn, zoomOut, zoomReset,
@@ -307,13 +311,13 @@ export function useCommands(deps: CommandsDeps) {
         await updater.check(false);
         break;
       }
-      // 视图菜单 / 快捷键共用：文件树视图、大纲视图、状态栏、全屏
+      // 视图菜单 / 快捷键共用：切换侧栏视图（折叠态会先展开，非 md 时大纲给提示）
       case "toggle-sidebar": {
-        sidebarView.value = "files";
+        selectSidebarView("files");
         break;
       }
       case "toggle-outline": {
-        sidebarView.value = "outline";
+        selectSidebarView("outline");
         break;
       }
       case "switch-tab-next": {

@@ -552,7 +552,9 @@ pub fn set_sidebar_view_checked(
 
     let view_ids = ["toggle-sidebar", "toggle-outline"];
     let menu = app.menu().ok_or("菜单未初始化")?;
-    set_checked_by_ids(&menu, &view_ids, &view_id)
+    // view_id 是视图名（files / outline），而勾选 API 要的是菜单项 ID —— 必须转换，
+    // 否则 id == active_id 永不相等，两项勾选会被一起清空（issue #340）。
+    set_checked_by_ids(&menu, &view_ids, sidebar_menu_id(&view_id))
 }
 
 /// 前端调用：切换界面语言后重建原生菜单
