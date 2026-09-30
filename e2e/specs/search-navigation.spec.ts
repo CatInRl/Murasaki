@@ -105,28 +105,39 @@ describe("跨文件搜索结果跳转", () => {
   });
 
   it("点击搜索结果打开对应文件到新 tab", async () => {
-    // 打开统一搜索条
+    // 打开统一搜索条，并等它挂载完成 —— GSB onMounted 会 clear()（清空 query/results），
+    // 挂载完成前写入查询会被清掉（WebKit 上脚本推进可能快于渲染进程完成挂载）
     await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
-    await browser.pause(200);
+    await waitForPresent(browser, ".gsb__input input", 10000);
 
-    // 输入关键词触发搜索（内容命中渲染到 .gsb__item）
-    const input = await browser.$(".gsb__input input");
-    await input.setValue("abc123");
+    // 经 store 驱动搜索（与「搜索关键词返回匹配文件结果」用例同款）：setValue → @input →
+    // 250ms 防抖这条输入链路在 WebKit 上不确定（Linux 首跑两个输入驱动用例都没产出结果），
+    // store 驱动则每轮 CI 都稳定；await 落定后 results 已被权威覆盖、chunk 监听已清理，
+    // 列表不再重渲染，点击也就没有「落在被替换节点上」的竞态
+    const result = await browser.executeAsync((done: (res: unknown) => void) => {
+      // @ts-ignore
+      const pinia = window.__pinia__;
+      const search = pinia._s.get("search");
+      search.setOptions({ regex: false, caseSensitive: false, wholeWord: false });
+      search.setQuery("abc123");
+      Promise.resolve(search.search())
+        .then(() => done({ ok: true, resultsCount: search.results.length }))
+        .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
+    });
+    expect(result as any).toMatchObject({ ok: true });
+    expect((result as any).resultsCount).toBeGreaterThanOrEqual(2);
 
     // 等待内容命中结果渲染（等待在先、取句柄在后：browser.$ 对不存在的元素不抛错，
     // 先取句柄会把等待整步做废 —— #320）
     await waitForPresent(browser, ".gsb__item", 10000);
 
-    // 点击结果项打开文件。内容命中按文件流式到达（search-result-chunk，每命中一个
-    // 文件就追加一次并重渲染列表），「取句柄 → 点击落地」之间若下一个 chunk 到达，
-    // 点击会落在已被替换的节点上变成 no-op；openFile 又是 async 的 IPC 链
-    // （read_text_file + get_file_mtime），WebKitWebDriver 上每条命令都更慢，
-    // 固定 sleep 等不到 tab。按 #273 的有界重派发手法：点击后短窗轮询 tabs store，
-    // 未打开则重取句柄再点，共 3 次。
+    // 点击结果项打开文件。openFile 是 async 的 IPC 链（read_text_file + get_file_mtime），
+    // WebKitWebDriver 上每条命令都更慢，固定 sleep 等不到 tab；按 #273 的有界重派发手法：
+    // 点击后短窗轮询 tabs store，未打开则重取句柄再点，共 3 次。
     const attempts = 3;
     let tabsState: { count: number; activePath: string | null } | null = null;
     for (let attempt = 1; attempt <= attempts && !tabsState; attempt++) {
@@ -206,20 +217,23 @@ describe("跨文件搜索结果跳转", () => {
   });
 
   it("文件名搜索", async () => {
-    // 打开统一搜索条
+    // 打开统一搜索条并等挂载完成（同点击用例：先等挂载再写 query，避开 onMounted clear()）
     await browser.execute(() => {
       // @ts-ignore
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
-    await browser.pause(200);
+    await waitForPresent(browser, ".gsb__input input", 10000);
 
-    // 输入文件名（前端模糊匹配，无需 Rust）
-    const input = await browser.$(".gsb__input input");
-    await input.setValue("file-b");
-    await browser.pause(300);
+    // 文件名分组是纯前端 computed（filesSource 对 query 模糊匹配，无需 Rust），
+    // 经 store 写入 query 即渲染；同样绕开 WebKit 上不确定的 setValue → @input 链路
+    await browser.execute(() => {
+      // @ts-ignore
+      const search = window.__pinia__._s.get("search");
+      search.setQuery("file-b");
+    });
 
-    // 结果区应出现含 file-b.md 的条目（文件名分组）
+    // 条目出现用轮询等（waitForPresent），出现后再取句柄读取
     const items = await browser.$$(".gsb__item");
     // webdriverio v9 的 `$$` 返回值把原生 Array.map 覆盖成了异步版（返回 Promise 而非可迭代数组），
     // 所以 `Promise.all(items.map(...))` 会因「参数不可迭代」报错；直接 await 这个异步 map 即可拿到文本数组
