@@ -46,7 +46,7 @@
     "dompurify": "^3.4.15",
     "katex": "^0.18.7",
     "lucide-vue-next": "^0.577.0",
-    "markdown-it": "^14.3.0",
+    "markdown-it": "^14.3.2",
     "markdown-it-abbr": "^2.0.0",
     "markdown-it-container": "^4.0.0",
     "markdown-it-emoji": "^3.1.0",
