@@ -3,7 +3,7 @@
  * 依赖 main.ts 中暴露的 window.__pinia__
  */
 import type { Browser } from "webdriverio";
-import { waitForInBrowser, slowCallExtension } from "./wait";
+import { waitForInBrowser, slowCallExtension, appProbe } from "./wait";
 import { toAppPath } from "./platform";
 
 /**
@@ -58,11 +58,12 @@ export async function waitForPinia(
       deadline += slowCallExtension(sweepStart);
     }
 
-    // 主探针：execute 在服务端挂起时 30s 后抛 script timeout（#375）——
-    // 吞掉继续轮询，等客户端重发自愈；报错保留在 lastProbeError 供超时诊断。
+    // 主探针：macOS 走 appProbe（direct eval + reclaim 恢复，#375 A），其余平台
+    // 仍 browser.execute；后者挂起时 30s 后抛 script timeout（#375）——吞掉继续
+    // 轮询，等客户端重发自愈；报错保留在 lastProbeError 供超时诊断。
     const probeStart = Date.now();
     try {
-      const ready = await browser.execute(() => {
+      const ready = await appProbe(browser, () => {
         // @ts-ignore
         return !!(window as any).__pinia__;
       });
