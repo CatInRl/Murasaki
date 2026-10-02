@@ -207,13 +207,19 @@ describe("多窗口多工作区", () => {
     await browser.switchToWindow(wsWindow);
     await waitForPiniaInCurrentWindow(browser, 30000);
 
-    await browser.execute(() => {
-      try {
-        window.__TAURI_INTERNALS__.invoke("close_window");
-      } catch {
-        /* ignore */
-      }
-    });
+    await browser
+      .execute(() => {
+        try {
+          window.__TAURI_INTERNALS__.invoke("close_window");
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {
+        // close_window 销毁当前 webview 后 IPC channel 随之断开，这次 execute
+        // 必然报 "Channel closed"——是预期副作用而非失败；真实断言在下方
+        // waitUntil（句柄数归一）与主窗口存活检查。
+      });
 
     await browser.waitUntil(
       async () => (await browser.getWindowHandles()).length === 1,

@@ -213,6 +213,33 @@ async function pressHomeOrEnd(b: Browser, key: "Home" | "End"): Promise<void> {
   await b.pause(100);
 }
 
+/**
+ * 按 Ctrl+Shift+{字母} 段落快捷键（macOS 为 Cmd+Shift+{字母}）。
+ *
+ * 插件合成的「双修饰键 + 字母」事件修饰位不可靠（单修饰键 11.1 可达 keymap，
+ * 双修饰键命中失败），与 pressHomeOrEnd 同因改走直接派发：key 用小写字母并置
+ * metaKey + shiftKey，经 CM6 runHandlers 的字符键分支加 Shift 前缀后命中
+ * Meta-Shift-{k}（绑定 Mod-Shift-k 在 macOS 上的归一化结果）。
+ */
+async function pressParagraphShortcut(b: Browser, key: "k" | "q"): Promise<void> {
+  if (!IS_MACOS) {
+    await b.keys(["Control", "Shift", key]);
+  } else {
+    await b.execute((k: string) => {
+      (document.activeElement as HTMLElement | null)?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: k,
+          metaKey: true,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    }, key);
+  }
+  await b.pause(100);
+}
+
 /** 按 Backspace N 次 */
 async function pressBackspace(b: Browser, times = 1): Promise<void> {
   for (let i = 0; i < times; i++) {
@@ -836,8 +863,9 @@ describe("WYSIWYG 模式全量测试", () => {
   // 11. 编辑测试 - 快捷键
   // ========================================================================
   // 快捷键命中走 CM6 keymap 路径（buildEditorShortcutExtension，Prec.highest）；
-  // 合成按键不会经过原生菜单（NSMenu 加速器只截获真实按键）。macOS 上 Mod = Meta，
-  // 因此 macOS 用 Meta 前缀组合键（其余平台用 Control）。
+  // 合成按键不会经过原生菜单（NSMenu 加速器只截获真实按键）。macOS 上 Mod = Meta。
+  // 单修饰键（11.1）插件合成事件可达 keymap；双修饰键 + 字母（11.2/11.3）插件
+  // 合成不可靠，macOS 改走 pressParagraphShortcut 的直接 keydown 派发。
   describe("11. 编辑 - 段落快捷键", () => {
     it("11.1 Ctrl+1 切换到 H1", async () => {
       await setContentAndWait(browser, "文本");
@@ -851,7 +879,7 @@ describe("WYSIWYG 模式全量测试", () => {
     it("11.2 Ctrl+Shift+K 插入代码块", async () => {
       await setContentAndWait(browser, "文本");
       await setCursor(browser, 1);
-      await browser.keys(IS_MACOS ? ["Meta", "Shift", "k"] : ["Control", "Shift", "k"]);
+      await pressParagraphShortcut(browser, "k");
       await browser.pause(200);
       const content = await getContent(browser);
       // 可能插入 ``` 围栏
@@ -861,7 +889,7 @@ describe("WYSIWYG 模式全量测试", () => {
     it("11.3 Ctrl+Shift+Q 切换引用块", async () => {
       await setContentAndWait(browser, "文本");
       await setCursor(browser, 1);
-      await browser.keys(IS_MACOS ? ["Meta", "Shift", "q"] : ["Control", "Shift", "q"]);
+      await pressParagraphShortcut(browser, "q");
       await browser.pause(200);
       const content = await getContent(browser);
       expect(content).toMatch(/^>\s/);
