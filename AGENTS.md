@@ -195,9 +195,20 @@ milestone 可以并存（例如 `0.9.5` 与 `1.0.0` 各挂各的 issue），但*
 
 完整 changelog 详见 [CHANGELOG.md](CHANGELOG.md)。版本发布时必须同步更新该文件。
 
-### 当前版本：0.10.0（2026-09-29）
+### 当前版本：0.10.1（2026-10-02）
 
-**文件打开与拖放体验补全 + 配色单一来源**：拖入窗口即可打开文件 / 文件夹，应用打不开的文件（pdf / zip / exe…）给出兜底出口与拖入提示，图片插入方式可配置，标签栏新增常驻「全部标签」面板；配色收敛为「色阶 → 语义 token」单一来源并让 Mermaid / PlantUML / KaTeX 与 HTML 导出跟随主色，新增 i18n key 与设计 token 两道静态守卫；同时彻底移除自 0.5.0 起就已关闭的 AI Agent 功能，并修掉一批静默失效。
+**三平台 e2e + 退出确认 + 一批交互修复**：CI 的 e2e 矩阵扩到三平台（Linux 真实 WebKitGTK 驱动、macOS 应用内嵌 WebDriver 首期只跑不拦）；关闭窗口 / 退出应用时有未保存改动改为三选一汇总确认（不再静默落盘）；修复拖入图片落点、演示模式缩放留白、菜单快捷键提示、视图菜单切换、全屏快捷键与 Linux/macOS 本地图片失图；升级四个运行期依赖清掉 17 条安全告警。
+
+- Linux e2e：CI 新增 `e2e (linux)` job——tauri-driver + WebKitWebDriver（webkit2gtk-driver）驱动真实 WebKitGTK，经 Xvfb 无头运行，与 Windows e2e 共用同一套 spec；Rust `is_e2e_mode()` 增加 Linux 判定通道，e2e harness（进程清理、driver 查找、settings.json 路径、预检脚本）跨平台化。首跑即拦下 spec 里反斜杠拼接路径在 Linux 上产生混合分隔符、应用打不开文件的问题——接收路径的边界现按平台归一化（Windows 原样，其余平台 `\` → `/`）
+- macOS e2e：CI 新增 `e2e (macos)` job（首期只跑不拦）——tauri-driver 在 macOS 走 safaridriver 需 GUI 授权不可行，改为应用内嵌 WebDriver 服务端：新增 macOS 运行期依赖 `tauri-plugin-wdio-webdriver` 1.4.0（`cfg(target_os = "macos")` 门控且仅 debug 构建注册，生产 release 无调试端口），harness 直接 spawn debug 二进制并注入 `TAURI_WEBDRIVER_PORT` / `WDIO_EMBEDDED_SERVER`，轮询 `GET /status` 就绪后直连建 session；Windows / Linux 链路不变。收尾修掉 macOS 合成键盘事件不触发 CM6 绑定（`browser.execute` 直派 KeyboardEvent，绕过插件的事件合成路径）与关窗用例误报（容忍 `close_window` 的 IPC 断开）
+- 退出确认（#346，[ADR-0017](docs/adr/0017-close-interception-with-draft-flush-on-exit.md) 部分修订）：关闭窗口 / 退出应用时有未保存改动，由静默落盘改为一次三选一汇总确认（全部保存并关闭 / 不保存关闭 / 取消）；选「保存」逐个写回、任一取消或失败即中止退出；多窗口各自询问，无未保存改动不打扰；退出时草稿兜底保留。顺带修正 CONTEXT.md「未命名 tab 下次启动不恢复」的旧说法
+- 修复（#344/#337/#341/#340/#338）：拖入图片落点不再整体偏上（wry 在 OLE 回调里已做 `ScreenToClient`，落点本就相对 webview 客户区，删掉装饰偏移只做 DPR 折算，顺带修贴近左上角拖入被判非法坐标静默回退光标）；演示模式放大后预览占满编辑区（`zoom` 下百分比按缩放后的包含块解析，删反向除宽高的重复补偿，逻辑抽为纯函数 `presentationZoomStyle()`）；菜单快捷键提示按平台显示 `Ctrl` / `⌘`（不再原样显示内部 token `CmdOrCtrl`）；视图菜单「文件树视图 / 大纲视图」点击生效（勾选同步传错 ID + 折叠态不展开 + 非 Markdown 静默回退，三处一起修）；`F11` 全屏生效（capability 缺 `core:window:allow-set-fullscreen` 被 ACL 拒、异常又被吞，补权限并改以 `win.isFullscreen()` 为准）
+- Linux/macOS 本地图片失图（#339）：DOMPurify 默认 URI 白名单没有 Tauri 的 asset 协议，`asset://localhost/...` 的 `<img src>` 被整个剥掉，预览与 HTML 导出全部失图；现以 `ALLOWED_URI_REGEXP` 放行 `asset:`，data URI（Base64 内嵌）不受影响
+- 安全（#353/#354/#355/#356，共清 17 条告警）：`brace-expansion` 2.1.7（4 高危 + 1 中危 DoS：无界展开 OOM / 无控递归栈耗尽等）、`undici` 7.30.0（2 高危 + 5 中危 + 3 低危：TLS 选项克隆丢失、WebSocket 子协议未捕获异常、解压无上限、缓存重放泄 cookie 等）、`markdown-it` 14.3.2（linkify 二次复杂度可阻塞事件循环数十秒）、`dompurify` 3.4.16（afterSanitize 移除节点后残留事件处理器可触发 DOM XSS）
+
+### 历史版本
+
+- 0.10.0（2026-09-29）：**文件打开与拖放体验补全 + 配色单一来源**：拖入窗口即可打开文件 / 文件夹，应用打不开的文件（pdf / zip / exe…）给出兜底出口与拖入提示，图片插入方式可配置，标签栏新增常驻「全部标签」面板；配色收敛为「色阶 → 语义 token」单一来源并让 Mermaid / PlantUML / KaTeX 与 HTML 导出跟随主色，新增 i18n key 与设计 token 两道静态守卫；同时彻底移除自 0.5.0 起就已关闭的 AI Agent 功能，并修掉一批静默失效。
 
 - 打不开的文件有兜底出口（#307/#317/#318）：新增 Rust 命令 `open_with_default_app`（Windows `explorer.exe` / macOS `open` / Linux `xdg-open`，不经 shell）；文件树右键给「用系统默认程序打开」、点击弹说明、拖入时恰好 1 个附同一动作（≥2 个只报计数）；拖入多目录 / 目录与文件混投时提示「已忽略 N 个文件夹（一个窗口只能打开一个工作区）」。取舍与完整打开矩阵写入 [ADR-0020](docs/adr/0020-file-open-strategy-and-fallbacks.md)
 - 拖拽打开文件 / 文件夹（#92）：走 Tauri 原生 drag-drop（`onDragDropEvent`）而非 HTML5 拖放（原生事件会拦截系统文件拖放）；恰好一个目录 → 新窗口打开（同目录已在某窗口打开则聚焦），文件逐个在当前窗口开为标签，拖拽经过窗口显示「松开以打开」遮罩
