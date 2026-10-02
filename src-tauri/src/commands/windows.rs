@@ -124,6 +124,12 @@ pub fn create_editor_window(app: &AppHandle, path: Option<String>) -> Result<Str
         .resizable(true)
         .fullscreen(false);
 
+    // E2E（所有平台）：注入与主窗口相同的 console 捕获脚本（#371）。
+    // 新窗口若 __pinia__ 迟迟未暴露，helper 超时时可 dump 出启动期日志。
+    if crate::is_e2e_mode() {
+        builder = builder.initialization_script(crate::E2E_CONSOLE_HOOK_SCRIPT);
+    }
+
     // E2E：主窗口在 `lib.rs` setup 里按 `--remote-debugging-port` 注入 WebView2 参数，
     // 动态创建的窗口必须注入完全相同的参数 —— 否则 WebView2 因环境选项不同另起一个
     // 浏览器进程，调试端点（msedgedriver / CDP）上看不到新窗口，多窗口 E2E 无从驱动。

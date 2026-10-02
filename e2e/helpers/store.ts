@@ -119,9 +119,36 @@ export async function waitForPiniaInCurrentWindow(
     if (ready) return;
     await browser.pause(500);
   }
+  // 超时：收集 webview 内的诊断信息（#371）—— console 缓冲由 Rust 侧
+  // initialization_script 在任何页面脚本前注入，能反映 __pinia__ 初始化全程
   const title = await browser.getTitle().catch(() => "<unknown>");
+  let detail = `title="${title}"`;
+  const diag = await browser
+    .execute(() => {
+      // @ts-ignore
+      const buf = (window as any).__murasakiConsoleBuffer__;
+      return {
+        readyState: document.readyState,
+        logs: buf ? buf.slice(-100) : null,
+      };
+    })
+    .catch(() => null);
+  if (!diag) {
+    detail += "，诊断信息收集失败（execute 抛错，webview 可能已崩溃）";
+  } else {
+    detail += `，readyState="${diag.readyState}"`;
+    if (diag.logs === null) {
+      detail += "，__murasakiConsoleBuffer__ 未注入（initialization_script 未生效？）";
+    } else if (diag.logs.length > 0) {
+      detail +=
+        `，webview console（最近 ${diag.logs.length} 条）：\n` +
+        diag.logs.map((l: any) => `  [${l.level}] ${l.msg}`).join("\n");
+    } else {
+      detail += "，webview console 缓冲为空（页面脚本未产生任何输出）";
+    }
+  }
   throw new Error(
-    `waitForPiniaInCurrentWindow 超时 (${timeout}ms)：当前句柄未暴露 __pinia__。title="${title}"。`
+    `waitForPiniaInCurrentWindow 超时 (${timeout}ms)：当前句柄未暴露 __pinia__。${detail}`
   );
 }
 
