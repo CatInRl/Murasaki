@@ -124,7 +124,9 @@ function embeddedServerReady(port: number): Promise<boolean> {
   });
 }
 
-async function waitForEmbeddedServer(port: number, timeout = 60000): Promise<void> {
+// 单轮 25s：beforeAll hook 预算 60s，3 次重试若单轮 60s 会在首轮顶穿 hook，
+// 失败时报错沦为 vitest 裸超时；收窄后至少完整跑完 2 轮，由这里抛出带排查指引的错误
+async function waitForEmbeddedServer(port: number, timeout = 25000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     if (await embeddedServerReady(port)) return;
