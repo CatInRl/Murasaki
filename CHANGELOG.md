@@ -4,10 +4,14 @@
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-02
+
+本版本为 0.10.0 的补丁版：CI e2e 矩阵扩展到 Linux / macOS（macOS 首期只跑不拦），关闭窗口 / 退出应用时有未保存改动改为三选一汇总确认（替代静默落盘），修复拖入图片落点、演示模式缩放留白、菜单快捷键提示、视图菜单切换、全屏快捷键与 Linux/macOS 本地图片失图，并升级四个运行期依赖清掉 17 条安全告警。
+
 ### Added
 
 - **Linux e2e 支持**：CI 新增 `e2e (linux)` job——tauri-driver + WebKitWebDriver（webkit2gtk-driver）驱动真实 WebKitGTK，经 Xvfb 无头运行，与 Windows 的 WebView2 e2e 共用同一套 spec；Rust 侧 `is_e2e_mode()` 增加 Linux 判定通道（tauri-driver 经 WebKitWebDriver 启动应用时注入的 `TAURI_WEBVIEW_AUTOMATION` / `TAURI_AUTOMATION` 环境变量），e2e harness（进程清理、driver 查找、settings.json 路径、预检脚本）跨平台化，预检由 PowerShell 脚本改为跨平台 Node 实现。首跑即拦下一类真问题：spec 里 `${WS1}\\file.md` 式的反斜杠拼接在 Linux 上产生混合分隔符路径，应用打不开文件且 `executeAsync` 永不返回、整套挂起——现统一在接收路径的边界按平台归一化（Windows 原样保留，其余平台 `\` → `/`）。
-- **macOS e2e 支持**：CI 新增 `e2e (macos)` job（首期只跑不拦，同 Linux e2e 提升路径）——tauri-driver 在 macOS 走 safaridriver 需 GUI 授权、CI 不可行，改为**应用内嵌 WebDriver 服务端**：新增 macOS 运行期依赖 `tauri-plugin-wdio-webdriver` 1.4.0（`cfg(target_os = "macos")` 门控，且仅 debug 构建注册，生产 release 无调试端口）；harness 直接 spawn debug 二进制并注入 `TAURI_WEBDRIVER_PORT` / `WDIO_EMBEDDED_SERVER`，轮询 `GET /status` 就绪后直连建 session；Rust 侧 `is_e2e_mode()` 新增 macOS 判定通道（识别内嵌服务端注入的环境变量），Windows / Linux 链路不变。
+- **macOS e2e 支持**：CI 新增 `e2e (macos)` job（首期只跑不拦，同 Linux e2e 提升路径）——tauri-driver 在 macOS 走 safaridriver 需 GUI 授权、CI 不可行，改为**应用内嵌 WebDriver 服务端**：新增 macOS 运行期依赖 `tauri-plugin-wdio-webdriver` 1.4.0（`cfg(target_os = "macos")` 门控，且仅 debug 构建注册，生产 release 无调试端口）；harness 直接 spawn debug 二进制并注入 `TAURI_WEBDRIVER_PORT` / `WDIO_EMBEDDED_SERVER`，轮询 `GET /status` 就绪后直连建 session；Rust 侧 `is_e2e_mode()` 新增 macOS 判定通道（识别内嵌服务端注入的环境变量），Windows / Linux 链路不变。后续收尾修掉 macOS 上合成键盘事件不触发 CM6 快捷键绑定的问题（改用 `browser.execute` 直接派发 KeyboardEvent，绕过插件的事件合成路径），关窗用例则容忍 `close_window` 引发 IPC 通道断开的预期副作用。
 
 ### Changed
 
