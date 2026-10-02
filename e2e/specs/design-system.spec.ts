@@ -16,7 +16,7 @@ import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
 import { isRendered, readText, textOfElement, waitForPresent, waitForInBrowser } from "../helpers/wait";
-import { toAppPath } from "../helpers/platform";
+import { IS_MACOS, toAppPath } from "../helpers/platform";
 
 let browser: Browser;
 
@@ -118,15 +118,16 @@ describe("设计系统", () => {
     const hints = await browser.$$(".welcome-page .shortcut-hint");
     expect(hints.length).toBeGreaterThanOrEqual(3);
 
-    // 验证包含 Ctrl+O 提示
+    // macOS 按 #341 的平台转换显示 ⌘ 变体，期望值按平台取
+    const expectKey = (win: string, mac: string) => (IS_MACOS ? mac : win);
     const hintTexts: string[] = [];
     for (let i = 0; i < hints.length; i++) {
       const kbd = await hints[i].$(".shortcut-key");
       hintTexts.push(await textOfElement(browser, kbd));
     }
-    expect(hintTexts).toContain("Ctrl+O");
-    expect(hintTexts).toContain("Ctrl+N");
-    expect(hintTexts).toContain("Ctrl+Shift+O");
+    expect(hintTexts).toContain(expectKey("Ctrl+O", "⌘+O"));
+    expect(hintTexts).toContain(expectKey("Ctrl+N", "⌘+N"));
+    expect(hintTexts).toContain(expectKey("Ctrl+Shift+O", "⌘+Shift+O"));
   });
 
   it("无工作区时文件树显示 EmptyState", async () => {

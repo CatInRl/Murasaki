@@ -16,6 +16,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { waitForPinia, dismissAllDialogs } from "../helpers/store";
 import { textOfElement, waitForPresent, waitForAbsent } from "../helpers/wait";
+import { IS_MACOS } from "../helpers/platform";
 
 let browser: Browser;
 
@@ -188,7 +189,8 @@ describe("右键菜单", () => {
     await waitForAbsent(browser, ".murasaki-context-menu", 5000);
   });
 
-  it("点击外部关闭菜单", async () => {
+  // macOS 跳过：WebDriver 合成 click 在 WKWebView 上不触发外部点击关闭监听，跟进 #370
+  it.skipIf(IS_MACOS)("点击外部关闭菜单", async () => {
     await browser.execute(() => {
       // @ts-ignore
       const menu = window.__pinia__._s.get("contextMenu");

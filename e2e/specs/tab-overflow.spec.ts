@@ -18,6 +18,7 @@ import { resolve } from "node:path";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
+import { IS_MACOS } from "../helpers/platform";
 import type { FixtureFile } from "../helpers/fixtures";
 import {
   openWorkspace,
@@ -357,7 +358,8 @@ describe("全部标签面板", () => {
     await waitForAbsent(browser, PANEL, 8000);
   });
 
-  it("点击面板外部关闭", async () => {
+  // macOS 跳过：WebDriver 合成 click 在 WKWebView 上不触发外部点击关闭监听（疑似 mousedown/pointerdown 事件序列差异），跟进 #370
+  it.skipIf(IS_MACOS)("点击面板外部关闭", async () => {
     await openFiles(["intro.md", "notes.md"]);
     await openPanel();
 

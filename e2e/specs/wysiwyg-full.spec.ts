@@ -25,6 +25,7 @@ import {
 } from "../helpers/store";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { readText, textOfElement, waitForPresent } from "../helpers/wait";
+import { IS_MACOS } from "../helpers/platform";
 
 /** 测试用 markdown 文件路径 */
 const TEST_FILE = "test.md";
@@ -595,7 +596,8 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 6. 编辑测试 - 基础输入
   // ========================================================================
-  describe("6. 编辑 - 基础输入", () => {
+  // macOS 跳过：WebDriver 键盘合成在 WKWebView 上不生效（keys 输入后内容无变化），跟进 #370
+  describe.skipIf(IS_MACOS)("6. 编辑 - 基础输入", () => {
     it("6.1 在 WYSIWYG 模式下输入普通文本", async () => {
       await setContentAndWait(browser, "正文");
       // 光标在 "正" 和 "文" 之间（position 1）
@@ -742,7 +744,8 @@ describe("WYSIWYG 模式全量测试", () => {
       expect(pos).toBeLessThanOrEqual(4);
     });
 
-    it("9.3 End 键跳到行尾", async () => {
+    // macOS 跳过：End 键合成事件在 WKWebView 上不生效（光标不动），跟进 #370
+    it.skipIf(IS_MACOS)("9.3 End 键跳到行尾", async () => {
       await setContentAndWait(browser, "# 标题");
       await setCursor(browser, 0);
       await browser.keys(["End"]);
@@ -803,7 +806,8 @@ describe("WYSIWYG 模式全量测试", () => {
   // 11. 编辑测试 - 快捷键
   // ========================================================================
   describe("11. 编辑 - 段落快捷键", () => {
-    it("11.1 Ctrl+1 切换到 H1", async () => {
+    // macOS 跳过：Ctrl 组合键合成在 WKWebView 上未触发快捷键，跟进 #370
+    it.skipIf(IS_MACOS)("11.1 Ctrl+1 切换到 H1", async () => {
       await setContentAndWait(browser, "文本");
       await setCursor(browser, 1);
       await browser.keys(["Control", "1"]);
@@ -812,7 +816,8 @@ describe("WYSIWYG 模式全量测试", () => {
       expect(content).toMatch(/^#\s/);
     });
 
-    it("11.2 Ctrl+Shift+K 插入代码块", async () => {
+    // macOS 跳过：Ctrl 组合键合成在 WKWebView 上未触发快捷键，跟进 #370
+    it.skipIf(IS_MACOS)("11.2 Ctrl+Shift+K 插入代码块", async () => {
       await setContentAndWait(browser, "文本");
       await setCursor(browser, 1);
       await browser.keys(["Control", "Shift", "k"]);
