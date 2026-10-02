@@ -189,8 +189,7 @@ describe("右键菜单", () => {
     await waitForAbsent(browser, ".murasaki-context-menu", 5000);
   });
 
-  // macOS 跳过：WebDriver 合成 click 在 WKWebView 上不触发外部点击关闭监听，跟进 #370
-  it.skipIf(IS_MACOS)("点击外部关闭菜单", async () => {
+  it("点击外部关闭菜单", async () => {
     await browser.execute(() => {
       // @ts-ignore
       const menu = window.__pinia__._s.get("contextMenu");
@@ -202,8 +201,20 @@ describe("右键菜单", () => {
 
     await waitForPresent(browser, ".murasaki-context-menu", 5000);
 
-    // 点击 body（菜单外部）
-    await browser.$("body").click();
+    if (IS_MACOS) {
+      // macOS：插件 element click 只派发单个 click 事件，而外部关闭监听依赖 mousedown（#370），
+      // 手动派发完整鼠标序列到 body（菜单外部）
+      await browser.execute(() => {
+        for (const type of ["mousedown", "mouseup", "click"] as const) {
+          document.body.dispatchEvent(
+            new MouseEvent(type, { bubbles: true, cancelable: true, composed: true })
+          );
+        }
+      });
+    } else {
+      // 点击 body（菜单外部）
+      await browser.$("body").click();
+    }
 
     await waitForAbsent(browser, ".murasaki-context-menu", 5000);
   });

@@ -161,9 +161,55 @@ async function setCursorToEnd(b: Browser): Promise<void> {
   await b.pause(150);
 }
 
-/** 在当前光标位置输入文本 */
+/**
+ * 在当前光标位置输入文本。
+ *
+ * macOS 走应用内嵌 WebDriver 插件（tauri-plugin-wdio-webdriver），插件对按键只派发
+ * 合成 KeyboardEvent，不产生文本插入（其 value setter 注入仅覆盖 input/textarea，
+ * 不含 contentEditable），因此 macOS 改用 execCommand 派发 insertText：在聚焦的
+ * CM6 contentEditable 上产生与真实输入等价的 DOM mutation，由 CM6 MutationObserver
+ * 同步进文档。Windows/Linux 走 tauri-driver + 原生 driver 的真实键盘注入，直接 keys。
+ */
 async function typeText(b: Browser, text: string): Promise<void> {
-  await b.keys(text);
+  if (!IS_MACOS) {
+    await b.keys(text);
+  } else {
+    await b.execute((t: string) => {
+      document.execCommand("insertText", false, t);
+    }, text);
+  }
+  await b.pause(100);
+}
+
+/** 获取编辑器光标位置（selection.main.head） */
+async function getCursorHead(b: Browser): Promise<number> {
+  return await b.execute(() => {
+    // @ts-ignore
+    const bridge = window.__pinia__._s.get("editorBridge");
+    if (bridge && bridge.editorView) {
+      return bridge.editorView.state.selection.main.head;
+    }
+    return -1;
+  });
+}
+
+/**
+ * 按 Home / End 键。
+ *
+ * macOS 上 WDIO 会把 "Home"/"End" 转成 \uE011/\uE010，插件键表没有这两个码，
+ * 只能合成 key 为 PUA 字符的事件，CM6 永远命不中 Home/End 绑定；因此 macOS 直接
+ * 派发正确 key 属性的合成 keydown，与真实按键同走 CM6 defaultKeymap 的路径。
+ */
+async function pressHomeOrEnd(b: Browser, key: "Home" | "End"): Promise<void> {
+  if (!IS_MACOS) {
+    await b.keys([key]);
+  } else {
+    await b.execute((k: string) => {
+      (document.activeElement as HTMLElement | null)?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true })
+      );
+    }, key);
+  }
   await b.pause(100);
 }
 
@@ -596,8 +642,7 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 6. 编辑测试 - 基础输入
   // ========================================================================
-  // macOS 跳过：WebDriver 键盘合成在 WKWebView 上不生效（keys 输入后内容无变化），跟进 #370
-  describe.skipIf(IS_MACOS)("6. 编辑 - 基础输入", () => {
+  describe("6. 编辑 - 基础输入", () => {
     it("6.1 在 WYSIWYG 模式下输入普通文本", async () => {
       await setContentAndWait(browser, "正文");
       // 光标在 "正" 和 "文" 之间（position 1）
@@ -709,53 +754,38 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 9. 编辑测试 - 光标移动
   // ========================================================================
-  // macOS 跳过：光标移动键（Home/End）合成在 WKWebView 上不生效，9.1/9.2 属断言宽容的假绿，跟进 #370
-  describe.skipIf(IS_MACOS)("9. 编辑 - 光标移动", () => {
+  describe("9. 编辑 - 光标移动", () => {
     it("9.1 方向键右跨越隐藏标记", async () => {
       await setContentAndWait(browser, "**粗体**\n\n后文");
-      // 光标在段外（标记隐藏），位于 "后文" 起始
-      await setCursorToEnd(browser);
-      const startPos = await browser.execute(() => {
-        // @ts-ignore
-        const view = window.__pinia__._s.get("editorBridge").editorView;
-        return view.state.selection.main.head;
-      });
-      // 按右方向键
+      // 光标置于最后一行行内（"后" 之前）；原用例放在文档末尾，ArrowRight 无处可移，断言恒真
+      await setCursor(browser, 8);
+      const startPos = await getCursorHead(browser);
+      // 按右方向键，光标应真实移动
       await browser.keys(["ArrowRight"]);
       await browser.pause(100);
-      // 光标应移动，不报错
-      const pos = await browser.execute(() => {
-        // @ts-ignore
-        const view = window.__pinia__._s.get("editorBridge").editorView;
-        return view.state.selection.main.head;
-      });
-      expect(pos).toBeGreaterThanOrEqual(startPos);
+      const pos = await getCursorHead(browser);
+      expect(pos).toBeGreaterThan(startPos);
     });
 
     it("9.2 Home 键跳到行首", async () => {
       await setContentAndWait(browser, "# 标题");
-      await setCursor(browser, 4);
-      await browser.keys(["Home"]);
-      await browser.pause(100);
-      const pos = await browser.execute(() => {
-        // @ts-ignore
-        const view = window.__pinia__._s.get("editorBridge").editorView;
-        return view.state.selection.main.head;
-      });
-      expect(pos).toBeLessThanOrEqual(4);
+      // 光标置于行中间（offset 4 是行尾，按 Home 无处可移，原断言恒真）
+      await setCursor(browser, 2);
+      const startPos = await getCursorHead(browser);
+      await pressHomeOrEnd(browser, "Home");
+      const pos = await getCursorHead(browser);
+      // 必须真实移动到行首（更小的 offset）
+      expect(pos).toBeLessThan(startPos);
     });
 
     it("9.3 End 键跳到行尾", async () => {
       await setContentAndWait(browser, "# 标题");
       await setCursor(browser, 0);
-      await browser.keys(["End"]);
-      await browser.pause(100);
-      const pos = await browser.execute(() => {
-        // @ts-ignore
-        const view = window.__pinia__._s.get("editorBridge").editorView;
-        return view.state.selection.main.head;
-      });
-      expect(pos).toBeGreaterThanOrEqual(3);
+      const startPos = await getCursorHead(browser);
+      await pressHomeOrEnd(browser, "End");
+      const pos = await getCursorHead(browser);
+      // 必须真实移动到行尾（更大的 offset）
+      expect(pos).toBeGreaterThan(startPos);
     });
   });
 
@@ -805,12 +835,14 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 11. 编辑测试 - 快捷键
   // ========================================================================
-  // macOS 跳过：Ctrl 组合键合成在 WKWebView 上未触发快捷键（11.3 曾侥幸通过、二轮证实失败），跟进 #370
-  describe.skipIf(IS_MACOS)("11. 编辑 - 段落快捷键", () => {
+  // 快捷键命中走 CM6 keymap 路径（buildEditorShortcutExtension，Prec.highest）；
+  // 合成按键不会经过原生菜单（NSMenu 加速器只截获真实按键）。macOS 上 Mod = Meta，
+  // 因此 macOS 用 Meta 前缀组合键（其余平台用 Control）。
+  describe("11. 编辑 - 段落快捷键", () => {
     it("11.1 Ctrl+1 切换到 H1", async () => {
       await setContentAndWait(browser, "文本");
       await setCursor(browser, 1);
-      await browser.keys(["Control", "1"]);
+      await browser.keys(IS_MACOS ? ["Meta", "1"] : ["Control", "1"]);
       await browser.pause(200);
       const content = await getContent(browser);
       expect(content).toMatch(/^#\s/);
@@ -819,7 +851,7 @@ describe("WYSIWYG 模式全量测试", () => {
     it("11.2 Ctrl+Shift+K 插入代码块", async () => {
       await setContentAndWait(browser, "文本");
       await setCursor(browser, 1);
-      await browser.keys(["Control", "Shift", "k"]);
+      await browser.keys(IS_MACOS ? ["Meta", "Shift", "k"] : ["Control", "Shift", "k"]);
       await browser.pause(200);
       const content = await getContent(browser);
       // 可能插入 ``` 围栏
@@ -829,7 +861,7 @@ describe("WYSIWYG 模式全量测试", () => {
     it("11.3 Ctrl+Shift+Q 切换引用块", async () => {
       await setContentAndWait(browser, "文本");
       await setCursor(browser, 1);
-      await browser.keys(["Control", "Shift", "q"]);
+      await browser.keys(IS_MACOS ? ["Meta", "Shift", "q"] : ["Control", "Shift", "q"]);
       await browser.pause(200);
       const content = await getContent(browser);
       expect(content).toMatch(/^>\s/);
@@ -839,15 +871,14 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 12. 编辑测试 - 撤销/重做
   // ========================================================================
-  // macOS 跳过：undo/redo 用例依赖 typeText 输入（WKWebView 不生效，12.1 属恒真假绿），跟进 #370
-  describe.skipIf(IS_MACOS)("12. 编辑 - 撤销/重做", () => {
+  describe("12. 编辑 - 撤销/重做", () => {
     it("12.1 Ctrl+Z 撤销输入", async () => {
       await setContentAndWait(browser, "正文");
       await setCursor(browser, 2);
       await typeText(browser, "X");
       await browser.pause(100);
-      // 撤销
-      await browser.keys(["Control", "z"]);
+      // 撤销（macOS 上 Mod = Meta）
+      await browser.keys(IS_MACOS ? ["Meta", "z"] : ["Control", "z"]);
       await browser.pause(200);
       const content = await getContent(browser);
       expect(content).not.toContain("X");
@@ -858,9 +889,9 @@ describe("WYSIWYG 模式全量测试", () => {
       await setCursor(browser, 2);
       await typeText(browser, "X");
       await browser.pause(100);
-      await browser.keys(["Control", "z"]);
+      await browser.keys(IS_MACOS ? ["Meta", "z"] : ["Control", "z"]);
       await browser.pause(200);
-      await browser.keys(["Control", "y"]);
+      await browser.keys(IS_MACOS ? ["Meta", "y"] : ["Control", "y"]);
       await browser.pause(200);
       const content = await getContent(browser);
       expect(content).toContain("X");
@@ -935,8 +966,7 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 14. 块内编辑测试
   // ========================================================================
-  // macOS 跳过：块内编辑依赖 typeText 输入（WKWebView 不生效），跟进 #370
-  describe.skipIf(IS_MACOS)("14. 块内编辑", () => {
+  describe("14. 块内编辑", () => {
     it("14.1 代码块内编辑代码文本", async () => {
       await setContentAndWait(browser, "```\ncode\n```");
       // 光标在 code 内
@@ -976,8 +1006,7 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 15. 行内编辑测试
   // ========================================================================
-  // macOS 跳过：行内编辑依赖 typeText 输入（WKWebView 不生效），跟进 #370
-  describe.skipIf(IS_MACOS)("15. 行内编辑", () => {
+  describe("15. 行内编辑", () => {
     it("15.1 链接文本内编辑", async () => {
       await setContentAndWait(browser, "[GitHub](https://github.com)");
       // 光标在 "GitHub" 内
@@ -1017,8 +1046,7 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 16. 复杂嵌套编辑
   // ========================================================================
-  // macOS 跳过：复杂嵌套编辑依赖 typeText 输入（WKWebView 不生效），跟进 #370
-  describe.skipIf(IS_MACOS)("16. 复杂嵌套编辑", () => {
+  describe("16. 复杂嵌套编辑", () => {
     it("16.1 引用块内列表项编辑", async () => {
       await setContentAndWait(browser, "> - 项1\n> - 项2");
       // 光标在 "项1" 的 "项" 和 "1" 之间（position 5）
@@ -1042,7 +1070,8 @@ describe("WYSIWYG 模式全量测试", () => {
       await setCursor(browser, 15);
       await typeText(browser, "X");
       const content = await getContent(browser);
-      // 围栏应保持完整
+      // 先要求编辑真的生效（原内容不含 X），再要求围栏保持完整
+      expect(content).toContain("X");
       expect(content).toMatch(/```js[\s\S]+```/);
     });
   });
