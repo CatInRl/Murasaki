@@ -14,6 +14,12 @@ name: Test
 # 驱动真实 WebKitGTK，经 Xvfb 无头运行；应用侧 E2E 判定来自 tauri-driver 注入的
 # TAURI_WEBVIEW_AUTOMATION 环境变量（见 src-tauri/src/lib.rs 的 is_e2e_mode）。
 # 首期不加入 required status checks，稳定后再提升（同 #261 的路径）。
+#
+# macOS e2e（e2e-macos job）不用 tauri-driver —— 它不支持 WKWebView（safaridriver
+# 需 GUI 授权，CI 不可用）。改用应用内嵌的 WebDriver 服务端（tauri-plugin-wdio-webdriver，
+# 仅 debug 构建注册，见 lib.rs run()）：应用进程由 e2e/helpers/driver.ts 自行 spawn/kill，
+# session 生命周期 = 应用进程生命周期。因此被测二进制必须 `tauri build --debug` ——
+# release 二进制没注册插件，/status 永不就绪。首期同样只跑不拦（#368）。
 on:
   pull_request:
   push:
@@ -204,5 +210,53 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-logs-linux
+          path: ${{ runner.temp }}/murasaki-devtools.log
+          if-no-files-found: ignore
+
+  e2e-macos:
+    name: e2e (macos)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: 安装 Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Rust 构建
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 安装 npm 依赖
+        run: npm ci
+
+      # 无需安装 tauri-driver / 原生 driver（理由见文件头 macOS 段）。
+      # 必须 --debug：内嵌 WebDriver 服务端仅 debug 构建注册。
+      # --no-bundle 跳过打包 —— e2e 只需要可运行的裸二进制（driver.ts spawn 它）。
+      - name: 构建应用（debug）
+        run: npx tauri build --debug --no-bundle
+
+      # macOS runner 自带 GUI session（WindowServer），WKWebView 可直接跑，无需 Xvfb。
+      # TMPDIR 指到 runner.temp：应用侧 e2e_trace 写 temp_dir()/murasaki-devtools.log，
+      # macOS 下 temp_dir() 取 TMPDIR，与 artifact 路径保持一致。
+      - name: 运行 E2E
+        run: npm run test:e2e
+        env:
+          TMPDIR: ${{ runner.temp }}
+
+      # 失败时留诊断日志（artifact 名必须与前两个 e2e job 不同）
+      - name: 上传失败诊断日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-macos
           path: ${{ runner.temp }}/murasaki-devtools.log
           if-no-files-found: ignore

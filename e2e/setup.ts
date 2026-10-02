@@ -1,14 +1,19 @@
 /**
- * Vitest globalSetup（Windows / Linux 双平台）：
+ * Vitest globalSetup（Windows / Linux / macOS 三平台）：
  * 1. 重定向 APPDATA 到 e2e/.appdata/，保证每次测试干净启动
  * 2. 启动 tauri-driver 子进程，监听 4444 端口
  * 3. teardown 时关闭 driver
+ *
+ * macOS 例外：tauri-driver 不支持 WKWebView（safaridriver 需 GUI 授权，CI 不可用），
+ * 改用应用内嵌的 WebDriver 服务端（tauri-plugin-wdio-webdriver，仅 debug 构建注册）。
+ * 应用进程由 driver.ts 的 createSession 自己 spawn/kill（session 生命周期 = 应用进程
+ * 生命周期），本文件不做 spawn，teardown 只兜底清理残留。
  */
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { createConnection } from "node:net";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { IS_WINDOWS } from "./helpers/platform";
+import { IS_WINDOWS, IS_MACOS } from "./helpers/platform";
 import { killProcessesByName } from "./helpers/processes";
 
 const DRIVER_PORT = 4444;
@@ -16,7 +21,7 @@ const DRIVER_PORT = 4444;
 // 4444 在线但 4445 不在线 = tauri-driver 孤立（msedgedriver 被 cleanup 杀掉了），无法恢复。
 const NATIVE_DRIVER_PORT = 4445;
 
-let driverProcess: ChildProcessWithoutNullStreams | null = null;
+let driverProcess: ChildProcess | null = null;
 
 /**
  * 清理残留的 murasaki 进程
@@ -189,12 +194,25 @@ export default async function setup(): Promise<void | (() => Promise<void>)> {
   // 1. 固定界面语言：必须在任何 app 启动之前完成
   ensureChineseLocale();
 
-  // 2. AppData 清理已移至 closeSession（每 spec 间清理）和运行前 PowerShell 外部清理。
+  // 2. macOS：tauri-driver 不可用（WKWebView 需 safaridriver GUI 授权，CI 不可用），
+  //    应用内嵌的 WebDriver 服务端（仅 debug 构建注册）由 driver.ts 的 createSession
+  //    spawn 应用时自动启动，本文件无需启动任何 driver。
+  if (IS_MACOS) {
+    console.log(
+      "[e2e] macOS：跳过 tauri-driver，应用内嵌 WebDriver 服务端由 driver.ts 管理"
+    );
+    return async () => {
+      // 正常情况下 closeSession 已按 session 生命周期杀掉应用，这里只兜底清理残留
+      killProcessesByName("murasaki");
+    };
+  }
+
+  // 3. AppData 清理已移至 closeSession（每 spec 间清理）和运行前 PowerShell 外部清理。
   //    TRAE Sandbox 会直接 kill 尝试删除 AppData 的 Node.js 进程，try/catch 无法兜底。
   //    所以 setup.ts 不再做 AppData 清理，由 driver.ts 的 closeSession 通过
   //    PowerShell 子进程清理（sandbox 允许 PowerShell 操作 AppData）。
 
-  // 3. 启动 tauri-driver，显式传入 --native-driver 路径
+  // 4. 启动 tauri-driver，显式传入 --native-driver 路径
   //    用 detached + shell 方式启动，避免 vitest fork 环境影响 tauri-driver 的 hyper 服务器
   //    （vitest 环境下 spawn 启动的 tauri-driver 处理 HTTP 请求时会出现 IncompleteMessage）
   //

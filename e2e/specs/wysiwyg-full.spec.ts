@@ -25,6 +25,7 @@ import {
 } from "../helpers/store";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { readText, textOfElement, waitForPresent } from "../helpers/wait";
+import { IS_MACOS } from "../helpers/platform";
 
 /** 测试用 markdown 文件路径 */
 const TEST_FILE = "test.md";
@@ -595,7 +596,8 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 6. 编辑测试 - 基础输入
   // ========================================================================
-  describe("6. 编辑 - 基础输入", () => {
+  // macOS 跳过：WebDriver 键盘合成在 WKWebView 上不生效（keys 输入后内容无变化），跟进 #370
+  describe.skipIf(IS_MACOS)("6. 编辑 - 基础输入", () => {
     it("6.1 在 WYSIWYG 模式下输入普通文本", async () => {
       await setContentAndWait(browser, "正文");
       // 光标在 "正" 和 "文" 之间（position 1）
@@ -707,7 +709,8 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 9. 编辑测试 - 光标移动
   // ========================================================================
-  describe("9. 编辑 - 光标移动", () => {
+  // macOS 跳过：光标移动键（Home/End）合成在 WKWebView 上不生效，9.1/9.2 属断言宽容的假绿，跟进 #370
+  describe.skipIf(IS_MACOS)("9. 编辑 - 光标移动", () => {
     it("9.1 方向键右跨越隐藏标记", async () => {
       await setContentAndWait(browser, "**粗体**\n\n后文");
       // 光标在段外（标记隐藏），位于 "后文" 起始
@@ -802,7 +805,8 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 11. 编辑测试 - 快捷键
   // ========================================================================
-  describe("11. 编辑 - 段落快捷键", () => {
+  // macOS 跳过：Ctrl 组合键合成在 WKWebView 上未触发快捷键（11.3 曾侥幸通过、二轮证实失败），跟进 #370
+  describe.skipIf(IS_MACOS)("11. 编辑 - 段落快捷键", () => {
     it("11.1 Ctrl+1 切换到 H1", async () => {
       await setContentAndWait(browser, "文本");
       await setCursor(browser, 1);
@@ -835,7 +839,8 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 12. 编辑测试 - 撤销/重做
   // ========================================================================
-  describe("12. 编辑 - 撤销/重做", () => {
+  // macOS 跳过：undo/redo 用例依赖 typeText 输入（WKWebView 不生效，12.1 属恒真假绿），跟进 #370
+  describe.skipIf(IS_MACOS)("12. 编辑 - 撤销/重做", () => {
     it("12.1 Ctrl+Z 撤销输入", async () => {
       await setContentAndWait(browser, "正文");
       await setCursor(browser, 2);
@@ -930,7 +935,8 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 14. 块内编辑测试
   // ========================================================================
-  describe("14. 块内编辑", () => {
+  // macOS 跳过：块内编辑依赖 typeText 输入（WKWebView 不生效），跟进 #370
+  describe.skipIf(IS_MACOS)("14. 块内编辑", () => {
     it("14.1 代码块内编辑代码文本", async () => {
       await setContentAndWait(browser, "```\ncode\n```");
       // 光标在 code 内
@@ -970,7 +976,8 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 15. 行内编辑测试
   // ========================================================================
-  describe("15. 行内编辑", () => {
+  // macOS 跳过：行内编辑依赖 typeText 输入（WKWebView 不生效），跟进 #370
+  describe.skipIf(IS_MACOS)("15. 行内编辑", () => {
     it("15.1 链接文本内编辑", async () => {
       await setContentAndWait(browser, "[GitHub](https://github.com)");
       // 光标在 "GitHub" 内
@@ -1010,7 +1017,8 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   // 16. 复杂嵌套编辑
   // ========================================================================
-  describe("16. 复杂嵌套编辑", () => {
+  // macOS 跳过：复杂嵌套编辑依赖 typeText 输入（WKWebView 不生效），跟进 #370
+  describe.skipIf(IS_MACOS)("16. 复杂嵌套编辑", () => {
     it("16.1 引用块内列表项编辑", async () => {
       await setContentAndWait(browser, "> - 项1\n> - 项2");
       // 光标在 "项1" 的 "项" 和 "1" 之间（position 5）

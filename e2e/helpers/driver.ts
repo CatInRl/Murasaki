@@ -15,18 +15,23 @@
  */
 import { attach, type Browser } from "webdriverio";
 import { resolve } from "node:path";
+import { spawn, type ChildProcess } from "node:child_process";
 import http from "node:http";
 import { createConnection } from "node:net";
 import { existsSync, rmSync } from "node:fs";
 import { clearPersistedTabs, waitForAppReady, waitForPinia } from "./store";
-import { IS_WINDOWS } from "./platform";
+import { IS_WINDOWS, IS_MACOS } from "./platform";
 import { isProcessAlive, killProcessesByName } from "./processes";
 
 const DEFAULT_BINARY = resolve(
   process.cwd(),
   IS_WINDOWS
     ? "src-tauri/target/release/murasaki.exe"
-    : "src-tauri/target/release/murasaki"
+    : IS_MACOS
+      ? // macOS e2e 必须 debug 构建：内嵌 WebDriver 服务端仅 debug 构建注册
+        //（lib.rs run() 的 #[cfg(debug_assertions)] 门控），release 二进制没有 /status
+        "src-tauri/target/debug/murasaki"
+      : "src-tauri/target/release/murasaki"
 );
 
 // tauri-driver 监听地址。attach() 必须显式传入这些参数 —— webdriverio 9.x 的
@@ -37,6 +42,16 @@ const DRIVER_PORT = 4444;
 // tauri-driver 默认把 msedgedriver 监听在这个端口（cli.rs --native-port 默认 4445）。
 // 4444 在线但 4445 不在线 = tauri-driver 孤立（msedgedriver 被 cleanup 杀掉了），无法恢复。
 const NATIVE_DRIVER_PORT = 4445;
+
+// macOS 内嵌 WebDriver 服务端端口（tauri-plugin-wdio-webdriver 读 TAURI_WEBDRIVER_PORT，
+// 默认即 4445）。macOS 上没有 msedgedriver，与 Windows/Linux 的 4445 用途不冲突。
+const EMBEDDED_DRIVER_PORT = Number(process.env.TAURI_WEBDRIVER_PORT ?? 4445);
+
+// macOS 分支自己 spawn 的应用进程。session 生命周期 = 应用进程生命周期
+//（与 Windows/Linux 的「每个 spec 一个 fresh 实例」语义对齐），
+// closeSession 负责杀掉；模块级持有是为了 closeSession 能精确杀自己拉起的进程，
+// 而不是按进程名误杀 dev 中跑的 murasaki。
+let embeddedAppProcess: ChildProcess | null = null;
 
 /**
  * `browser.waitUntil` 的重试间隔 / 默认预算（#300）。
@@ -78,23 +93,176 @@ export interface CreateSessionOptions {
 }
 
 /**
+ * GET /status 探测 macOS 内嵌 WebDriver 服务是否就绪。
+ *
+ * `value.ready === true` 当且仅当应用至少存在一个 webview 窗口 —— 这是比
+ * tauri-driver 的 /status（永远 ready）更强的信号：轮询它天然等到「应用窗口已建」。
+ */
+function embeddedServerReady(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = http.request(
+      { hostname: DRIVER_HOSTNAME, port, path: "/status", method: "GET" },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          try {
+            const json = JSON.parse(data);
+            resolve(json.value?.ready === true);
+          } catch {
+            resolve(false);
+          }
+        });
+      }
+    );
+    req.on("error", () => resolve(false));
+    req.setTimeout(2000, () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+}
+
+// 单轮 25s：beforeAll hook 预算 60s，3 次重试若单轮 60s 会在首轮顶穿 hook，
+// 失败时报错沦为 vitest 裸超时；收窄后至少完整跑完 2 轮，由这里抛出带排查指引的错误
+async function waitForEmbeddedServer(port: number, timeout = 25000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    if (await embeddedServerReady(port)) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(
+    `内嵌 WebDriver 服务未在 ${timeout}ms 内就绪（GET /status 的 value.ready !== true）。` +
+      "排查：应用是否 debug 构建（release 未注册插件）？端口是否被占用？"
+  );
+}
+
+/** 杀掉本模块 spawn 的 macOS 应用进程，等待退出（最多 8s），超时升级 SIGKILL */
+async function killEmbeddedApp(): Promise<void> {
+  const child = embeddedAppProcess;
+  embeddedAppProcess = null;
+  if (!child) return;
+  if (child.exitCode === null && !child.killed) {
+    try {
+      child.kill();
+    } catch {
+      // 忽略：进程可能已退出
+    }
+  }
+  // 只等自己 spawn 的这个进程退出 —— 不按进程名全局检查，
+  // 否则开发者同时跑着 tauri:dev 的 murasaki 会被误判、误杀。
+  for (let i = 0; i < 16; i++) {
+    if (child.exitCode !== null) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  // SIGTERM 未生效，升级 SIGKILL
+  try {
+    child.kill("SIGKILL");
+  } catch {
+    /* ignore */
+  }
+  await new Promise((r) => setTimeout(r, 1000));
+}
+
+/**
+ * macOS：harness 自己 spawn 应用（注入 TAURI_WEBDRIVER_PORT + WDIO_EMBEDDED_SERVER
+ * 触发内嵌 WebDriver 服务端），轮询 /status 就绪后直连建 session。
+ *
+ * 没有 tauri-driver 代管应用进程，因此 spawn/kill 都在本文件内闭环，
+ * session 生命周期与 Windows/Linux 语义一致 = 每个 spec 一个 fresh 应用实例。
+ */
+async function createEmbeddedSession(): Promise<Browser> {
+  const binary = getBinaryPath();
+
+  // 清掉上次 closeSession 失败的漏网进程，保证 fresh start
+  await killEmbeddedApp();
+
+  const env = {
+    ...process.env,
+    TAURI_WEBDRIVER_PORT: String(EMBEDDED_DRIVER_PORT),
+    WDIO_EMBEDDED_SERVER: "true"
+  };
+
+  let lastError: unknown = null;
+  let browser: Browser | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      embeddedAppProcess = spawn(binary, [], {
+        stdio: ["ignore", "pipe", "pipe"],
+        env
+      });
+      embeddedAppProcess.stdout?.on("data", (d: Buffer) =>
+        process.stdout.write(`[app] ${d.toString()}`)
+      );
+      embeddedAppProcess.stderr?.on("data", (d: Buffer) =>
+        process.stderr.write(`[app!] ${d.toString()}`)
+      );
+
+      await waitForEmbeddedServer(EMBEDDED_DRIVER_PORT);
+
+      // 内嵌服务端不校验 capability（空 alwaysMatch 即可）；如需定向窗口可传
+      // alwaysMatch["wdio:tauriServiceOptions"]["windowLabel"]
+      const { sessionId } = await createSessionViaHttp(
+        EMBEDDED_DRIVER_PORT,
+        JSON.stringify({ capabilities: { alwaysMatch: {} } })
+      );
+
+      browser = await attach({
+        sessionId,
+        hostname: DRIVER_HOSTNAME,
+        port: EMBEDDED_DRIVER_PORT,
+        protocol: "http",
+        path: "/",
+        capabilities: { alwaysMatch: {} }
+      } as any);
+      // 同 #300：attach 不合并 remote() 默认配置，必须显式补 waitUntil 重试参数
+      browser.options.waitforInterval = WAITFOR_INTERVAL;
+      browser.options.waitforTimeout = WAITFOR_TIMEOUT;
+      break;
+    } catch (err) {
+      lastError = err;
+      console.warn(
+        `[driver] 内嵌 session 创建失败 (attempt ${attempt + 1}/3):`,
+        err instanceof Error ? err.message : String(err)
+      );
+      // 杀掉本轮 spawn 的应用再重试，避免残留进程占住端口
+      await killEmbeddedApp();
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+
+  if (!browser) throw lastError;
+
+  // 就绪等待与 Windows/Linux 同一标准：__pinia__ 就绪 ≠ 应用恢复完毕（#315）
+  try {
+    await waitForPinia(browser);
+    await waitForAppReady(browser);
+  } catch (err) {
+    await closeSession(browser).catch(() => {});
+    throw err;
+  }
+
+  return browser;
+}
+
+/**
  * 用 Node.js http 模块发送 POST /session 请求
  * 绕过 webdriverio 9.x undici 与 tauri-driver hyper 的兼容性问题
+ *
+ * @param port 服务端口：Windows/Linux = tauri-driver（4444），macOS = 应用内嵌服务端
+ * @param body 请求体：Windows/Linux 带 tauri:options.application（driver 负责拉起应用）；
+ *              macOS 空 alwaysMatch（内嵌服务端不校验 capability，应用已由 harness 拉起）
  */
-function createSessionViaHttp(binary: string): Promise<{ sessionId: string }> {
+function createSessionViaHttp(
+  port: number,
+  body: string
+): Promise<{ sessionId: string }> {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({
-      capabilities: {
-        alwaysMatch: {
-          "tauri:options": { application: binary }
-        }
-      }
-    });
-
     const req = http.request(
       {
         hostname: DRIVER_HOSTNAME,
-        port: DRIVER_PORT,
+        port,
         path: "/session",
         method: "POST",
         headers: {
@@ -150,6 +318,9 @@ function createSessionViaHttp(binary: string): Promise<{ sessionId: string }> {
 export async function createSession(
   _opts: CreateSessionOptions = {}
 ): Promise<Browser> {
+  // macOS 走内嵌服务端：无 tauri-driver，应用由本文件 spawn
+  if (IS_MACOS) return createEmbeddedSession();
+
   const binary = getBinaryPath();
 
   // 预检：tauri-driver 在线但 msedgedriver 端口（4445）不在线 = 孤立状态。
@@ -174,7 +345,16 @@ export async function createSession(
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       // 1. 用 Node.js http 模块创建 session（绕过 undici 兼容性问题）
-      const { sessionId } = await createSessionViaHttp(binary);
+      const { sessionId } = await createSessionViaHttp(
+        DRIVER_PORT,
+        JSON.stringify({
+          capabilities: {
+            alwaysMatch: {
+              "tauri:options": { application: binary }
+            }
+          }
+        })
+      );
 
       // 2. 用 webdriverio attach 连接到已有 session
       //    attach 不发送新的 POST /session 请求，直接复用 sessionId
@@ -283,6 +463,17 @@ export async function closeSession(browser: Browser): Promise<void> {
   } catch {
     // 忽略：session 可能已经失效
   }
+
+  // macOS：应用进程由本模块 spawn，deleteSession 不会杀它（没有 driver 代管进程
+  // 生命周期），必须自己收尸。WebKitGTK/WKWebView 都没有 WebView2 的窗口状态恢复
+  // 行为，EBWebView 清理是 Windows 专属，macOS 无需处理。
+  if (IS_MACOS) {
+    await killEmbeddedApp();
+    // 等待文件句柄释放（与下方 Windows/Linux 的收尾等待对齐）
+    await new Promise((r) => setTimeout(r, 1200));
+    return;
+  }
+
   // 等待 murasaki 进程退出（最多 8 秒）
   let exited = false;
   for (let i = 0; i < 16; i++) {
