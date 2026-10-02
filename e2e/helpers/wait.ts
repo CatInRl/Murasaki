@@ -221,6 +221,22 @@ export async function readText(
 }
 
 /**
+ * 单次 browser.execute 的正常耗时约几 ms；超过该阈值视为一次服务端挂起
+ * （#375：macOS 上 WebKit 间歇回收 evaluateJavaScript 完成回调，插件侧只能
+ * 等满 30s script timeout，再由 webdriverio 客户端重发自愈）。
+ */
+export const SLOW_EXECUTE_MS = 5000;
+
+/**
+ * 计算一次探针调用的预算顺延量：慢调用（> `SLOW_EXECUTE_MS`）返回实际耗时，
+ * 正常调用返回 0。调用方把返回值累加进自己的 deadline，挂起就不占用轮询预算。
+ */
+export function slowCallExtension(probeStart: number): number {
+  const elapsed = Date.now() - probeStart;
+  return elapsed > SLOW_EXECUTE_MS ? elapsed : 0;
+}
+
+/**
  * 手写轮询等待「浏览器上下文里返回真值的条件」，返回首次为真的结果。
  *
  * 用于等 UI 状态出现（如「tab 栏出现名为 intro.md 的标签」）：这类断言不能用
@@ -231,6 +247,10 @@ export async function readText(
  * @param options.timeout 总预算；默认 15s（CI runner 比本地慢，别给太紧）
  * @param options.interval 轮询间隔
  * @param options.message 超时错误里的描述，便于定位是哪一步没等到
+ *
+ * 挂起吸收（#375）：单次 execute 耗时异常长（服务端 30s script timeout，见
+ * `slowCallExtension`）时把总预算顺延等长 —— 挂起不占用轮询预算，也不会让
+ * 一次挂起直接判死。
  */
 export async function waitForInBrowser<T = unknown>(
   browser: Browser,
@@ -240,13 +260,29 @@ export async function waitForInBrowser<T = unknown>(
 ): Promise<T> {
   const { timeout = 15000, interval = 200, message = "条件" } = options;
   const start = Date.now();
+  let deadline = start + timeout;
   let last: unknown = undefined;
-  while (Date.now() - start < timeout) {
-    last = await browser.execute(script as never, ...(args as never[]));
+  let lastError: unknown = undefined;
+  while (Date.now() < deadline) {
+    // execute 可能因服务端挂起抛 script timeout（#375）——吞掉继续轮询，
+    // 客户端重发自愈后下一轮照常探针；报错保留在 lastError 供超时诊断。
+    const probeStart = Date.now();
+    try {
+      last = await browser.execute(script as never, ...(args as never[]));
+      lastError = undefined;
+    } catch (err) {
+      last = false;
+      lastError = err;
+    }
+    deadline += slowCallExtension(probeStart);
     if (last) return last as T;
     await browser.pause(interval);
   }
+  const errorNote = lastError
+    ? `（最后一次 execute 报错：${String(lastError)}）`
+    : "";
   throw new Error(
-    `waitForInBrowser: ${message} 未在 ${timeout}ms 内满足（最后一次结果：${JSON.stringify(last)}）`
+    `waitForInBrowser: ${message} 未在 ${Date.now() - start}ms（基础预算 ${timeout}ms）内满足` +
+      `${errorNote}（最后一次结果：${JSON.stringify(last)}）`
   );
 }
