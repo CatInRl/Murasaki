@@ -39,5 +39,10 @@ sys-locale = "0.3.2"
 webview2-com = "0.38"
 windows = "0.61"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# macOS E2E 专用：内嵌 WebDriver 服务端（tauri-driver 不支持 WKWebView）。
+# 仅 debug 构建注册（见 lib.rs run()），release 构建只是多编译不用。
+tauri-plugin-wdio-webdriver = "1.4.0"
+
 [dev-dependencies]
 tempfile = "3"

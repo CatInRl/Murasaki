@@ -26,16 +26,24 @@ use commands::windows::{self, WindowRegistry};
 ///   （tauri-driver 1.x 为 `TAURI_AUTOMATION=true`），WebKitWebDriver 再拉起应用时
 ///   环境被继承，因此应用侧直接读环境变量即可判定。WebKitGTK 没有 WebView2 那套
 ///   additional-browser-arguments 通道，也不需要。
+/// - **macOS**：tauri-driver 不支持 WKWebView（safaridriver 需 GUI 授权，CI 不可用），
+///   改用 wdio-tauri-service 配套的内嵌 WebDriver 服务端（tauri-plugin-wdio-webdriver）。
+///   harness 直接拉起应用二进制并注入 `TAURI_WEBDRIVER_PORT`（服务端口）与
+///   `WDIO_EMBEDDED_SERVER=true`（wdio-service spawn 应用时的原生注入值），任一命中即判 E2E。
 fn is_e2e_mode() -> bool {
     let argv: Vec<String> = std::env::args().collect();
     let env_additional_args = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").ok();
     let automation_env = std::env::var("TAURI_WEBVIEW_AUTOMATION")
         .or_else(|_| std::env::var("TAURI_AUTOMATION"))
         .ok();
+    let embedded_server_env = std::env::var("WDIO_EMBEDDED_SERVER").ok();
+    let webdriver_port_env = std::env::var("TAURI_WEBDRIVER_PORT").ok();
     is_e2e_mode_from(
         &argv,
         env_additional_args.as_deref(),
         automation_env.as_deref(),
+        embedded_server_env.as_deref(),
+        webdriver_port_env.as_deref(),
     )
 }
 
@@ -44,11 +52,22 @@ fn is_e2e_mode_from(
     argv: &[String],
     env_additional_args: Option<&str>,
     automation_env: Option<&str>,
+    embedded_server_env: Option<&str>,
+    webdriver_port_env: Option<&str>,
 ) -> bool {
     if argv.iter().any(|a| a.starts_with("--remote-debugging-port=")) {
         return true;
     }
     if automation_env == Some("true") {
+        return true;
+    }
+    if embedded_server_env == Some("true") {
+        return true;
+    }
+    if webdriver_port_env
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false)
+    {
         return true;
     }
     env_additional_args
@@ -443,6 +462,14 @@ pub fn run() {
         }));
     }
 
+    // macOS E2E：内嵌 WebDriver 服务端（tauri-driver 不支持 WKWebView，safaridriver
+    // 需 GUI 授权）。插件 setup 本身无条件起 server，因此生产门控由我们负责：
+    // debug_assertions 保证 release 构建不含此代码，e2e 判定保证本地 dev 不起服务。
+    #[cfg(all(debug_assertions, target_os = "macos"))]
+    if e2e {
+        builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+    }
+
     builder
         .manage(WatcherState::default())
         .manage(search::SearchState::default())
@@ -688,6 +715,8 @@ mod tests {
         assert!(is_e2e_mode_from(
             &argv(&["--remote-debugging-port=9222"]),
             None,
+            None,
+            None,
             None
         ));
     }
@@ -697,7 +726,13 @@ mod tests {
     #[test]
     fn e2e_mode_detects_env_injection() {
         let env = "--enable-automation --remote-debugging-port=0 --test-type=webdriver";
-        assert!(is_e2e_mode_from(&argv(&[]), Some(env), None));
+        assert!(is_e2e_mode_from(
+            &argv(&[]),
+            Some(env),
+            None,
+            None,
+            None
+        ));
     }
 
     /// 只含调试端口、缺 `--test-type=webdriver` 时不判 E2E，
@@ -707,15 +742,19 @@ mod tests {
         assert!(!is_e2e_mode_from(
             &argv(&[]),
             Some("--remote-debugging-port=9222"),
+            None,
+            None,
             None
         ));
     }
 
     #[test]
     fn e2e_mode_false_for_plain_launch() {
-        assert!(!is_e2e_mode_from(&argv(&[]), None, None));
+        assert!(!is_e2e_mode_from(&argv(&[]), None, None, None, None));
         assert!(!is_e2e_mode_from(
             &argv(&["--user-data-dir=C:\\tmp\\x"]),
+            None,
+            None,
             None,
             None
         ));
@@ -726,15 +765,93 @@ mod tests {
     /// WebKitWebDriver 启动应用时环境被继承 —— 应用侧读环境变量即可判定
     #[test]
     fn e2e_mode_detects_tauri_automation_env() {
-        assert!(is_e2e_mode_from(&argv(&[]), None, Some("true")));
+        assert!(is_e2e_mode_from(
+            &argv(&[]),
+            None,
+            Some("true"),
+            None,
+            None
+        ));
     }
 
     /// automation 标志严格匹配 "true"：其它值（"1"/"false"/空串）不判 E2E，
     /// 与 Windows 通道防误判的设计一致
     #[test]
     fn e2e_mode_ignores_automation_env_not_true() {
-        assert!(!is_e2e_mode_from(&argv(&[]), None, Some("false")));
-        assert!(!is_e2e_mode_from(&argv(&[]), None, Some("1")));
-        assert!(!is_e2e_mode_from(&argv(&[]), None, Some("")));
+        assert!(!is_e2e_mode_from(
+            &argv(&[]),
+            None,
+            Some("false"),
+            None,
+            None
+        ));
+        assert!(!is_e2e_mode_from(&argv(&[]), None, Some("1"), None, None));
+        assert!(!is_e2e_mode_from(
+            &argv(&[]),
+            None,
+            Some(""),
+            None,
+            None
+        ));
+    }
+
+    /// macOS：wdio-service 拉起应用时注入 `WDIO_EMBEDDED_SERVER=true`，
+    /// harness 直接 spawn 二进制时同样注入该变量
+    #[test]
+    fn e2e_mode_detects_wdio_embedded_server_env() {
+        assert!(is_e2e_mode_from(
+            &argv(&[]),
+            None,
+            None,
+            Some("true"),
+            None
+        ));
+    }
+
+    /// `WDIO_EMBEDDED_SERVER` 严格匹配 "true"：其它值不判 E2E，
+    /// 与 automation 通道的防误判风格一致
+    #[test]
+    fn e2e_mode_ignores_wdio_embedded_server_env_not_true() {
+        assert!(!is_e2e_mode_from(
+            &argv(&[]),
+            None,
+            None,
+            Some("false"),
+            None
+        ));
+        assert!(!is_e2e_mode_from(&argv(&[]), None, None, Some("1"), None));
+        assert!(!is_e2e_mode_from(&argv(&[]), None, None, Some(""), None));
+    }
+
+    /// macOS：harness 只注入服务端口 `TAURI_WEBDRIVER_PORT` 也能命中 E2E ——
+    /// 该变量正是内嵌服务端自身的端口配置，二者天然对齐
+    #[test]
+    fn e2e_mode_detects_webdriver_port_env() {
+        assert!(is_e2e_mode_from(
+            &argv(&[]),
+            None,
+            None,
+            None,
+            Some("4445")
+        ));
+    }
+
+    /// 端口变量为空 / 纯空白视为未设置，不判 E2E
+    #[test]
+    fn e2e_mode_ignores_blank_webdriver_port_env() {
+        assert!(!is_e2e_mode_from(
+            &argv(&[]),
+            None,
+            None,
+            None,
+            Some("")
+        ));
+        assert!(!is_e2e_mode_from(
+            &argv(&[]),
+            None,
+            None,
+            None,
+            Some("   ")
+        ));
     }
 }
