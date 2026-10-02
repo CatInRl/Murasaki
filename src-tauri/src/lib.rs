@@ -75,6 +75,67 @@ fn is_e2e_mode_from(
         .unwrap_or(false)
 }
 
+/// E2E 模式下注入所有 webview 的 console 捕获脚本（#371）。
+///
+/// `murasaki-devtools.log` 只在 `--remote-debugging-port`（WebView2 / tauri-driver）
+/// 通道下被写入，macOS 内嵌 WebDriver 不经过 `detect_remote_debugging_args`，
+/// webview 内的启动期报错在 CI 上完全不可见 —— 新窗口 `__pinia__` 30s 未暴露时
+/// 只有 title 一个线索。此脚本按 Tauri `initialization_script` 语义在**任何页面
+/// 脚本执行前**运行，把 console 输出与未捕获异常收进
+/// `window.__murasakiConsoleBuffer__` 环形缓冲，由 `e2e/helpers/store.ts`
+/// 在等待超时时 dump 进失败信息（随断言错误进入 CI 日志）。
+pub(crate) const E2E_CONSOLE_HOOK_SCRIPT: &str = r#"(function () {
+  if (window.__murasakiConsoleBuffer__) return;
+  var MAX = 500;
+  var buf = [];
+  window.__murasakiConsoleBuffer__ = buf;
+  function push(level, msg) {
+    try {
+      buf.push({ t: Date.now(), level: level, msg: String(msg).slice(0, 2000) });
+      if (buf.length > MAX) buf.splice(0, buf.length - MAX);
+    } catch (_) {}
+  }
+  function fmt(args) {
+    try {
+      var parts = [];
+      for (var i = 0; i < args.length; i++) {
+        var a = args[i];
+        try {
+          parts.push(typeof a === "string" ? a : JSON.stringify(a));
+        } catch (_) {
+          parts.push(String(a));
+        }
+      }
+      return parts.join(" ");
+    } catch (_) {
+      return "<format failed>";
+    }
+  }
+  ["log", "info", "warn", "error", "debug"].forEach(function (level) {
+    var orig = console[level];
+    console[level] = function () {
+      push(level, fmt(arguments));
+      if (orig) orig.apply(console, arguments);
+    };
+  });
+  window.addEventListener("error", function (e) {
+    push(
+      "error",
+      "window.onerror: " + (e.message || "?") +
+        " @" + (e.filename || "?") + ":" + (e.lineno || 0) + ":" + (e.colno || 0)
+    );
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    var reason = e && e.reason;
+    var msg = "unhandledrejection: ";
+    try {
+      msg += reason && reason.stack ? reason.stack : String(reason);
+    } catch (_) {}
+    push("error", msg);
+  });
+})();
+"#;
+
 /// 取当前活动窗口（菜单事件与外部入口的路由目标）。
 ///
 /// 多窗口后不再固定发往 `main`：菜单栏是 app 级共享的，事件应落在用户正在用的窗口。
@@ -537,6 +598,12 @@ pub fn run() {
                 .min_inner_size(800.0, 600.0)
                 .resizable(true)
                 .fullscreen(false);
+
+            // E2E（所有平台）：注入 console 捕获脚本（#371）—— macOS 内嵌 WebDriver
+            // 没有 devtools 日志通道，webview 内的启动期报错只能靠缓冲 dump
+            if is_e2e_mode() {
+                builder = builder.initialization_script(E2E_CONSOLE_HOOK_SCRIPT);
+            }
 
             if let Some((extra_args, port)) = detect_remote_debugging_args() {
                 e2e_trace(&format!(

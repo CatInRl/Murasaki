@@ -22,7 +22,6 @@ import {
   dismissAllDialogs,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { IS_MACOS } from "../helpers/platform";
 
 let browser: Browser;
 let wsPath: string;
@@ -195,8 +194,7 @@ describe("多窗口多工作区", () => {
     await closeExtraWindows();
   });
 
-  // macOS 跳过：新窗口 30s 内未暴露 window.__pinia__（窗口 title 正常，疑似新窗口注入/初始化时序差异），跟进 #371
-  it.skipIf(IS_MACOS)("close_window 只关闭本窗口，主窗口仍在", async () => {
+  it("close_window 只关闭本窗口，主窗口仍在", async () => {
     await openInNewWindow(wsPath);
     await browser.waitUntil(
       async () => (await browser.getWindowHandles()).length === 2,
@@ -209,13 +207,19 @@ describe("多窗口多工作区", () => {
     await browser.switchToWindow(wsWindow);
     await waitForPiniaInCurrentWindow(browser, 30000);
 
-    await browser.execute(() => {
-      try {
-        window.__TAURI_INTERNALS__.invoke("close_window");
-      } catch {
-        /* ignore */
-      }
-    });
+    await browser
+      .execute(() => {
+        try {
+          window.__TAURI_INTERNALS__.invoke("close_window");
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {
+        // close_window 销毁当前 webview 后 IPC channel 随之断开，这次 execute
+        // 必然报 "Channel closed"——是预期副作用而非失败；真实断言在下方
+        // waitUntil（句柄数归一）与主窗口存活检查。
+      });
 
     await browser.waitUntil(
       async () => (await browser.getWindowHandles()).length === 1,
