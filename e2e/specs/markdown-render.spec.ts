@@ -540,6 +540,49 @@ describe("4. Mermaid 图表", () => {
     const exists = await browser.execute(() => !!document.querySelector(".preview-pane"));
     expect(exists).toBe(true);
   });
+
+  it("4.5 mermaid SVG 完整显示：gantt 不被域外 today 线压扁（#342）", async () => {
+    await openAndWait(browser, "render/mermaid.md", 15000);
+    // 等三个 SVG 全部异步渲染完成
+    await waitForInBrowser(
+      browser,
+      () => document.querySelectorAll(".preview-pane .mermaid svg").length >= 3,
+      [],
+      { message: "mermaid SVG 未渲染完整", timeout: 20000 }
+    );
+    const infos = await browser.execute(() => {
+      return Array.from(document.querySelectorAll(".preview-pane .mermaid svg")).map((svg) => {
+        const el = svg as SVGSVGElement;
+        const vb = (el.getAttribute("viewBox") ?? "").trim().split(/[\s,]+/).map(Number);
+        const rect = el.getBoundingClientRect();
+        const today = el.querySelector("g.today");
+        const ok = vb.length === 4 && vb.every((n) => Number.isFinite(n));
+        return {
+          vbW: ok ? vb[2] : 0,
+          vbH: ok ? vb[3] : 0,
+          w: rect.width,
+          h: rect.height,
+          hasToday: !!today,
+          todayHidden: today ? (today as SVGElement).style.display === "none" : null,
+        };
+      });
+    });
+    expect(infos.length).toBeGreaterThanOrEqual(3);
+    for (const info of infos) {
+      expect(info.vbW).toBeGreaterThan(0);
+      expect(info.vbH).toBeGreaterThan(0);
+      // 压扁守卫：分屏预览约 600px 宽，gantt 正常渲染高 ~51px；
+      // 若 today 线（x~18000）混入 viewBox，等比缩放会把整图压到 ~5px 高
+      expect(info.h).toBeGreaterThanOrEqual(24);
+      // viewBox 未被域外元素撑爆：正常内容宽度与渲染宽度同量级
+      expect(info.w / info.vbW).toBeGreaterThanOrEqual(0.25);
+    }
+    // 只有 gantt 会画 today 线；今天（2026-10）在任务域（2026-01）之外，
+    // sanitize 必须把它隐藏并收窄 viewBox
+    const withToday = infos.filter((i) => i.hasToday);
+    expect(withToday.length).toBe(1);
+    expect(withToday[0].todayHidden).toBe(true);
+  });
 });
 
 // ===== 测试组 5：Emoji =====

@@ -37,7 +37,7 @@ import { TableEditor } from "./tableEditor";
 import { renderFrontMatterCard } from "../../composables/useFrontMatter";
 import { resolveImageSrc } from "../../utils/imagePath";
 import { renderPlantUmlCode } from "../../utils/plantuml";
-import { ensureMermaid } from "../../utils/mermaidTheme";
+import { ensureMermaid, sanitizeMermaidSvg } from "../../utils/mermaidTheme";
 
 // ===== T7.1 Widgets =====
 
@@ -243,7 +243,10 @@ class MermaidWidget extends WysiwygBlockWidget {
     void ensureMermaid()
       .then((mermaid) => mermaid.render(this.id, this.code))
       .then(({ svg }) => {
-        if (container.isConnected) container.innerHTML = svg;
+        if (container.isConnected) {
+          container.innerHTML = svg;
+          sanitizeMermaidSvg(container);
+        }
       })
       .catch(() => {
         // 渲染失败：保留源码占位
@@ -296,7 +299,10 @@ class DiagramPreviewWidget extends WysiwygBlockWidget {
       void ensureMermaid()
         .then((mermaid) => mermaid.render(id, this.code))
         .then(({ svg }) => {
-          if (body.isConnected) body.innerHTML = svg;
+          if (body.isConnected) {
+            body.innerHTML = svg;
+            sanitizeMermaidSvg(body);
+          }
         })
         .catch(() => {
           // 渲染失败：保留源码占位

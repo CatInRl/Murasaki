@@ -474,4 +474,69 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     dimCount = await browser.$$(".murasaki-wysiwyg-mark-dim").then((els) => els.length);
     expect(dimCount).toBeGreaterThan(0);
   });
+
+  it("WYSIWYG 模式渲染 mermaid widget 且 gantt 不被域外 today 线压扁（#342）", async () => {
+    const wsPath = resetWorkspace([
+      {
+        path: "mermaid-gantt.md",
+        content: [
+          "# Gantt 测试",
+          "",
+          "```mermaid",
+          "gantt",
+          "    title 项目进度",
+          "    dateFormat  YYYY-MM-DD",
+          "    section 阶段一",
+          "    设计 :done, des1, 2026-01-01, 7d",
+          "    编码 :active, des2, after des1, 10d",
+          "```",
+          "",
+          "结尾段。",
+          "",
+        ].join("\n"),
+      },
+    ]);
+    await openWorkspace(browser, wsPath);
+    await openFileInTab(browser, `${wsPath}\\mermaid-gantt.md`);
+    await ensureSplitMode(browser);
+    await setWysiwygMode(browser);
+    // 光标移到结尾段，让 mermaid 围栏以 widget 形式渲染
+    await browser.execute(() => {
+      // @ts-ignore
+      const view = window.__pinia__._s.get("editorBridge").editorView;
+      if (view) {
+        const end = view.state.doc.length;
+        view.dispatch({ selection: { anchor: end, head: end } });
+        view.focus();
+      }
+    });
+
+    // mermaid 异步渲染，等 SVG 出现
+    await waitForPresent(browser, ".murasaki-wysiwyg-mermaid svg", 15000);
+
+    const info = await browser.execute(() => {
+      const el = document.querySelector(".murasaki-wysiwyg-mermaid svg") as SVGSVGElement | null;
+      if (!el) return null;
+      const vb = (el.getAttribute("viewBox") ?? "").trim().split(/[\s,]+/).map(Number);
+      const rect = el.getBoundingClientRect();
+      const today = el.querySelector("g.today");
+      const ok = vb.length === 4 && vb.every((n) => Number.isFinite(n));
+      return {
+        vbW: ok ? vb[2] : 0,
+        h: rect.height,
+        w: rect.width,
+        hasToday: !!today,
+        todayHidden: today ? (today as SVGElement).style.display === "none" : null,
+      };
+    });
+    expect(info).not.toBeNull();
+    expect(info!.vbW).toBeGreaterThan(0);
+    // 压扁守卫：编辑区约 1100px 宽，gantt 正常渲染高 ~94px；
+    // 若 today 线（x~18000）混入 viewBox，等比缩放会把整图压到 ~6px 高
+    expect(info!.h).toBeGreaterThanOrEqual(24);
+    expect(info!.w / info!.vbW).toBeGreaterThanOrEqual(0.25);
+    // 今天（2026-10）在任务域（2026-01）之外，sanitize 必须隐藏 today 线
+    expect(info!.hasToday).toBe(true);
+    expect(info!.todayHidden).toBe(true);
+  });
 });

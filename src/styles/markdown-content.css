@@ -411,6 +411,12 @@
   margin: 12px 0;
   text-align: center;
 }
+/* 与 .plantuml-block svg 同款约束：mermaid 内联 style 已带 max-width，此处
+ * 显式兜底（issue #342），保证内联缺失/未来行为变化时 SVG 仍受卡片约束。 */
+.markdown-body .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
 
 /* === PlantUML diagrams（官方 TeaVM 纯浏览器产物，本地渲染） ===
  * 与 .mermaid 同款卡片包裹，SVG 居中展示。 */

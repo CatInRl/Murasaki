@@ -5,7 +5,7 @@ import { renderFrontMatterCard } from "../composables/useFrontMatter";
 import { MARKDOWN_THEMES } from "../composables/useTheme";
 // 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
 import "../styles/markdown-content.css";
-import { ensureMermaid } from "../utils/mermaidTheme";
+import { ensureMermaid, sanitizeMermaidSvg } from "../utils/mermaidTheme";
 
 interface Props {
   source: string;
@@ -60,6 +60,7 @@ async function renderMermaid(container: HTMLElement) {
     try {
       const { svg } = await mermaid.render(id, code);
       block.innerHTML = svg;
+      sanitizeMermaidSvg(block);
     } catch (err) {
       block.innerHTML = `<pre style="color:var(--murasaki-state-error)">${(err as Error).message}</pre>`;
     }
