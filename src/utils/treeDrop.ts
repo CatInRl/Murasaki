@@ -10,7 +10,7 @@
  * - 应用打不开（pdf / zip / exe …）→ 系统默认程序兜底（#307 出口）
  * - 目录 → 忽略（目录拖入编辑器没有明确意图；也不能静默改当前窗口的工作区）
  */
-import { isImageFile, isMarkdownFile, isEditableTextFile } from "./fileKind";
+import { isImageFile, canOpenInApp } from "./fileKind";
 
 /** 文件树拖入编辑器时按类型分流的动作 */
 export type TreeDropAction = "insert-image" | "open-tab" | "system-open" | "ignore";
@@ -27,6 +27,6 @@ export function classifyTreeDrop(
 ): TreeDropAction {
   if (nodeType === "directory") return "ignore";
   if (isImageFile(name)) return "insert-image";
-  if (isMarkdownFile(name) || isEditableTextFile(name)) return "open-tab";
+  if (canOpenInApp(name)) return "open-tab";
   return "system-open";
 }
