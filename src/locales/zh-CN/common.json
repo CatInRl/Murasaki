@@ -122,6 +122,7 @@
     "closeAriaLabel": "关闭通知",
     "cannotOpenFile": "此文件无法在 Murasaki 中打开",
     "unsupportedDropFiles": "已忽略 {count} 个无法打开的文件",
-    "ignoredDropFolders": "已忽略 {count} 个文件夹（一个窗口只能打开一个工作区）"
+    "ignoredDropFolders": "已忽略 {count} 个文件夹（一个窗口只能打开一个工作区）",
+    "draftSaveFailed": "草稿保存失败，未保存内容可能丢失"
   }
 }
