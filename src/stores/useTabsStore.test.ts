@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useTabsStore } from "./useTabsStore";
+import type { Tab } from "../types";
 
 // 路径去重（#304）：同一文件可能以不同分隔符写法到达，openFile 的「是否已打开」与
 // getTabByPath 的查找都必须按归一化路径比较，否则会重复开 tab / 找不到 tab。
@@ -86,6 +87,28 @@ describe("useTabsStore", () => {
       await store.openFile("C:/docs/a.md");
 
       expect(store.activeTabId).toBe(first.id);
+    });
+  });
+
+  // #385：store 层不得存本地化字符串——「未命名」文案由渲染层按当前语言注入，
+  // 否则切换语言后标签标题仍是旧语言的硬编码。
+  describe("getTabTitle（#385 标题去本地化）", () => {
+    it("有 path 时返回 basename，与注入文案无关", () => {
+      const store = useTabsStore();
+      const tab = { id: "t1", path: "C:/docs/note.md" } as unknown as Tab;
+      expect(store.getTabTitle(tab, "Untitled")).toBe("note.md");
+    });
+
+    it("无 path 时返回调用方注入的文案，不再硬编码「未命名」", () => {
+      const store = useTabsStore();
+      const tab = { id: "t2", path: null } as unknown as Tab;
+      expect(store.getTabTitle(tab, "Untitled")).toBe("Untitled");
+    });
+
+    it("注入不同文案返回不同文案（文案确实来自参数）", () => {
+      const store = useTabsStore();
+      const tab = { id: "t3", path: null } as unknown as Tab;
+      expect(store.getTabTitle(tab, "無題")).toBe("無題");
     });
   });
 });
