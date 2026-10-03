@@ -23,8 +23,15 @@ vi.mock("./usePersistenceStore", () => ({
   }),
 }));
 
+// 草稿兜底失败的反馈断言（#378）：spy 单例供各用例断言
+const { warningSpy } = vi.hoisted(() => ({ warningSpy: vi.fn() }));
+vi.mock("./useToastStore", () => ({
+  useToastStore: () => ({ warning: warningSpy }),
+}));
+
 beforeEach(() => {
   setActivePinia(createPinia());
+  warningSpy.mockClear();
 });
 
 describe("useTabsStore", () => {
@@ -144,6 +151,41 @@ describe("useTabsStore", () => {
       expect(saveDraftSpy).not.toHaveBeenCalled();
       expect(tab.content).toBe("本地未保存的修改");
       expect(tab.isDirty).toBe(true);
+    });
+  });
+
+  describe("草稿兜底写失败时的用户反馈（#378 评审补充）", () => {
+    it("doCloseTab 写草稿失败：仍完成关闭，并 toast 警告不静默", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      (fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("disk full")
+      );
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "未保存的修改");
+
+      await expect(store.doCloseTab(tab.id)).resolves.toBeTruthy();
+      expect(store.tabs).toHaveLength(0);
+      expect(warningSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("load-disk 前写草稿失败：继续加载磁盘内容，并 toast 警告不静默", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      (fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("disk full")
+      );
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "本地未保存的修改");
+      (fileSystem.getMtime as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        1_700_000_999_000
+      );
+
+      await store.applyExternalResolution("C:\\docs\\a.md", "load-disk", "磁盘新内容");
+
+      expect(tab.content).toBe("磁盘新内容");
+      expect(tab.isDirty).toBe(false);
+      expect(warningSpy).toHaveBeenCalledTimes(1);
     });
   });
 });
