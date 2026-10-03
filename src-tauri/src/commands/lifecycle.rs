@@ -22,6 +22,14 @@ impl ClosingState {
         let mut set = self.0.lock().unwrap_or_else(|e| e.into_inner());
         set.insert(label.to_string())
     }
+
+    /// 让某窗口退出落盘流程（issue #377）：用户在退出确认里选「取消」后由
+    /// 前端经 [`cancel_close`] 调用。不退出的话残留的 label 会让后续
+    /// CloseRequested 在 [`intercept_close_request`] 里被吞掉，关闭按钮永久失效。
+    pub fn cancel(&self, label: &str) {
+        let mut set = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        set.remove(label);
+    }
 }
 
 /// 处理窗口关闭请求。
@@ -41,6 +49,14 @@ pub fn intercept_close_request(window: &tauri::Window) -> bool {
     }
     let _ = window.emit_to(window.label(), "app-close-requested", ());
     true
+}
+
+/// 用户在退出确认里选「取消」后调用：退出本窗口的关闭拦截流程（issue #377）。
+/// 见 [`ClosingState::cancel`]。
+#[tauri::command]
+pub fn cancel_close(window: tauri::Window) {
+    let state = window.app_handle().state::<ClosingState>();
+    state.cancel(window.label());
 }
 
 /// 前端落盘完成后调用，真正退出应用（兼容旧调用点 / 兜底路径）
@@ -86,5 +102,33 @@ mod tests {
         assert!(state.begin("main"));
         // 其它窗口不受影响，仍可进入自己的落盘流程
         assert!(state.begin("win-1"));
+    }
+
+    // issue #377：用户在退出确认里选「取消」后，前端调 cancel_close 退出落盘流程，
+    // 再次点关闭必须能重新进入 —— 否则该窗口的关闭按钮永久失效
+    #[test]
+    fn cancel_allows_reentry_after_user_cancels() {
+        let state = ClosingState::default();
+        assert!(state.begin("win-1"));
+        state.cancel("win-1");
+        assert!(state.begin("win-1"));
+    }
+
+    #[test]
+    fn cancel_unknown_label_is_noop() {
+        let state = ClosingState::default();
+        state.cancel("win-1");
+        assert!(state.begin("win-1"));
+    }
+
+    #[test]
+    fn cancel_is_scoped_per_window() {
+        let state = ClosingState::default();
+        assert!(state.begin("main"));
+        assert!(state.begin("win-1"));
+        state.cancel("main");
+        // 未取消的窗口仍在流程中，重复关闭依旧被拦截（防丢数据，ADR-0017）
+        assert!(!state.begin("win-1"));
+        assert!(state.begin("main"));
     }
 }
