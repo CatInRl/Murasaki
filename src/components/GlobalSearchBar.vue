@@ -57,7 +57,7 @@ const tabsSource = computed(() =>
   tabsStore.tabs.map((tab) => ({
     id: tab.id,
     path: tab.path,
-    title: tabsStore.getTabTitle(tab),
+    title: tabsStore.getTabTitle(tab, t("common.untitled")),
   }))
 );
 

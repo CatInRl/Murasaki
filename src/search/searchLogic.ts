@@ -161,6 +161,8 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
   const empty = query.length === 0;
   const groups: SearchGroup[] = [];
   const shown = new Set<string>();
+  /** #387：路径 → 先出现的条目（标签/最近/文件名），内容命中并入该条目而非丢掉 */
+  const mergeTargets = new Map<string, SearchEntry>();
   /** 跨组去重键：有路径走归一化路径（同一文件的不同分隔符写法不该重复出现），
    *  未命名标签没有路径可归一化，退回其 id */
   const dedupeKey = (path: string | null, fallbackId = ""): string =>
@@ -175,7 +177,7 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
     if (!empty && !entryMatches(t.title, t.path, query)) continue;
     const key = dedupeKey(t.path, t.id);
     shown.add(key);
-    tabItems.push({
+    const entry: SearchEntry = {
       id: nextId("tabs"),
       group: "tabs",
       title: t.title,
@@ -184,7 +186,9 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
       ranges: empty ? [] : matchText(t.title, query).ranges,
       isOpen: true,
       tabId: t.id,
-    });
+    };
+    tabItems.push(entry);
+    mergeTargets.set(key, entry);
   }
   if (tabItems.length) groups.push({ kind: "tabs", items: tabItems });
 
@@ -194,8 +198,9 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
     if (recentItems.length >= SEARCH_LIMITS.recent) break;
     if (shown.has(dedupeKey(r.path))) continue;
     if (!empty && !entryMatches(r.title, r.path, query)) continue;
-    shown.add(dedupeKey(r.path));
-    recentItems.push({
+    const recentKey = dedupeKey(r.path);
+    shown.add(recentKey);
+    const entry: SearchEntry = {
       id: nextId("recent"),
       group: "recent",
       title: r.title,
@@ -203,7 +208,9 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
       subtitle: dirname(r.path),
       ranges: empty ? [] : matchText(r.title, query).ranges,
       isOpen: false,
-    });
+    };
+    recentItems.push(entry);
+    mergeTargets.set(recentKey, entry);
   }
   if (recentItems.length) groups.push({ kind: "recent", items: recentItems });
 
@@ -224,8 +231,9 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
       })
       .slice(0, SEARCH_LIMITS.files);
     const fileItems: SearchEntry[] = matched.map((f) => {
-      shown.add(dedupeKey(f.path));
-      return {
+      const fileKey = dedupeKey(f.path);
+      shown.add(fileKey);
+      const entry: SearchEntry = {
         id: nextId("files"),
         group: "files",
         title: f.title,
@@ -234,6 +242,8 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
         ranges: empty ? [] : matchText(f.title, query).ranges,
         isOpen: false,
       };
+      mergeTargets.set(fileKey, entry);
+      return entry;
     });
     if (fileItems.length) groups.push({ kind: "files", items: fileItems });
   }
@@ -245,10 +255,22 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
     let filesUsed = 0;
     for (const c of ctx.content) {
       if (filesUsed >= SEARCH_LIMITS.contentFiles) break;
-      if (shown.has(dedupeKey(c.path))) continue;
+      const key = dedupeKey(c.path);
       const hits = c.hits.slice(0, SEARCH_LIMITS.contentPerFile);
       if (!hits.length) continue;
-      shown.add(dedupeKey(c.path));
+      if (shown.has(key)) {
+        // #387：文件已作为 标签/最近/文件名 条目出现——把首个命中（行号 + 摘要）
+        // 并入那条，让用户选中后能跳行；不再生成重复条目（保持去重语义）
+        const target = mergeTargets.get(key);
+        const first = hits[0];
+        if (target && target.snippet === undefined) {
+          target.lineNumber = first.lineNumber;
+          target.snippet = first.snippet;
+          target.snippetRanges = first.ranges;
+        }
+        continue;
+      }
+      shown.add(key);
       filesUsed++;
       for (const h of hits) {
         contentItems.push({
@@ -276,4 +298,38 @@ export function buildGroups(ctx: BuildGroupsContext): SearchGroup[] {
 function entryMatches(title: string, path: string | null, query: string): boolean {
   const hay = path ? `${title} ${path}` : title;
   return matchText(hay, query).ok;
+}
+
+/** #387：跳行定位入参——dirty tab 的磁盘行号不可信，需按内存内容重新定位 */
+export interface ResolveJumpLineArgs {
+  /** 结果条目（磁盘行号可能缺省） */
+  entry: { lineNumber?: number };
+  /** tab 是否有未保存改动（编辑器内容 ≠ 磁盘内容） */
+  isDirty: boolean;
+  /** tab 当前内存内容 */
+  content: string;
+  /** 搜索词 */
+  query: string;
+  /** 是否区分大小写（与内容搜索选项一致，默认不区分） */
+  caseSensitive?: boolean;
+}
+
+/**
+ * 解析搜索条目应跳转的行号。
+ * - 非 dirty：磁盘行号可信，直接用；
+ * - dirty：按内存内容对搜索词首次出现重新定位（1-based）；找不到 → 回退磁盘行号
+ *   （聊胜于无）；没有磁盘行号且找不到 → undefined（不跳行）。
+ */
+export function resolveSearchJumpLine(args: ResolveJumpLineArgs): number | undefined {
+  if (!args.isDirty) return args.entry.lineNumber;
+  const query = args.query;
+  if (query) {
+    const hay = args.caseSensitive ? args.content : args.content.toLowerCase();
+    const needle = args.caseSensitive ? query : query.toLowerCase();
+    const idx = hay.indexOf(needle);
+    if (idx >= 0) {
+      return hay.slice(0, idx).split("\n").length;
+    }
+  }
+  return args.entry.lineNumber;
 }

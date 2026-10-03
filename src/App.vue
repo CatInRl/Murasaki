@@ -61,6 +61,7 @@ import { useNaiveTheme } from "./composables/useNaiveTheme";
 import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import type { SidebarView, EditorMode } from "./types";
 import type { SearchEntry } from "./search/searchLogic";
+import { resolveSearchJumpLine } from "./search/searchLogic";
 import { READING_FONT_PRESETS } from "./types";
 import {
   PRESENTATION_ZOOM_DEFAULT,
@@ -729,12 +730,27 @@ async function onSearchEntrySelect(entry: SearchEntry): Promise<void> {
   // 已打开的标签 → 直接切换（不重新加载，保留编辑状态）
   if (entry.isOpen && entry.tabId) {
     tabsStore.switchTo(entry.tabId);
+    // #387：dirty tab 的磁盘行号不可信，按内存内容对搜索词重新定位
+    const tab = tabsStore.tabs.find((t) => t.id === entry.tabId);
+    const line = resolveSearchJumpLine({
+      entry,
+      isDirty: tab?.isDirty ?? false,
+      content: tab?.content ?? "",
+      query: searchStore.query,
+      caseSensitive: searchStore.options.caseSensitive,
+    });
+    if (line !== undefined) {
+      requestAnimationFrame(() => {
+        editorRef.value?.scrollToLine(line);
+        editorRef.value?.focus();
+      });
+    }
     return;
   }
   // 未保存标签（path=null）无法打开
   if (!entry.path) return;
   await openFile(entry.path);
-  // 内容命中 → 打开后跳转到命中行
+  // 内容命中 → 打开后跳转到命中行（刚从磁盘读入，行号可信）
   const line = entry.lineNumber;
   if (line !== undefined) {
     requestAnimationFrame(() => {

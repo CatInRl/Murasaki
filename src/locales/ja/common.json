@@ -44,6 +44,7 @@
   "exportHtmlTitle": "HTML をエクスポート",
   "exportPdfTitle": "PDF をエクスポート",
   "exportPdfSuccess": "PDF をエクスポートしました",
+  "exportHtmlSuccess": "HTML をエクスポートしました: {path}",
   "copyRichTextSuccess": "リッチテキストをクリップボードにコピーしました",
   "drop": {
     "overlayTitle": "ドロップして開く",

@@ -58,9 +58,13 @@ export const useTabsStore = defineStore("tabs", () => {
     });
   }
 
-  /** 获取 tab 显示标题（仅文件名） */
-  function getTabTitle(tab: Tab): string {
-    return tab.path ? basename(tab.path) : "未命名";
+  /**
+   * 获取 tab 显示标题（仅文件名）。
+   * #385：store 层不存本地化字符串——未命名文案由渲染层按当前语言注入，
+   * 否则切换语言后标签标题仍是旧语言的硬编码。
+   */
+  function getTabTitle(tab: Tab, untitledText: string): string {
+    return tab.path ? basename(tab.path) : untitledText;
   }
 
   // ===== Actions =====
