@@ -5,11 +5,13 @@
  * - useExitFlush：接线层，未保存改动先问用户（保存 / 不保存 / 取消），取消要能中止退出
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
 import { flushUnsavedOnExit, useExitFlush, type ExitFlushTab } from "./useExitFlush";
 import { fileSystem } from "../services/fileSystem";
 
 // 接线层会碰 Tauri IPC 与草稿落盘：这里替身化，测试只关心编排顺序
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => undefined) }));
+const invokeSpy = invoke as unknown as ReturnType<typeof vi.fn>;
 vi.mock("@tauri-apps/api/webviewWindow", () => ({
   getCurrentWebviewWindow: () => ({ destroy: vi.fn(async () => undefined) }),
 }));
@@ -130,23 +132,29 @@ describe("useExitFlush（退出确认 #346）", () => {
     const resolveUnsaved = vi.fn(async () => false);
     const { onExitRequested } = useExitFlush(deps, { resolveUnsaved });
 
+    invokeSpy.mockClear();
     await onExitRequested();
     expect(saveDraftSpy).not.toHaveBeenCalled();
     expect(persist).not.toHaveBeenCalled();
+    // issue #377：Rust ClosingState 已登记本窗口，取消时必须显式退出拦截，
+    // 否则下次 CloseRequested 被 intercept_close_request 吞掉，关闭按钮永久失效
+    expect(invokeSpy).toHaveBeenCalledWith("cancel_close");
 
     await onExitRequested();
     expect(resolveUnsaved).toHaveBeenCalledTimes(2);
     warn.mockRestore();
   });
 
-  it("确认过程抛错：按「取消退出」处理（宁可关不掉也不静默丢改动）", async () => {
+  it("确认过程抛错：按「取消退出」处理，同样要退出 Rust 拦截", async () => {
     const warn = vi.spyOn(console, "error").mockImplementation(() => {});
     const { deps } = makeDeps([tab()]);
     const resolveUnsaved = vi.fn(async () => {
       throw new Error("dialog failed");
     });
+    invokeSpy.mockClear();
     await useExitFlush(deps, { resolveUnsaved }).onExitRequested();
     expect(saveDraftSpy).not.toHaveBeenCalled();
+    expect(invokeSpy).toHaveBeenCalledWith("cancel_close");
     warn.mockRestore();
   });
 });
