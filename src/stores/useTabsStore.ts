@@ -2,8 +2,10 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import type { Tab, PersistedTab } from "../types";
 import { usePersistenceStore } from "./usePersistenceStore";
+import { useToastStore } from "./useToastStore";
 import { fileSystem } from "../services/fileSystem";
 import { basename, isSamePath } from "../utils/path";
+import { i18n } from "../i18n";
 
 /**
  * 标签页 Store
@@ -12,6 +14,10 @@ import { basename, isSamePath } from "../utils/path";
  * - 启动恢复：从 tabs.json 读取上次状态，结合草稿恢复内容
  */
 export const useTabsStore = defineStore("tabs", () => {
+  const toast = useToastStore();
+  /** 文案翻译（用户可见文本必须走 i18n，禁止硬编码） */
+  const t = i18n.global.t.bind(i18n.global);
+
   // ===== State =====
   /** 标签页列表 */
   const tabs = ref<Tab[]>([]);
@@ -39,6 +45,17 @@ export const useTabsStore = defineStore("tabs", () => {
   /** 生成唯一 tab id */
   function genId(): string {
     return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  /**
+   * 写草稿兜底：失败不阻断主流程（关闭 / 加载磁盘照常），但不能静默——
+   * 未保存内容将随草稿一起丢失，用户必须知道（#378 评审补充）。
+   */
+  async function persistDraftQuietly(path: string, content: string, mtime: number): Promise<void> {
+    await fileSystem.saveDraft(path, content, mtime).catch((err) => {
+      console.error("保存草稿失败:", err);
+      toast.warning(t("common.toast.draftSaveFailed"));
+    });
   }
 
   /**
@@ -177,8 +194,7 @@ export const useTabsStore = defineStore("tabs", () => {
     const tab = tabs.value[idx];
     if (tab.isDirty && tab.path) {
       // 写入草稿（保留未保存内容，供下次启动恢复）
-      await fileSystem.saveDraft(tab.path, tab.content, tab.lastMtime ?? 0)
-        .catch((err) => console.error("保存草稿失败:", err));
+      await persistDraftQuietly(tab.path, tab.content, tab.lastMtime ?? 0);
     }
 
     tabs.value.splice(idx, 1);
@@ -205,7 +221,8 @@ export const useTabsStore = defineStore("tabs", () => {
 
   /**
    * 应用外部修改处理结果到 tab
-   * - "load-disk"：用磁盘内容覆盖 tab 内容，更新 mtime，清除 dirty 与外部修改标记
+   * - "load-disk"：用磁盘内容覆盖 tab 内容，更新 mtime，清除 dirty 与外部修改标记；
+   *   覆盖会丢弃本地未保存内容，故先写草稿兜底（issue #378，ADR-0001）
    * - "keep-local"：用户选择保留本地版本，将 lastMtime 对齐到磁盘当前 mtime，
    *   否则关闭时写入草稿的 knownMtime 与磁盘不一致，下次打开会被判定为过期草稿而丢弃
    */
@@ -217,10 +234,16 @@ export const useTabsStore = defineStore("tabs", () => {
     const tab = getTabByPath(filePath);
     if (!tab) return;
     if (choice === "load-disk") {
+      const mtime = await fileSystem.getMtime(filePath);
+      if (tab.isDirty) {
+        // issue #378：本地未保存内容即将被磁盘内容覆盖，先写草稿兜底，
+        // 让用户事后仍可经 ADR-0001 的草稿恢复找回来。knownMtime 必须用磁盘
+        // 当前 mtime，否则下次打开会被判为过期草稿而直接丢弃，兜底失效。
+        await persistDraftQuietly(filePath, tab.content, mtime);
+      }
       if (externalContent !== undefined) {
         tab.content = externalContent;
       }
-      const mtime = await fileSystem.getMtime(filePath);
       tab.lastMtime = mtime;
       // 选择"加载磁盘版本"后，磁盘内容即当前内容，更新快照
       tab.savedContent = tab.content;

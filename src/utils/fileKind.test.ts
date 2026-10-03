@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import {
   isImageFile,
   isEditableTextFile,
+  canOpenInApp,
   isLargeExtensionlessFile,
   isMarkdownFile,
   isHtmlFile,
@@ -68,6 +69,20 @@ describe("isDocumentFile / isSourceOnlyFile", () => {
   it("两者互斥（文档类 ⟺ 非源码-only）", () => {
     for (const name of ["a.md", "a.html", "a.txt", "a.pdf", "noext"]) {
       expect(isSourceOnlyFile(name)).toBe(!isDocumentFile(name));
+    }
+  });
+});
+
+describe("canOpenInApp", () => {
+  it("markdown / 白名单文本 / 无后缀 → 能在应用内打开", () => {
+    for (const name of ["a.md", "a.txt", "a.json", "a.py", "a.html", "Makefile", ".gitignore"]) {
+      expect(canOpenInApp(name)).toBe(true);
+    }
+  });
+
+  it("白名单外的扩展名 → 打不开（走系统默认程序兜底，#307/#379）", () => {
+    for (const name of ["a.pdf", "a.zip", "a.exe", "a.docx", "a.mp4"]) {
+      expect(canOpenInApp(name)).toBe(false);
     }
   });
 });

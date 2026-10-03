@@ -97,6 +97,13 @@ export function useExitFlush(
       }
       if (!proceed) {
         inFlight = false;
+        // issue #377：Rust 侧 ClosingState 已登记本窗口，必须显式退出拦截，
+        // 否则下次 CloseRequested 被 intercept_close_request 吞掉，窗口永远关不掉
+        try {
+          await invoke("cancel_close");
+        } catch (err) {
+          console.error("[Murasaki] cancel_close 失败:", err);
+        }
         return;
       }
     }

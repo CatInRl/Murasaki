@@ -309,6 +309,19 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
             "fullscreen",
             i18n::with_accel(mt("view.fullscreen"), &accel("fullscreen", "F11")),
         )
+        .separator()
+        .text(
+            "zoom-in",
+            i18n::with_accel(mt("view.zoomIn"), &accel("zoom-in", "CmdOrCtrl+=")),
+        )
+        .text(
+            "zoom-out",
+            i18n::with_accel(mt("view.zoomOut"), &accel("zoom-out", "CmdOrCtrl+-")),
+        )
+        .text(
+            "zoom-reset",
+            i18n::with_accel(mt("view.zoomReset"), &accel("zoom-reset", "CmdOrCtrl+0")),
+        )
         .build()?;
 
     // === Theme menu ===
