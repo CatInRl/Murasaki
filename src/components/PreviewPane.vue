@@ -58,7 +58,13 @@ async function renderMermaid(container: HTMLElement) {
     const code = block.textContent || "";
     const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
     try {
-      const { svg } = await mermaid.render(id, code);
+      // mermaid 不传容器时把临时 div 直接挂到 body（无宽度样式），gantt 等图
+      // 的 viewBox 宽度取 elem.parentElement.offsetWidth，测出的是 body 宽——
+      // 在 WebView2 下可能远大于预览列宽，图被压成一条线（#342）。
+      // 传真实容器让测量落在预览列内；容器不可见（宽 0）时 gantt 只防
+      // undefined 不防 0，会画出 0 宽 viewBox，此时回退不传。
+      const renderTarget = block.offsetWidth > 0 ? block : undefined;
+      const { svg } = await mermaid.render(id, code, renderTarget);
       block.innerHTML = svg;
       sanitizeMermaidSvg(block);
     } catch (err) {

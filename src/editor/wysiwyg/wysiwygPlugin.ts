@@ -241,7 +241,15 @@ class MermaidWidget extends WysiwygBlockWidget {
     // 占位：出错时显示源码，便于排错
     container.textContent = this.code;
     void ensureMermaid()
-      .then((mermaid) => mermaid.render(this.id, this.code))
+      .then((mermaid) =>
+        // 传真实容器让 gantt 等图从容器测宽（挂 body 会测出 body 宽，图被
+        // 压扁，#342）；widget 尚未入 DOM 或不可见时回退不传（见 PreviewPane）。
+        mermaid.render(
+          this.id,
+          this.code,
+          container.isConnected && container.offsetWidth > 0 ? container : undefined,
+        ),
+      )
       .then(({ svg }) => {
         if (container.isConnected) {
           container.innerHTML = svg;
@@ -249,7 +257,10 @@ class MermaidWidget extends WysiwygBlockWidget {
         }
       })
       .catch(() => {
-        // 渲染失败：保留源码占位
+        // 渲染失败：恢复源码占位（传容器时 render 会先清空占位）
+        if (container.isConnected) {
+          container.textContent = this.code;
+        }
       });
     // 点击 widget：发出事件定位光标到块起始位置
     container.addEventListener("click", () => {
@@ -297,7 +308,14 @@ class DiagramPreviewWidget extends WysiwygBlockWidget {
       body.classList.add("mermaid");
       body.textContent = this.code; // 占位：出错时保留源码便于排错
       void ensureMermaid()
-        .then((mermaid) => mermaid.render(id, this.code))
+        .then((mermaid) =>
+          // 同 MermaidWidget：传真实容器测宽，未入 DOM/不可见时回退不传
+          mermaid.render(
+            id,
+            this.code,
+            body.isConnected && body.offsetWidth > 0 ? body : undefined,
+          ),
+        )
         .then(({ svg }) => {
           if (body.isConnected) {
             body.innerHTML = svg;
@@ -305,7 +323,10 @@ class DiagramPreviewWidget extends WysiwygBlockWidget {
           }
         })
         .catch(() => {
-          // 渲染失败：保留源码占位
+          // 渲染失败：恢复源码占位（传容器时 render 会先清空占位）
+          if (body.isConnected) {
+            body.textContent = this.code;
+          }
         });
     } else if (lang === "katex" || lang === "math") {
       body.classList.add("katex", "katex-display");

@@ -11,7 +11,11 @@
 
 interface MermaidApi {
   initialize(config: Record<string, unknown>): void;
-  render(id: string, code: string): Promise<{ svg: string }>;
+  render(
+    id: string,
+    code: string,
+    svgContainingElement?: Element,
+  ): Promise<{ svg: string }>;
 }
 
 /** themeVariables 缓存：主色运行期不变，首次读一次即可（issue #295） */
