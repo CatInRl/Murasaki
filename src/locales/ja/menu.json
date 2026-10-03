@@ -65,7 +65,10 @@
     "filesView": "ファイルツリー",
     "outlineView": "アウトライン",
     "statusBar": "ステータスバー",
-    "fullscreen": "全画面表示"
+    "fullscreen": "全画面表示",
+    "zoomIn": "拡大",
+    "zoomOut": "縮小",
+    "zoomReset": "ズームをリセット"
   },
   "aboutText": "Murasaki v{version}\n軽量なローカル Markdown ファイル管理エディター\nTauri 2.x + Vue 3 + CodeMirror 6 採用"
 }

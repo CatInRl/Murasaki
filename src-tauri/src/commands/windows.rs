@@ -90,6 +90,36 @@ impl WindowRegistry {
     }
 }
 
+/// 从工作区路径提取展示名（末段目录名），供窗口标题使用。
+///
+/// 统一 `\` 与 `/` 两种分隔符并去掉尾部斜杠后取最后一段；
+/// 提取结果为空时返回原路径。
+fn workspace_display_name(path: &str) -> String {
+    let unified = path.replace('\\', "/");
+    let trimmed = unified.trim_end_matches('/');
+    let name = trimmed.rsplit('/').next().unwrap_or("");
+    if name.is_empty() {
+        path.to_string()
+    } else {
+        name.to_string()
+    }
+}
+
+/// 窗口标题：有工作区时显示「<目录名> — Murasaki」，无则回退「Murasaki」（issue #380）。
+pub fn window_title_for_workspace(path: Option<&str>) -> String {
+    match path {
+        None => "Murasaki".to_string(),
+        Some(p) => {
+            let name = workspace_display_name(p);
+            if name.is_empty() {
+                "Murasaki".to_string()
+            } else {
+                format!("{} — Murasaki", name)
+            }
+        }
+    }
+}
+
 /// 创建编辑器窗口。`path` 为 `None` 时创建空白窗口。
 ///
 /// - `path` 是**目录**：先查注册表，命中则聚焦已有窗口并返回其 label（不建新窗）；
@@ -117,8 +147,14 @@ pub fn create_editor_window(app: &AppHandle, path: Option<String>) -> Result<Str
     }
 
     let label = registry.next_label();
+    // 目录工作区直接以目录名作为初始标题；文件 / 空白窗口保持「Murasaki」。
+    // 后续前端上报 set_window_workspace 时还会同步一次。
+    let initial_title = match path.as_deref() {
+        Some(p) if std::path::Path::new(p).is_dir() => window_title_for_workspace(Some(p)),
+        _ => window_title_for_workspace(None),
+    };
     let mut builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::default())
-        .title("Murasaki")
+        .title(&initial_title)
         .inner_size(1200.0, 800.0)
         .min_inner_size(800.0, 600.0)
         .resizable(true)
@@ -185,7 +221,10 @@ pub async fn open_path_in_new_window(app: AppHandle, path: String) -> Result<Str
 #[tauri::command]
 pub fn set_window_workspace(window: WebviewWindow, app: AppHandle, path: Option<String>) {
     app.state::<WindowRegistry>()
-        .set_workspace(window.label(), path);
+        .set_workspace(window.label(), path.clone());
+    // 标题跟随工作区（issue #380）：任务栏按「目录名 — Murasaki」分辨多窗口
+    let title = window_title_for_workspace(path.as_deref());
+    let _ = window.set_title(&title);
 }
 
 /// 前端调用：关闭本窗口。
@@ -284,5 +323,31 @@ mod tests {
         let b = normalize_path("/tmp/a");
         assert_eq!(a, b);
         assert_eq!(normalize_path("/tmp/a\\b"), normalize_path("/tmp/a/b"));
+    }
+
+    #[test]
+    fn window_title_without_workspace_is_plain() {
+        assert_eq!(window_title_for_workspace(None), "Murasaki");
+    }
+
+    #[test]
+    fn window_title_uses_workspace_basename() {
+        assert_eq!(
+            window_title_for_workspace(Some("/home/user/docs")),
+            "docs — Murasaki"
+        );
+    }
+
+    #[test]
+    fn window_title_handles_mixed_separators_and_trailing_slash() {
+        assert_eq!(
+            window_title_for_workspace(Some("C:\\repos\\murasaki\\")),
+            "murasaki — Murasaki"
+        );
+    }
+
+    #[test]
+    fn window_title_empty_path_falls_back_to_plain() {
+        assert_eq!(window_title_for_workspace(Some("")), "Murasaki");
     }
 }
