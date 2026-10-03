@@ -10,7 +10,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async () => undefined),
 }));
 
-import { ref, nextTick, effectScope, type Ref, type EffectScope } from "vue";
+import { ref, nextTick, effectScope, type EffectScope } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useModeMenuSync } from "./useModeMenuSync";
 import type { EditorMode } from "../types";
