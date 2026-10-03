@@ -131,8 +131,9 @@ export async function waitForPiniaInCurrentWindow(
   browser: Browser,
   timeout = 30000
 ): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
+  let deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const probeStart = Date.now();
     const ready = await browser
       .execute(() => {
         // @ts-ignore
@@ -140,6 +141,9 @@ export async function waitForPiniaInCurrentWindow(
       })
       .catch(() => false);
     if (ready) return;
+    // #375：execute 挂起（B 后 5s 即抛 ScriptTimeout）不占轮询预算 ——
+    // 慢调用的实际耗时顺延 deadline，与 waitForPinia 同一手法
+    deadline += slowCallExtension(probeStart);
     await browser.pause(500);
   }
   // 超时：收集 webview 内的诊断信息（#371）—— console 缓冲由 Rust 侧

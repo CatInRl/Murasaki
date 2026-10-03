@@ -21,6 +21,7 @@ import { createConnection } from "node:net";
 import { existsSync, rmSync } from "node:fs";
 import { clearPersistedTabs, waitForAppReady, waitForPinia } from "./store";
 import { IS_WINDOWS, IS_MACOS, EMBEDDED_DRIVER_PORT } from "./platform";
+import { SLOW_EXECUTE_MS } from "./wait";
 import { isProcessAlive, killProcessesByName } from "./processes";
 
 const DEFAULT_BINARY = resolve(
@@ -215,9 +216,10 @@ async function createEmbeddedSession(): Promise<Browser> {
       // 同 #300：attach 不合并 remote() 默认配置，必须显式补 waitUntil 重试参数
       browser.options.waitforInterval = WAITFOR_INTERVAL;
       browser.options.waitforTimeout = WAITFOR_TIMEOUT;
-      // #375 B：非 direct eval 路径的残余 execute 挂起 5s 快速失败（服务端默认 30s，
-      // 是 macOS 挂起链路里最痛的黑洞）；direct eval 探针有独立的 6s 预算，不经这里
-      await browser.setTimeouts(undefined, undefined, 5000);
+      // #375 B：非 direct eval 路径的残余 execute 挂起快速失败（服务端默认 30s，
+      // 是 macOS 挂起链路里最痛的黑洞）；阈值与 wait.ts 慢调用判定共用
+      // SLOW_EXECUTE_MS —— direct eval 探针有独立的 6s 预算，不经这里
+      await browser.setTimeouts(undefined, undefined, SLOW_EXECUTE_MS);
       break;
     } catch (err) {
       lastError = err;
