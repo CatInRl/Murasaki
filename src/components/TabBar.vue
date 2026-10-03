@@ -355,10 +355,11 @@ function onPanelKeydown(e: KeyboardEvent): void {
         <span class="tab-title">{{ tabsStore.getTabTitle(tab, t("common.untitled")) }}</span>
         <!-- dirty 状态：紫色圆点 -->
         <span v-if="tab.isDirty" class="dirty-dot" aria-hidden="true"></span>
-        <!-- 关闭按钮：仅 hover 时显示 -->
+        <!-- 关闭按钮：仅 hover 时显示；tabindex=-1 使其不进 Tab 序（WAI-ARIA：tab 不得含可聚焦后代，键盘关闭走 Delete/右键菜单） -->
         <button
           class="close-btn"
           type="button"
+          tabindex="-1"
           :title="$t('editor.tabBar.close')"
           :aria-label="$t('editor.tabBar.closeTabAria')"
           @click="onCloseTab($event, tab.id)"
