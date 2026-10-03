@@ -89,6 +89,18 @@ export function isEditableTextFile(name: string): boolean {
 }
 
 /**
+ * 是否能在应用内打开（markdown 或可编辑文本/代码）。
+ *
+ * 「能不能打开」的统一口径（#307/#379 复用）：打不开的文件一律走
+ * 「用系统默认程序打开」兜底（见 ADR-0020 打开矩阵）。
+ *
+ * @param name 文件名或路径
+ */
+export function canOpenInApp(name: string): boolean {
+  return isMarkdownFile(name) || isEditableTextFile(name);
+}
+
+/**
  * 无后缀文件是否「大到需要先确认」（≥ EXTENSIONLESS_TEXT_MAX_SIZE）。
  *
  * 只用于两处（#308）：

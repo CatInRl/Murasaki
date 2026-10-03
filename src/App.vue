@@ -168,6 +168,7 @@ const {
   openFile, openFileViaDialog, openPathInNewWindow, saveCurrentFile, saveAsCurrentFile,
   reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, onNewTab, onNewFile,
   onOpenFolder, onOpenFile, onOpenRecent, notifyUnsupportedFiles, notifyIgnoredFolders,
+  openWithDefaultApp,
 } = useFileActions({ tabsStore, workspace, fileOps, persistence, dialog, toast: toastStore, activeTab, currentTheme });
 
 // ===== 拖放打开（原生 drag-drop，issue #92）=====
@@ -911,6 +912,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             @cursor-change="onCursorChange"
             @open-internal="openFile"
             @drop-image-path="onDropImagePath"
+            @open-with-default-app="openWithDefaultApp"
             @context-action="onEditorContextAction"
             @zoom-step="onZoomStep"
           />
