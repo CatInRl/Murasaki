@@ -359,6 +359,7 @@ export function useFileActions(deps: FileActionsDeps) {
     openPathInNewWindow,
     notifyUnsupportedFiles,
     notifyIgnoredFolders,
+    openWithDefaultApp,
     saveCurrentFile,
     saveAsCurrentFile,
     reloadCurrentFile,
