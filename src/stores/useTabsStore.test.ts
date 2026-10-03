@@ -11,6 +11,7 @@ vi.mock("../services/fileSystem", () => ({
     readText: vi.fn(async (path: string) => `content of ${path}`),
     getMtime: vi.fn(async () => 1_700_000_000_000),
     draftExists: vi.fn(async () => false),
+    saveDraft: vi.fn(async () => undefined),
   },
 }));
 
@@ -86,6 +87,63 @@ describe("useTabsStore", () => {
       await store.openFile("C:/docs/a.md");
 
       expect(store.activeTabId).toBe(first.id);
+    });
+  });
+
+  describe("外部修改：load-disk 前写草稿兜底（#378）", () => {
+    it("load-disk 会丢弃本地未保存内容，覆盖前先以磁盘当前 mtime 写草稿", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const saveDraftSpy = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "本地未保存的修改");
+
+      // 外部修改后磁盘 mtime 变化
+      (fileSystem.getMtime as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        1_700_000_999_000
+      );
+      await store.applyExternalResolution("C:\\docs\\a.md", "load-disk", "磁盘新内容");
+
+      // 草稿内容必须是覆盖前的本地内容、knownMtime 必须是磁盘当前 mtime
+      //（否则下次打开会被 ADR-0001 判为过期草稿而丢弃，兜底失效）
+      expect(saveDraftSpy).toHaveBeenCalledWith(
+        "C:\\docs\\a.md",
+        "本地未保存的修改",
+        1_700_000_999_000
+      );
+      expect(tab.content).toBe("磁盘新内容");
+      expect(tab.isDirty).toBe(false);
+    });
+
+    it("tab 无未保存修改时 load-disk 不写草稿", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const saveDraftSpy = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+      const store = useTabsStore();
+      await store.openFile("C:\\docs\\a.md");
+      (fileSystem.getMtime as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        1_700_000_999_000
+      );
+
+      await store.applyExternalResolution("C:\\docs\\a.md", "load-disk", "磁盘新内容");
+
+      expect(saveDraftSpy).not.toHaveBeenCalled();
+    });
+
+    it("keep-local 不写草稿（本地内容仍在 tab 中）", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const saveDraftSpy = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "本地未保存的修改");
+      (fileSystem.getMtime as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        1_700_000_999_000
+      );
+
+      await store.applyExternalResolution("C:\\docs\\a.md", "keep-local");
+
+      expect(saveDraftSpy).not.toHaveBeenCalled();
+      expect(tab.content).toBe("本地未保存的修改");
+      expect(tab.isDirty).toBe(true);
     });
   });
 });

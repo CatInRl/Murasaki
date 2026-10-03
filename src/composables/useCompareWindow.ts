@@ -83,18 +83,19 @@ export function useCompareWindow(deps: CompareWindowDeps) {
     const externalContent = await invoke<string>("read_text_file", { path });
     const fileName = basename(path);
     // 三选一对话框改走 dialog store（unsavedChanges）
-    // 映射：save → 加载磁盘版本 / discard → 保留本地版本 / cancel → 对比并合并
+    // 映射（issue #378：主按钮必须是保守动作，破坏性动作降级到中间按钮）：
+    //   save（主按钮）→ 保留本地版本 / discard（中间）→ 加载磁盘版本 / cancel → 对比并合并
     const choice = await dialog.unsavedChanges({
       title: t("common.dialog.fileModifiedExternalTitle"),
       message: t("common.dialog.fileModifiedExternalMessage", { name: fileName }),
-      saveText: t("common.loadDiskVersion"),
-      discardText: t("common.keepLocalVersion"),
+      saveText: t("common.keepLocalVersion"),
+      discardText: t("common.loadDiskVersion"),
       cancelText: t("common.compareAndMerge"),
     });
     if (choice === "save") {
-      await tabsStore.applyExternalResolution(path, "load-disk", externalContent);
-    } else if (choice === "discard") {
       await tabsStore.applyExternalResolution(path, "keep-local");
+    } else if (choice === "discard") {
+      await tabsStore.applyExternalResolution(path, "load-disk", externalContent);
     } else {
       // cancel → compare
       compareState.value = {

@@ -201,7 +201,8 @@ export const useTabsStore = defineStore("tabs", () => {
 
   /**
    * 应用外部修改处理结果到 tab
-   * - "load-disk"：用磁盘内容覆盖 tab 内容，更新 mtime，清除 dirty 与外部修改标记
+   * - "load-disk"：用磁盘内容覆盖 tab 内容，更新 mtime，清除 dirty 与外部修改标记；
+   *   覆盖会丢弃本地未保存内容，故先写草稿兜底（issue #378，ADR-0001）
    * - "keep-local"：用户选择保留本地版本，将 lastMtime 对齐到磁盘当前 mtime，
    *   否则关闭时写入草稿的 knownMtime 与磁盘不一致，下次打开会被判定为过期草稿而丢弃
    */
@@ -213,10 +214,17 @@ export const useTabsStore = defineStore("tabs", () => {
     const tab = getTabByPath(filePath);
     if (!tab) return;
     if (choice === "load-disk") {
+      const mtime = await fileSystem.getMtime(filePath);
+      if (tab.isDirty) {
+        // issue #378：本地未保存内容即将被磁盘内容覆盖，先写草稿兜底，
+        // 让用户事后仍可经 ADR-0001 的草稿恢复找回来。knownMtime 必须用磁盘
+        // 当前 mtime，否则下次打开会被判为过期草稿而直接丢弃，兜底失效。
+        await fileSystem.saveDraft(filePath, tab.content, mtime)
+          .catch((err) => console.error("保存草稿失败:", err));
+      }
       if (externalContent !== undefined) {
         tab.content = externalContent;
       }
-      const mtime = await fileSystem.getMtime(filePath);
       tab.lastMtime = mtime;
       // 选择"加载磁盘版本"后，磁盘内容即当前内容，更新快照
       tab.savedContent = tab.content;
