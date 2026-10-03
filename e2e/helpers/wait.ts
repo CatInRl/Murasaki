@@ -47,8 +47,22 @@
  * **自己**按间隔轮询 —— `waitForPresent` / `waitForAbsent` 调 `browser.$().isExisting()`，
  * `waitForRendered` 每轮**重取句柄**后走 `isRenderedElement`（用的是 WebDriver 元素 API，
  * 但轮询控制权在我们手里，不依赖它的等待命令是否重试）。
+ * - **macOS 探针走 `/wdio/eval` direct eval 而非 `browser.execute`**（#375 A）：WebKit
+ *   间歇回收 `callAsyncJavaScript` 完成回调会让 execute 在服务端挂满 30s script timeout
+ *   （上游 webdriverio/desktop-mobile#540，见 `slowCallExtension` 的历史背景），而插件的
+ *   DirectEval 通道（挂在 server 根路径，不经 session）自带三重 reclaim 恢复 —— 带外
+ *   投递 + fallback delivery + 750ms 无结果重跑（最多 3 次），把挂起转换成快速重试，
+ *   30s 黑洞不可能存在。代价是 direct eval **按 Tauri 窗口标签（"main"/"win-N"）路由**，
+ *   与 WebDriver 句柄没有对应关系：主窗口场景的探针（本文件绝大多数调用点）默认打
+ *   "main"；需要跟随当前句柄的场景（如 drag-drop 切到新窗口后）传
+ *   `inCurrentWindow: true` 退回 `browser.execute`（挂起由 script timeout 5s 兜底，
+ *   见 driver.ts 的 setTimeouts）。元素句柄类探针（`isRenderedElement` /
+ *   `textOfElement`）传的是 WebDriver 元素引用，direct eval 不经 session 层无法还原成
+ *   DOM 节点 —— **保持 browser.execute**。
  */
 import type { Browser } from "webdriverio";
+import http from "node:http";
+import { IS_MACOS, EMBEDDED_DRIVER_PORT } from "./platform";
 
 /**
  * 「已渲染」判定的**单一实现**（在浏览器上下文执行），入参是选择器字符串或元素句柄。
@@ -221,6 +235,131 @@ export async function readText(
 }
 
 /**
+ * 单次 browser.execute 的正常耗时约几 ms；超过该阈值视为一次服务端挂起
+ * （#375：macOS 上 WebKit 间歇回收 evaluateJavaScript 完成回调，插件侧只能
+ * 等满 30s script timeout，再由 webdriverio 客户端重发自愈）。
+ */
+export const SLOW_EXECUTE_MS = 5000;
+
+/**
+ * 计算一次探针调用的预算顺延量：慢调用（> `SLOW_EXECUTE_MS`）返回实际耗时，
+ * 正常调用返回 0。调用方把返回值累加进自己的 deadline，挂起就不占用轮询预算。
+ */
+export function slowCallExtension(probeStart: number): number {
+  const elapsed = Date.now() - probeStart;
+  return elapsed > SLOW_EXECUTE_MS ? elapsed : 0;
+}
+
+/**
+ * direct eval 的单次预算（请求体里的 `timeout_ms`，插件用它封顶整个 reclaim 序列）：
+ * 正常探针 ms 级返回；回收场景插件在 750ms（RECLAIM_GRACE）内带外重跑、最多 3 次，
+ * 6s 绰绰有余；真挂死场景由该预算报错，替代旧链路的 30s。客户端 socket 兜底再加 2s。
+ */
+export const DIRECT_EVAL_TIMEOUT_MS = 6000;
+
+/** 插件把 direct eval 挂在 server 根路径（router.rs），不在 /session/{id} 下 */
+const DIRECT_EVAL_PATH = "/wdio/eval";
+
+/**
+ * 把 `browser.execute` 风格的探针包装成插件 DirectEval 要求的 async-callback 契约：
+ * 插件的 wrapper 把我们的脚本包进 `(function(){ SCRIPT }).apply(null, [__report])`，
+ * 所以 `arguments[arguments.length - 1]` 是插件注入的 done 回调；结果对象需含 `ok`
+ * 字段（true → HTTP 200 + value；false → HTTP 500 + error）。
+ * 探针约定是**自包含函数**（引用不到模块作用域）+ **纯 JSON 值参数** —— 现有全部
+ * 调用点满足，新增调用点也要遵守。
+ */
+function wrapDirectEvalScript(script: unknown, args: unknown[]): string {
+  return [
+    "var done = arguments[arguments.length - 1];",
+    "try {",
+    `  var __fn = ${String(script)};`,
+    `  var __argv = ${JSON.stringify(args)};`,
+    "  done({ ok: true, value: __fn.apply(null, __argv) });",
+    "} catch (__e) {",
+    "  done({ ok: false, error: __e && __e.message ? __e.message : String(__e) });",
+    "}",
+  ].join("\n");
+}
+
+/** direct eval 的 HTTP 客户端：POST { script, window_label, timeout_ms } → { value | error } */
+function directEval<T>(script: unknown, args: unknown[], windowLabel: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const payload = Buffer.from(
+      JSON.stringify({
+        script: wrapDirectEvalScript(script, args),
+        window_label: windowLabel,
+        timeout_ms: DIRECT_EVAL_TIMEOUT_MS,
+      }),
+      "utf8"
+    );
+    const req = http.request(
+      {
+        hostname: "127.0.0.1",
+        port: EMBEDDED_DRIVER_PORT,
+        path: DIRECT_EVAL_PATH,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": payload.length,
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          let body: { value?: unknown; undef?: boolean; error?: string } = {};
+          try {
+            body = text ? JSON.parse(text) : {};
+          } catch {
+            reject(
+              new Error(
+                `/wdio/eval 响应非 JSON：status=${res.statusCode} body=${text.slice(0, 200)}`
+              )
+            );
+            return;
+          }
+          if ((res.statusCode ?? 0) >= 400) {
+            reject(new Error(`/wdio/eval ${res.statusCode}：${body.error ?? text.slice(0, 200)}`));
+            return;
+          }
+          resolve((body.undef ? undefined : body.value) as T);
+        });
+      }
+    );
+    req.setTimeout(DIRECT_EVAL_TIMEOUT_MS + 2000, () =>
+      req.destroy(new Error(`/wdio/eval ${DIRECT_EVAL_TIMEOUT_MS + 2000}ms 无响应（服务端挂死？）`))
+    );
+    req.on("error", reject);
+    req.end(payload);
+  });
+}
+
+/**
+ * 单次探针原语：`waitForInBrowser` 与 `waitForPinia` 的主探针都建立在它之上。
+ *
+ * - macOS（内嵌 driver）：走 `/wdio/eval` direct eval 到 main 窗口，自带 reclaim
+ *   恢复，挂起不可能累积到 30s（#375 A）；
+ * - 其余平台 / `inCurrentWindow: true`：`browser.execute`，跟随 WebDriver 当前句柄
+ *   （Windows/Linux 没有 #540 挂起问题，行为与历史完全一致）。
+ *
+ * 约束（同文件头注释）：探针必须自包含、参数必须是纯 JSON 值；**不要**对传元素
+ * 句柄的探针用 direct eval（不经 session 层无法还原 DOM 节点）；多窗口场景
+ * （当前句柄不是 main）必须传 `inCurrentWindow: true`，否则探针会打到 main。
+ */
+export async function appProbe<T = unknown>(
+  browser: Browser,
+  script: string | ((...args: never[]) => T),
+  args: unknown[] = [],
+  opts: { inCurrentWindow?: boolean } = {}
+): Promise<T> {
+  if (!opts.inCurrentWindow && IS_MACOS) {
+    return directEval<T>(script, args, "main");
+  }
+  return (await browser.execute(script as never, ...(args as never[]))) as T;
+}
+
+/**
  * 手写轮询等待「浏览器上下文里返回真值的条件」，返回首次为真的结果。
  *
  * 用于等 UI 状态出现（如「tab 栏出现名为 intro.md 的标签」）：这类断言不能用
@@ -231,22 +370,50 @@ export async function readText(
  * @param options.timeout 总预算；默认 15s（CI runner 比本地慢，别给太紧）
  * @param options.interval 轮询间隔
  * @param options.message 超时错误里的描述，便于定位是哪一步没等到
+ * @param options.inCurrentWindow macOS direct eval 只投递到 main 窗口；当前句柄
+ *   不是 main（如 drag-drop 切到新窗口后）必须传 true 退回 `browser.execute`
+ *
+ * 挂起吸收（#375）：macOS 上主探针走 `appProbe` 的 direct eval（reclaim 恢复），
+ * 30s 挂起已基本不可能；其余平台与 `inCurrentWindow: true` 仍走 `browser.execute`，
+ * 单次耗时异常长（服务端 30s script timeout，见 `slowCallExtension`）时把总预算
+ * 顺延等长 —— 挂起不占用轮询预算，也不会让一次挂起直接判死。
  */
 export async function waitForInBrowser<T = unknown>(
   browser: Browser,
   script: string | ((...args: never[]) => T),
   args: unknown[] = [],
-  options: { timeout?: number; interval?: number; message?: string } = {}
+  options: {
+    timeout?: number;
+    interval?: number;
+    message?: string;
+    inCurrentWindow?: boolean;
+  } = {}
 ): Promise<T> {
-  const { timeout = 15000, interval = 200, message = "条件" } = options;
+  const { timeout = 15000, interval = 200, message = "条件", inCurrentWindow } = options;
   const start = Date.now();
+  let deadline = start + timeout;
   let last: unknown = undefined;
-  while (Date.now() - start < timeout) {
-    last = await browser.execute(script as never, ...(args as never[]));
+  let lastError: unknown = undefined;
+  while (Date.now() < deadline) {
+    // execute 可能因服务端挂起抛 script timeout（#375）——吞掉继续轮询，
+    // 客户端重发自愈后下一轮照常探针；报错保留在 lastError 供超时诊断。
+    const probeStart = Date.now();
+    try {
+      last = await appProbe(browser, script, args, { inCurrentWindow });
+      lastError = undefined;
+    } catch (err) {
+      last = false;
+      lastError = err;
+    }
+    deadline += slowCallExtension(probeStart);
     if (last) return last as T;
     await browser.pause(interval);
   }
+  const errorNote = lastError
+    ? `（最后一次 execute 报错：${String(lastError)}）`
+    : "";
   throw new Error(
-    `waitForInBrowser: ${message} 未在 ${timeout}ms 内满足（最后一次结果：${JSON.stringify(last)}）`
+    `waitForInBrowser: ${message} 未在 ${Date.now() - start}ms（基础预算 ${timeout}ms）内满足` +
+      `${errorNote}（最后一次结果：${JSON.stringify(last)}）`
   );
 }

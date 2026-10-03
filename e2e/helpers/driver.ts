@@ -20,7 +20,8 @@ import http from "node:http";
 import { createConnection } from "node:net";
 import { existsSync, rmSync } from "node:fs";
 import { clearPersistedTabs, waitForAppReady, waitForPinia } from "./store";
-import { IS_WINDOWS, IS_MACOS } from "./platform";
+import { IS_WINDOWS, IS_MACOS, EMBEDDED_DRIVER_PORT } from "./platform";
+import { SLOW_EXECUTE_MS } from "./wait";
 import { isProcessAlive, killProcessesByName } from "./processes";
 
 const DEFAULT_BINARY = resolve(
@@ -42,10 +43,6 @@ const DRIVER_PORT = 4444;
 // tauri-driver 默认把 msedgedriver 监听在这个端口（cli.rs --native-port 默认 4445）。
 // 4444 在线但 4445 不在线 = tauri-driver 孤立（msedgedriver 被 cleanup 杀掉了），无法恢复。
 const NATIVE_DRIVER_PORT = 4445;
-
-// macOS 内嵌 WebDriver 服务端端口（tauri-plugin-wdio-webdriver 读 TAURI_WEBDRIVER_PORT，
-// 默认即 4445）。macOS 上没有 msedgedriver，与 Windows/Linux 的 4445 用途不冲突。
-const EMBEDDED_DRIVER_PORT = Number(process.env.TAURI_WEBDRIVER_PORT ?? 4445);
 
 // macOS 分支自己 spawn 的应用进程。session 生命周期 = 应用进程生命周期
 //（与 Windows/Linux 的「每个 spec 一个 fresh 实例」语义对齐），
@@ -219,6 +216,10 @@ async function createEmbeddedSession(): Promise<Browser> {
       // 同 #300：attach 不合并 remote() 默认配置，必须显式补 waitUntil 重试参数
       browser.options.waitforInterval = WAITFOR_INTERVAL;
       browser.options.waitforTimeout = WAITFOR_TIMEOUT;
+      // #375 B：非 direct eval 路径的残余 execute 挂起快速失败（服务端默认 30s，
+      // 是 macOS 挂起链路里最痛的黑洞）；阈值与 wait.ts 慢调用判定共用
+      // SLOW_EXECUTE_MS —— direct eval 探针有独立的 6s 预算，不经这里
+      await browser.setTimeouts(undefined, undefined, SLOW_EXECUTE_MS);
       break;
     } catch (err) {
       lastError = err;
