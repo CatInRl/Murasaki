@@ -64,6 +64,53 @@ export function refreshMermaidTheme(): void {
   themeVariablesCache = null;
   mermaidReady = null;
   initPromise = null;
+  lastUseWidth = null;
+}
+
+let lastUseWidth: number | null = null;
+
+/**
+ * gantt 测不到容器宽时的兜底（mermaid 自身测量失败时的回退值，同为 1200）。
+ */
+const GANTT_USEWIDTH_FALLBACK = 1200;
+
+/**
+ * 统一的 mermaid 渲染入口（分栏预览、WYSIWYG MermaidWidget、实时预览卡共用）。
+ *
+ * gantt 的 viewBox 宽度在 mermaid 源码里取渲染中间 DOM 的 parentElement.offsetWidth，
+ * 挂 body 时测出的是 body 宽（WebView2 下可能远大于预览列宽，图被等比压扁 #342），
+ * WebView2 被 occluded（CI 无头会话）时布局冻结，连传真实容器都测出 body 宽。
+ * `useWidth` 是 mermaid 提供的官方通道（gantt draw 中 conf.useWidth 直接替换测量值），
+ * 渲染前注入容器实际宽度即完全绕开 DOM 测量：容器可见用容器宽，不可见兜底 1200。
+ *
+ * 容器仍照常传给 render（其余图类型受益于中间 DOM 挂载点）。initialize 每次都会
+ * 重算 themeVariables，因此注入 useWidth 时必须全量带上（否则 token 派生主题被
+ * 覆盖回默认，issue #295）；宽度不变时跳过重复 initialize。
+ */
+export async function renderMermaidDiagram(
+  container: HTMLElement | undefined,
+  id: string,
+  code: string,
+): Promise<string> {
+  const mermaid = await ensureMermaid();
+  const useContainer =
+    container !== undefined && container.isConnected && container.offsetWidth > 0
+      ? container
+      : undefined;
+  const width = useContainer
+    ? Math.round(useContainer.offsetWidth)
+    : GANTT_USEWIDTH_FALLBACK;
+  if (width !== lastUseWidth) {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: "base",
+      securityLevel: "loose",
+      themeVariables: buildMermaidThemeVariables(),
+      gantt: { useWidth: width },
+    });
+    lastUseWidth = width;
+  }
+  return (await mermaid.render(id, code, useContainer)).svg;
 }
 
 let mermaidReady: MermaidApi | null = null;

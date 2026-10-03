@@ -37,7 +37,7 @@ import { TableEditor } from "./tableEditor";
 import { renderFrontMatterCard } from "../../composables/useFrontMatter";
 import { resolveImageSrc } from "../../utils/imagePath";
 import { renderPlantUmlCode } from "../../utils/plantuml";
-import { ensureMermaid, sanitizeMermaidSvg } from "../../utils/mermaidTheme";
+import { renderMermaidDiagram, sanitizeMermaidSvg } from "../../utils/mermaidTheme";
 
 // ===== T7.1 Widgets =====
 
@@ -240,17 +240,11 @@ class MermaidWidget extends WysiwygBlockWidget {
     container.className = `murasaki-wysiwyg-mermaid mermaid${this.selectionClass()}`;
     // 占位：出错时显示源码，便于排错
     container.textContent = this.code;
-    void ensureMermaid()
-      .then((mermaid) =>
-        // 传真实容器让 gantt 等图从容器测宽（挂 body 会测出 body 宽，图被
-        // 压扁，#342）；widget 尚未入 DOM 或不可见时回退不传（见 PreviewPane）。
-        mermaid.render(
-          this.id,
-          this.code,
-          container.isConnected && container.offsetWidth > 0 ? container : undefined,
-        ),
-      )
-      .then(({ svg }) => {
+    // 宽度经 useWidth 注入（utils/mermaidTheme.ts，#342）：toDOM 时元素尚未入
+    // DOM，renderMermaidDiagram 内部先 await ensureMermaid 再判容器，检查落在
+    // 挂载之后——可见则按容器宽，不可见（宽 0 / 未挂载）兜底 1200。
+    void renderMermaidDiagram(container, this.id, this.code)
+      .then((svg) => {
         if (container.isConnected) {
           container.innerHTML = svg;
           sanitizeMermaidSvg(container);
@@ -307,16 +301,9 @@ class DiagramPreviewWidget extends WysiwygBlockWidget {
       const id = `murasaki-preview-mermaid-${Math.random().toString(36).slice(2, 10)}`;
       body.classList.add("mermaid");
       body.textContent = this.code; // 占位：出错时保留源码便于排错
-      void ensureMermaid()
-        .then((mermaid) =>
-          // 同 MermaidWidget：传真实容器测宽，未入 DOM/不可见时回退不传
-          mermaid.render(
-            id,
-            this.code,
-            body.isConnected && body.offsetWidth > 0 ? body : undefined,
-          ),
-        )
-        .then(({ svg }) => {
+      // 同 MermaidWidget：宽度经 useWidth 注入（#342），见 utils/mermaidTheme.ts
+      void renderMermaidDiagram(body, id, this.code)
+        .then((svg) => {
           if (body.isConnected) {
             body.innerHTML = svg;
             sanitizeMermaidSvg(body);

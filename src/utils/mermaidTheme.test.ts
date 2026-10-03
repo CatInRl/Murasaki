@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   sanitizeMermaidSvg,
   todayLineIndexesOutsideContentBox,
   unionRect,
   type MermaidRect,
 } from "./mermaidTheme";
+
+vi.mock("mermaid", () => ({
+  default: { initialize: vi.fn(), render: vi.fn() },
+}));
 
 const CONTENT_1264 = { x: 0, y: 0, width: 1264, height: 148 };
 
@@ -212,5 +216,87 @@ describe("sanitizeMermaidSvg", () => {
     sanitizeMermaidSvg(container);
     expect(todayAt(svg, 0).style.display).toBe("none");
     expect(svg.getAttribute("viewBox")).toBe("0 0 1264 148");
+  });
+});
+
+describe("renderMermaidDiagram", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function load() {
+    const mod = await import("./mermaidTheme");
+    const mm = (await import("mermaid")).default;
+    vi.mocked(mm.render).mockResolvedValue({ svg: "<svg></svg>", diagramType: "mermaid" });
+    return { mod, mm };
+  }
+
+  function elWithWidth(width: number, connect = false): HTMLElement {
+    const el = document.createElement("div");
+    if (connect) document.body.appendChild(el);
+    Object.defineProperty(el, "offsetWidth", { value: width });
+    return el;
+  }
+
+  function initCalls(mm: Awaited<ReturnType<typeof load>>["mm"]): Array<[Record<string, unknown>]> {
+    return vi.mocked(mm.initialize).mock.calls as unknown as Array<[Record<string, unknown>]>;
+  }
+
+  it("容器已挂载且可见 → render 前 initialize 注入 gantt.useWidth=容器宽，render 传容器", async () => {
+    const { mod, mm } = await load();
+    const el = elWithWidth(600, true);
+    const svg = await mod.renderMermaidDiagram(el, "m1", "gantt\nx");
+    expect(svg).toBe("<svg></svg>");
+    expect(initCalls(mm)[1]?.[0]).toMatchObject({ gantt: { useWidth: 600 } });
+    expect(vi.mocked(mm.render).mock.calls[0]?.[2]).toBe(el);
+  });
+
+  it("容器未挂载 → render 不传容器，useWidth 兜底 1200（不依赖 DOM 测量）", async () => {
+    const { mod, mm } = await load();
+    const el = elWithWidth(0);
+    await mod.renderMermaidDiagram(el, "m2", "gantt\nx");
+    expect(initCalls(mm)[1]?.[0]).toMatchObject({ gantt: { useWidth: 1200 } });
+    expect(vi.mocked(mm.render).mock.calls[0]?.[2]).toBeUndefined();
+  });
+
+  it("容器挂载但宽 0（WebView2 布局冻结/occluded）→ useWidth 兜底 1200", async () => {
+    const { mod, mm } = await load();
+    const el = elWithWidth(0, true);
+    await mod.renderMermaidDiagram(el, "m3", "gantt\nx");
+    expect(initCalls(mm)[1]?.[0]).toMatchObject({ gantt: { useWidth: 1200 } });
+    expect(vi.mocked(mm.render).mock.calls[0]?.[2]).toBeUndefined();
+  });
+
+  it("重复 initialize 必须带全量配置与 themeVariables（mermaid initialize 每次重算主题，缺了会把 token 主题冲回默认）", async () => {
+    const { mod, mm } = await load();
+    const el = elWithWidth(600, true);
+    await mod.renderMermaidDiagram(el, "m4", "gantt\nx");
+    const secondInit = initCalls(mm)[1]?.[0] as Record<string, unknown>;
+    expect(secondInit.startOnLoad).toBe(false);
+    expect(secondInit.theme).toBe("base");
+    expect(secondInit.securityLevel).toBe("loose");
+    expect(secondInit.themeVariables).toBeDefined();
+  });
+
+  it("同宽连续渲染 → 不重复 initialize", async () => {
+    const { mod, mm } = await load();
+    const el = elWithWidth(600, true);
+    await mod.renderMermaidDiagram(el, "m5", "gantt\nx");
+    expect(initCalls(mm).length).toBe(2); // ensureMermaid 首次 + useWidth 注入
+    await mod.renderMermaidDiagram(el, "m6", "gantt\nx");
+    expect(initCalls(mm).length).toBe(2);
+  });
+
+  it("宽度变化 → 重新 initialize 更新 useWidth", async () => {
+    const { mod, mm } = await load();
+    await mod.renderMermaidDiagram(elWithWidth(600, true), "m7", "gantt\nx");
+    await mod.renderMermaidDiagram(elWithWidth(900, true), "m8", "gantt\nx");
+    const calls = initCalls(mm);
+    expect(calls.length).toBe(3);
+    expect(calls[2]?.[0]).toMatchObject({ gantt: { useWidth: 900 } });
   });
 });

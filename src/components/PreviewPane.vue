@@ -5,7 +5,7 @@ import { renderFrontMatterCard } from "../composables/useFrontMatter";
 import { MARKDOWN_THEMES } from "../composables/useTheme";
 // 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
 import "../styles/markdown-content.css";
-import { ensureMermaid, sanitizeMermaidSvg } from "../utils/mermaidTheme";
+import { renderMermaidDiagram, sanitizeMermaidSvg } from "../utils/mermaidTheme";
 
 interface Props {
   source: string;
@@ -51,20 +51,13 @@ renderer.setShikiTheme(resolveShikiTheme(props.theme));
 async function renderMermaid(container: HTMLElement) {
   const blocks = container.querySelectorAll<HTMLElement>(".mermaid");
   if (blocks.length === 0) return;
-  // 初始化与 token 派生的 themeVariables 统一在 utils/mermaidTheme.ts（issue #295），
-  // 与 WYSIWYG 共用一个初始化入口，不再依赖「本组件先 initialize」的隐式副作用。
-  const mermaid = await ensureMermaid();
+  // 初始化、token 派生的 themeVariables 与 gantt 宽度注入统一在
+  // utils/mermaidTheme.ts（issue #295/#342），与 WYSIWYG 共用同一渲染入口。
   for (const block of Array.from(blocks)) {
     const code = block.textContent || "";
     const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
     try {
-      // mermaid 不传容器时把临时 div 直接挂到 body（无宽度样式），gantt 等图
-      // 的 viewBox 宽度取 elem.parentElement.offsetWidth，测出的是 body 宽——
-      // 在 WebView2 下可能远大于预览列宽，图被压成一条线（#342）。
-      // 传真实容器让测量落在预览列内；容器不可见（宽 0）时 gantt 只防
-      // undefined 不防 0，会画出 0 宽 viewBox，此时回退不传。
-      const renderTarget = block.offsetWidth > 0 ? block : undefined;
-      const { svg } = await mermaid.render(id, code, renderTarget);
+      const svg = await renderMermaidDiagram(block, id, code);
       block.innerHTML = svg;
       sanitizeMermaidSvg(block);
     } catch (err) {
