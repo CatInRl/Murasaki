@@ -580,16 +580,31 @@ describe("4. Mermaid 图表", () => {
       });
     });
     expect(infos.length).toBeGreaterThanOrEqual(3);
-    // 压扁守卫收成单点断言：分屏预览约 600px 宽，gantt 正常渲染高 ~51px，
-    // 若 today 线（x~18000）混入 viewBox，等比缩放会把整图压到 ~5px 高；
-    // 失败信息携带每张 SVG 的完整诊断（index/kind/vb/rect/ratio）
+    // 完整显示守卫（单点断言，失败信息带每张 SVG 的完整诊断）。三项都是「渲染性质」，
+    // 与运行环境字体无关：
+    // - viewBox 有效（vbW/vbH > 0）；
+    // - h >= 24：压扁守卫。#342 根因是 gantt 的 today 线（x≈18000）混入 viewBox，
+    //   SVG 以容器宽渲染时高度被等比压到 <1px，h 下限直接捕捉「图被压没」；
+    // - 等比：rect.h/rect.w 与 vbH/vbW 相对误差 <= 10%，捕捉「被强制拉伸变形」。
+    // 不断言 w/vbW >= 0.25：该比值实为「容器宽/内容排版宽」，而内容排版宽由字体
+    // 度量决定——CI（英文 Windows）对 CJK 的字体 fallback 与本地（中文 Windows）差异
+    // 巨大（#342 实测 flowchart vb 612x145 → 2078x2077，ratio 0.132），图本身等比
+    // 完整渲染并无缺陷，ratio 断言只会把环境差异误判成渲染失败。
     const bad = infos
       .map((info) => {
-        const ratio = info.vbW > 0 ? info.w / info.vbW : 0;
-        if (info.vbW > 0 && info.vbH > 0 && info.h >= 24 && ratio >= 0.25) {
-          return null;
+        if (info.vbW <= 0 || info.vbH <= 0) {
+          return `svg[${info.index} ${info.kind}] viewBox 无效: ${info.vbW}x${info.vbH}`;
         }
-        return `svg[${info.index} ${info.kind}] vb=${info.vbW}x${info.vbH} rect=${info.w.toFixed(1)}x${info.h.toFixed(1)} maxW="${info.maxW}" hasToday=${info.hasToday} ratio=${ratio.toFixed(4)}`;
+        if (info.h < 24) {
+          return `svg[${info.index} ${info.kind}] 渲染高度 ${info.h.toFixed(1)}px < 24（被压扁？）vb=${info.vbW}x${info.vbH} rect=${info.w.toFixed(1)}x${info.h.toFixed(1)} maxW="${info.maxW}"`;
+        }
+        const aspect = info.vbH / info.vbW;
+        const rendered = info.h / info.w;
+        const deviation = Math.abs(rendered - aspect) / aspect;
+        if (deviation > 0.1) {
+          return `svg[${info.index} ${info.kind}] 不等比（偏差 ${(deviation * 100).toFixed(1)}%）vb=${info.vbW}x${info.vbH} rect=${info.w.toFixed(1)}x${info.h.toFixed(1)} maxW="${info.maxW}"`;
+        }
+        return null;
       })
       .filter((msg): msg is string => msg !== null);
     expect(bad.join("; ") || "all svg pass guards").toBe("all svg pass guards");
