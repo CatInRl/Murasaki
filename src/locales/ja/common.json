@@ -122,6 +122,7 @@
     "closeAriaLabel": "通知を閉じる",
     "cannotOpenFile": "このファイルは Murasaki では開けません",
     "unsupportedDropFiles": "開けないファイルを {count} 件無視しました",
-    "ignoredDropFolders": "フォルダーを {count} 件無視しました（1 つのウィンドウで開けるワークスペースは 1 つだけです）"
+    "ignoredDropFolders": "フォルダーを {count} 件無視しました（1 つのウィンドウで開けるワークスペースは 1 つだけです）",
+    "sourceOnlyMode": "このファイルはソースモードのみ対応しています。表示モードは切り替えられません"
   }
 }
