@@ -5,7 +5,7 @@ import { renderFrontMatterCard } from "../composables/useFrontMatter";
 import { MARKDOWN_THEMES } from "../composables/useTheme";
 // 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
 import "../styles/markdown-content.css";
-import { ensureMermaid } from "../utils/mermaidTheme";
+import { renderMermaidDiagram, sanitizeMermaidSvg } from "../utils/mermaidTheme";
 
 interface Props {
   source: string;
@@ -51,15 +51,15 @@ renderer.setShikiTheme(resolveShikiTheme(props.theme));
 async function renderMermaid(container: HTMLElement) {
   const blocks = container.querySelectorAll<HTMLElement>(".mermaid");
   if (blocks.length === 0) return;
-  // 初始化与 token 派生的 themeVariables 统一在 utils/mermaidTheme.ts（issue #295），
-  // 与 WYSIWYG 共用一个初始化入口，不再依赖「本组件先 initialize」的隐式副作用。
-  const mermaid = await ensureMermaid();
+  // 初始化、token 派生的 themeVariables 与 gantt 宽度注入统一在
+  // utils/mermaidTheme.ts（issue #295/#342），与 WYSIWYG 共用同一渲染入口。
   for (const block of Array.from(blocks)) {
     const code = block.textContent || "";
     const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
     try {
-      const { svg } = await mermaid.render(id, code);
+      const svg = await renderMermaidDiagram(block, id, code);
       block.innerHTML = svg;
+      sanitizeMermaidSvg(block);
     } catch (err) {
       block.innerHTML = `<pre style="color:var(--murasaki-state-error)">${(err as Error).message}</pre>`;
     }

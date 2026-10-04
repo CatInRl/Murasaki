@@ -37,7 +37,7 @@ import { TableEditor } from "./tableEditor";
 import { renderFrontMatterCard } from "../../composables/useFrontMatter";
 import { resolveImageSrc } from "../../utils/imagePath";
 import { renderPlantUmlCode } from "../../utils/plantuml";
-import { ensureMermaid } from "../../utils/mermaidTheme";
+import { renderMermaidDiagram, sanitizeMermaidSvg } from "../../utils/mermaidTheme";
 
 // ===== T7.1 Widgets =====
 
@@ -240,13 +240,21 @@ class MermaidWidget extends WysiwygBlockWidget {
     container.className = `murasaki-wysiwyg-mermaid mermaid${this.selectionClass()}`;
     // 占位：出错时显示源码，便于排错
     container.textContent = this.code;
-    void ensureMermaid()
-      .then((mermaid) => mermaid.render(this.id, this.code))
-      .then(({ svg }) => {
-        if (container.isConnected) container.innerHTML = svg;
+    // 宽度经 useWidth 注入（utils/mermaidTheme.ts，#342）：toDOM 时元素尚未入
+    // DOM，renderMermaidDiagram 内部先 await ensureMermaid 再判容器，检查落在
+    // 挂载之后——可见则按容器宽，不可见（宽 0 / 未挂载）兜底 1200。
+    void renderMermaidDiagram(container, this.id, this.code)
+      .then((svg) => {
+        if (container.isConnected) {
+          container.innerHTML = svg;
+          sanitizeMermaidSvg(container);
+        }
       })
       .catch(() => {
-        // 渲染失败：保留源码占位
+        // 渲染失败：恢复源码占位（传容器时 render 会先清空占位）
+        if (container.isConnected) {
+          container.textContent = this.code;
+        }
       });
     // 点击 widget：发出事件定位光标到块起始位置
     container.addEventListener("click", () => {
@@ -293,13 +301,19 @@ class DiagramPreviewWidget extends WysiwygBlockWidget {
       const id = `murasaki-preview-mermaid-${Math.random().toString(36).slice(2, 10)}`;
       body.classList.add("mermaid");
       body.textContent = this.code; // 占位：出错时保留源码便于排错
-      void ensureMermaid()
-        .then((mermaid) => mermaid.render(id, this.code))
-        .then(({ svg }) => {
-          if (body.isConnected) body.innerHTML = svg;
+      // 同 MermaidWidget：宽度经 useWidth 注入（#342），见 utils/mermaidTheme.ts
+      void renderMermaidDiagram(body, id, this.code)
+        .then((svg) => {
+          if (body.isConnected) {
+            body.innerHTML = svg;
+            sanitizeMermaidSvg(body);
+          }
         })
         .catch(() => {
-          // 渲染失败：保留源码占位
+          // 渲染失败：恢复源码占位（传容器时 render 会先清空占位）
+          if (body.isConnected) {
+            body.textContent = this.code;
+          }
         });
     } else if (lang === "katex" || lang === "math") {
       body.classList.add("katex", "katex-display");
