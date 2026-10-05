@@ -42,7 +42,12 @@ export function resolvedToken(name: string, seen: Set<string> = new Set()): stri
   return value;
 }
 
-const norm = (value: string): string => value.trim().toLowerCase();
+/**
+ * 归一化：去首尾空白、转小写，并压缩逗号两侧空白。jsdom 各版本对 CSS 值的空白序列化
+ * 不一致（30 起保留声明原文，旧版按 `, ` 规范化），比较前先抹平这层差异。
+ */
+const norm = (value: string): string =>
+  value.trim().toLowerCase().replace(/\s*,\s*/g, ",");
 
 describe("composables/useNaiveTheme", () => {
   describe("createMurasakiThemeOverrides", () => {
@@ -83,8 +88,8 @@ describe("composables/useNaiveTheme", () => {
 
     it("字体对齐 --murasaki-font-ui / --murasaki-font-mono", () => {
       const c = createMurasakiThemeOverrides().common!;
-      expect(c.fontFamily).toBe(resolvedToken("--murasaki-font-ui"));
-      expect(c.fontFamilyMono).toBe(resolvedToken("--murasaki-font-mono"));
+      expect(norm(String(c.fontFamily))).toBe(norm(resolvedToken("--murasaki-font-ui")));
+      expect(norm(String(c.fontFamilyMono))).toBe(norm(resolvedToken("--murasaki-font-mono")));
       expect(c.fontFamily).toContain("Inter");
     });
 
@@ -104,9 +109,9 @@ describe("composables/useNaiveTheme", () => {
 
     it("阴影对齐 --murasaki-shadow-*", () => {
       const c = createMurasakiThemeOverrides().common!;
-      expect(c.boxShadow1).toBe(resolvedToken("--murasaki-shadow-sm"));
-      expect(c.boxShadow2).toBe(resolvedToken("--murasaki-shadow-md"));
-      expect(c.boxShadow3).toBe(resolvedToken("--murasaki-shadow-lg"));
+      expect(norm(String(c.boxShadow1))).toBe(norm(resolvedToken("--murasaki-shadow-sm")));
+      expect(norm(String(c.boxShadow2))).toBe(norm(resolvedToken("--murasaki-shadow-md")));
+      expect(norm(String(c.boxShadow3))).toBe(norm(resolvedToken("--murasaki-shadow-lg")));
     });
 
     it("NPopover 组件级 overrides 对齐 --murasaki-* token（T5.1, issue #71）", () => {
@@ -115,7 +120,9 @@ describe("composables/useNaiveTheme", () => {
       expect(overrides.Popover!.color).toBe(resolvedToken("--murasaki-popover"));
       expect(overrides.Popover!.textColor).toBe(resolvedToken("--murasaki-popover-foreground"));
       expect(overrides.Popover!.borderRadius).toBe(resolvedToken("--murasaki-radius-md"));
-      expect(overrides.Popover!.boxShadow).toBe(resolvedToken("--murasaki-shadow-lg"));
+      expect(norm(String(overrides.Popover!.boxShadow))).toBe(
+        norm(resolvedToken("--murasaki-shadow-lg"))
+      );
     });
   });
 
