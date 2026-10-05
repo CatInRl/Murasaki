@@ -113,12 +113,12 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
   });
 
   // 4. 编辑模式设置变更 -> 运行时同步到当前编辑器（不 gated，初始化时也需应用）
-  //    同步原生 "视图 / 显示模式" 菜单的互斥勾选
+  //    菜单勾选由 App.vue 的 useModeMenuSync 按「生效模式」推送（issue #381）——
+  //    此处若按偏好值推送，会把 source-only / html 降级场景的勾选拽回偏好值
   watch(
     () => persistence.settings.editorMode,
     (mode) => {
       editorBridge.setEditorMode(mode);
-      void invoke("set_mode_checked", { modeId: "mode-" + mode });
     }
   );
 
@@ -190,11 +190,9 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
         // 始终调用，即使值未变也保证前端与 Rust 状态一致
         setLocale(persistence.settings.language);
         void invoke("reload_menu", { lang: persistence.settings.language });
-        // 同步显示模式菜单勾选：经 loadSettings 读取的 editorMode 若与当前
-        // 相同 watcher 不会触发，故在此补一次保证 "视图 / 显示模式" 勾选正确
-        void invoke("set_mode_checked", {
-          modeId: "mode-" + persistence.settings.editorMode,
-        });
+        // 显示模式菜单勾选不再此处补推（issue #381）：reload_menu 重建菜单时
+        // build_app_menu 会按活动窗口的 WindowUiState 恢复勾选，而该状态已由
+        // useModeMenuSync 随生效模式维护；前端按偏好值补推反而会写错勾选
         // 同步快捷键覆盖到原生菜单（菜单项右侧快捷键提示跟随用户自定义）
         void invoke("update_shortcut_labels", {
           overrides: toMenuAccelerators(persistence.settings.shortcuts ?? {}),

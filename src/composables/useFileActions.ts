@@ -262,9 +262,11 @@ export function useFileActions(deps: FileActionsDeps) {
         filePath: tab.path,
       });
       await fileSystem.writeText(selected, html);
+      // #384：与 PDF / 复制富文本的反馈模型统一——成功 toast、失败 toast.error
+      toast.success(t("common.exportHtmlSuccess", { path: selected }));
     } catch (err) {
       console.error("导出 HTML 失败:", err);
-      dialog.alert({ message: t("common.error.exportHtmlFailed", { error: err }), variant: "error" });
+      toast.error(t("common.error.exportHtmlFailed", { error: err }));
     }
   }
 
@@ -359,6 +361,7 @@ export function useFileActions(deps: FileActionsDeps) {
     openPathInNewWindow,
     notifyUnsupportedFiles,
     notifyIgnoredFolders,
+    openWithDefaultApp,
     saveCurrentFile,
     saveAsCurrentFile,
     reloadCurrentFile,
