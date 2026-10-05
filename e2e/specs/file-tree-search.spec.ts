@@ -15,7 +15,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { isRendered, readText, textOfElement, waitForPresent } from "../helpers/wait";
+import { isRendered, readText, waitForInBrowser, waitForPresent } from "../helpers/wait";
 
 /**
  * 半透明主色底色的判定（issue #294）。
@@ -168,8 +168,9 @@ describe("文件树选中态 & 搜索高亮", () => {
         .catch((err: unknown) => done(err ? String(err) : null));
     });
 
-    const marks = await browser.$$(".gsb-hl");
-    expect(marks.length).toBeGreaterThan(0);
+    // mark 渲染必须轮询等：CI 上搜索完成与 DOM 渲染之间有延迟，单次读列表
+    // 读太早会得 0（与下方「文件名匹配渲染」同根因，#342 Windows e2e 实录）
+    await waitForPresent(browser, ".gsb-hl", 10000);
 
     // mark 元素的文字应包含搜索关键词
     expect(await readText(browser, ".gsb-hl")).toContain("特殊关键词");
@@ -193,12 +194,18 @@ describe("文件树选中态 & 搜索高亮", () => {
     await input.setValue("match-filename");
     await browser.pause(300);
 
-    // 文件名分组应出现含 match-filename 的条目
-    const items = await browser.$$(".gsb__item");
-    // webdriverio v9 的 `$$` 返回值把原生 Array.map 覆盖成了异步版（返回 Promise 而非可迭代数组），
-    // 所以 `Promise.all(items.map(...))` 会因「参数不可迭代」报错；直接 await 这个异步 map 即可拿到文本数组
-    const texts = await items.map((i) => textOfElement(browser, i));
-    expect(texts.some((t) => t.includes("match-filename"))).toBe(true);
+    // 文件名分组应出现含 match-filename 的条目。等结果必须轮询而非固定
+    // pause(300) + 单次读列表：CI 上模糊匹配有防抖且渲染慢，读太早 items 里
+    // 还没有目标条目，some() 恒 false（#342 Windows e2e 实录的 flake 根因）
+    await waitForInBrowser(
+      browser,
+      () => {
+        const items = Array.from(document.querySelectorAll(".gsb__item"));
+        return items.some((i) => (i.textContent ?? "").includes("match-filename"));
+      },
+      [],
+      { message: "文件名匹配结果（.gsb__item 含 match-filename）", timeout: 10000 }
+    );
   });
 
   it("统一搜索条可见性切换", async () => {

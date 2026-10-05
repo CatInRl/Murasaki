@@ -42,6 +42,7 @@ import { useCommands } from "./composables/useCommands";
 import { useShortcuts } from "./shortcuts/useShortcuts";
 import { toMenuAccelerators } from "./shortcuts/shortcutsLogic";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
+import { useModeMenuSync } from "./composables/useModeMenuSync";
 import { useExitFlush, type ExitFlushTab } from "./composables/useExitFlush";
 import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
 import { setLocale } from "./i18n";
@@ -60,6 +61,7 @@ import { useNaiveTheme } from "./composables/useNaiveTheme";
 import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import type { SidebarView, EditorMode } from "./types";
 import type { SearchEntry } from "./search/searchLogic";
+import { resolveSearchJumpLine } from "./search/searchLogic";
 import { READING_FONT_PRESETS } from "./types";
 import {
   PRESENTATION_ZOOM_DEFAULT,
@@ -115,6 +117,9 @@ const effectiveEditorMode = computed<EditorMode>(() => {
   if (editorBridge.editorMode === "wysiwyg" && !currentIsMarkdown.value) return "split";
   return editorBridge.editorMode;
 });
+// 菜单勾选跟随「生效模式」而非全局偏好（issue #381）：source-only 文件上
+// 生效模式恒为 source，偏好值推送会把勾选拽离实际编辑器行为
+useModeMenuSync(effectiveEditorMode);
 
 /** 演示模式缩放百分比（持久化于 settings.presentationZoom） */
 const presentationZoom = computed(() => persistence.settings.presentationZoom);
@@ -149,9 +154,13 @@ async function zoomReset(): Promise<void> {
  * 写入 settings.editorMode，经 useAppLifecycle watcher 同步 editorBridge 与原生菜单勾选。
  * source-only 文件（yaml/txt/json…）永远只读源码，其上的切换不写回设置 ——
  * 这样该字段始终保存「markdown 文件的最后一次模式」，切回 .md 时自然恢复。
+ * 拒绝切换时给 toast 反馈，不静默吞掉操作（issue #382）。
  */
 async function onSelectMode(mode: EditorMode): Promise<void> {
-  if (currentIsSourceOnly.value) return;
+  if (currentIsSourceOnly.value) {
+    toastStore.info(t("common.toast.sourceOnlyMode"));
+    return;
+  }
   if (persistence.settings.editorMode === mode) return;
   await persistence.updateSettings({ editorMode: mode });
 }
@@ -168,6 +177,7 @@ const {
   openFile, openFileViaDialog, openPathInNewWindow, saveCurrentFile, saveAsCurrentFile,
   reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, onNewTab, onNewFile,
   onOpenFolder, onOpenFile, onOpenRecent, notifyUnsupportedFiles, notifyIgnoredFolders,
+  openWithDefaultApp,
 } = useFileActions({ tabsStore, workspace, fileOps, persistence, dialog, toast: toastStore, activeTab, currentTheme });
 
 // ===== 拖放打开（原生 drag-drop，issue #92）=====
@@ -423,11 +433,8 @@ onMounted(async () => {
     READING_FONT_PRESETS[persistence.settings.editorFontPreset] ?? READING_FONT_PRESETS.d
   );
   // 应用保存的编辑模式（运行时切换，无需重启）
+  // 菜单勾选由 useModeMenuSync（watch effectiveEditorMode）随生效值自动推送
   editorBridge.setEditorMode(persistence.settings.editorMode);
-  // 同步原生 "视图 / 显示模式" 菜单勾选（watcher 不触发首值时补一次）
-  void invoke("set_mode_checked", {
-    modeId: "mode-" + persistence.settings.editorMode,
-  });
   // 应用保存的界面语言（ADR-0013，前端 i18n + Rust 菜单）
   // 首次启动（language 从未写入）时先探测系统语言作为默认并持久化（issue #141）；
   // 已持久化语言的既有用户跳过探测，保持原设置。
@@ -723,12 +730,27 @@ async function onSearchEntrySelect(entry: SearchEntry): Promise<void> {
   // 已打开的标签 → 直接切换（不重新加载，保留编辑状态）
   if (entry.isOpen && entry.tabId) {
     tabsStore.switchTo(entry.tabId);
+    // #387：dirty tab 的磁盘行号不可信，按内存内容对搜索词重新定位
+    const tab = tabsStore.tabs.find((t) => t.id === entry.tabId);
+    const line = resolveSearchJumpLine({
+      entry,
+      isDirty: tab?.isDirty ?? false,
+      content: tab?.content ?? "",
+      query: searchStore.query,
+      caseSensitive: searchStore.options.caseSensitive,
+    });
+    if (line !== undefined) {
+      requestAnimationFrame(() => {
+        editorRef.value?.scrollToLine(line);
+        editorRef.value?.focus();
+      });
+    }
     return;
   }
   // 未保存标签（path=null）无法打开
   if (!entry.path) return;
   await openFile(entry.path);
-  // 内容命中 → 打开后跳转到命中行
+  // 内容命中 → 打开后跳转到命中行（刚从磁盘读入，行号可信）
   const line = entry.lineNumber;
   if (line !== undefined) {
     requestAnimationFrame(() => {
@@ -911,6 +933,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             @cursor-change="onCursorChange"
             @open-internal="openFile"
             @drop-image-path="onDropImagePath"
+            @open-with-default-app="openWithDefaultApp"
             @context-action="onEditorContextAction"
             @zoom-step="onZoomStep"
           />

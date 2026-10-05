@@ -217,7 +217,9 @@ describe("拖拽打开（原生 drag-drop）", () => {
     // 必须用「不切句柄」的等待：waitForPinia 会遍历句柄并停回主窗口
     await waitForPiniaInCurrentWindow(browser, 30000);
 
-    // 新窗口把该目录作为工作区打开
+    // 新窗口把该目录作为工作区打开。
+    // inCurrentWindow: true —— 当前句柄是新建的 win-N，不能让 macOS direct eval
+    // 把探针投递到 main 窗口（见 wait.ts appProbe 的窗口标签语义，#375）。
     const ok = await waitForInBrowser(
       browser,
       (p: string) => {
@@ -225,7 +227,11 @@ describe("拖拽打开（原生 drag-drop）", () => {
         return window.__pinia__._s.get("workspace")?.workspacePath === p;
       },
       [wsPath],
-      { timeout: 15000, message: "拖入的目录成为新窗口的工作区" }
+      {
+        timeout: 15000,
+        message: "拖入的目录成为新窗口的工作区",
+        inCurrentWindow: true,
+      }
     );
     expect(ok).toBe(true);
     // 文件树随之出现，且新窗口没有继承任何标签（外部入口不恢复会话）

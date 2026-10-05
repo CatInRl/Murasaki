@@ -36,8 +36,8 @@ uuid = { version = "1", features = ["v4"] }
 sys-locale = "0.3.2"
 
 [target.'cfg(windows)'.dependencies]
-webview2-com = "0.38"
-windows = "0.61"
+webview2-com = "0.39"
+windows = "0.62"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # macOS E2E 专用：内嵌 WebDriver 服务端（tauri-driver 不支持 WKWebView）。

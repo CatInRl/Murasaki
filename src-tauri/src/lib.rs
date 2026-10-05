@@ -557,6 +557,7 @@ pub fn run() {
             launch::classify_drop_paths,
             lifecycle::exit_app,
             lifecycle::quit_app,
+            lifecycle::cancel_close,
             windows::open_path_in_new_window,
             windows::set_window_workspace,
             windows::close_window,

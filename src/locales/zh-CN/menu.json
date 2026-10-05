@@ -65,7 +65,10 @@
     "filesView": "文件树视图",
     "outlineView": "大纲视图",
     "statusBar": "状态栏",
-    "fullscreen": "全屏"
+    "fullscreen": "全屏",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "zoomReset": "重置缩放"
   },
   "aboutText": "Murasaki v{version}\n轻量级本地 Markdown 文件管理编辑器\n基于 Tauri 2.x + Vue 3 + CodeMirror 6"
 }
