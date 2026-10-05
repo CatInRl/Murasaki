@@ -540,6 +540,80 @@ describe("4. Mermaid 图表", () => {
     const exists = await browser.execute(() => !!document.querySelector(".preview-pane"));
     expect(exists).toBe(true);
   });
+
+  it("4.5 mermaid SVG 完整显示：gantt 不被域外 today 线压扁（#342）", async () => {
+    await openAndWait(browser, "render/mermaid.md", 15000);
+    // 等三个 SVG 全部异步渲染完成
+    await waitForInBrowser(
+      browser,
+      () => document.querySelectorAll(".preview-pane .mermaid svg").length >= 3,
+      [],
+      { message: "mermaid SVG 未渲染完整", timeout: 20000 }
+    );
+    const infos = await browser.execute(() => {
+      return Array.from(document.querySelectorAll(".preview-pane .mermaid svg")).map((svg, index) => {
+        const el = svg as SVGSVGElement;
+        const vb = (el.getAttribute("viewBox") ?? "").trim().split(/[\s,]+/).map(Number);
+        const rect = el.getBoundingClientRect();
+        const today = el.querySelector("g.today");
+        const ok = vb.length === 4 && vb.every((n) => Number.isFinite(n));
+        // 图类型探测（#342 CI 取证用）：循环 expect 失败只报裸比值，
+        // 无法指认失败的是哪张图，所以把类型与全部度量带进失败信息
+        const kind = today
+          ? "gantt"
+          : el.querySelector(".actor")
+            ? "sequence"
+            : el.querySelector(".node, .edgePaths")
+              ? "flowchart"
+              : "unknown";
+        return {
+          index,
+          kind,
+          vbW: ok ? vb[2] : 0,
+          vbH: ok ? vb[3] : 0,
+          w: rect.width,
+          h: rect.height,
+          maxW: el.style.maxWidth,
+          hasToday: !!today,
+          todayHidden: today ? (today as SVGElement).style.display === "none" : null,
+        };
+      });
+    });
+    expect(infos.length).toBeGreaterThanOrEqual(3);
+    // 完整显示守卫（单点断言，失败信息带每张 SVG 的完整诊断）。三项都是「渲染性质」，
+    // 与运行环境字体无关：
+    // - viewBox 有效（vbW/vbH > 0）；
+    // - h >= 24：压扁守卫。#342 根因是 gantt 的 today 线（x≈18000）混入 viewBox，
+    //   SVG 以容器宽渲染时高度被等比压到 <1px，h 下限直接捕捉「图被压没」；
+    // - 等比：rect.h/rect.w 与 vbH/vbW 相对误差 <= 10%，捕捉「被强制拉伸变形」。
+    // 不断言 w/vbW >= 0.25：该比值实为「容器宽/内容排版宽」，而内容排版宽由字体
+    // 度量决定——CI（英文 Windows）对 CJK 的字体 fallback 与本地（中文 Windows）差异
+    // 巨大（#342 实测 flowchart vb 612x145 → 2078x2077，ratio 0.132），图本身等比
+    // 完整渲染并无缺陷，ratio 断言只会把环境差异误判成渲染失败。
+    const bad = infos
+      .map((info) => {
+        if (info.vbW <= 0 || info.vbH <= 0) {
+          return `svg[${info.index} ${info.kind}] viewBox 无效: ${info.vbW}x${info.vbH}`;
+        }
+        if (info.h < 24) {
+          return `svg[${info.index} ${info.kind}] 渲染高度 ${info.h.toFixed(1)}px < 24（被压扁？）vb=${info.vbW}x${info.vbH} rect=${info.w.toFixed(1)}x${info.h.toFixed(1)} maxW="${info.maxW}"`;
+        }
+        const aspect = info.vbH / info.vbW;
+        const rendered = info.h / info.w;
+        const deviation = Math.abs(rendered - aspect) / aspect;
+        if (deviation > 0.1) {
+          return `svg[${info.index} ${info.kind}] 不等比（偏差 ${(deviation * 100).toFixed(1)}%）vb=${info.vbW}x${info.vbH} rect=${info.w.toFixed(1)}x${info.h.toFixed(1)} maxW="${info.maxW}"`;
+        }
+        return null;
+      })
+      .filter((msg): msg is string => msg !== null);
+    expect(bad.join("; ") || "all svg pass guards").toBe("all svg pass guards");
+    // 只有 gantt 会画 today 线；今天（2026-10）在任务域（2026-01）之外，
+    // sanitize 必须把它隐藏并收窄 viewBox
+    const withToday = infos.filter((i) => i.hasToday);
+    expect(withToday.length).toBe(1);
+    expect(withToday[0].todayHidden).toBe(true);
+  });
 });
 
 // ===== 测试组 5：Emoji =====

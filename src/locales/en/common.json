@@ -44,6 +44,7 @@
   "exportHtmlTitle": "Export HTML",
   "exportPdfTitle": "Export PDF",
   "exportPdfSuccess": "PDF exported",
+  "exportHtmlSuccess": "HTML exported: {path}",
   "copyRichTextSuccess": "Rich text copied to clipboard",
   "drop": {
     "overlayTitle": "Drop to open",
@@ -122,6 +123,8 @@
     "closeAriaLabel": "Close notification",
     "cannotOpenFile": "This file cannot be opened in Murasaki",
     "unsupportedDropFiles": "Ignored {count} file(s) that Murasaki cannot open",
-    "ignoredDropFolders": "Ignored {count} folder(s) (a window can only open one workspace)"
+    "ignoredDropFolders": "Ignored {count} folder(s) (a window can only open one workspace)",
+    "sourceOnlyMode": "This file only supports source mode; display mode cannot be switched",
+    "draftSaveFailed": "Failed to save draft; unsaved changes may be lost"
   }
 }

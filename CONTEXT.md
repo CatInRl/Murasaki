@@ -727,6 +727,20 @@ issue #104 范围：性能修复 + UX 导航。
 - **UX**：结果折叠/展开导航优化、搜索进度指示、命中行号显示。
 - 不改变搜索入口与基本能力（正则/大小写/整词）。
 
+## 知识库 (Knowledge Base)
+
+规划中（wayfinder 图 [#323](https://github.com/CatInRl/Murasaki/issues/323)）。把工作区暴露给外部 MCP 客户端的**只读检索服务**：外部 AI 工具可以列出工作区结构、检索语义相关片段并取回全文。应用本身不做 agent（#264 已删），只提供检索出口。完整规格见 [spec](docs/specs/mcp-knowledge-base-spec.md)，架构取舍见 [ADR-0021](docs/adr/0021-mcp-knowledge-base-sidecar-stdio-and-disk-index.md)。
+
+- **MCP 服务端 / sidecar (`murasaki-mcp`)** —— 独立命令行二进制，由 MCP 客户端按工作区 spawn，经 stdio 收发 JSON-RPC；一实例 = 一工作区；编辑器不开也能用（直接读磁盘索引，缺失时自己懒建）。
+- **检索核心 (`murasaki-kb`)** —— GUI 与 sidecar 共用的 Rust crate，含分块、嵌入、索引读写与混合检索。
+- **MCP 客户端 (MCP Client)** —— 消费知识库的外部 AI 工具（Trae / Claude Desktop / Cursor 等），通过工具调用检索工作区。
+- **索引 (Index)** —— 工作区 markdown 的结构化分块 + 向量的落盘产物，位于 `%APPDATA%\murasaki\index\<workspace_key>\`。索引只反映磁盘状态：未保存的编辑不入索引。
+- **工作区键 (Workspace Key)** —— 索引目录名，`sha1(规范化工作区路径)`；工作区改名/移动即产生新键（索引重建）。
+- **分块 (Chunk)** —— 索引的最小检索单元：以 ATX 标题（h1–h3）为主边界、代码块与表格整体成块、目标约 512 token、不重叠；携带标题面包屑（heading trail）与源码行号。
+- **嵌入 (Embedding)** —— 把分块文本映射为 1024 维向量（bge-m3 int8 本地模型），支撑语义检索；模型首次使用时下载。
+- **混合检索 (Hybrid Search)** —— 关键词通道（与 `Ctrl+Shift+F` 跨文件搜索同源）与语义通道两路召回，RRF 融合排序。
+- **降级检索 (Degraded Search)** —— 模型未下载 / 加载失败 / macOS x64 时退化为纯关键词检索，响应带 `degraded` 标记；功能不断崖而非报错。
+
 ## 自动更新 (Auto Update)
 
 0.4.0 起支持应用内自动检查与安装更新。详见 [ADR-0012](docs/adr/0012-auto-update-via-tauri-updater-with-github-releases.md)。

@@ -11,6 +11,7 @@ import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { isTabOutOfWorkspace } from "../utils/path";
 import { buildTabList, filterTabList } from "../utils/tabList";
 import type { TabListEntry } from "../utils/tabList";
+import { tabKeyAction } from "../utils/tabNavigation";
 import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
 import type { MenuItem } from "../stores/useContextMenuStore";
 import type { Tab } from "../types";
@@ -117,6 +118,33 @@ function onClick(tabId: string): void {
   tabsStore.switchTo(tabId);
 }
 
+/** #386：标签栏键盘导航——纯逻辑在 utils/tabNavigation.ts，此处只做应用 */
+function onTabKeydown(e: KeyboardEvent, index: number): void {
+  const action = tabKeyAction(e.key, index, tabs.value.length);
+  if (!action) return;
+  e.preventDefault();
+  if (action.close) {
+    // 与中键关闭同路：未保存确认由父组件的 useTabClose 处理
+    emit("close-tab", tabs.value[index].id);
+    return;
+  }
+  if (action.activate) {
+    onClick(tabs.value[index].id);
+    return;
+  }
+  // 方向键 / Home / End：roving tabindex 手动激活模式——只移焦点，Enter / Space 才激活
+  focusTabAt(action.nextIndex);
+}
+
+/** 把焦点移到目标标签（tabindex=-1 的元素仍可编程聚焦），并滚入可视区 */
+function focusTabAt(index: number): void {
+  const el = tabsListRef.value?.querySelector<HTMLElement>(
+    `.tab-item[data-tab-index="${index}"]`
+  );
+  el?.focus();
+  el?.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
 /**
  * 中键点击关闭 tab
  */
@@ -200,7 +228,7 @@ const tabEntries = computed(() =>
   buildTabList(tabsStore.tabs, {
     activeTabId: tabsStore.activeTabId,
     workspacePath: workspace.workspacePath,
-    titleOf: (tab) => tabsStore.getTabTitle(tab),
+    titleOf: (tab) => tabsStore.getTabTitle(tab, t("common.untitled")),
   })
 );
 const filteredEntries = computed(() => filterTabList(tabEntries.value, tabQuery.value));
@@ -294,15 +322,20 @@ function onPanelKeydown(e: KeyboardEvent): void {
 
 <template>
   <div class="tab-bar-container">
-    <!-- Tab 列表 -->
-    <div ref="tabsListRef" class="tabs-list">
+    <!-- Tab 列表（#386：roving tabindex——激活项 tabindex=0，其余 -1，方向键移焦点） -->
+    <div ref="tabsListRef" class="tabs-list" role="tablist">
       <div
-        v-for="tab in tabs"
+        v-for="(tab, index) in tabs"
         :key="tab.id"
         class="tab-item"
         :class="{ active: isActive(tab.id) }"
+        role="tab"
+        :tabindex="isActive(tab.id) ? 0 : -1"
+        :aria-selected="isActive(tab.id)"
+        :data-tab-index="index"
         :title="tabTooltip(tab)"
         @click="onClick(tab.id)"
+        @keydown="onTabKeydown($event, index)"
         @mousedown="onMiddleClick($event, tab.id)"
         @contextmenu="onContextMenu($event, tab)"
       >
@@ -319,13 +352,14 @@ function onPanelKeydown(e: KeyboardEvent): void {
           <line x1="8" y1="17" x2="14" y2="17"/>
         </svg>
         <ArrowUpRight v-else class="tab-icon" :size="13" :stroke-width="2" aria-hidden="true" />
-        <span class="tab-title">{{ tabsStore.getTabTitle(tab) }}</span>
+        <span class="tab-title">{{ tabsStore.getTabTitle(tab, t("common.untitled")) }}</span>
         <!-- dirty 状态：紫色圆点 -->
         <span v-if="tab.isDirty" class="dirty-dot" aria-hidden="true"></span>
-        <!-- 关闭按钮：仅 hover 时显示 -->
+        <!-- 关闭按钮：仅 hover 时显示；tabindex=-1 使其不进 Tab 序（WAI-ARIA：tab 不得含可聚焦后代，键盘关闭走 Delete/右键菜单） -->
         <button
           class="close-btn"
           type="button"
+          tabindex="-1"
           :title="$t('editor.tabBar.close')"
           :aria-label="$t('editor.tabBar.closeTabAria')"
           @click="onCloseTab($event, tab.id)"

@@ -31,6 +31,7 @@ import {
   isHtmlFile,
   isImageFile,
   isEditableTextFile,
+  canOpenInApp,
   isLargeExtensionlessFile,
   EXTENSIONLESS_TEXT_MAX_SIZE,
 } from "../utils/fileKind";
@@ -143,16 +144,6 @@ function onClick(): void {
 }
 
 /**
- * 该文件能否在应用内打开为标签（markdown / html / 白名单文本代码 / 无后缀）
- *
- * 点击与右键菜单的「打开」共用同一口径，避免两处判定漂移（#308 改口径时两边都要动）。
- * 图片不在此列 —— 它走预览窗，见 `isImageFile`。
- */
-function canOpenInApp(name: string): boolean {
-  return isMarkdownFile(name) || isEditableTextFile(name);
-}
-
-/**
  * 文本/代码文件类（排除 markdown 与 html，用于图标分类）
  *
  * 与「能不能打开」的口径**故意不同**：无后缀文件即使能打开，只要不小（≥1MB）就仍按
@@ -174,14 +165,18 @@ function isTextFile(name: string): boolean {
  * 文件树节点拖拽：
  * - 任何文件/目录都可拖（用于工作区内移动到其他目录）
  * - 图片文件额外携带 text/plain，供拖入编辑器时插入相对路径引用
- * 使用自定义 MIME 类型 application/x-murasaki-file-path 携带绝对路径
+ * 使用自定义 MIME 类型 application/x-murasaki-file-path 携带绝对路径，
+ * 并随 application/x-murasaki-node-type 携带节点类型 —— 供编辑器落下时
+ * 按类型分流（#379：图片插入 / 开标签 / 系统默认程序）
  */
 const DRAG_MIME = "application/x-murasaki-file-path";
+const NODE_TYPE_MIME = "application/x-murasaki-node-type";
 
 function onDragStart(e: DragEvent): void {
   if (props.node.type !== "file" && props.node.type !== "directory") return;
   if (!e.dataTransfer) return;
   e.dataTransfer.setData(DRAG_MIME, props.node.path);
+  e.dataTransfer.setData(NODE_TYPE_MIME, props.node.type);
   if (props.node.type === "file" && isImageFile(props.node.name)) {
     e.dataTransfer.setData("text/plain", props.node.path);
     e.dataTransfer.effectAllowed = "copy";

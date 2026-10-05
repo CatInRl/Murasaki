@@ -7,6 +7,7 @@ import HtmlPreview from "./HtmlPreview.vue";
 import { useScrollSync } from "../composables/useScrollSync";
 import { isHtmlFile } from "../utils/fileKind";
 import { presentationZoomStyle } from "../utils/presentationZoom";
+import { classifyTreeDrop } from "../utils/treeDrop";
 import type { EditorMode } from "../types";
 
 interface Props {
@@ -68,6 +69,8 @@ const emit = defineEmits<{
   (e: "open-internal", path: string): void;
   /** 从文件树拖入图片：要求父组件插入相对路径引用 */
   (e: "drop-image-path", path: string): void;
+  /** 从文件树拖入应用打不开的文件：要求父组件走系统默认程序兜底（#307/#379） */
+  (e: "open-with-default-app", path: string): void;
   /** 编辑器右键菜单高级操作（插入表格/链接/图片） */
   (e: "context-action", action: "insert-table" | "insert-link" | "insert-image"): void;
   /** 演示模式 Ctrl+滚轮缩放：1=放大，-1=缩小（由父组件夹取边界并持久化） */
@@ -241,6 +244,8 @@ function onTaskToggle(payload: { li: HTMLElement; checked: boolean }) {
 // 外部拖入（系统文件）由 Tauri 原生拖放驱动（#288），不经过这里的 HTML5 dragover/drop ——
 // 下方 onEditorDragOver / onEditorDrop 只处理**文件树内部拖拽**（FILE_TREE_DRAG_MIME）。
 const FILE_TREE_DRAG_MIME = "application/x-murasaki-file-path";
+/** TreeNode.onDragStart 随路径一并携带的节点类型，供落下时按类型分流（#379） */
+const FILE_TREE_NODE_TYPE_MIME = "application/x-murasaki-node-type";
 
 /** 编辑区拖拽悬停态（落点反馈，issue #151） */
 const dropActive = ref(false);
@@ -275,7 +280,17 @@ function onEditorDrop(e: DragEvent): void {
   // 外部图片不在这里处理：走 Tauri 原生拖放链路（useDragDrop → useImagePaste.insertDroppedImages）
   if (!path) return;
   e.preventDefault();
-  emit("drop-image-path", path);
+  // 按类型分流（#379）：图片插入相对路径引用；应用打得开的（markdown/文本/无后缀）
+  // 开为 tab；打不开的走系统默认程序兜底；目录忽略（拖目录进编辑器没有明确意图）
+  const nodeType = e.dataTransfer.getData(FILE_TREE_NODE_TYPE_MIME);
+  const action = classifyTreeDrop(nodeType || "file", path);
+  if (action === "insert-image") {
+    emit("drop-image-path", path);
+  } else if (action === "open-tab") {
+    emit("open-internal", path);
+  } else if (action === "system-open") {
+    emit("open-with-default-app", path);
+  }
 }
 
 // 暴露给父组件：滚动到指定行（供大纲跳转使用）

@@ -414,3 +414,33 @@ describe("useFileActions - exportCurrentPdf", () => {
     );
   });
 });
+
+// #384：HTML 导出与 PDF / 复制富文本的反馈模型统一——成功 toast.success、
+// 失败 toast.error；此前成功路径完全静默、失败走 dialog.alert。
+describe("useFileActions - exportCurrentHtml 反馈（#384）", () => {
+  it("导出成功 → toast.success 反馈", async () => {
+    mockedExportHtml.mockResolvedValue("<html>ok</html>");
+    mockedSaveDialog.mockResolvedValue("/test/out.html");
+
+    const deps = makeDeps();
+    const { exportCurrentHtml } = useFileActions(deps);
+    await exportCurrentHtml();
+
+    expect(deps.toast.success).toHaveBeenCalledTimes(1);
+    expect(deps.toast.success).toHaveBeenCalledWith(expect.stringContaining("导出"));
+  });
+
+  it("导出失败 → toast.error（与 PDF 反馈模型统一），不再 dialog.alert", async () => {
+    mockedExportHtml.mockRejectedValue(new Error("render fail"));
+    mockedSaveDialog.mockResolvedValue("/test/out.html");
+
+    const deps = makeDeps();
+    const { exportCurrentHtml } = useFileActions(deps);
+    await exportCurrentHtml();
+
+    expect(deps.toast.error).toHaveBeenCalledWith(
+      expect.stringContaining("导出 HTML 失败")
+    );
+    expect(deps.dialog.alert).not.toHaveBeenCalled();
+  });
+});
