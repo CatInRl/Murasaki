@@ -88,8 +88,8 @@ describe("composables/useNaiveTheme", () => {
 
     it("字体对齐 --murasaki-font-ui / --murasaki-font-mono", () => {
       const c = createMurasakiThemeOverrides().common!;
-      expect(norm(c.fontFamily)).toBe(norm(resolvedToken("--murasaki-font-ui")));
-      expect(norm(c.fontFamilyMono)).toBe(norm(resolvedToken("--murasaki-font-mono")));
+      expect(norm(String(c.fontFamily))).toBe(norm(resolvedToken("--murasaki-font-ui")));
+      expect(norm(String(c.fontFamilyMono))).toBe(norm(resolvedToken("--murasaki-font-mono")));
       expect(c.fontFamily).toContain("Inter");
     });
 
@@ -109,9 +109,9 @@ describe("composables/useNaiveTheme", () => {
 
     it("阴影对齐 --murasaki-shadow-*", () => {
       const c = createMurasakiThemeOverrides().common!;
-      expect(norm(c.boxShadow1)).toBe(norm(resolvedToken("--murasaki-shadow-sm")));
-      expect(norm(c.boxShadow2)).toBe(norm(resolvedToken("--murasaki-shadow-md")));
-      expect(norm(c.boxShadow3)).toBe(norm(resolvedToken("--murasaki-shadow-lg")));
+      expect(norm(String(c.boxShadow1))).toBe(norm(resolvedToken("--murasaki-shadow-sm")));
+      expect(norm(String(c.boxShadow2))).toBe(norm(resolvedToken("--murasaki-shadow-md")));
+      expect(norm(String(c.boxShadow3))).toBe(norm(resolvedToken("--murasaki-shadow-lg")));
     });
 
     it("NPopover 组件级 overrides 对齐 --murasaki-* token（T5.1, issue #71）", () => {
@@ -120,7 +120,9 @@ describe("composables/useNaiveTheme", () => {
       expect(overrides.Popover!.color).toBe(resolvedToken("--murasaki-popover"));
       expect(overrides.Popover!.textColor).toBe(resolvedToken("--murasaki-popover-foreground"));
       expect(overrides.Popover!.borderRadius).toBe(resolvedToken("--murasaki-radius-md"));
-      expect(norm(overrides.Popover!.boxShadow)).toBe(norm(resolvedToken("--murasaki-shadow-lg")));
+      expect(norm(String(overrides.Popover!.boxShadow))).toBe(
+        norm(resolvedToken("--murasaki-shadow-lg"))
+      );
     });
   });
 
