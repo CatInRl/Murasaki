@@ -4,10 +4,18 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- 修复 **Mermaid gantt 图的「今日」标记线把整图毁掉**（#342）：today 线画在「今天」处，当今天落在任务时间域之外时 mermaid 11 的两种表现都会毁图——域外 today 坐标（x≈18000）被计入 viewBox，正常 ~68px 高的 gantt 在容器内被等比压成 ~5px 的细线（图不可读）；未计入则图正常显示但 today 线画在可视区外、图内文字被裁。新增 `sanitizeMermaidSvg()`（mermaidTheme.ts）在每次 mermaid 渲染完成后对 SVG 做一次收敛：隐藏全部 `g.today`，以根 `getBBox()` 取真实内容盒，相对内容盒判定 today 是否域外（域外保持隐藏、域内/跨界恢复显示并并回内容盒），viewBox 收窄到最终内容盒并同步 inline `max-width`，保证 SVG 受卡片约束不被撑爆；分栏预览（PreviewPane）与 WYSIWYG（MermaidWidget / PlantUML 的 DiagramPreviewWidget）两处渲染入口统一接线，PlantUML 图卡同样受益；gantt 渲染宽度改走 mermaid `useWidth` 官方通道注入（此前临时容器挂 body 测得 0 宽），0 宽防御 + 占位恢复。e2e 断言改为环境无关三重守卫（viewBox 有效 / 渲染高度 ≥24px / 等比偏差 ≤10%）——CI 英文 Windows 对 CJK 的字体 fallback 与本地中文 Windows 差异巨大（实测 flowchart viewBox 612×145 → 2078×2077），旧的宽高比阈值断言把环境差异误判成渲染缺陷；文件树搜索的两处「固定 pause 后单次读列表」等待同步改为轮询（CI 慢环境下读太早恒空导致偶发挂掉）。
+
+## [0.10.1] - 2026-10-02
+
+本版本为 0.10.0 的补丁版：CI e2e 矩阵扩展到 Linux / macOS（macOS 首期只跑不拦），关闭窗口 / 退出应用时有未保存改动改为三选一汇总确认（替代静默落盘），修复拖入图片落点、演示模式缩放留白、菜单快捷键提示、视图菜单切换、全屏快捷键与 Linux/macOS 本地图片失图，并升级四个运行期依赖清掉 17 条安全告警。
+
 ### Added
 
 - **Linux e2e 支持**：CI 新增 `e2e (linux)` job——tauri-driver + WebKitWebDriver（webkit2gtk-driver）驱动真实 WebKitGTK，经 Xvfb 无头运行，与 Windows 的 WebView2 e2e 共用同一套 spec；Rust 侧 `is_e2e_mode()` 增加 Linux 判定通道（tauri-driver 经 WebKitWebDriver 启动应用时注入的 `TAURI_WEBVIEW_AUTOMATION` / `TAURI_AUTOMATION` 环境变量），e2e harness（进程清理、driver 查找、settings.json 路径、预检脚本）跨平台化，预检由 PowerShell 脚本改为跨平台 Node 实现。首跑即拦下一类真问题：spec 里 `${WS1}\\file.md` 式的反斜杠拼接在 Linux 上产生混合分隔符路径，应用打不开文件且 `executeAsync` 永不返回、整套挂起——现统一在接收路径的边界按平台归一化（Windows 原样保留，其余平台 `\` → `/`）。
-- **macOS e2e 支持**：CI 新增 `e2e (macos)` job（首期只跑不拦，同 Linux e2e 提升路径）——tauri-driver 在 macOS 走 safaridriver 需 GUI 授权、CI 不可行，改为**应用内嵌 WebDriver 服务端**：新增 macOS 运行期依赖 `tauri-plugin-wdio-webdriver` 1.4.0（`cfg(target_os = "macos")` 门控，且仅 debug 构建注册，生产 release 无调试端口）；harness 直接 spawn debug 二进制并注入 `TAURI_WEBDRIVER_PORT` / `WDIO_EMBEDDED_SERVER`，轮询 `GET /status` 就绪后直连建 session；Rust 侧 `is_e2e_mode()` 新增 macOS 判定通道（识别内嵌服务端注入的环境变量），Windows / Linux 链路不变。
+- **macOS e2e 支持**：CI 新增 `e2e (macos)` job（首期只跑不拦，同 Linux e2e 提升路径）——tauri-driver 在 macOS 走 safaridriver 需 GUI 授权、CI 不可行，改为**应用内嵌 WebDriver 服务端**：新增 macOS 运行期依赖 `tauri-plugin-wdio-webdriver` 1.4.0（`cfg(target_os = "macos")` 门控，且仅 debug 构建注册，生产 release 无调试端口）；harness 直接 spawn debug 二进制并注入 `TAURI_WEBDRIVER_PORT` / `WDIO_EMBEDDED_SERVER`，轮询 `GET /status` 就绪后直连建 session；Rust 侧 `is_e2e_mode()` 新增 macOS 判定通道（识别内嵌服务端注入的环境变量），Windows / Linux 链路不变。后续收尾修掉 macOS 上合成键盘事件不触发 CM6 快捷键绑定的问题（改用 `browser.execute` 直接派发 KeyboardEvent，绕过插件的事件合成路径），关窗用例则容忍 `close_window` 引发 IPC 通道断开的预期副作用。
 
 ### Changed
 
@@ -434,7 +442,8 @@ Murasaki 首个正式版本：基于 Tauri 2.x + Vue 3 的本地 Markdown 文件
 - 系统设置（编辑分类含行号 / 软折行开关、AI Provider 配置）。
 - 全屏 F11 自动隐藏状态栏；Ctrl+Shift+E 文件树 / Ctrl+Shift+M 大纲侧栏切换。
 
-[Unreleased]: https://github.com/CatInRl/Murasaki/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/CatInRl/Murasaki/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/CatInRl/Murasaki/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/CatInRl/Murasaki/compare/v0.9.0...v0.10.0
 [0.8.0]: https://github.com/CatInRl/Murasaki/compare/v0.7.1...v0.8.0
 [0.3.0]: https://github.com/CatInRl/Murasaki/compare/v0.2.0...v0.3.0

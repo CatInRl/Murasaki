@@ -3,7 +3,7 @@
  * 依赖 main.ts 中暴露的 window.__pinia__
  */
 import type { Browser } from "webdriverio";
-import { waitForInBrowser } from "./wait";
+import { waitForInBrowser, slowCallExtension, appProbe } from "./wait";
 import { toAppPath } from "./platform";
 
 /**
@@ -16,20 +16,28 @@ import { toAppPath } from "./platform";
  * 的 active window 可能是 settings 窗口（title = "设置"），且 WebView2 可能在
  * 启动后异步恢复 settings 窗口。解决方案：每次轮询时检查当前 title，若非
  * "Murasaki" 则遍历 handles 切换到主窗口。
+ *
+ * 挂起吸收（#375）：macOS 上 WebKit 会间歇回收 evaluateJavaScript 完成回调，
+ * 服务端 30s 后才报 script timeout（webdriverio 客户端重发自愈）。单次 execute
+ * 耗时异常长时把总预算顺延等长 —— 挂起不占用轮询预算，也不会因一次挂起就把
+ * 整个 session 判死（此前主探针无 catch，一次挂起 = beforeAll 失败 = 整文件 skip）。
  */
 export async function waitForPinia(
   browser: Browser,
   timeout = 30000
 ): Promise<void> {
   const start = Date.now();
+  let deadline = start + timeout;
   let lastSwitchAttempt = 0;
+  let lastProbeError: unknown = undefined;
 
-  while (Date.now() - start < timeout) {
+  while (Date.now() < deadline) {
     // 每 2s 或首次：遍历所有 handles，寻找暴露了 __pinia__ 的窗口。
     // 不再依赖 title === "Murasaki"（启动期间 title 可能是 "localhost" 或空），
     // 而是直接在每个 handle 上执行 execute 检测 __pinia__。
     if (Date.now() - lastSwitchAttempt > 2000) {
       lastSwitchAttempt = Date.now();
+      const sweepStart = Date.now();
       try {
         const handles = await browser.getWindowHandles().catch(() => []);
         for (const handle of handles) {
@@ -47,21 +55,36 @@ export async function waitForPinia(
       } catch {
         // 忽略：切换失败不致命
       }
+      deadline += slowCallExtension(sweepStart);
     }
 
-    const ready = await browser.execute(() => {
-      // @ts-ignore
-      return !!(window as any).__pinia__;
-    });
-    if (ready) return;
+    // 主探针：macOS 走 appProbe（direct eval + reclaim 恢复，#375 A），其余平台
+    // 仍 browser.execute；后者挂起时 30s 后抛 script timeout（#375）——吞掉继续
+    // 轮询，等客户端重发自愈；报错保留在 lastProbeError 供超时诊断。
+    const probeStart = Date.now();
+    try {
+      const ready = await appProbe(browser, () => {
+        // @ts-ignore
+        return !!(window as any).__pinia__;
+      });
+      lastProbeError = undefined;
+      if (ready) return;
+    } catch (err) {
+      lastProbeError = err;
+    }
+    deadline += slowCallExtension(probeStart);
     await browser.pause(500);
   }
   // 超时：诊断信息
   const title = await browser.getTitle().catch(() => "<unknown>");
   const state = await browser.execute(() => document.readyState).catch(() => "<unknown>");
   const handles = await browser.getWindowHandles().catch(() => []);
+  const errorNote = lastProbeError
+    ? ` 最后一次探针报错：${String(lastProbeError)}。`
+    : "";
   throw new Error(
-    `waitForPinia 超时 (${timeout}ms)：__pinia__ 未暴露。` +
+    `waitForPinia 超时 (${Date.now() - start}ms，基础预算 ${timeout}ms)：__pinia__ 未暴露。` +
+    `${errorNote}` +
     ` title="${title}", readyState="${state}", handles=${handles.length}.` +
     ` 可能原因：上一次测试遗留 WebView2 窗口状态（如 settings 窗口）。`
   );
@@ -108,8 +131,9 @@ export async function waitForPiniaInCurrentWindow(
   browser: Browser,
   timeout = 30000
 ): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
+  let deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const probeStart = Date.now();
     const ready = await browser
       .execute(() => {
         // @ts-ignore
@@ -117,11 +141,41 @@ export async function waitForPiniaInCurrentWindow(
       })
       .catch(() => false);
     if (ready) return;
+    // #375：execute 挂起（B 后 5s 即抛 ScriptTimeout）不占轮询预算 ——
+    // 慢调用的实际耗时顺延 deadline，与 waitForPinia 同一手法
+    deadline += slowCallExtension(probeStart);
     await browser.pause(500);
   }
+  // 超时：收集 webview 内的诊断信息（#371）—— console 缓冲由 Rust 侧
+  // initialization_script 在任何页面脚本前注入，能反映 __pinia__ 初始化全程
   const title = await browser.getTitle().catch(() => "<unknown>");
+  let detail = `title="${title}"`;
+  const diag = await browser
+    .execute(() => {
+      // @ts-ignore
+      const buf = (window as any).__murasakiConsoleBuffer__;
+      return {
+        readyState: document.readyState,
+        logs: buf ? buf.slice(-100) : null,
+      };
+    })
+    .catch(() => null);
+  if (!diag) {
+    detail += "，诊断信息收集失败（execute 抛错，webview 可能已崩溃）";
+  } else {
+    detail += `，readyState="${diag.readyState}"`;
+    if (diag.logs === null) {
+      detail += "，__murasakiConsoleBuffer__ 未注入（initialization_script 未生效？）";
+    } else if (diag.logs.length > 0) {
+      detail +=
+        `，webview console（最近 ${diag.logs.length} 条）：\n` +
+        diag.logs.map((l: any) => `  [${l.level}] ${l.msg}`).join("\n");
+    } else {
+      detail += "，webview console 缓冲为空（页面脚本未产生任何输出）";
+    }
+  }
   throw new Error(
-    `waitForPiniaInCurrentWindow 超时 (${timeout}ms)：当前句柄未暴露 __pinia__。title="${title}"。`
+    `waitForPiniaInCurrentWindow 超时 (${timeout}ms)：当前句柄未暴露 __pinia__。${detail}`
   );
 }
 

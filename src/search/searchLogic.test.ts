@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchText, buildGroups, SEARCH_LIMITS } from "./searchLogic";
+import { matchText, buildGroups, SEARCH_LIMITS, resolveSearchJumpLine } from "./searchLogic";
 import type { BuildGroupsContext, SearchContentFileSource, SearchTabSource } from "./searchLogic";
 
 // ===== 测试数据工厂 =====
@@ -256,5 +256,119 @@ describe("buildGroups", () => {
         expect(item.isOpen).toBe(g.kind === "tabs");
       }
     }
+  });
+
+  // #387：已打开文件的正文命中不能被去重直接丢掉——否则条目没有 lineNumber，
+  // 选中后无法跳行。合并进先出现的条目而不是新增条目（保持去重语义）。
+  it("已打开文件的正文命中合并进 tabs 条目并携带行号与摘要（#387）", () => {
+    const ctx = makeCtx({
+      query: "a",
+      contentQuery: "a",
+      tabs: [tab("t1", "/ws/a.md", "a.md")],
+      content: [
+        {
+          path: "/ws/a.md",
+          title: "a.md",
+          hits: [{ lineNumber: 3, snippet: "three", ranges: [[0, 1]] }],
+        },
+      ],
+    });
+    const groups = buildGroups(ctx);
+    const item = groups.find((x) => x.kind === "tabs")!.items[0];
+    expect(item.lineNumber).toBe(3);
+    expect(item.snippet).toBe("three");
+    expect(item.snippetRanges).toEqual([[0, 1]]);
+  });
+
+  it("被去重的最近文件条目同样合并正文命中（#387）", () => {
+    const ctx = makeCtx({
+      query: "m",
+      contentQuery: "m",
+      recents: [{ path: "/ws/r.md", title: "r.md" }],
+      content: [
+        { path: "/ws/r.md", title: "r.md", hits: [{ lineNumber: 5, snippet: "five", ranges: [] }] },
+      ],
+    });
+    const groups = buildGroups(ctx);
+    const item = groups.find((x) => x.kind === "recent")!.items[0];
+    expect(item.lineNumber).toBe(5);
+  });
+
+  it("合并是并入而非新增：唯一命中文件并入前组后 content 组为空", () => {
+    const ctx = makeCtx({
+      query: "a",
+      contentQuery: "a",
+      tabs: [tab("t1", "/ws/a.md", "a.md")],
+      content: [
+        { path: "/ws/a.md", title: "a.md", hits: [{ lineNumber: 3, snippet: "three", ranges: [] }] },
+      ],
+    });
+    const groups = buildGroups(ctx);
+    expect(groups.find((x) => x.kind === "content")).toBeUndefined();
+  });
+});
+
+// #387：dirty tab 的磁盘行号不可信（编辑器内容已变），跳行前按内存内容对搜索词
+// 重新定位；非 dirty tab 行为不变，直接用磁盘行号。
+describe("resolveSearchJumpLine", () => {
+  it("dirty tab：按内存内容中搜索词首次出现的行号定位", () => {
+    const line = resolveSearchJumpLine({
+      entry: { lineNumber: 99 },
+      isDirty: true,
+      content: "line1\nline2 has term\nline3",
+      query: "term",
+    });
+    expect(line).toBe(2);
+  });
+
+  it("dirty 但内存中找不到搜索词 → 回退磁盘行号（聊胜于无）", () => {
+    const line = resolveSearchJumpLine({
+      entry: { lineNumber: 7 },
+      isDirty: true,
+      content: "no match here",
+      query: "zzz",
+    });
+    expect(line).toBe(7);
+  });
+
+  it("非 dirty tab 行为不变：直接用磁盘行号", () => {
+    const line = resolveSearchJumpLine({
+      entry: { lineNumber: 3 },
+      isDirty: false,
+      content: "term on line 1",
+      query: "term",
+    });
+    expect(line).toBe(3);
+  });
+
+  it("默认大小写不敏感（与搜索默认一致）", () => {
+    const line = resolveSearchJumpLine({
+      entry: { lineNumber: 1 },
+      isDirty: true,
+      content: "L1\nTERM here",
+      query: "term",
+    });
+    expect(line).toBe(2);
+  });
+
+  it("caseSensitive=true 时区分大小写", () => {
+    const line = resolveSearchJumpLine({
+      entry: { lineNumber: 4 },
+      isDirty: true,
+      content: "term\nTERM",
+      query: "TERM",
+      caseSensitive: true,
+    });
+    expect(line).toBe(2);
+  });
+
+  it("无行号且内存未命中 → undefined（不跳行）", () => {
+    const line = resolveSearchJumpLine({
+      entry: {},
+      isDirty: true,
+      content: "no match",
+      query: "zzz",
+    });
+    expect(line).toBeUndefined();
   });
 });

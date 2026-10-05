@@ -358,13 +358,26 @@ describe("全部标签面板", () => {
     await waitForAbsent(browser, PANEL, 8000);
   });
 
-  // macOS 跳过：WebDriver 合成 click 在 WKWebView 上不触发外部点击关闭监听（疑似 mousedown/pointerdown 事件序列差异），跟进 #370
-  it.skipIf(IS_MACOS)("点击面板外部关闭", async () => {
+  it("点击面板外部关闭", async () => {
     await openFiles(["intro.md", "notes.md"]);
     await openPanel();
 
     await waitForPresent(browser, ".cm-content", 8000);
-    await (await browser.$(".cm-content")).click();
+    if (IS_MACOS) {
+      // macOS：插件 element click 只派发单个 click 事件，而 NPopover 的 clickoutside
+      // 需要 mousedown + mouseup 成对发生（#370），手动派发完整鼠标序列
+      await browser.execute(() => {
+        const el = document.querySelector(".cm-content");
+        if (!el) throw new Error(".cm-content not found");
+        for (const type of ["mousedown", "mouseup", "click"] as const) {
+          el.dispatchEvent(
+            new MouseEvent(type, { bubbles: true, cancelable: true, composed: true })
+          );
+        }
+      });
+    } else {
+      await (await browser.$(".cm-content")).click();
+    }
 
     await waitForAbsent(browser, PANEL, 8000);
   });

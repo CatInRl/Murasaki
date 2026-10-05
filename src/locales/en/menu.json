@@ -65,7 +65,10 @@
     "filesView": "File Tree",
     "outlineView": "Outline",
     "statusBar": "Status Bar",
-    "fullscreen": "Full Screen"
+    "fullscreen": "Full Screen",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "zoomReset": "Reset Zoom"
   },
   "aboutText": "Murasaki v{version}\nA lightweight local Markdown file manager and editor\nBuilt with Tauri 2.x + Vue 3 + CodeMirror 6"
 }

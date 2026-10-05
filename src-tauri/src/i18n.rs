@@ -93,4 +93,16 @@ mod tests {
     fn with_accel_without_accel_is_plain_label() {
         assert_eq!(with_accel("状态栏", ""), "状态栏");
     }
+
+    #[test]
+    fn zoom_menu_texts_exist_in_all_langs() {
+        for key in ["view.zoomIn", "view.zoomOut", "view.zoomReset"] {
+            for lang in SUPPORTED_LANGS {
+                assert!(
+                    !menu_text(lang, key).is_empty(),
+                    "缺少菜单文案: {lang} {key}"
+                );
+            }
+        }
+    }
 }
