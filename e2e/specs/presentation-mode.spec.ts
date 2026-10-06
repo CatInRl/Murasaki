@@ -25,8 +25,9 @@ import {
   waitForPinia,
   dismissAllDialogs,
   resetPersistenceSettings,
+  ensureSplitMode,
 } from "../helpers/store";
-import { readText, waitForInBrowser, waitForPresent } from "../helpers/wait";
+import { readText, waitForAbsent, waitForInBrowser, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -283,6 +284,11 @@ describe("演示模式", () => {
       { message: "HTML 预览子文档未就绪" }
     );
 
+    // 记录 WebView2 整页缩放观测点：devicePixelRatio 随浏览器级缩放变化，应用层
+    // zoom（presentationZoomStyle）不改它。若 keydown 的取消没回传到子文档原始
+    // 事件，Ctrl+= 会让 WebView2 浏览器加速键同时整页缩放，DPR 就会变。
+    const dprBefore = await browser.execute(() => window.devicePixelRatio);
+
     // 1) Ctrl+滚轮：真实滚轮事件落在子文档里（父文档完全收不到），只能由父侧在
     //    contentDocument 上补挂的监听器接回。修好之前这里会一直是 100%。
     await browser.execute(() => {
@@ -301,22 +307,74 @@ describe("演示模式", () => {
     });
     await browser.waitUntil(async () => (await getZoom(browser)) === 110, {
       timeout: 5000,
+      timeoutMsg: "子文档 Ctrl+滚轮后 zoom 未到 110（#405 wheel 接回失效）",
     });
     expect(await readText(browser, ".status-zoom-chip", /110%/)).toContain("110%");
 
     // 2) 焦点进入 iframe 后的 Ctrl+=：keydown 发生在子文档里，父 window 收不到，
-    //    须由父侧重派发回 window 才能走既有的快捷键系统
+    //    须由父侧重派发回 window 才能走既有的快捷键系统；取消行为也要回传原始
+    //    事件，否则 WebView2 浏览器加速键会同时整页缩放（用 DPR 断言）
     await (await browser.$(".html-iframe")).click();
     await browser.keys(["Control", "="]);
     await browser.waitUntil(async () => (await getZoom(browser)) === 120, {
       timeout: 5000,
+      timeoutMsg: "iframe 内 Ctrl+= 后 zoom 未到 120（#405 keydown 接回失效）",
+    });
+    expect(await browser.execute(() => window.devicePixelRatio)).toBe(dprBefore);
+
+    // 3) Ctrl+- 缩小
+    await browser.keys(["Control", "-"]);
+    await browser.waitUntil(async () => (await getZoom(browser)) === 110, {
+      timeout: 5000,
+      timeoutMsg: "iframe 内 Ctrl+- 后 zoom 未回到 110",
     });
 
-    // 3) Ctrl+0 复位
+    // 4) 焦点在 iframe 内时其它全局快捷键同样可达（#405 验收 3）：
+    //    Ctrl+P 拉起统一搜索条，Esc 关闭
+    await browser.keys(["Control", "p"]);
+    await waitForPresent(browser, ".gsb", 5000);
+    await browser.keys(["Escape"]);
+    await waitForAbsent(browser, ".gsb", 5000);
+
+    // 5) Ctrl+0 复位
     await browser.keys(["Control", "0"]);
     await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
       timeout: 5000,
+      timeoutMsg: "iframe 内 Ctrl+0 后 zoom 未复位到 100",
     });
+  });
+
+  it("HTML 分屏（非演示模式）下 Ctrl+滚轮不缩放（#405 验收：非演示行为不变）", async () => {
+    await ensureSplitMode(browser);
+    await openWorkspace(browser, wsPath);
+    await openFileInTab(browser, `${wsPath}\\page.html`);
+    await waitForPresent(browser, ".html-iframe", 10000);
+    await waitForInBrowser(
+      browser,
+      () => {
+        const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
+        return !!fr?.contentDocument?.body;
+      },
+      [],
+      { message: "HTML 预览子文档未就绪" }
+    );
+
+    await browser.execute(() => {
+      const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
+      const view = fr?.contentWindow as (Window & typeof globalThis) | null;
+      const doc = fr?.contentDocument;
+      if (!view || !doc) throw new Error("html iframe not ready");
+      doc.dispatchEvent(
+        new view.WheelEvent("wheel", {
+          ctrlKey: true,
+          deltaY: -120,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    });
+    await browser.pause(500);
+    expect(await getZoom(browser)).toBe(100);
   });
 
   it("非演示模式下缩放快捷键不生效", async () => {

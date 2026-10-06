@@ -6,6 +6,7 @@
 
 ### Fixed
 
+- 修复 **HTML 文件的演示模式无法缩放**（#405）：HTML 预览是沙箱 iframe，Ctrl+滚轮与键盘事件发生在子文档里、不会跨越 iframe 边界冒泡到父文档，挂在 `.preview-zoom` 的滚轮监听与全局快捷键（`Ctrl+=` / `Ctrl+-` / `Ctrl+0` 等）全部收不到，缩放 chip 恒为 100%。利用 sandbox 既有的 `allow-same-origin`（父侧可访问 `contentDocument`），在 iframe 每次 load 后由父侧补挂 wheel / keydown 监听器把事件接回：滚轮直接交给既有 `onWheel`（演示模式 Ctrl+滚轮缩放生效），keydown 重派发到父 `window` 走快捷键系统、被消费时把 `defaultPrevented` 同步回传给子文档原始事件（否则 WebView2 浏览器级加速键——整页缩放 / 打印——会在 iframe 内照常触发、与应用行为叠加）。不给沙箱加 `allow-scripts`，HTML 内脚本依旧不执行。附带收益：焦点在 HTML 预览内时 Ctrl+S / Ctrl+P 等全局快捷键同样可用（分屏模式同样生效）。
 - 修复 **Mermaid gantt 图的「今日」标记线把整图毁掉**（#342）：today 线画在「今天」处，当今天落在任务时间域之外时 mermaid 11 的两种表现都会毁图——域外 today 坐标（x≈18000）被计入 viewBox，正常 ~68px 高的 gantt 在容器内被等比压成 ~5px 的细线（图不可读）；未计入则图正常显示但 today 线画在可视区外、图内文字被裁。新增 `sanitizeMermaidSvg()`（mermaidTheme.ts）在每次 mermaid 渲染完成后对 SVG 做一次收敛：隐藏全部 `g.today`，以根 `getBBox()` 取真实内容盒，相对内容盒判定 today 是否域外（域外保持隐藏、域内/跨界恢复显示并并回内容盒），viewBox 收窄到最终内容盒并同步 inline `max-width`，保证 SVG 受卡片约束不被撑爆；分栏预览（PreviewPane）与 WYSIWYG（MermaidWidget / PlantUML 的 DiagramPreviewWidget）两处渲染入口统一接线，PlantUML 图卡同样受益；gantt 渲染宽度改走 mermaid `useWidth` 官方通道注入（此前临时容器挂 body 测得 0 宽），0 宽防御 + 占位恢复。e2e 断言改为环境无关三重守卫（viewBox 有效 / 渲染高度 ≥24px / 等比偏差 ≤10%）——CI 英文 Windows 对 CJK 的字体 fallback 与本地中文 Windows 差异巨大（实测 flowchart viewBox 612×145 → 2078×2077），旧的宽高比阈值断言把环境差异误判成渲染缺陷；文件树搜索的两处「固定 pause 后单次读列表」等待同步改为轮询（CI 慢环境下读太早恒空导致偶发挂掉）。
 
 ## [0.10.1] - 2026-10-02
