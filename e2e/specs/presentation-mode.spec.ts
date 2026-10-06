@@ -298,11 +298,14 @@ describe("演示模式", () => {
     //    「监听挂在当前文档上」的检查、探针与 dispatch 必须在同一次 execute 内同步
     //    完成——拆成多次 IPC 的话，中间文档可能被替换，事件会派到没有监听的新文档
     //    上；并以 zoom 是否到位作为整体重试条件兜底（每轮重新拿文档、重新派发）。
-    //    每轮 dispatch 前临时挂一只读探针（后注册、target 阶段按注册顺序执行，故读
-    //    defaultPrevented 时业务监听已跑完），把「事件是否真的到达子文档监听、
-    //    deltaY/ctrlKey 实际值、是否被 preventDefault、zoom 前后值」一并带回；超时
-    //    时把最后一轮完整观测抛进错误，CI 注解可直接区分断点在「监听未执行 /
-    //    事件属性丢失 / 链路后段（zoom-step 之后）」哪一环（#405 第三次 CI 失败加装）。
+    //    每轮 dispatch 前临时挂只读探针，把「事件是否真的到达子文档监听、
+    //    deltaY/ctrlKey 实际值、zoom 前后值」一并带回；超时时把最后一轮完整观测
+    //    抛进错误，CI 注解可直接区分断点环节（#405 第三次 CI 失败加装）。
+    //    派发目标是 body 而非 document：实测 macOS WKWebView 对以 document 节点
+    //    为目标的合成 wheel 派发不投递任何监听（第四次 CI 的 hits 为空、zoom 不动，
+    //    WebView2 则正常），改落在 body 上冒泡——真实滚轮事件本就落元素再冒泡；
+    //    双探针区分「target 收到」与「冒泡到 document」：target 收到而 document
+    //    没收到才是产品链路真断（转发监听没接到冒泡事件）。
     let lastWheelObs: unknown = null;
     try {
       await browser.waitUntil(
@@ -313,6 +316,8 @@ describe("演示模式", () => {
             if (!doc || doc.documentElement.dataset.murasakiEventsAttached !== "1") {
               return { dispatched: false, reason: "flag-not-set" };
             }
+            const body = doc.body;
+            if (!body) return { dispatched: false, reason: "no-body" };
             const view = fr?.contentWindow as (Window & typeof globalThis) | null;
             if (!view) return { dispatched: false, reason: "no-content-window" };
             // @ts-ignore
@@ -322,22 +327,19 @@ describe("演示模式", () => {
             if (zoomBefore === 110) {
               return { dispatched: false, reason: "already-110", zoomAfter: zoomBefore };
             }
-            const hits: Array<{
-              deltaY: number;
-              ctrlKey: boolean;
-              defaultPrevented: boolean;
-            }> = [];
-            const probe = (ev: WheelEvent): void => {
-              hits.push({
-                deltaY: ev.deltaY,
-                ctrlKey: ev.ctrlKey,
-                defaultPrevented: ev.defaultPrevented,
-              });
+            const targetHits: Array<{ deltaY: number; ctrlKey: boolean }> = [];
+            const docHits: Array<{ deltaY: number; ctrlKey: boolean }> = [];
+            const targetProbe = (ev: WheelEvent): void => {
+              targetHits.push({ deltaY: ev.deltaY, ctrlKey: ev.ctrlKey });
             };
-            doc.addEventListener("wheel", probe, { capture: true });
+            const docProbe = (ev: WheelEvent): void => {
+              docHits.push({ deltaY: ev.deltaY, ctrlKey: ev.ctrlKey });
+            };
+            body.addEventListener("wheel", targetProbe);
+            doc.addEventListener("wheel", docProbe, { capture: true });
             let dispatchError: string | null = null;
             try {
-              doc.dispatchEvent(
+              body.dispatchEvent(
                 new view.WheelEvent("wheel", {
                   ctrlKey: true,
                   deltaY: -120,
@@ -348,19 +350,23 @@ describe("演示模式", () => {
             } catch (err) {
               dispatchError = String(err);
             } finally {
-              doc.removeEventListener("wheel", probe, { capture: true });
+              body.removeEventListener("wheel", targetProbe);
+              doc.removeEventListener("wheel", docProbe, { capture: true });
             }
             return {
               dispatched: dispatchError === null,
               dispatchError,
-              hits,
+              targetHits,
+              docHits,
               zoomBefore,
               zoomAfter: persistence?.settings?.presentationZoom,
             };
           })) as {
             dispatched: boolean;
             dispatchError: string | null;
-            hits: Array<{ deltaY: number; ctrlKey: boolean; defaultPrevented: boolean }>;
+            reason?: string;
+            targetHits?: Array<{ deltaY: number; ctrlKey: boolean }>;
+            docHits?: Array<{ deltaY: number; ctrlKey: boolean }>;
             zoomBefore?: number;
             zoomAfter?: number;
           };
