@@ -417,6 +417,13 @@
   max-width: 100%;
   height: auto;
 }
+/* issue #342：mermaid 按自带行高（16px × 1.5 = 24px）测量节点文本并分配
+ * foreignObject 高度，而 .markdown-body p 的 1.75 行高会级联进 foreignObject 内
+ * 的 <p>，实际排版比测量基准每行多出 4px——行数越多溢出越大，约 4 行起文字即被
+ * 节点方框视觉裁切。让 p 继承 mermaid 自身行高，与测量基准保持一致。 */
+.markdown-body .mermaid svg p {
+  line-height: inherit;
+}
 
 /* === PlantUML diagrams（官方 TeaVM 纯浏览器产物，本地渲染） ===
  * 与 .mermaid 同款卡片包裹，SVG 居中展示。 */
