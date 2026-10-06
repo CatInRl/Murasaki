@@ -6,9 +6,9 @@
 
 ### Changed
 
-- **运行期依赖升级（Dependabot，#362 / #363）**——Tauri 生态整体升到 2.12，另升两个 Rust 依赖：
-  - **Tauri 生态 2.12（#362，Rust crate 与 npm 包同批）**：Rust 侧 `tauri` 2.11.6 → 2.12.0、`wry` 0.55.1 → 0.57.0、`tao` 0.35.3 → 0.37.1，插件升至 `tauri-plugin-dialog` 2.8.0 / `-fs` 2.6.0 / `-store` 2.5.0 / `-shell` 2.4.0 / `-updater` 2.13.0 / `-process` 2.4.0 / `-single-instance` 2.5.0；前端 `@tauri-apps/api` 2.11.1 → 2.12.0，`@tauri-apps/plugin-{dialog,fs,process,shell,store,updater}` 同步对齐，另升 `katex` 0.18.7 → 0.18.9、`vue-i18n` 11.1.11 → 11.4.12。Rust 与 npm 的 major/minor 必须一致（Tauri CLI 在 `tauri build` 时校验，不一致直接报 `Found version mismatched Tauri packages`），故两侧必须同批落地；并顺带把 `webview2-com` 钉到 0.39、`windows` 钉到 0.62.2 与升版后的 wry 对齐（此前仍钉 0.38 / 0.61，会让 `pdf.rs` 的 `NavigationCompletedEventHandler` 与 wry 出现两套 `windows` 类型、编译报 `E0277`）。
-  - **`notify` 7.0.0 → 8.2.0、`dirs` 5.0.1 → 6.0.0（#363）**：两个 Rust 运行期依赖的小版本升级。
+- **运行期依赖升级（Dependabot，#362 / #363）**——Tauri 生态（Rust crate 与 npm 包）升到 2.12，另有一批前端依赖与两个 Rust 依赖跟进：
+  - **Tauri 生态 2.12（#362，Rust crate 与 npm 包同批）**：Rust 侧核心 `tauri` 2.11.6 → 2.12.0、`wry` 0.55.1 → 0.57.0、`tao` 0.35.3 → 0.37.1，插件升至 `tauri-plugin-dialog` 2.8.0 / `-fs` 2.6.0 / `-store` 2.5.0 / `-shell` 2.4.0 / `-updater` 2.13.0 / `-process` 2.4.0 / `-single-instance` 2.5.0；前端 `@tauri-apps/api` 2.11.1 → 2.12.0，`@tauri-apps/plugin-{dialog,fs,process,shell,store,updater}` 同步对齐，另升 `katex` 0.18.7 → 0.18.9、`vue-i18n` 11.1.11 → 11.4.12。Rust 与 npm 的 major/minor 必须一致（Tauri CLI 在 `tauri build` 时校验，不一致直接报 `Found version mismatched Tauri packages`），故两侧必须同批落地；并顺带把 `webview2-com` 钉到 0.39、`windows` 钉到 0.62.2 与升版后的 wry 对齐（此前仍钉 0.38 / 0.61，会让 `pdf.rs` 的 `NavigationCompletedEventHandler` 与 wry 出现两套 `windows` 类型、编译报 `E0277`）。
+  - **`notify` 7.0.0 → 8.2.0、`dirs` 5.0.1 → 6.0.0（#363）**：两个 Rust 运行期依赖各跨一个主版本。
 
 ### Fixed
 
