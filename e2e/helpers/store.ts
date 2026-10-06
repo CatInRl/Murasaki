@@ -194,21 +194,55 @@ export async function getStore<T = any>(
   }, name);
 }
 
+/** 释放本窗口的文件 watcher 句柄（e2e 专用清场）。应用语义不变：真实关闭工作区
+ *  仍有意保留 watcher（见 src-tauri/src/commands/watcher.rs 注释），但跨用例残留
+ *  句柄会卡住下一用例对测试目录的删除/重建（issue #408）。 */
+async function stopWatchingBestEffort(browser: Browser): Promise<void> {
+  try {
+    await browser.executeAsync((done: (res: unknown) => void) => {
+      try {
+        // @ts-ignore
+        window.__TAURI_INTERNALS__.invoke("stop_watching").then(
+          () => done(null),
+          () => done(null)
+        );
+      } catch {
+        done(null);
+      }
+    });
+  } catch {
+    // 尽力而为：watcher 释放失败不阻断清场主流程
+  }
+}
+
 /** 通过 workspace store 直接打开工作区（绕过原生对话框） */
 export async function openWorkspace(
   browser: Browser,
   path: string
 ): Promise<void> {
+  await stopWatchingBestEffort(browser);
   // 注意：browser.execute 在 Tauri WebView2 下不等待 async function 的 Promise
   // 改用 executeAsync，通过 done callback 显式等待异步操作完成
-  await browser.executeAsync((wsPath: string, done: (res: unknown) => void) => {
+  const res = await browser.executeAsync((wsPath: string, done: (res: unknown) => void) => {
     // @ts-ignore
     const pinia = window.__pinia__;
     const workspace = pinia._s.get("workspace");
+    // 消音防 session 污染（机制详见 callStoreAction 注释）
+    const origError = console.error;
+    console.error = () => {};
     Promise.resolve(workspace.openWorkspace(wsPath))
-      .then(() => done(null))
-      .catch((err: unknown) => done(err ? String(err) : null));
+      .then(() => {
+        console.error = origError;
+        done(null);
+      })
+      .catch((err: unknown) => {
+        console.error = origError;
+        done(err ? String(err) : null);
+      });
   }, path);
+  if (res) {
+    throw new Error(`openWorkspace("${path}") 失败: ${res}`);
+  }
 }
 
 /** 关闭工作区 */
@@ -221,6 +255,7 @@ export async function closeWorkspace(browser: Browser): Promise<void> {
       .then(() => done(null))
       .catch((err: unknown) => done(err ? String(err) : null));
   });
+  await stopWatchingBestEffort(browser);
 }
 
 /** 关闭所有 tabs（测试隔离用，避免前序测试的 tab 残留导致 sidebar 不消失）
