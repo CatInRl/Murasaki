@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 
 interface Props {
   /** 原始 HTML 内容 */
@@ -11,7 +11,7 @@ withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  /** 子文档内的滚轮事件（iframe 会吞掉滚轮，父文档收不到，见下方 onFrameLoad） */
+  /** 子文档内的滚轮事件（iframe 会吞掉滚轮，父文档收不到，见下方 attachFrameListeners） */
   (e: "inner-wheel", ev: WheelEvent): void;
   /** 子文档内的键盘事件（同上，焦点在 iframe 内时父 window 收不到 keydown） */
   (e: "inner-keydown", ev: KeyboardEvent): void;
@@ -19,6 +19,10 @@ const emit = defineEmits<{
 
 const scrollRef = ref<HTMLDivElement | null>(null);
 const frameRef = ref<HTMLIFrameElement | null>(null);
+
+/** 幂等标记：写在子文档 documentElement 的 dataset 上，随文档对象走 */
+const ATTACH_FLAG = "murasakiEventsAttached";
+const ATTACH_POLL_MS = 100;
 
 /**
  * 把子文档里的滚轮 / 键盘事件抛回父组件（issue #405）。
@@ -31,14 +35,48 @@ const frameRef = ref<HTMLIFrameElement | null>(null);
  * iframe 的 sandbox 含 `allow-same-origin`，故 `contentDocument` 与父文档同源、
  * 可由父侧直接访问 —— 在这里补挂监听器即可，无需给沙箱加 `allow-scripts`
  * （html 里的脚本依旧不执行）。srcdoc 每次变化都会换一份新文档，旧文档连同
- * 监听器一起销毁，所以只在每次 load 后重新挂即可，不需要显式解绑。
+ * 监听器一起销毁，所以不需要显式解绑；挂载必须幂等（见下方轮询说明），
+ * 标记写在 documentElement 的 dataset 上即可随文档对象走、换文档自动失效。
  */
-function onFrameLoad(): void {
+function attachFrameListeners(): void {
   const doc = frameRef.value?.contentDocument;
-  if (!doc) return;
+  if (!doc || !doc.documentElement) return;
+  if (doc.documentElement.dataset[ATTACH_FLAG] === "1") return;
+  doc.documentElement.dataset[ATTACH_FLAG] = "1";
   doc.addEventListener("wheel", (ev) => emit("inner-wheel", ev), { passive: false });
   doc.addEventListener("keydown", (ev) => emit("inner-keydown", ev));
 }
+
+function onFrameLoad(): void {
+  attachFrameListeners();
+}
+
+/**
+ * load 兜底轮询：只靠 @load 挂监听在 WebKit 系不可靠 —— WebKitGTK / WKWebView
+ * 上 srcdoc 文档「可交互」（body 就绪）早于 load 事件，且 iframe 初建还会先以
+ * about:blank 文档触发一次 load，监听可能挂在随即被替换的初始文档上、或晚于
+ * 第一次用户输入（#405 在 Linux / macOS e2e 失败的根因，Windows WebView2 只是
+ * 时序上恰好没踩）。改为低频轮询幂等挂载：已挂载时本轮只剩一次 dataset 读取，
+ * 开销可忽略；srcdoc 换文档后下一轮自动重挂。e2e 也以该标记为「监听已挂上」
+ * 的就绪判据（presentation-mode.spec.ts）。
+ */
+let attachPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function startAttachPoll(): void {
+  if (attachPollTimer !== null) return;
+  attachPollTimer = setInterval(attachFrameListeners, ATTACH_POLL_MS);
+  attachFrameListeners();
+}
+
+function stopAttachPoll(): void {
+  if (attachPollTimer !== null) {
+    clearInterval(attachPollTimer);
+    attachPollTimer = null;
+  }
+}
+
+onMounted(startAttachPoll);
+onBeforeUnmount(stopAttachPoll);
 
 defineExpose({
   /** 返回预览区的滚动容器，供滚动同步使用 */

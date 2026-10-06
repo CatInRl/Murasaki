@@ -273,15 +273,18 @@ describe("演示模式", () => {
     await pressShortcut(browser, "$", { ctrl: true, shift: true });
     await waitForPresent(browser, ".editor-pane.mode-presentation", 10000);
     await waitForPresent(browser, ".html-iframe", 10000);
-    // 子文档 load 完成后父侧才挂得上监听器（HtmlPreview 的 @load）
+    // 等父侧把 wheel / keydown 监听挂上：HtmlPreview 幂等轮询挂载后会在子文档
+    // documentElement 上打 data-murasaki-events-attached 标记。不能只等 body 就绪
+    // —— WebKit 系（Linux WebKitGTK / macOS WKWebView）上 srcdoc 文档可交互早于
+    // load 事件，body 在了监听也可能还没挂上（#405 CI 双平台失败的根因）。
     await waitForInBrowser(
       browser,
       () => {
         const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
-        return !!fr?.contentDocument?.body;
+        return fr?.contentDocument?.documentElement?.dataset.murasakiEventsAttached === "1";
       },
       [],
-      { message: "HTML 预览子文档未就绪" }
+      { message: "HTML 预览子文档监听未挂载（murasakiEventsAttached 未置位）" }
     );
 
     // 记录 WebView2 整页缩放观测点：devicePixelRatio 随浏览器级缩放变化，应用层
@@ -353,10 +356,10 @@ describe("演示模式", () => {
       browser,
       () => {
         const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
-        return !!fr?.contentDocument?.body;
+        return fr?.contentDocument?.documentElement?.dataset.murasakiEventsAttached === "1";
       },
       [],
-      { message: "HTML 预览子文档未就绪" }
+      { message: "HTML 预览子文档监听未挂载（murasakiEventsAttached 未置位）" }
     );
 
     await browser.execute(() => {
