@@ -41,6 +41,13 @@ const ATTACH_POLL_MS = 100;
 function attachFrameListeners(): void {
   const doc = frameRef.value?.contentDocument;
   if (!doc || !doc.documentElement) return;
+  // 跳过 iframe 的初始占位文档（无 src / srcdoc 未加载时引擎提供的同步 about:blank
+  // 文档）：它有完整的 documentElement，若把监听挂在这里，srcdoc 正式加载替换文档
+  // 后监听器随占位文档一起销毁，事件全部丢失（#405 在 Linux / macOS e2e 的根因
+  // —— Windows WebView2 srcdoc 加载快、轮询 tick 时往往已是最终文档才没踩）。
+  // 只排除明确的 about:blank，其它 location 一律挂载，避免个别引擎对 srcdoc 文档
+  // 的 location 报法不同（如空串）导致永远不挂。
+  if (doc.location?.href === "about:blank") return;
   if (doc.documentElement.dataset[ATTACH_FLAG] === "1") return;
   doc.documentElement.dataset[ATTACH_FLAG] = "1";
   doc.addEventListener("wheel", (ev) => emit("inner-wheel", ev), { passive: false });
@@ -91,15 +98,16 @@ defineExpose({
       只读预览：把 HTML 源码作为文档渲染。
       sandbox 不授予 allow-scripts，脚本不执行（与"预览区隔离"。XSS 防护一致）。
       allow-same-origin + allow-popups：允许相对资源与弹窗。
-      注意：allow-same-origin 同时让父侧可以访问 contentDocument（见 onFrameLoad），
+      注意：allow-same-origin 同时让父侧可以访问 contentDocument（见 attachFrameListeners），
       这是把子文档事件接回父组件的依据，**不要移除**。
+      不用 loading="lazy"：HTML 预览必然在视区内，lazy 只会让「占位文档 → srcdoc
+      文档」的替换时序更不可控（#405）。
     -->
     <iframe
       ref="frameRef"
       :srcdoc="source"
       class="html-iframe"
       sandbox="allow-same-origin allow-popups"
-      loading="lazy"
       @load="onFrameLoad"
     ></iframe>
   </div>

@@ -274,9 +274,10 @@ describe("演示模式", () => {
     await waitForPresent(browser, ".editor-pane.mode-presentation", 10000);
     await waitForPresent(browser, ".html-iframe", 10000);
     // 等父侧把 wheel / keydown 监听挂上：HtmlPreview 幂等轮询挂载后会在子文档
-    // documentElement 上打 data-murasaki-events-attached 标记。不能只等 body 就绪
-    // —— WebKit 系（Linux WebKitGTK / macOS WKWebView）上 srcdoc 文档可交互早于
-    // load 事件，body 在了监听也可能还没挂上（#405 CI 双平台失败的根因）。
+    // documentElement 上打 data-murasaki-events-attached 标记。标记只打在 srcdoc
+    // 正式文档上（轮询会跳过 about:blank 占位文档——WebKit 系上它同样有完整的
+    // documentElement，监听若挂上去会被随后加载的 srcdoc 文档整体替换，这是
+    // #405 第二次 CI 双平台失败的根因），因此看到标记即当前文档已是最终文档。
     await waitForInBrowser(
       browser,
       () => {
@@ -294,24 +295,34 @@ describe("演示模式", () => {
 
     // 1) Ctrl+滚轮：真实滚轮事件落在子文档里（父文档完全收不到），只能由父侧在
     //    contentDocument 上补挂的监听器接回。修好之前这里会一直是 100%。
-    await browser.execute(() => {
-      const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
-      const view = fr?.contentWindow as (Window & typeof globalThis) | null;
-      const doc = fr?.contentDocument;
-      if (!view || !doc) throw new Error("html iframe not ready");
-      doc.dispatchEvent(
-        new view.WheelEvent("wheel", {
-          ctrlKey: true,
-          deltaY: -120,
-          bubbles: true,
-          cancelable: true,
-        })
-      );
-    });
-    await browser.waitUntil(async () => (await getZoom(browser)) === 110, {
-      timeout: 5000,
-      timeoutMsg: "子文档 Ctrl+滚轮后 zoom 未到 110（#405 wheel 接回失效）",
-    });
+    //    「监听挂在当前文档上」的检查与 dispatch 必须在同一次 execute 内同步完成
+    //    ——拆成两次 IPC 的话，中间文档可能被替换，事件会派到没有监听的新文档上；
+    //    并以 zoom 是否到位作为整体重试条件兜底（每轮重新拿文档、重新派发）。
+    await browser.waitUntil(
+      async () => {
+        const dispatched = (await browser.execute(() => {
+          const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
+          const doc = fr?.contentDocument;
+          if (!doc || doc.documentElement.dataset.murasakiEventsAttached !== "1") return false;
+          const view = fr?.contentWindow as (Window & typeof globalThis) | null;
+          if (!view) return false;
+          doc.dispatchEvent(
+            new view.WheelEvent("wheel", {
+              ctrlKey: true,
+              deltaY: -120,
+              bubbles: true,
+              cancelable: true,
+            })
+          );
+          return true;
+        })) as boolean;
+        return dispatched && (await getZoom(browser)) === 110;
+      },
+      {
+        timeout: 5000,
+        timeoutMsg: "子文档 Ctrl+滚轮后 zoom 未到 110（#405 wheel 接回失效）",
+      }
+    );
     expect(await readText(browser, ".status-zoom-chip", /110%/)).toContain("110%");
 
     // 2) 焦点进入 iframe 后的 Ctrl+=：keydown 发生在子文档里，父 window 收不到，
@@ -362,11 +373,16 @@ describe("演示模式", () => {
       { message: "HTML 预览子文档监听未挂载（murasakiEventsAttached 未置位）" }
     );
 
+    // 同演示用例：检查与派发放进同一次 execute，防两次 IPC 之间文档被替换后
+    // 派到没有监听的新文档上（那样断言会平凡通过，测不到「接回后仍不缩放」）
     await browser.execute(() => {
       const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
-      const view = fr?.contentWindow as (Window & typeof globalThis) | null;
       const doc = fr?.contentDocument;
-      if (!view || !doc) throw new Error("html iframe not ready");
+      if (!doc || doc.documentElement.dataset.murasakiEventsAttached !== "1") {
+        throw new Error("listeners not attached to current html iframe document");
+      }
+      const view = fr?.contentWindow as (Window & typeof globalThis) | null;
+      if (!view) throw new Error("html iframe not ready");
       doc.dispatchEvent(
         new view.WheelEvent("wheel", {
           ctrlKey: true,
