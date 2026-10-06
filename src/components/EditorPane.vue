@@ -104,6 +104,29 @@ function onWheel(e: WheelEvent): void {
   emit("zoom-step", e.deltaY < 0 ? 1 : -1);
 }
 
+/**
+ * HTML 预览焦点在 iframe 内时的键盘事件（issue #405）。
+ *
+ * 焦点进了预览 iframe 后，keydown 发生在子文档里，父 `window` 的全局快捷键监听器
+ * 收不到（实测 `document.activeElement === IFRAME` 时父 `window` 零 keydown），
+ * 于是演示模式的 Ctrl+=/-/0 失效、Ctrl+S / Ctrl+P 等也一并失效。这里把事件按原样
+ * 重派发到父 `window`，交给既有的快捷键系统统一匹配分发。
+ */
+function onInnerKeydown(e: KeyboardEvent): void {
+  window.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: e.key,
+      code: e.code,
+      ctrlKey: e.ctrlKey,
+      shiftKey: e.shiftKey,
+      altKey: e.altKey,
+      metaKey: e.metaKey,
+      bubbles: true,
+      cancelable: true,
+    })
+  );
+}
+
 /** 当前文件是否为 html（决定右侧预览用 HtmlPreview 渲染原始 HTML） */
 const isHtml = computed(() =>
   props.currentFilePath ? isHtmlFile(props.currentFilePath) : false
@@ -383,6 +406,8 @@ defineExpose({
             v-else
             ref="previewRef"
             :source="modelValue"
+            @inner-wheel="onWheel"
+            @inner-keydown="onInnerKeydown"
           />
         </div>
       </div>

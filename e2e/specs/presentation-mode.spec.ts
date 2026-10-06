@@ -26,7 +26,7 @@ import {
   dismissAllDialogs,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { readText, waitForPresent } from "../helpers/wait";
+import { readText, waitForInBrowser, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
 let wsPath: string;
@@ -82,6 +82,19 @@ function presentationFixtures(): FixtureFile[] {
   return [
     ...defaultFixtureFiles(),
     { path: "plain.txt", content: "纯文本内容，不支持预览渲染。" },
+    {
+      // HTML 演示模式的缩放回归夹具（#405）：内容要够长，让子文档自身可滚动
+      // （真实滚轮会被子文档消费掉，正是「父文档收不到事件」的复现条件）。
+      path: "page.html",
+      content: [
+        "<!DOCTYPE html>",
+        '<html lang="zh-CN"><head><meta charset="utf-8"><title>页面</title></head>',
+        '<body style="margin:0">',
+        '<h1 style="margin:16px">HTML 演示页</h1>',
+        '<div style="height:2000px;background:linear-gradient(#fff,#ddd)"></div>',
+        "</body></html>",
+      ].join("\n"),
+    },
   ];
 }
 
@@ -251,6 +264,59 @@ describe("演示模式", () => {
     expect(hits?.paneW ?? 0).toBeGreaterThan(100);
     expect(hits?.leftInBox).toBe(true);
     expect(hits?.rightInBox).toBe(true);
+  });
+
+  it("HTML 文件演示模式下同样可缩放（iframe 内事件接回父文档，#405）", async () => {
+    await openWorkspace(browser, wsPath);
+    await openFileInTab(browser, `${wsPath}\\page.html`);
+    await pressShortcut(browser, "$", { ctrl: true, shift: true });
+    await waitForPresent(browser, ".editor-pane.mode-presentation", 10000);
+    await waitForPresent(browser, ".html-iframe", 10000);
+    // 子文档 load 完成后父侧才挂得上监听器（HtmlPreview 的 @load）
+    await waitForInBrowser(
+      browser,
+      () => {
+        const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
+        return !!fr?.contentDocument?.body;
+      },
+      [],
+      { message: "HTML 预览子文档未就绪" }
+    );
+
+    // 1) Ctrl+滚轮：真实滚轮事件落在子文档里（父文档完全收不到），只能由父侧在
+    //    contentDocument 上补挂的监听器接回。修好之前这里会一直是 100%。
+    await browser.execute(() => {
+      const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
+      const view = fr?.contentWindow as (Window & typeof globalThis) | null;
+      const doc = fr?.contentDocument;
+      if (!view || !doc) throw new Error("html iframe not ready");
+      doc.dispatchEvent(
+        new view.WheelEvent("wheel", {
+          ctrlKey: true,
+          deltaY: -120,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    });
+    await browser.waitUntil(async () => (await getZoom(browser)) === 110, {
+      timeout: 5000,
+    });
+    expect(await readText(browser, ".status-zoom-chip", /110%/)).toContain("110%");
+
+    // 2) 焦点进入 iframe 后的 Ctrl+=：keydown 发生在子文档里，父 window 收不到，
+    //    须由父侧重派发回 window 才能走既有的快捷键系统
+    await (await browser.$(".html-iframe")).click();
+    await browser.keys(["Control", "="]);
+    await browser.waitUntil(async () => (await getZoom(browser)) === 120, {
+      timeout: 5000,
+    });
+
+    // 3) Ctrl+0 复位
+    await browser.keys(["Control", "0"]);
+    await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
+      timeout: 5000,
+    });
   });
 
   it("非演示模式下缩放快捷键不生效", async () => {
