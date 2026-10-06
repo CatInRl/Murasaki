@@ -295,34 +295,89 @@ describe("演示模式", () => {
 
     // 1) Ctrl+滚轮：真实滚轮事件落在子文档里（父文档完全收不到），只能由父侧在
     //    contentDocument 上补挂的监听器接回。修好之前这里会一直是 100%。
-    //    「监听挂在当前文档上」的检查与 dispatch 必须在同一次 execute 内同步完成
-    //    ——拆成两次 IPC 的话，中间文档可能被替换，事件会派到没有监听的新文档上；
-    //    并以 zoom 是否到位作为整体重试条件兜底（每轮重新拿文档、重新派发）。
-    await browser.waitUntil(
-      async () => {
-        const dispatched = (await browser.execute(() => {
-          const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
-          const doc = fr?.contentDocument;
-          if (!doc || doc.documentElement.dataset.murasakiEventsAttached !== "1") return false;
-          const view = fr?.contentWindow as (Window & typeof globalThis) | null;
-          if (!view) return false;
-          doc.dispatchEvent(
-            new view.WheelEvent("wheel", {
-              ctrlKey: true,
-              deltaY: -120,
-              bubbles: true,
-              cancelable: true,
-            })
-          );
-          return true;
-        })) as boolean;
-        return dispatched && (await getZoom(browser)) === 110;
-      },
-      {
-        timeout: 5000,
-        timeoutMsg: "子文档 Ctrl+滚轮后 zoom 未到 110（#405 wheel 接回失效）",
-      }
-    );
+    //    「监听挂在当前文档上」的检查、探针与 dispatch 必须在同一次 execute 内同步
+    //    完成——拆成多次 IPC 的话，中间文档可能被替换，事件会派到没有监听的新文档
+    //    上；并以 zoom 是否到位作为整体重试条件兜底（每轮重新拿文档、重新派发）。
+    //    每轮 dispatch 前临时挂一只读探针（后注册、target 阶段按注册顺序执行，故读
+    //    defaultPrevented 时业务监听已跑完），把「事件是否真的到达子文档监听、
+    //    deltaY/ctrlKey 实际值、是否被 preventDefault、zoom 前后值」一并带回；超时
+    //    时把最后一轮完整观测抛进错误，CI 注解可直接区分断点在「监听未执行 /
+    //    事件属性丢失 / 链路后段（zoom-step 之后）」哪一环（#405 第三次 CI 失败加装）。
+    let lastWheelObs: unknown = null;
+    try {
+      await browser.waitUntil(
+        async () => {
+          const obs = (await browser.execute(() => {
+            const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
+            const doc = fr?.contentDocument;
+            if (!doc || doc.documentElement.dataset.murasakiEventsAttached !== "1") {
+              return { dispatched: false, reason: "flag-not-set" };
+            }
+            const view = fr?.contentWindow as (Window & typeof globalThis) | null;
+            if (!view) return { dispatched: false, reason: "no-content-window" };
+            // @ts-ignore
+            const persistence = window.__pinia__?._s?.get("persistence");
+            const zoomBefore = persistence?.settings?.presentationZoom;
+            // 防过冲：zoom 已到位就不再派发（避免 waitUntil 重试把 zoom 越推越高）
+            if (zoomBefore === 110) {
+              return { dispatched: false, reason: "already-110", zoomAfter: zoomBefore };
+            }
+            const hits: Array<{
+              deltaY: number;
+              ctrlKey: boolean;
+              defaultPrevented: boolean;
+            }> = [];
+            const probe = (ev: WheelEvent): void => {
+              hits.push({
+                deltaY: ev.deltaY,
+                ctrlKey: ev.ctrlKey,
+                defaultPrevented: ev.defaultPrevented,
+              });
+            };
+            doc.addEventListener("wheel", probe, { capture: true });
+            let dispatchError: string | null = null;
+            try {
+              doc.dispatchEvent(
+                new view.WheelEvent("wheel", {
+                  ctrlKey: true,
+                  deltaY: -120,
+                  bubbles: true,
+                  cancelable: true,
+                })
+              );
+            } catch (err) {
+              dispatchError = String(err);
+            } finally {
+              doc.removeEventListener("wheel", probe, { capture: true });
+            }
+            return {
+              dispatched: dispatchError === null,
+              dispatchError,
+              hits,
+              zoomBefore,
+              zoomAfter: persistence?.settings?.presentationZoom,
+            };
+          })) as {
+            dispatched: boolean;
+            dispatchError: string | null;
+            hits: Array<{ deltaY: number; ctrlKey: boolean; defaultPrevented: boolean }>;
+            zoomBefore?: number;
+            zoomAfter?: number;
+          };
+          lastWheelObs = obs;
+          return obs.zoomAfter === 110;
+        },
+        {
+          timeout: 5000,
+          interval: 200,
+          timeoutMsg: "子文档 Ctrl+滚轮后 zoom 未到 110（#405 wheel 接回失效）",
+        }
+      );
+    } catch {
+      throw new Error(
+        `子文档 Ctrl+滚轮后 zoom 未到 110（#405 wheel 接回失效）。最后一轮观测：${JSON.stringify(lastWheelObs)}`
+      );
+    }
     expect(await readText(browser, ".status-zoom-chip", /110%/)).toContain("110%");
 
     // 2) 焦点进入 iframe 后的 Ctrl+=：keydown 发生在子文档里，父 window 收不到，

@@ -20,7 +20,7 @@ const emit = defineEmits<{
 const scrollRef = ref<HTMLDivElement | null>(null);
 const frameRef = ref<HTMLIFrameElement | null>(null);
 
-/** 幂等标记：写在子文档 documentElement 的 dataset 上，随文档对象走 */
+/** 幂等标记：写在子文档 documentElement 的 dataset 上，随文档对象走；必须在两条监听都挂上后才置位（它同时是 e2e 的「监听已挂上」判据，挂载抛异常则保持未置位、下一轮轮询重试） */
 const ATTACH_FLAG = "murasakiEventsAttached";
 const ATTACH_POLL_MS = 100;
 
@@ -49,9 +49,9 @@ function attachFrameListeners(): void {
   // 的 location 报法不同（如空串）导致永远不挂。
   if (doc.location?.href === "about:blank") return;
   if (doc.documentElement.dataset[ATTACH_FLAG] === "1") return;
-  doc.documentElement.dataset[ATTACH_FLAG] = "1";
   doc.addEventListener("wheel", (ev) => emit("inner-wheel", ev), { passive: false });
   doc.addEventListener("keydown", (ev) => emit("inner-keydown", ev));
+  doc.documentElement.dataset[ATTACH_FLAG] = "1";
 }
 
 function onFrameLoad(): void {
