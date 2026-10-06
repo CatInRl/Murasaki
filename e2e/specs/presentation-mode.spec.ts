@@ -460,13 +460,21 @@ describe("演示模式", () => {
       `${zoomAfterWheel}%`
     );
 
-    // 2) iframe 内的 Ctrl+=：真实焦点进入 iframe 时 keydown 落在子文档里，父
-    //    window 收不到，须由 HtmlPreview 的 keydown 监听 → inner-keydown →
-    //    EditorPane 重派回 window 才能走既有快捷键系统。用 execute 直派而非
-    //    browser.keys：不依赖焦点恰好落在 iframe 里，也不依赖宿主平台对合成
-    //    键盘事件的处理（macOS 内嵌 WebDriver 的合成键盘连 CM6 绑定都触发不了），
-    //    三平台行为一致；快捷键匹配按 e.key，与 e.code 无关。
-    await pressShortcutInHtmlDoc(browser, "=", { ctrl: true });
+    // 2) 缩放快捷键，注入口按平台选择（快捷键匹配按 e.key，与 e.code 无关）：
+    //    - Windows：pressShortcutInHtmlDoc（execute 直派 keydown 进子文档），
+    //      端到端覆盖「焦点在 iframe 内快捷键仍可达」的接回链路（HtmlPreview
+    //      keydown 监听 → inner-keydown → EditorPane 重派回 window）。
+    //    - WebKit 系：无法从测试侧向子框架注入合成输入——跨 realm 的
+    //      dispatchEvent 被引擎整体吞掉（wheel 有同 execute 内双探针零命中的 CI
+    //      定论 run 37442702866；keydown 有 flag 校验通过、派发不抛错仍零效果的
+    //      CI 定论 run 37453204670），退而用父 window 直派（pressShortcut，三
+    //      平台可靠），验证 HTML 演示页响应全局缩放快捷键（缩放命令只按演示
+    //      模式设门、不按文件类型）；子框架 keydown 监听已挂载由上方 flag 等待
+    //      保证，接回链路的端到端验证由 Windows job 覆盖。
+    const pressKey: (key: string, opts?: { ctrl?: boolean }) => Promise<void> = IS_WEBKIT
+      ? (key, opts) => pressShortcut(browser, key, opts)
+      : (key, opts) => pressShortcutInHtmlDoc(browser, key, opts);
+    await pressKey("=", { ctrl: true });
     await browser.waitUntil(async () => (await getZoom(browser)) === zoomAfterWheel + 10, {
       timeout: 5000,
       timeoutMsg: "iframe 内 Ctrl+= 后 zoom 未 +10（#405 keydown 接回失效）",
@@ -477,7 +485,7 @@ describe("演示模式", () => {
     expect(await browser.execute(() => window.devicePixelRatio)).toBe(dprBefore);
 
     // 3) Ctrl+- 缩小
-    await pressShortcutInHtmlDoc(browser, "-", { ctrl: true });
+    await pressKey("-", { ctrl: true });
     await browser.waitUntil(async () => (await getZoom(browser)) === zoomAfterWheel, {
       timeout: 5000,
       timeoutMsg: "iframe 内 Ctrl+- 后 zoom 未回落",
@@ -487,7 +495,7 @@ describe("演示模式", () => {
     //    Ctrl+P 拉起统一搜索条，Esc 关闭。Escape 例外：搜索条的关闭逻辑绑在其
     //    根节点 @keydown 上（DOM 层而非 window 层），向 window 派发到不了，须在
     //    父文档内向其自动聚焦的输入框派发并让它冒泡到根节点。
-    await pressShortcutInHtmlDoc(browser, "p", { ctrl: true });
+    await pressKey("p", { ctrl: true });
     await waitForPresent(browser, ".gsb", 5000);
     await browser.execute(() => {
       const input = document.querySelector(".gsb input[type='text']");
@@ -500,7 +508,7 @@ describe("演示模式", () => {
 
     // 5) Ctrl+0 复位（Windows 由 110% 复位；WebKit 上第 3 步已回到 100%，
     //    仍照常派发保持链路覆盖，断言首查即真不构成平台差异风险）
-    await pressShortcutInHtmlDoc(browser, "0", { ctrl: true });
+    await pressKey("0", { ctrl: true });
     await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
       timeout: 5000,
       timeoutMsg: "iframe 内 Ctrl+0 后 zoom 未复位到 100",
