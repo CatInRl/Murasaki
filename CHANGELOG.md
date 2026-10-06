@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- 修复 **Mermaid 节点方框内文字超过约 4 行被视觉裁切**（#342 同 issue 的另一症状，此前修的是 gantt today 线）：mermaid 按自带行高（16px × 1.5 = 24px）测量节点文本并分配 `foreignObject` 高度，而 `.markdown-body p` 的 1.75 行高会命中 `foreignObject` 内的 `<p>`（实测 computed line-height 28px），实际排版比测量基准每行多出 4px——溢出随行数线性增长（1～5 行实测 4/8/12/16/20px），小溢出被节点 padding 掩盖、约 4 行起文字即被方框裁掉；分栏预览 / WYSIWYG（编辑器容器带 `.markdown-body` class）/ 演示模式三个入口同病。现以 `.markdown-body .mermaid svg p { line-height: inherit; }` 让 `<p>` 继承 mermaid 自身行高、与测量基准一致；新增静态守卫 `mermaidClipGuard.test.ts` 防该规则被误删。Edge headless 夹具红绿闭环验证：修复前 1～5 行 + 自然换行 6 例全部溢出、修复后全部归零。
 - 修复 **Mermaid gantt 图的「今日」标记线把整图毁掉**（#342）：today 线画在「今天」处，当今天落在任务时间域之外时 mermaid 11 的两种表现都会毁图——域外 today 坐标（x≈18000）被计入 viewBox，正常 ~68px 高的 gantt 在容器内被等比压成 ~5px 的细线（图不可读）；未计入则图正常显示但 today 线画在可视区外、图内文字被裁。新增 `sanitizeMermaidSvg()`（mermaidTheme.ts）在每次 mermaid 渲染完成后对 SVG 做一次收敛：隐藏全部 `g.today`，以根 `getBBox()` 取真实内容盒，相对内容盒判定 today 是否域外（域外保持隐藏、域内/跨界恢复显示并并回内容盒），viewBox 收窄到最终内容盒并同步 inline `max-width`，保证 SVG 受卡片约束不被撑爆；分栏预览（PreviewPane）与 WYSIWYG（MermaidWidget / PlantUML 的 DiagramPreviewWidget）两处渲染入口统一接线，PlantUML 图卡同样受益；gantt 渲染宽度改走 mermaid `useWidth` 官方通道注入（此前临时容器挂 body 测得 0 宽），0 宽防御 + 占位恢复。e2e 断言改为环境无关三重守卫（viewBox 有效 / 渲染高度 ≥24px / 等比偏差 ≤10%）——CI 英文 Windows 对 CJK 的字体 fallback 与本地中文 Windows 差异巨大（实测 flowchart viewBox 612×145 → 2078×2077），旧的宽高比阈值断言把环境差异误判成渲染缺陷；文件树搜索的两处「固定 pause 后单次读列表」等待同步改为轮询（CI 慢环境下读太早恒空导致偶发挂掉）。
 
 ## [0.10.1] - 2026-10-02
