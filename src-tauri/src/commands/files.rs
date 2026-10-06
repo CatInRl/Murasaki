@@ -105,12 +105,9 @@ fn is_markdown(name: &str) -> bool {
 
 /// 递归遍历目录生成文件树
 /// show_hidden: 是否显示全部（含 NOISE_NAMES 清单与 dotfile）；false 时按 spec 过滤噪音 + dotfile
-fn build_tree_inner(dir: &Path, show_hidden: bool) -> Vec<TreeNode> {
+fn build_tree_inner(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<TreeNode>> {
     let mut nodes: Vec<TreeNode> = Vec::new();
-    let entries = match fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => return nodes,
-    };
+    let entries = fs::read_dir(dir)?;
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -126,7 +123,7 @@ fn build_tree_inner(dir: &Path, show_hidden: bool) -> Vec<TreeNode> {
             Err(_) => continue,
         };
         if metadata.is_dir() {
-            let children = build_tree_inner(&path, show_hidden);
+            let children = build_tree_inner(&path, show_hidden).unwrap_or_default();
             nodes.push(TreeNode {
                 name,
                 path: path.to_string_lossy().to_string(),
@@ -147,7 +144,7 @@ fn build_tree_inner(dir: &Path, show_hidden: bool) -> Vec<TreeNode> {
     }
 
     sort_tree_nodes(&mut nodes);
-    nodes
+    Ok(nodes)
 }
 
 /// 列出指定目录的文件树（递归，一次返回完整结构）
@@ -161,7 +158,9 @@ pub fn list_tree(path: String, show_hidden: Option<bool>) -> Result<Vec<TreeNode
     if !dir.is_dir() {
         return Err(format!("不是目录: {}", path));
     }
-    Ok(build_tree_inner(dir, show_hidden.unwrap_or(false)))
+    let tree = build_tree_inner(dir, show_hidden.unwrap_or(false))
+        .map_err(|e| format!("读取目录失败: {}: {}", path, e))?;
+    Ok(tree)
 }
 
 /// 创建文件（若已存在则报错）
@@ -455,5 +454,37 @@ mod tests {
         };
         let err = get_file_size(missing.to_string()).unwrap_err();
         assert!(err.contains("文件不存在"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn build_tree_inner_returns_err_when_dir_unreadable() {
+        let file = std::env::temp_dir().join("murasaki-408-not-a-dir");
+        let _ = fs::remove_file(&file);
+        fs::write(&file, b"x").unwrap();
+        let result = build_tree_inner(&file, false);
+        let _ = fs::remove_file(&file);
+        assert!(
+            result.is_err(),
+            "issue #408: read_dir 失败必须返回 Err 而不是静默空树: {result:?}"
+        );
+    }
+
+    #[test]
+    fn build_tree_inner_lists_dir_and_filters_noise() {
+        let dir = std::env::temp_dir().join("murasaki-408-build-tree");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("a.md"), "x").unwrap();
+        fs::create_dir_all(dir.join(".git")).unwrap();
+        fs::write(dir.join(".git").join("config"), "x").unwrap();
+
+        let hidden = build_tree_inner(&dir, true).unwrap();
+        assert_eq!(hidden.len(), 2);
+
+        let visible = build_tree_inner(&dir, false).unwrap();
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].name, "a.md");
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }
