@@ -22,7 +22,7 @@
     "charCount": "{count} 文字",
     "modeTooltip": "クリックして表示モードを切り替え",
     "zoomLabel": "{percent}%",
-    "zoomTooltip": "プレゼンテーションのズーム：Ctrl+ホイール / Ctrl+= / Ctrl+-、クリックで 100% に戻す"
+    "zoomTooltip": "プレビューのズーム：Ctrl+ホイール / Ctrl+= / Ctrl+-、クリックで 100% に戻す"
   },
   "tabBar": {
     "newTab": "新規ファイル",

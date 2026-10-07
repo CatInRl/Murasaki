@@ -91,7 +91,7 @@ export const SHORTCUT_COMMANDS: ShortcutCommand[] = [
   { id: "open-all-tabs", labelKey: "settings.shortcuts.openAllTabs", category: "view", defaultShortcut: null, scope: "global" },
   { id: "fullscreen", labelKey: "settings.shortcuts.fullscreen", category: "view", defaultShortcut: "F11", scope: "global" },
   { id: "toggle-statusbar", labelKey: "settings.shortcuts.toggleStatusbar", category: "view", defaultShortcut: "Alt+Shift+S", scope: "global" },
-  // 演示模式缩放（global；非演示模式调用无副作用，见 App.vue zoomEnabled）。
+  // 预览缩放（global；无预览区模式（源码/所见即所得）调用无副作用，见 App.vue zoomEnabled）。
   // Ctrl+0 与编辑器作用域的「普通」同键：跨作用域互斥，detectConflicts 按作用域隔离。
   { id: "zoom-in", labelKey: "settings.shortcuts.zoomIn", category: "view", defaultShortcut: "Ctrl+=", scope: "global" },
   { id: "zoom-out", labelKey: "settings.shortcuts.zoomOut", category: "view", defaultShortcut: "Ctrl+-", scope: "global" },

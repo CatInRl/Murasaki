@@ -235,8 +235,8 @@ export interface SettingsState {
    */
   shortcuts: Record<string, string | null>;
   /**
-   * 演示模式缩放百分比（默认 100，范围 50–200，0.9.0）。
-   * 仅演示模式生效，属视图状态，不参与设置面板的 draft 比较。
+   * 预览缩放百分比（默认 100，范围 50–200，0.9.0）。
+   * 生效于有预览区的模式（分屏 + 演示，#412），属视图状态，不参与设置面板的 draft 比较。
    */
   presentationZoom: number;
 }
