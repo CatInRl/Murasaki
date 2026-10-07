@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-10-07
+
+本版本为 0.10.1 的常规迭代：Tauri 生态（Rust crate 与 npm 包）升到 2.12，`notify` / `dirs` 各跨一个主版本；修复 HTML 文件演示模式无法缩放、Mermaid 节点文字超过约 4 行被方框裁切与 gantt 图「今日」标记线毁图，并根治 e2e 文件树抖动的根因链（纯测试基建，应用行为零变化）。
+
 ### Changed
 
 - **运行期依赖升级（Dependabot，#362 / #363）**——Tauri 生态（Rust crate 与 npm 包）升到 2.12，另有一批前端依赖与两个 Rust 依赖跟进：
@@ -451,7 +455,8 @@ Murasaki 首个正式版本：基于 Tauri 2.x + Vue 3 的本地 Markdown 文件
 - 系统设置（编辑分类含行号 / 软折行开关、AI Provider 配置）。
 - 全屏 F11 自动隐藏状态栏；Ctrl+Shift+E 文件树 / Ctrl+Shift+M 大纲侧栏切换。
 
-[Unreleased]: https://github.com/CatInRl/Murasaki/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/CatInRl/Murasaki/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/CatInRl/Murasaki/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/CatInRl/Murasaki/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/CatInRl/Murasaki/compare/v0.9.0...v0.10.0
 [0.8.0]: https://github.com/CatInRl/Murasaki/compare/v0.7.1...v0.8.0
