@@ -6,7 +6,7 @@ import PreviewPane from "./PreviewPane.vue";
 import HtmlPreview from "./HtmlPreview.vue";
 import { useScrollSync } from "../composables/useScrollSync";
 import { isHtmlFile } from "../utils/fileKind";
-import { presentationZoomStyle } from "../utils/presentationZoom";
+import { presentationZoomStyle, zoomAppliesTo } from "../utils/presentationZoom";
 import { classifyTreeDrop } from "../utils/treeDrop";
 import type { EditorMode } from "../types";
 
@@ -42,7 +42,7 @@ interface Props {
   fontFamily?: string;
   /** 中文符号转 Markdown 记号（行首输入 + 空格自动转换，0.8.0） */
   fullwidthToMarkdown?: boolean;
-  /** 演示模式缩放百分比（50–200，默认 100，仅演示模式生效） */
+  /** 预览缩放百分比（50–200，默认 100，分屏/演示模式生效） */
   zoom?: number;
 }
 
@@ -73,7 +73,7 @@ const emit = defineEmits<{
   (e: "open-with-default-app", path: string): void;
   /** 编辑器右键菜单高级操作（插入表格/链接/图片） */
   (e: "context-action", action: "insert-table" | "insert-link" | "insert-image"): void;
-  /** 演示模式 Ctrl+滚轮缩放：1=放大，-1=缩小（由父组件夹取边界并持久化） */
+  /** 预览区 Ctrl+滚轮缩放：1=放大，-1=缩小（由父组件夹取边界并持久化） */
   (e: "zoom-step", direction: 1 | -1): void;
 }>();
 
@@ -86,20 +86,26 @@ const cursorKey = ref(0);
 /** 是否演示模式（仅预览、只读） */
 const isPresentation = computed(() => props.editorMode === "presentation");
 
+/** 缩放是否生效：凡有预览区的模式（分屏 + 演示）都真实缩放（#412） */
+const zoomApplies = computed(() => zoomAppliesTo(props.editorMode));
+
 /**
- * 演示模式缩放样式：只设 `zoom`。
+ * 预览缩放样式：只设 `zoom`。
  *
  * 不要再反向除宽高（此前是 `width: calc(100% / z)`）—— `zoom` 会让百分比尺寸按
  * 「缩放后的包含块」解析，`width: 100%` 就已经填满，再除一次等于重复补偿，
  * 放大后预览会缩成面板的 1/z 宽（issue #337）。逻辑抽在 `presentationZoomStyle`。
+ *
+ * 缩放快捷键是 global（不分模式），#405 又把 iframe 内事件回接进来了 —— 出口若只认
+ * 演示模式，分屏下就成了「入口开、出口关」：状态在变、内容不动（issue #412）。
  */
 const zoomStyle = computed<Record<string, string> | undefined>(() =>
-  isPresentation.value ? presentationZoomStyle(props.zoom) : undefined
+  zoomApplies.value ? presentationZoomStyle(props.zoom) : undefined
 );
 
-/** Ctrl+滚轮缩放（仅演示模式接管，preventDefault 拦截 WebView2 浏览器缩放） */
+/** Ctrl+滚轮缩放（有预览区的模式接管，preventDefault 拦截 WebView2 浏览器缩放） */
 function onWheel(e: WheelEvent): void {
-  if (!isPresentation.value || !e.ctrlKey) return;
+  if (!zoomApplies.value || !e.ctrlKey) return;
   e.preventDefault();
   emit("zoom-step", e.deltaY < 0 ? 1 : -1);
 }
@@ -395,7 +401,7 @@ defineExpose({
         class="pane-right"
         :style="{ width: editorMode === 'split' ? `calc(${100 - leftWidthPct}% - 6px)` : '100%' }"
       >
-        <!-- 演示模式：缩放包裹层（Ctrl+滚轮 / 快捷键） -->
+        <!-- 预览缩放包裹层（分屏 + 演示，#412）：Ctrl+滚轮 / 快捷键 -->
         <div class="preview-zoom" :style="zoomStyle" @wheel="onWheel">
           <PreviewPane
             v-if="!isHtml"
@@ -469,7 +475,7 @@ defineExpose({
   min-width: 100px;
   min-height: 0;
 }
-/* 演示模式缩放包裹层（默认占满；缩放时 inline style 反向除宽高消除 zoom 放大） */
+/* 预览缩放包裹层（#337：默认占满；缩放只设 inline zoom，百分比尺寸按缩放后的包含块解析，勿反向除宽高） */
 .preview-zoom {
   width: 100%;
   height: 100%;

@@ -515,7 +515,13 @@ describe("演示模式", () => {
     });
   });
 
-  it("HTML 分屏（非演示模式）下 Ctrl+滚轮不缩放（#405 验收：非演示行为不变）", async () => {
+  it("HTML 分屏下 Ctrl+滚轮与快捷键真实缩放（#412：分屏与演示共用同一接回链路）", async () => {
+    if (IS_WEBKIT) {
+      // WebKit 吞合成子框架 WheelEvent（见 IS_WEBKIT 注释），滚轮入口在这两个
+      // 平台无法端到端断言；分屏缩放本身已由 Markdown 分屏快捷键用例覆盖，
+      // iframe 接回链路（keydown 合成不分平台）已由上方演示模式用例覆盖。
+      return;
+    }
     await ensureSplitMode(browser);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\page.html`);
@@ -530,35 +536,87 @@ describe("演示模式", () => {
       { message: "HTML 预览子文档监听未挂载（murasakiEventsAttached 未置位）" }
     );
 
-    // 同演示用例：检查与派发放进同一次 execute，防两次 IPC 之间文档被替换后
-    // 派到没有监听的新文档上（那样断言会平凡通过，测不到「接回后仍不缩放」）
-    await browser.execute(() => {
-      const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
-      const doc = fr?.contentDocument;
-      if (!doc || doc.documentElement.dataset.murasakiEventsAttached !== "1") {
-        throw new Error("listeners not attached to current html iframe document");
-      }
-      const view = fr?.contentWindow as (Window & typeof globalThis) | null;
-      if (!view) throw new Error("html iframe not ready");
-      doc.dispatchEvent(
-        new view.WheelEvent("wheel", {
-          ctrlKey: true,
-          deltaY: -120,
-          bubbles: true,
-          cancelable: true,
-        })
-      );
+    // #412 前出口被 presentation 门控，分屏下状态在变内容不动；现分屏与演示
+    // 共用同一 wheel 接回链路，复用演示用例的合成滚轮 helper（Windows 专用）
+    // DPR 守卫（#412 验收 2）：devicePixelRatio 只随浏览器级整页缩放变化，
+    // 应用层 zoom 不改它；若取消未回传，WebView2 加速键会整页缩放、DPR 变化
+    const dprBefore = await browser.execute(() => window.devicePixelRatio);
+    await wheelZoomHtmlPreviewTo110(browser);
+    expect(await readText(browser, ".status-zoom-chip", /110%/)).toContain("110%");
+
+    // 快捷键同链路可达（#412 验收 1「HTML iframe 与 Markdown 预览一致」）：
+    // 焦点在子文档内 Ctrl+- 经 keydown 接回缩小（能走到这里的只有 Windows）
+    await pressShortcutInHtmlDoc(browser, "-", { ctrl: true });
+    await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
+      timeout: 5000,
+      timeoutMsg: "HTML 分屏下 Ctrl+- 后 zoom 未回到 100（#412 出口未开）",
     });
-    await browser.pause(500);
-    expect(await getZoom(browser)).toBe(100);
+    expect(await browser.execute(() => window.devicePixelRatio)).toBe(dprBefore);
   });
 
-  it("非演示模式下缩放快捷键不生效", async () => {
+  it("分屏（Markdown 预览）下缩放快捷键真实生效（#412）", async () => {
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\intro.md`);
-    // 默认 split 模式
+    // 默认 split 模式：有预览区，缩放 chip 常驻（#412 前 chip 是演示模式专属）
+    await waitForPresent(browser, ".status-zoom-chip", 5000);
     expect(await getZoom(browser)).toBe(100);
+    await waitForPresent(browser, ".markdown-body h1", 5000);
 
+    // 渲染尺寸基线：块级内容的视觉宽度可能被「zoom 下百分比按缩放后的包含块
+    // 解析」抵住不变（#337），文字高度是稳定的变化信号；只断言变大，不做比例
+    // 阈值（CI 字体 fallback 环境差异会把阈值误判成渲染缺陷，#342 教训）
+    const h1Before = await browser.execute(() => {
+      const h = document.querySelector(".markdown-body h1");
+      return h ? h.getBoundingClientRect().height : null;
+    });
+    expect(h1Before).not.toBeNull();
+
+    await pressShortcut(browser, "=", { ctrl: true });
+    await browser.waitUntil(async () => (await getZoom(browser)) === 110, {
+      timeout: 5000,
+      timeoutMsg: "分屏下 Ctrl+= 后 zoom 未到 110（#412 出口未开）",
+    });
+
+    // 状态变了，渲染也要真的变（#412 验收：不只是改状态）
+    const h1After = await browser.execute(() => {
+      const h = document.querySelector(".markdown-body h1");
+      return h ? h.getBoundingClientRect().height : null;
+    });
+    expect(h1After).not.toBeNull();
+    expect(h1After!).toBeGreaterThan(h1Before!);
+    expect(await readText(browser, ".status-zoom-chip", /110%/)).toContain("110%");
+
+    await pressShortcut(browser, "0", { ctrl: true });
+    await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
+      timeout: 5000,
+      timeoutMsg: "分屏下 Ctrl+0 后 zoom 未复位到 100",
+    });
+
+    // Ctrl+- 缩小（#412 验收 1：三个快捷键在分屏下逐一真实过渡）
+    await pressShortcut(browser, "-", { ctrl: true });
+    await browser.waitUntil(async () => (await getZoom(browser)) === 90, {
+      timeout: 5000,
+      timeoutMsg: "分屏下 Ctrl+- 后 zoom 未到 90（#412 出口未开）",
+    });
+    await pressShortcut(browser, "0", { ctrl: true });
+    await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
+      timeout: 5000,
+      timeoutMsg: "分屏下 Ctrl+- 后 Ctrl+0 未复位到 100",
+    });
+  });
+
+  it("源码模式（无预览区）下缩放快捷键不生效（#412）", async () => {
+    await openWorkspace(browser, wsPath);
+    await openFileInTab(browser, `${wsPath}\\intro.md`);
+    // Ctrl+Shift+1 切源码模式（合成 keydown 按 SHIFT_BASE_KEYS 反查，e.key === "!"）
+    await pressShortcut(browser, "!", { ctrl: true, shift: true });
+    await browser.waitUntil(
+      async () => (await browser.$(".editor-pane.mode-source")).isExisting(),
+      { timeout: 10000 }
+    );
+
+    // 无预览区模式不生效：状态不变（zoomAppliesTo 门控 no-op）。
+    // 事件链路本身已由上一用例（分屏生效）证明可达，此处不变即为门控生效。
     await pressShortcut(browser, "=", { ctrl: true });
     expect(await getZoom(browser)).toBe(100);
   });

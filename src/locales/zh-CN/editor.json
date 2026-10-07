@@ -22,7 +22,7 @@
     "charCount": "{count} 字符",
     "modeTooltip": "点击切换显示模式",
     "zoomLabel": "{percent}%",
-    "zoomTooltip": "演示模式缩放：Ctrl+滚轮 / Ctrl+= / Ctrl+-，点击重置为 100%"
+    "zoomTooltip": "预览缩放：Ctrl+滚轮 / Ctrl+= / Ctrl+-，点击重置为 100%"
   },
   "tabBar": {
     "newTab": "新建文件",

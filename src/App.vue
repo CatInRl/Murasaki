@@ -66,6 +66,7 @@ import { READING_FONT_PRESETS } from "./types";
 import {
   PRESENTATION_ZOOM_DEFAULT,
   stepPresentationZoom,
+  zoomAppliesTo,
 } from "./utils/presentationZoom";
 import { countChars, countWords } from "./utils/textStats";
 
@@ -121,12 +122,13 @@ const effectiveEditorMode = computed<EditorMode>(() => {
 // 生效模式恒为 source，偏好值推送会把勾选拽离实际编辑器行为
 useModeMenuSync(effectiveEditorMode);
 
-/** 演示模式缩放百分比（持久化于 settings.presentationZoom） */
+/** 预览缩放百分比（持久化于 settings.presentationZoom，分屏 + 演示生效，#412） */
 const presentationZoom = computed(() => persistence.settings.presentationZoom);
 
-/** 缩放仅在演示模式生效（避免与编辑器 Ctrl+0「普通」等命令互相干扰） */
+/** 缩放生效于有预览区的模式（分屏 + 演示，#412）：入口与 EditorPane 的出口门控必须一致，
+ * 否则分屏下「入口关、出口开」变成状态永不变，或「入口开、出口关」变成状态在变内容不动 */
 function zoomEnabled(): boolean {
-  return effectiveEditorMode.value === "presentation";
+  return zoomAppliesTo(effectiveEditorMode.value);
 }
 
 async function onZoomStep(direction: 1 | -1): Promise<void> {

@@ -22,7 +22,7 @@
     "charCount": "{count} chars",
     "modeTooltip": "Click to switch display mode",
     "zoomLabel": "{percent}%",
-    "zoomTooltip": "Presentation zoom: Ctrl+wheel / Ctrl+= / Ctrl+-, click to reset to 100%"
+    "zoomTooltip": "Preview zoom: Ctrl+wheel / Ctrl+= / Ctrl+-, click to reset to 100%"
   },
   "tabBar": {
     "newTab": "New File",

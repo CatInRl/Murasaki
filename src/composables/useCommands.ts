@@ -101,7 +101,7 @@ export interface CommandsDeps {
   openSettings: () => Promise<void>;
   toggleFullscreen: () => Promise<void>;
 
-  // 演示模式缩放（非演示模式下自身 no-op，见 App.vue）
+  // 预览缩放（无预览区模式下自身 no-op，见 App.vue）
   zoomIn: () => Promise<void>;
   zoomOut: () => Promise<void>;
   zoomReset: () => Promise<void>;
@@ -342,7 +342,7 @@ export function useCommands(deps: CommandsDeps) {
         statusBarVisible.value = !statusBarVisible.value;
         break;
       }
-      // 演示模式缩放（非演示模式下为 no-op）
+      // 预览缩放（无预览区模式下为 no-op）
       case "zoom-in": {
         await zoomIn();
         break;

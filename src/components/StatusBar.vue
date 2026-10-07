@@ -15,6 +15,7 @@ import {
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useTabsStore } from "../stores/useTabsStore";
 import { basename, dirname } from "../utils/path";
+import { zoomAppliesTo } from "../utils/presentationZoom";
 import type { EditorMode } from "../types";
 
 interface Props {
@@ -25,7 +26,7 @@ interface Props {
   wordCount: number;
   /** 当前生效的显示模式（受文件类型降级后的值） */
   editorMode?: EditorMode;
-  /** 演示模式缩放百分比 */
+  /** 预览缩放百分比 */
   zoom?: number;
 }
 
@@ -109,8 +110,8 @@ const modeOptions = computed(() =>
   }))
 );
 
-/** 演示模式：显示缩放 chip */
-const isPresentation = computed(() => props.editorMode === "presentation");
+/** 有预览区的模式（分屏 + 演示）显示缩放 chip，与缩放实际生效范围一致（#412） */
+const zoomApplies = computed(() => zoomAppliesTo(props.editorMode));
 
 function onModeSelect(key: string): void {
   if (key === props.editorMode) return;
@@ -183,9 +184,9 @@ function onModeSelect(key: string): void {
         </button>
       </NDropdown>
 
-      <!-- 演示模式：缩放百分比（点击复位 100%） -->
+      <!-- 有预览区的模式：缩放百分比（点击复位 100%） -->
       <button
-        v-if="isPresentation"
+        v-if="zoomApplies"
         type="button"
         class="status-chip status-zoom-chip"
         :title="$t('editor.statusBar.zoomTooltip')"

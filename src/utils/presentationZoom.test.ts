@@ -1,7 +1,8 @@
 /**
- * presentationZoom 单元测试（T3.2 演示模式缩放）
+ * presentationZoom 单元测试（T3.2 演示模式缩放；#412 生效范围扩到分屏）
  *
- * 覆盖步进与边界夹取：范围 50–200、步进 10、非法输入回落到默认 100。
+ * 覆盖步进与边界夹取：范围 50–200、步进 10、非法输入回落到默认 100；
+ * zoomAppliesTo 按模式判定生效范围。
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -12,7 +13,20 @@ import {
   clampPresentationZoom,
   presentationZoomStyle,
   stepPresentationZoom,
+  zoomAppliesTo,
 } from "./presentationZoom";
+
+describe("presentationZoom - zoomAppliesTo（#412）", () => {
+  it("有预览区的模式生效：分屏 + 演示", () => {
+    expect(zoomAppliesTo("split")).toBe(true);
+    expect(zoomAppliesTo("presentation")).toBe(true);
+  });
+
+  it("无预览区的模式不生效：源码 + 所见即所得", () => {
+    expect(zoomAppliesTo("source")).toBe(false);
+    expect(zoomAppliesTo("wysiwyg")).toBe(false);
+  });
+});
 
 describe("presentationZoom - 常量", () => {
   it("范围 50–200、步进 10、默认 100", () => {
