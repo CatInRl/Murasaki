@@ -15,7 +15,6 @@ import {
   stepPresentationZoom,
   zoomAppliesTo,
 } from "./presentationZoom";
-import type { EditorMode } from "../types";
 
 describe("presentationZoom - zoomAppliesTo（#412）", () => {
   it("有预览区的模式生效：分屏 + 演示", () => {
@@ -26,13 +25,6 @@ describe("presentationZoom - zoomAppliesTo（#412）", () => {
   it("无预览区的模式不生效：源码 + 所见即所得", () => {
     expect(zoomAppliesTo("source")).toBe(false);
     expect(zoomAppliesTo("wysiwyg")).toBe(false);
-  });
-
-  it("四种 EditorMode 全覆盖", () => {
-    const modes: EditorMode[] = ["source", "split", "wysiwyg", "presentation"];
-    for (const mode of modes) {
-      expect(typeof zoomAppliesTo(mode)).toBe("boolean");
-    }
   });
 });
 

@@ -515,7 +515,7 @@ describe("演示模式", () => {
     });
   });
 
-  it("HTML 分屏下 Ctrl+滚轮真实缩放（#412：分屏与演示共用同一接回链路）", async () => {
+  it("HTML 分屏下 Ctrl+滚轮与快捷键真实缩放（#412：分屏与演示共用同一接回链路）", async () => {
     if (IS_WEBKIT) {
       // WebKit 吞合成子框架 WheelEvent（见 IS_WEBKIT 注释），滚轮入口在这两个
       // 平台无法端到端断言；分屏缩放本身已由 Markdown 分屏快捷键用例覆盖，
@@ -538,8 +538,20 @@ describe("演示模式", () => {
 
     // #412 前出口被 presentation 门控，分屏下状态在变内容不动；现分屏与演示
     // 共用同一 wheel 接回链路，复用演示用例的合成滚轮 helper（Windows 专用）
+    // DPR 守卫（#412 验收 2）：devicePixelRatio 只随浏览器级整页缩放变化，
+    // 应用层 zoom 不改它；若取消未回传，WebView2 加速键会整页缩放、DPR 变化
+    const dprBefore = await browser.execute(() => window.devicePixelRatio);
     await wheelZoomHtmlPreviewTo110(browser);
     expect(await readText(browser, ".status-zoom-chip", /110%/)).toContain("110%");
+
+    // 快捷键同链路可达（#412 验收 1「HTML iframe 与 Markdown 预览一致」）：
+    // 焦点在子文档内 Ctrl+- 经 keydown 接回缩小（能走到这里的只有 Windows）
+    await pressShortcutInHtmlDoc(browser, "-", { ctrl: true });
+    await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
+      timeout: 5000,
+      timeoutMsg: "HTML 分屏下 Ctrl+- 后 zoom 未回到 100（#412 出口未开）",
+    });
+    expect(await browser.execute(() => window.devicePixelRatio)).toBe(dprBefore);
   });
 
   it("分屏（Markdown 预览）下缩放快捷键真实生效（#412）", async () => {
@@ -578,6 +590,18 @@ describe("演示模式", () => {
     await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
       timeout: 5000,
       timeoutMsg: "分屏下 Ctrl+0 后 zoom 未复位到 100",
+    });
+
+    // Ctrl+- 缩小（#412 验收 1：三个快捷键在分屏下逐一真实过渡）
+    await pressShortcut(browser, "-", { ctrl: true });
+    await browser.waitUntil(async () => (await getZoom(browser)) === 90, {
+      timeout: 5000,
+      timeoutMsg: "分屏下 Ctrl+- 后 zoom 未到 90（#412 出口未开）",
+    });
+    await pressShortcut(browser, "0", { ctrl: true });
+    await browser.waitUntil(async () => (await getZoom(browser)) === 100, {
+      timeout: 5000,
+      timeoutMsg: "分屏下 Ctrl+- 后 Ctrl+0 未复位到 100",
     });
   });
 

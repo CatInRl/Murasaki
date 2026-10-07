@@ -122,7 +122,7 @@ const effectiveEditorMode = computed<EditorMode>(() => {
 // 生效模式恒为 source，偏好值推送会把勾选拽离实际编辑器行为
 useModeMenuSync(effectiveEditorMode);
 
-/** 演示模式缩放百分比（持久化于 settings.presentationZoom） */
+/** 预览缩放百分比（持久化于 settings.presentationZoom，分屏 + 演示生效，#412） */
 const presentationZoom = computed(() => persistence.settings.presentationZoom);
 
 /** 缩放生效于有预览区的模式（分屏 + 演示，#412）：入口与 EditorPane 的出口门控必须一致，
