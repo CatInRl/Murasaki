@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use lexical_sort::natural_lexical_cmp;
 use pinyin::ToPinyin;
+use super::atomic_write::write_atomic;
 
 /// 文件树节点：与前端 TreeNode 类型对齐
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -301,10 +302,7 @@ pub fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
 /// 写入文件内容（文本）
 #[tauri::command]
 pub fn write_text_file(path: String, content: String) -> Result<(), String> {
-    if let Some(parent) = Path::new(&path).parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    fs::write(&path, content).map_err(|e| e.to_string())
+    write_atomic(Path::new(&path), content.as_bytes()).map_err(|e| e.to_string())
 }
 
 /// 检查路径是否存在

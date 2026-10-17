@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use super::atomic_write::write_atomic;
 use super::sha1_hex;
 use serde::Serialize;
 
@@ -122,7 +123,7 @@ pub fn save_image_asset(
     let hash = short_hash(&bytes);
     let filename = format!("{}-{}.{}", timestamp, hash, ext_norm);
     let abs_path = assets_dir.join(&filename);
-    fs::write(&abs_path, &bytes).map_err(|e| e.to_string())?;
+    write_atomic(&abs_path, &bytes).map_err(|e| e.to_string())?;
 
     let relative_path = format!("{}/{}", rel_dir, filename);
     Ok(SaveImageResult {
