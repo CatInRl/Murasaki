@@ -11,6 +11,7 @@ import { codeToHtml, type ThemeRegistration } from "shiki";
 import { dirname, extname, joinPaths } from "../utils/path";
 import { assetUrlToPath, isAbsolutePath } from "../utils/imagePath";
 import { fileSystem } from "../services/fileSystem";
+import { bytesToDataUri } from "./useImagePaste";
 import markdownContentCss from "../styles/markdown-content.css?raw";
 
 /**
@@ -117,6 +118,12 @@ function resolveShikiTheme(themeName: string): string {
   );
 }
 
+interface InlineImagesResult {
+  html: string;
+  /** 读取或编码失败、未能内联的图片路径 */
+  failed: string[];
+}
+
 /**
  * 将相对路径图片转为 Base64 data URI
  * 仅处理本地路径（http/https/data 开头的跳过）
@@ -125,10 +132,11 @@ async function inlineImages(
   html: string,
   workspacePath: string | null,
   filePath: string | null
-): Promise<string> {
+): Promise<InlineImagesResult> {
   // 匹配 <img src="..."> 中的 src
   const imgRegex = /<img\s+[^>]*src="([^"]+)"/g;
   const replacements: Array<{ original: string; replacement: string }> = [];
+  const failed: string[] = [];
   let match: RegExpExecArray | null;
 
   while ((match = imgRegex.exec(html)) !== null) {
@@ -138,7 +146,12 @@ async function inlineImages(
     const src = assetUrlToPath(rawSrc);
 
     // 跳过远程 URL 与已是 data URI 的图片（本地 asset URL 已在上面还原为路径）
-    if (/^(https?:|data:|file:)/i.test(src)) continue;
+    if (/^(https?:|data:)/i.test(src)) continue;
+    // file: 在导出的独立文件里无法保证可访问，计入未内联
+    if (/^file:/i.test(src)) {
+      failed.push(src);
+      continue;
+    }
 
     // 解析为绝对路径
     let absPath: string | null = null;
@@ -153,27 +166,19 @@ async function inlineImages(
       absPath = joinPaths(workspacePath, src);
     }
 
-    if (!absPath) continue;
+    if (!absPath) {
+      failed.push(src);
+      continue;
+    }
 
     try {
-      // 读取文件字节并转 Base64
+      // 读取文件字节并转 Base64（分块编码，避免大图触发 RangeError）
       const bytes = await fileSystem.readBinary(absPath).catch(() => null);
-      if (!bytes) continue;
-      const binary = String.fromCharCode(...bytes);
-      const base64 = btoa(binary);
-      // 推断 MIME 类型
-      const ext = extname(absPath);
-      const mime =
-        {
-          png: "image/png",
-          jpg: "image/jpeg",
-          jpeg: "image/jpeg",
-          gif: "image/gif",
-          webp: "image/webp",
-          bmp: "image/bmp",
-          svg: "image/svg+xml",
-        }[ext] ?? "image/png";
-      const dataUri = `data:${mime};base64,${base64}`;
+      if (!bytes) {
+        failed.push(src);
+        continue;
+      }
+      const dataUri = bytesToDataUri(new Uint8Array(bytes), extname(absPath));
       replacements.push({
         original: match[0],
         // 用 HTML 里实际出现的 `src="rawSrc"` 整段替换（src 已回解为文件路径，不再出现在
@@ -181,6 +186,7 @@ async function inlineImages(
         replacement: match[0].replace(`src="${rawSrc}"`, `src="${dataUri}"`),
       });
     } catch (err) {
+      failed.push(src);
       console.warn(`内联图片失败: ${src}`, err);
     }
   }
@@ -189,7 +195,7 @@ async function inlineImages(
   for (const { original, replacement } of replacements) {
     result = result.replace(original, replacement);
   }
-  return result;
+  return { html: result, failed: Array.from(new Set(failed)) };
 }
 
 /**
@@ -230,10 +236,16 @@ async function highlightCodeBlocksInHtml(
   return result;
 }
 
+export interface ExportHtmlResult {
+  html: string;
+  /** 未能内联的图片（导出文件里仍是本地路径） */
+  failedImages: string[];
+}
+
 /**
  * 导出 HTML：完整流程
  */
-export async function exportHtml(options: ExportHtmlOptions): Promise<string> {
+export async function exportHtml(options: ExportHtmlOptions): Promise<ExportHtmlResult> {
   const { source, theme, workspacePath, filePath } = options;
   const renderer = getMarkdownRenderer();
   renderer.setShikiTheme(resolveShikiTheme(theme));
@@ -255,14 +267,14 @@ export async function exportHtml(options: ExportHtmlOptions): Promise<string> {
 
   // 2. 高亮代码块
   const shikiTheme = resolveShikiThemeOption(resolveShikiTheme(theme));
-  let highlighted = await highlightCodeBlocksInHtml(bodyHtml, shikiTheme);
+  const highlighted = await highlightCodeBlocksInHtml(bodyHtml, shikiTheme);
 
   // 3. 内联图片为 Base64
-  highlighted = await inlineImages(highlighted, workspacePath, filePath);
+  const inlined = await inlineImages(highlighted, workspacePath, filePath);
 
   // 4. 添加 front-matter 卡片
   const fmCard = renderFrontMatterCard(getFrontMatter());
-  const finalBody = fmCard + highlighted;
+  const finalBody = fmCard + inlined.html;
 
   // 5. 包装完整 HTML
   // body 同时带 markdown-body class 和 data-md-theme 属性：
@@ -285,5 +297,5 @@ ${finalBody}
 </body>
 </html>`;
 
-  return html;
+  return { html, failedImages: inlined.failed };
 }

@@ -255,7 +255,7 @@ export function useFileActions(deps: FileActionsDeps) {
     });
     if (typeof selected !== "string" || !selected) return;
     try {
-      const html = await exportHtml({
+      const { html, failedImages } = await exportHtml({
         source: tab.content,
         theme: currentTheme.value,
         workspacePath: workspace.workspacePath ?? null,
@@ -264,6 +264,9 @@ export function useFileActions(deps: FileActionsDeps) {
       await fileSystem.writeText(selected, html);
       // #384：与 PDF / 复制富文本的反馈模型统一——成功 toast、失败 toast.error
       toast.success(t("common.exportHtmlSuccess", { path: selected }));
+      if (failedImages.length > 0) {
+        toast.info(t("common.exportImagesFailed", { count: failedImages.length }));
+      }
     } catch (err) {
       console.error("导出 HTML 失败:", err);
       toast.error(t("common.error.exportHtmlFailed", { error: err }));
@@ -286,7 +289,7 @@ export function useFileActions(deps: FileActionsDeps) {
     });
     if (typeof selected !== "string" || !selected) return;
     try {
-      const html = await exportHtml({
+      const { html, failedImages } = await exportHtml({
         source: tab.content,
         theme: currentTheme.value,
         workspacePath: workspace.workspacePath ?? null,
@@ -294,6 +297,9 @@ export function useFileActions(deps: FileActionsDeps) {
       });
       await fileSystem.exportPdf(html, selected);
       toast.success(t("common.exportPdfSuccess"));
+      if (failedImages.length > 0) {
+        toast.info(t("common.exportImagesFailed", { count: failedImages.length }));
+      }
     } catch (err) {
       console.error("导出 PDF 失败:", err);
       toast.error(t("common.error.exportPdfFailed", { error: err }));

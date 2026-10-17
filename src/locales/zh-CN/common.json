@@ -45,6 +45,7 @@
   "exportPdfTitle": "导出 PDF",
   "exportPdfSuccess": "已导出 PDF",
   "exportHtmlSuccess": "已导出 HTML: {path}",
+  "exportImagesFailed": "{count} 张图片未能内联，导出文件中可能缺少图片。",
   "copyRichTextSuccess": "已复制富文本到剪贴板",
   "drop": {
     "overlayTitle": "松开以打开",

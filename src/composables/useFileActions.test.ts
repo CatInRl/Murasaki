@@ -299,7 +299,7 @@ describe("useFileActions - exportCurrentPdf", () => {
 
   it("成功 → saveDialog(PDF) + exportHtml + exportPdf + toast.success", async () => {
     const fullHtml = "<html><body><h1>Hi</h1></body></html>";
-    mockedExportHtml.mockResolvedValue(fullHtml);
+    mockedExportHtml.mockResolvedValue({ html: fullHtml, failedImages: [] });
     mockedSaveDialog.mockResolvedValue("/test/file.pdf");
     mockedExportPdf.mockResolvedValue(undefined);
 
@@ -357,7 +357,7 @@ describe("useFileActions - exportCurrentPdf", () => {
 
   it("exportPdf 抛错 → toast.error", async () => {
     const fullHtml = "<html><body><h1>Hi</h1></body></html>";
-    mockedExportHtml.mockResolvedValue(fullHtml);
+    mockedExportHtml.mockResolvedValue({ html: fullHtml, failedImages: [] });
     mockedSaveDialog.mockResolvedValue("/test/file.pdf");
     mockedExportPdf.mockRejectedValue(new Error("PDF generation failed"));
 
@@ -372,7 +372,7 @@ describe("useFileActions - exportCurrentPdf", () => {
   });
 
   it("无标题 tab（path=null）也能导出，默认名 untitled.pdf", async () => {
-    mockedExportHtml.mockResolvedValue("<body>ok</body>");
+    mockedExportHtml.mockResolvedValue({ html: "<body>ok</body>", failedImages: [] });
     mockedSaveDialog.mockResolvedValue("/test/untitled.pdf");
     mockedExportPdf.mockResolvedValue(undefined);
 
@@ -397,7 +397,7 @@ describe("useFileActions - exportCurrentPdf", () => {
   });
 
   it("有路径的 tab 默认名用 basename 替换扩展名", async () => {
-    mockedExportHtml.mockResolvedValue("<body>ok</body>");
+    mockedExportHtml.mockResolvedValue({ html: "<body>ok</body>", failedImages: [] });
     mockedSaveDialog.mockResolvedValue("/test/my-doc.pdf");
     mockedExportPdf.mockResolvedValue(undefined);
 
@@ -419,7 +419,7 @@ describe("useFileActions - exportCurrentPdf", () => {
 // 失败 toast.error；此前成功路径完全静默、失败走 dialog.alert。
 describe("useFileActions - exportCurrentHtml 反馈（#384）", () => {
   it("导出成功 → toast.success 反馈", async () => {
-    mockedExportHtml.mockResolvedValue("<html>ok</html>");
+    mockedExportHtml.mockResolvedValue({ html: "<html>ok</html>", failedImages: [] });
     mockedSaveDialog.mockResolvedValue("/test/out.html");
 
     const deps = makeDeps();

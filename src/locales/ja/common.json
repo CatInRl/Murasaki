@@ -45,6 +45,7 @@
   "exportPdfTitle": "PDF をエクスポート",
   "exportPdfSuccess": "PDF をエクスポートしました",
   "exportHtmlSuccess": "HTML をエクスポートしました: {path}",
+  "exportImagesFailed": "{count} 枚の画像を埋め込めませんでした。出力ファイルで画像が欠ける可能性があります。",
   "copyRichTextSuccess": "リッチテキストをクリップボードにコピーしました",
   "drop": {
     "overlayTitle": "ドロップして開く",
