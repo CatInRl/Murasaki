@@ -134,6 +134,16 @@ describe("openEditorSession", () => {
     expect(session.snapshot().pendingConflict?.draftContent).toBe("draft");
     expect(store.drafts.has("/a.md")).toBe(true);
   });
+
+  it("未裁决冲突时关闭会话仍保留草稿", async () => {
+    const store = new MemoryStore({ "/a.md": { content: "disk", mtime: 200 } });
+    store.drafts.set("/a.md", { content: "draft", knownMtime: 100, savedAt: 5 });
+    const { session } = await openEditorSession({ id: "t1", path: "/a.md", store });
+
+    await session.dispose();
+
+    expect(store.drafts.get("/a.md")?.content).toBe("draft");
+  });
 });
 
 describe("resolveConflict", () => {
@@ -198,6 +208,19 @@ describe("内容与草稿", () => {
       knownMtime: 1,
       savedAt: expect.any(Number),
     });
+  });
+
+  it("内容回到基线时清理已落盘的旧草稿", async () => {
+    const store = new MemoryStore({ "/a.md": { content: "a", mtime: 1 } });
+    const { session } = await openEditorSession({ id: "t1", path: "/a.md", store });
+
+    session.setContent("ab");
+    await session.flushDraft();
+    expect(store.drafts.has("/a.md")).toBe(true);
+
+    session.setContent("a");
+    await session.flushDraft();
+    expect(store.drafts.has("/a.md")).toBe(false);
   });
 
   it("未命名会话不写草稿", async () => {
@@ -291,7 +314,21 @@ describe("编辑器 seam", () => {
 
     const second = createFakeEditor();
     session.attachEditor(second.adapter);
-    expect(second.setState).toHaveBeenCalledWith("edited in editor");
+    expect(second.doc).toBe("edited in editor");
+    expect(second.setState).toHaveBeenCalled();
+  });
+
+  it("重复挂载不退订旧 adapter 会泄漏监听，这里保证只保留一份", async () => {
+    const store = new MemoryStore({ "/a.md": { content: "hello", mtime: 1 } });
+    const { session } = await openEditorSession({ id: "t1", path: "/a.md", store });
+    const first = createFakeEditor();
+    const second = createFakeEditor();
+
+    session.attachEditor(first.adapter);
+    session.attachEditor(second.adapter);
+
+    expect(first.listenerCount()).toBe(0);
+    expect(second.listenerCount()).toBe(1);
   });
 
   it("光标变化经 adapter 写回快照", async () => {

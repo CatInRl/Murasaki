@@ -49,6 +49,9 @@
    - 优势：跨平台、性能更好、支持 `??` `&&` `?:` 等现代语法、错误显示更友好
    - 仅当遇到依赖 .NET Framework 的旧 Windows 专属模块时才回退到 `powershell`
 
+7. **终端通道的绕行方式**：直接 `RunCommand` 可能被 Toolhost 拒绝（报 `Toolhost terminal commands must be routed through the agent runtime`）。此时改用 `integrated_code_mode` 的 `Exec`，在其中 `await tools.Shell({ command, cwd })`，效果等同。
+   - 给子代理做 diff 评审时，先由主代理把 `git diff <base>` 落成临时文件（如 `%TEMP%\review-<pr>.diff`），再让子代理 `Read` 该文件——子代理通常拿不到可用的 shell。
+
 ### 之前的 GNU workaround（已废弃，不要恢复）
 
 历史会话曾经使用过这些 workaround，**它们都已删除且不应该重新引入**：

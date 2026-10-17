@@ -17,12 +17,14 @@ export interface CodeMirrorAdapterDeps {
   selectionCompartment: Compartment;
   /** 宿主提供的模式切换实现（重建 WYSIWYG / 字体 / 快捷键 compartment） */
   applyMode: (mode: EditorMode) => void;
+  /** 当前显示模式；未提供时按源码模式处理 */
+  initialMode?: EditorMode;
 }
 
 export function createCodeMirrorAdapter(deps: CodeMirrorAdapterDeps): EditorAdapter {
   const { view, selectionCompartment, applyMode } = deps;
 
-  let currentMode: EditorMode = "source";
+  let currentMode: EditorMode = deps.initialMode ?? "source";
   let selectionExtension: Extension | null = null;
 
   function applySelectionExtension(): void {

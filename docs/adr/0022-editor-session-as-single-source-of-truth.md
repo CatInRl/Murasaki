@@ -29,7 +29,7 @@
 2. **脏态单一定义**：`isDirty = content !== baselineContent`，不再有第二套判据。草稿恢复后内容与磁盘不同 → 自然为脏；撤销回原内容 → 自然不脏。
 3. **草稿归会话**：草稿读写与冲突判定不再散落在关闭、退出、外部修改三条链路里。
 4. **冲突裁决外置**：会话不做 UI 决定，返回类型化冲突结果；界面让用户选择「磁盘版 / 草稿版」后回传。
-5. **两个 seam**：`EditorAdapter`（CodeMirror，持有三个 compartment 的重建顺序）与 `DocumentStore`（整文件读写、mtime、草稿）。两者都有内存假实现，测试不需要 mock `invoke`。
+5. **两个 seam**：`EditorAdapter`（CodeMirror：负责换入状态后重新应用当前模式与光标监听，具体 compartment 由宿主注入）与 `DocumentStore`（整文件读写、mtime、草稿）。两者都有内存假实现，测试不需要 mock `invoke`。
 6. **草稿自动写入**：脏会话在内容变更后约 2 秒写草稿，关闭与退出强制 flush。它不等于保存到文件。
 7. **分三阶段落地**：Phase 1 纯增量引入模块与 seam；Phase 2 写路径接入、`Tab.content` 改为派生；Phase 3 迁移读点、删除旧字段与死状态。
 

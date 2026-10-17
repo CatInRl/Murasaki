@@ -6,17 +6,9 @@
  *
  * 本文件只声明接口，不依赖 CodeMirror 或 Tauri，便于用内存假实现做单测。
  */
-import type { EditorMode } from "../../types";
+import type { CursorPosition, EditorMode, ScrollPosition } from "../../types";
 
-export interface CursorPosition {
-  line: number;
-  ch: number;
-}
-
-export interface ScrollPosition {
-  x: number;
-  y: number;
-}
+export type { CursorPosition, ScrollPosition };
 
 /** 草稿与磁盘版本不一致时的待裁决信息 */
 export interface ConflictInfo {

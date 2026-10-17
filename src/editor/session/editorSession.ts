@@ -144,8 +144,22 @@ function createSession(params: CreateSessionParams): EditorSession {
     }, draftDebounceMs);
   }
 
-  async function writeDraftNow(): Promise<void> {
-    if (currentPath === null || !isDirty()) return;
+  async function discardDraftIfClean(): Promise<void> {
+    // 待裁决冲突期间不得删除草稿：那正是用户还没决定要不要保留的内容
+    if (currentPath === null || pendingConflict !== null || isDirty()) return;
+    try {
+      await store.deleteDraft(currentPath);
+    } catch (error) {
+      onDraftError?.(error);
+    }
+  }
+
+  async function draftWriteNow(): Promise<void> {
+    if (currentPath === null) return;
+    if (!isDirty()) {
+      await discardDraftIfClean();
+      return;
+    }
     try {
       await store.writeDraft(currentPath, content, baselineMtime ?? 0);
     } catch (error) {
@@ -155,8 +169,9 @@ function createSession(params: CreateSessionParams): EditorSession {
   }
 
   async function flushDraft(): Promise<void> {
+    if (disposed) return;
     cancelDraftTimer();
-    draftWriteChain = draftWriteChain.then(writeDraftNow);
+    draftWriteChain = draftWriteChain.then(draftWriteNow);
     await draftWriteChain;
   }
 
@@ -175,7 +190,13 @@ function createSession(params: CreateSessionParams): EditorSession {
   function setContent(text: string): void {
     if (disposed || text === content) return;
     content = text;
-    scheduleDraft();
+    if (isDirty()) {
+      scheduleDraft();
+    } else {
+      // 内容回到基线：取消待写入的草稿，并清掉已落盘的旧草稿
+      cancelDraftTimer();
+      void draftWriteChain.then(discardDraftIfClean);
+    }
     notify();
   }
 
@@ -197,6 +218,8 @@ function createSession(params: CreateSessionParams): EditorSession {
       baselineContent = content;
       baselineMtime = mtime;
       cancelDraftTimer();
+      // 等正在进行的草稿写入结束，否则它可能在删除之后又把草稿写回来
+      await draftWriteChain;
       await store.deleteDraft(target);
       if (previousPath !== null && previousPath !== target) {
         await store.deleteDraft(previousPath).catch(() => {});
@@ -240,6 +263,10 @@ function createSession(params: CreateSessionParams): EditorSession {
 
   function attachEditor(next: EditorAdapter): void {
     if (disposed) return;
+    if (adapter !== null) {
+      // 重复挂载时先退订旧 adapter，避免监听器泄漏
+      detachEditor();
+    }
     adapter = next;
     if (editorState !== null) {
       next.setState(editorState);

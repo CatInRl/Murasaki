@@ -39,6 +39,18 @@ export interface RecentEntry {
  */
 export type SidebarView = "files" | "outline";
 
+/** 光标位置（行号从 1 起，ch 为行内偏移） */
+export interface CursorPosition {
+  line: number;
+  ch: number;
+}
+
+/** 滚动位置（像素） */
+export interface ScrollPosition {
+  x: number;
+  y: number;
+}
+
 /**
  * 标签页数据结构
  * - path: 文件绝对路径（null 表示未保存的新文件）
@@ -58,8 +70,8 @@ export interface Tab {
   lastMtime: number | null;
   isDirty: boolean;
   hasExternalChange: boolean;
-  cursor: { line: number; ch: number };
-  scroll: { x: number; y: number };
+  cursor: CursorPosition;
+  scroll: ScrollPosition;
 }
 
 /**
@@ -128,8 +140,8 @@ export interface PersistedTab {
   path: string | null;
   content: string;
   lastMtime: number | null;
-  cursor: { line: number; ch: number };
-  scroll: { x: number; y: number };
+  cursor: CursorPosition;
+  scroll: ScrollPosition;
 }
 
 /**
