@@ -1,4 +1,5 @@
 pub mod assets;
+pub mod atomic_write;
 pub mod drafts;
 pub mod files;
 pub mod launch;
