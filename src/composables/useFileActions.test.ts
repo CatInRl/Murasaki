@@ -444,3 +444,47 @@ describe("useFileActions - exportCurrentHtml 反馈（#384）", () => {
     expect(deps.dialog.alert).not.toHaveBeenCalled();
   });
 });
+
+describe("useFileActions - reloadCurrentFile（#424）", () => {
+  it("无未保存改动时直接重载，不弹确认", async () => {
+    const deps = makeDeps();
+    const { reloadCurrentFile } = useFileActions(deps);
+
+    await reloadCurrentFile();
+
+    expect(deps.dialog.confirm).not.toHaveBeenCalled();
+    expect(deps.tabsStore.reloadFromDisk).toHaveBeenCalledWith("/test/file.md");
+  });
+
+  it("有未保存改动时先确认，取消则不重载", async () => {
+    const deps = makeDeps({ activeTab: { value: makeTab({ isDirty: true }) } });
+    const { reloadCurrentFile } = useFileActions(deps);
+
+    await reloadCurrentFile();
+
+    expect(deps.dialog.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining("file.md") })
+    );
+    expect(deps.tabsStore.reloadFromDisk).not.toHaveBeenCalled();
+  });
+
+  it("确认后执行重载", async () => {
+    const deps = makeDeps({ activeTab: { value: makeTab({ isDirty: true }) } });
+    asMock(deps.dialog.confirm).mockResolvedValue(true);
+    const { reloadCurrentFile } = useFileActions(deps);
+
+    await reloadCurrentFile();
+
+    expect(deps.tabsStore.reloadFromDisk).toHaveBeenCalledWith("/test/file.md");
+  });
+
+  it("未命名标签没有磁盘路径，不弹窗也不重载", async () => {
+    const deps = makeDeps({ activeTab: { value: makeTab({ path: null, isDirty: true }) } });
+    const { reloadCurrentFile } = useFileActions(deps);
+
+    await reloadCurrentFile();
+
+    expect(deps.dialog.confirm).not.toHaveBeenCalled();
+    expect(deps.tabsStore.reloadFromDisk).not.toHaveBeenCalled();
+  });
+});

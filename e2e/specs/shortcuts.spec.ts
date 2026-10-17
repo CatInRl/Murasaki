@@ -270,7 +270,7 @@ describe("快捷键", () => {
 
   // ============ M7: Ctrl+R 重新加载文件 ============
 
-  it("Ctrl+R 重新加载当前文件（覆盖未保存修改）", async () => {
+  it("Ctrl+R 有未保存修改时先确认：取消保留、确认后重载", async () => {
     // 此测试需要自定义 fixture（reload.md），保留 resetWorkspace 调用
     const reloadWsPath = resetWorkspace([
       { path: "reload.md", content: "# 原始内容\n" },
@@ -305,6 +305,13 @@ describe("快捷键", () => {
       return content.includes("修改后的内容");
     });
 
+    // 第一次 Ctrl+R：弹确认，选取消后本地内容保留
+    await pressShortcut(browser, "r", { ctrl: true });
+    await waitForPresent(browser, ".dialog-overlay", 5000);
+    const cancelBtn = await browser.$(".dialog-footer .dialog-btn:not(.primary)");
+    await cancelBtn.click();
+    await waitForAbsent(browser, ".dialog-overlay", 5000);
+
     let content = await browser.execute(() => {
       // @ts-ignore
       const tabs = window.__pinia__._s.get("tabs");
@@ -312,9 +319,12 @@ describe("快捷键", () => {
     });
     expect(content).toContain("修改后的内容");
 
-    // App.vue reloadCurrentFile 直接调用 tabsStore.reloadFromDisk，不弹确认
+    // 第二次 Ctrl+R：确认后内容被磁盘内容覆盖
     await pressShortcut(browser, "r", { ctrl: true });
-    // 等待内容被磁盘内容覆盖
+    await waitForPresent(browser, ".dialog-overlay", 5000);
+    const confirmBtn = await browser.$(".dialog-footer .dialog-btn.primary");
+    await confirmBtn.click();
+
     await waitForStoreState(browser, async () => {
       const c = await browser.execute(() => {
         // @ts-ignore
@@ -324,7 +334,6 @@ describe("快捷键", () => {
       return c.includes("原始内容") && !c.includes("修改后的内容");
     });
 
-    // 内容应被磁盘内容覆盖
     content = await browser.execute(() => {
       // @ts-ignore
       const tabs = window.__pinia__._s.get("tabs");
