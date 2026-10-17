@@ -4,450 +4,325 @@
 
 ## [0.10.3] - 2026-10-17
 
-本版本为 0.10.2 的常规迭代：修复应用运行中从外部入口（双击 `.md` / 命令行 / 任务栏拖入）打开时新窗口不置前——此前只闪一下任务栏、要 Alt+Tab 才看得到；并把编辑模式与所见即所得模式的默认正文行高由 1.6 提到 1.8，向预览 / 演示的舒展观感看齐。
+常规迭代：从外部打开文件时新窗口会置于最前；编辑模式与所见即所得模式的默认行距调宽。
 
 ### Changed
 
-- **编辑 / 所见即所得模式的默认行距调宽（#416）**：编辑器正文行高一直取自设置 `editorLineHeight`（默认 1.6），而预览 / 演示用的是 1.75——同一份内容在编辑态比预览态更紧，正是「演示模式看起来好一点」的来源。现把默认行高 1.6 → **1.8**（设置面板里本就有该档位，1.4 / 1.6 仍可手动选回），源码 / 分屏 / 所见即所得三种模式一并变宽，贴近预览与演示的舒展观感；已显式选择过行高的用户保持原值。
+- 编辑模式与所见即所得模式的默认正文行高由 1.6 调到 1.8，向预览 / 演示的舒展观感看齐（设置里仍可选回 1.4 / 1.6，此前手动改过行高的用户保持原值）。(#416)
 
 ### Fixed
 
-- 修复**双击 `.md` 文件打开时不把应用窗口置前**（#414）：应用**已在运行**时，外部入口（双击 `.md` / 命令行 / 拖到任务栏）经 single-instance 插件回调建新窗口，而这条建窗路径**漏了聚焦**。插件其实已经把「设置前台窗口」的权限交给回调（第二实例退出前调 `AllowSetForegroundWindow`，源码注释即 *Hand that right over before we exit, so focusing a window from the callback works*），但建窗时 tao 对 `focused: true` 只做 `ShowWindow(SW_SHOW)`（含 `force_window_active` 的强抢前台只在 fullscreen 建窗分支里调），应用不在前台时这次激活会被 Windows 前台锁拒掉 —— 新窗口只闪一下任务栏、拿不到前台与键盘焦点。现在 `create_editor_window` 建窗后显式 `window.set_focus()`（tauri → tao `force_window_active`：先试 `SetForegroundWindow`，被拒时再以合成 ALT 键抢前台权限），与「目录已在别处打开 → 聚焦那个窗口」分支的做法对齐，单一改动覆盖所有建窗入口（双击文件 / 命令行 / 拖到任务栏 / 打开文件夹 / 同目录未命中）。
+- 应用已在运行时，从外部入口（双击 `.md` / 命令行 / 拖到任务栏）打开文件，新窗口现在会置于最前并获得键盘焦点；此前只闪一下任务栏、需 Alt+Tab 才能看到。(#414)
 
 ## [0.10.2] - 2026-10-07
 
-本版本为 0.10.1 的常规迭代：Tauri 生态（Rust crate 与 npm 包）升到 2.12，`notify` / `dirs` 各跨一个主版本；修复 HTML 文件演示模式无法缩放及其遗留的分屏模式缩放失效、Mermaid 节点文字超过约 4 行被方框裁切与 gantt 图「今日」标记线毁图，并根治 e2e 文件树抖动的根因链（纯测试基建，应用行为零变化）。
+Tauri 生态升级到 2.12；修复 HTML 演示模式无法缩放（及分屏缩放失效）与两处 Mermaid 渲染问题。
 
 ### Changed
 
-- **运行期依赖升级（Dependabot，#362 / #363）**——Tauri 生态（Rust crate 与 npm 包）升到 2.12，另有一批前端依赖与两个 Rust 依赖跟进：
-  - **Tauri 生态 2.12（#362，Rust crate 与 npm 包同批）**：Rust 侧核心 `tauri` 2.11.6 → 2.12.0、`wry` 0.55.1 → 0.57.0、`tao` 0.35.3 → 0.37.1，插件升至 `tauri-plugin-dialog` 2.8.0 / `-fs` 2.6.0 / `-store` 2.5.0 / `-shell` 2.4.0 / `-updater` 2.13.0 / `-process` 2.4.0 / `-single-instance` 2.5.0；前端 `@tauri-apps/api` 2.11.1 → 2.12.0，`@tauri-apps/plugin-{dialog,fs,process,shell,store,updater}` 同步对齐，另升 `katex` 0.18.7 → 0.18.9、`vue-i18n` 11.1.11 → 11.4.12。Rust 与 npm 的 major/minor 必须一致（Tauri CLI 在 `tauri build` 时校验，不一致直接报 `Found version mismatched Tauri packages`），故两侧必须同批落地；并顺带把 `webview2-com` 钉到 0.39、`windows` 钉到 0.62.2 与升版后的 wry 对齐（此前仍钉 0.38 / 0.61，会让 `pdf.rs` 的 `NavigationCompletedEventHandler` 与 wry 出现两套 `windows` 类型、编译报 `E0277`）。
-  - **`notify` 7.0.0 → 8.2.0、`dirs` 5.0.1 → 6.0.0（#363）**：两个 Rust 运行期依赖各跨一个主版本。
+- 运行期依赖升级：Tauri 生态（Rust crate 与 npm 包同批）升到 2.12，另升 `notify` 到 8.2、`dirs` 到 6。(#362 #363)
 
 ### Fixed
 
-- 修复 **HTML 文件的演示模式无法缩放**（#405）：HTML 预览是沙箱 iframe，Ctrl+滚轮与键盘事件发生在子文档里、不会跨越 iframe 边界冒泡到父文档，挂在 `.preview-zoom` 的滚轮监听与全局快捷键（`Ctrl+=` / `Ctrl+-` / `Ctrl+0` 等）全部收不到，缩放 chip 恒为 100%。利用 sandbox 既有的 `allow-same-origin`（父侧可访问 `contentDocument`），由父侧在子文档上补挂 wheel / keydown 监听器把事件接回：滚轮直接交给既有 `onWheel`（演示模式 Ctrl+滚轮缩放生效），keydown 重派发到父 `window` 走快捷键系统、被消费时把 `defaultPrevented` 同步回传给子文档原始事件（否则 WebView2 浏览器级加速键——整页缩放 / 打印——会在 iframe 内照常触发、与应用行为叠加）。挂载不依赖 `@load` 时序而是低频轮询幂等完成——WebKit 系（Linux WebKitGTK / macOS WKWebView）的 srcdoc 文档「可交互」早于 `load` 事件、且 iframe 初建会先以 about:blank 触发一次 load，单靠 load 事件监听会挂到随即被替换的初始文档上（Linux / macOS e2e 首跑即拦下，Windows WebView2 只是时序恰好没踩）；轮询同时**跳过 about:blank 占位文档**——它在 WebKit 系上同样有完整的 `documentElement`，监听若挂上去，随后加载的 srcdoc 文档会整体替换文档对象、监听随之销毁（Linux / macOS e2e 第二跑拦下），并去掉 iframe 的 `loading="lazy"`（HTML 预览必然在视区内，lazy 只会让「占位 → 正式文档」的替换时序更不可控）；幂等标记写在子文档 `documentElement` 的 dataset 上随文档对象走，srcdoc 换文档自动失效、下一轮重挂。不给沙箱加 `allow-scripts`，HTML 内脚本依旧不执行。附带收益：焦点在 HTML 预览内时 Ctrl+S / Ctrl+P 等全局快捷键同样可用（分屏模式同样生效）。
-- 修复 **分屏模式下缩放完全失效**（#412，#405 的遗留问题）：#405 把 HTML 预览 iframe 的缩放事件接回父文档后，分屏模式的缩放仍不生效——预览区的缩放入口（`App.vue` 的 `zoomEnabled()`）、出口（`EditorPane` 的 `zoomStyle` / `onWheel`）与 StatusBar 的缩放 chip 共四处各自用 `editorMode === "presentation"` 判断，分屏模式下事件虽被接回应用层（Ctrl+滚轮不再触发 WebView2 整页缩放），但入口不放行、出口不渲染缩放样式，预览纹丝不动、缩放 chip 也不出现。现抽出纯函数 `zoomAppliesTo(mode)`（分屏与演示生效，源码 / 所见即所得无预览区不生效）作为单一来源，四处门控统一接它——散落的模式判断一旦只改其中一处，就会出现「入口开、出口关」的状态与内容脱节，这正是本 bug 的形态；设置键 `settings.presentationZoom` 与持久化语义不变。e2e 补分屏 Markdown 三快捷键逐一真实过渡（`Ctrl+=` → 110% / `Ctrl+-` → 90% / `Ctrl+0` → 100%）与 h1 渲染尺寸断言，HTML 分屏补 `Ctrl+滚轮` + `Ctrl+-`（与 Markdown 预览同矩阵）及 DPR 守卫——`devicePixelRatio` 只随浏览器级整页缩放变化、应用层 `zoom` 不改它，缩放前后不变即证明未触发 WebView2 整页缩放；源码模式 no-op 用例与演示模式既有全套用例保留。
-- 修复 **Mermaid 节点方框内文字超过约 4 行被视觉裁切**（#342 同 issue 的另一症状，此前修的是 gantt today 线）：mermaid 按自带行高（16px × 1.5 = 24px）测量节点文本并分配 `foreignObject` 高度，而 `.markdown-body p` 的 1.75 行高会命中 `foreignObject` 内的 `<p>`（实测 computed line-height 28px），实际排版比测量基准每行多出 4px——溢出随行数线性增长（1～5 行实测 4/8/12/16/20px），小溢出被节点 padding 掩盖、约 4 行起文字即被方框裁掉；分栏预览 / WYSIWYG（编辑器容器带 `.markdown-body` class）/ 演示模式三个入口同病。现以 `.markdown-body .mermaid svg p { line-height: inherit; }` 让 `<p>` 继承 mermaid 自身行高、与测量基准一致；新增静态守卫 `mermaidClipGuard.test.ts` 防该规则被误删。Edge headless 夹具红绿闭环验证：修复前 1～5 行 + 自然换行 6 例全部溢出、修复后全部归零。
-- 修复 **Mermaid gantt 图的「今日」标记线把整图毁掉**（#342）：today 线画在「今天」处，当今天落在任务时间域之外时 mermaid 11 的两种表现都会毁图——域外 today 坐标（x≈18000）被计入 viewBox，正常 ~68px 高的 gantt 在容器内被等比压成 ~5px 的细线（图不可读）；未计入则图正常显示但 today 线画在可视区外、图内文字被裁。新增 `sanitizeMermaidSvg()`（mermaidTheme.ts）在每次 mermaid 渲染完成后对 SVG 做一次收敛：隐藏全部 `g.today`，以根 `getBBox()` 取真实内容盒，相对内容盒判定 today 是否域外（域外保持隐藏、域内/跨界恢复显示并并回内容盒），viewBox 收窄到最终内容盒并同步 inline `max-width`，保证 SVG 受卡片约束不被撑爆；分栏预览（PreviewPane）与 WYSIWYG（MermaidWidget / PlantUML 的 DiagramPreviewWidget）两处渲染入口统一接线，PlantUML 图卡同样受益；gantt 渲染宽度改走 mermaid `useWidth` 官方通道注入（此前临时容器挂 body 测得 0 宽），0 宽防御 + 占位恢复。e2e 断言改为环境无关三重守卫（viewBox 有效 / 渲染高度 ≥24px / 等比偏差 ≤10%）——CI 英文 Windows 对 CJK 的字体 fallback 与本地中文 Windows 差异巨大（实测 flowchart viewBox 612×145 → 2078×2077），旧的宽高比阈值断言把环境差异误判成渲染缺陷；文件树搜索的两处「固定 pause 后单次读列表」等待同步改为轮询（CI 慢环境下读太早恒空导致偶发挂掉）。
-- 修复 **e2e 抖动的根因链：`list_tree` 读目录失败被静默吞成空树 + watcher 句柄跨用例竞争 + e2e helper 吞错**（#408）：文件树搜索类 spec 在 CI 上偶发「等不到文件树节点」满 10s 预算超时（如 `file-tree-search.spec.ts` 的「文件名匹配渲染」），rerun 一来一回约 40 分钟。根因三层叠加：①上一用例的文件 watcher 仍握着测试目录句柄（关闭工作区**有意**不释放 watcher，见 `watcher.rs` 注释，#311 的先停后启只覆盖重开场景），下一用例 `resetWorkspace` 删库重建与之竞争，Windows 上 `read_dir` 撞句柄冲突；②Rust `build_tree_inner` 对顶层 `read_dir` 失败走静默 `Err(_) => return nodes`，把失败包成 `Ok(空树)` 返回；③e2e helper `openWorkspace` 把 `executeAsync` 的返回值直接丢掉，应用侧失败只剩一条 `console.error`——而 tauri-driver 会缓存 `console.error` 输出并在后续每次 execute 时重放为 `WebDriverError`，毒化整个 session。三层一起修：`build_tree_inner` 改返回 `std::io::Result`，**顶层**读失败经 `list_tree` 报 `读取目录失败: {路径}: {io 错误}`（递归子目录保持静默——局部权限问题不该炸掉整棵树），新增 2 个单测锁住该语义；e2e helper 新增 `stopWatchingBestEffort()`，在 `closeWorkspace` 收尾与 `openWorkspace` 开头各调一次 `stop_watching` 释放残留句柄（应用语义零改动，纯测试侧清场，全程 best-effort 不阻断清场主流程）；`openWorkspace` 不再吞错——executeAsync 返回值非空即抛（带路径上下文），并在调 store 前临时消音 `console.error`、完成后恢复，防 session 污染。应用行为对用户零变化，改动只影响「读不到目录时给错误还是给空树」与测试基建。
+- HTML 文件的演示模式现在可以缩放（`Ctrl+=` / `Ctrl+-` / `Ctrl+0` / `Ctrl+滚轮`）：此前缩放事件发生在预览 iframe 内、传不到应用层，缩放恒为 100%；分屏模式同时修好，焦点在 HTML 预览内时 `Ctrl+S` / `Ctrl+P` 等快捷键也可用。(#405 #412)
+- Mermaid 节点中的文字超过约 4 行时不再被方框裁掉。(#342)
+- Mermaid gantt 图的「今日」标记线不再把整图压扁或裁掉图中文字。(#342)
 
 ## [0.10.1] - 2026-10-02
 
-本版本为 0.10.0 的补丁版：CI e2e 矩阵扩展到 Linux / macOS（macOS 首期只跑不拦），关闭窗口 / 退出应用时有未保存改动改为三选一汇总确认（替代静默落盘），修复拖入图片落点、演示模式缩放留白、菜单快捷键提示、视图菜单切换、全屏快捷键与 Linux/macOS 本地图片失图，并升级四个运行期依赖清掉 17 条安全告警。
-
-### Added
-
-- **Linux e2e 支持**：CI 新增 `e2e (linux)` job——tauri-driver + WebKitWebDriver（webkit2gtk-driver）驱动真实 WebKitGTK，经 Xvfb 无头运行，与 Windows 的 WebView2 e2e 共用同一套 spec；Rust 侧 `is_e2e_mode()` 增加 Linux 判定通道（tauri-driver 经 WebKitWebDriver 启动应用时注入的 `TAURI_WEBVIEW_AUTOMATION` / `TAURI_AUTOMATION` 环境变量），e2e harness（进程清理、driver 查找、settings.json 路径、预检脚本）跨平台化，预检由 PowerShell 脚本改为跨平台 Node 实现。首跑即拦下一类真问题：spec 里 `${WS1}\\file.md` 式的反斜杠拼接在 Linux 上产生混合分隔符路径，应用打不开文件且 `executeAsync` 永不返回、整套挂起——现统一在接收路径的边界按平台归一化（Windows 原样保留，其余平台 `\` → `/`）。
-- **macOS e2e 支持**：CI 新增 `e2e (macos)` job（首期只跑不拦，同 Linux e2e 提升路径）——tauri-driver 在 macOS 走 safaridriver 需 GUI 授权、CI 不可行，改为**应用内嵌 WebDriver 服务端**：新增 macOS 运行期依赖 `tauri-plugin-wdio-webdriver` 1.4.0（`cfg(target_os = "macos")` 门控，且仅 debug 构建注册，生产 release 无调试端口）；harness 直接 spawn debug 二进制并注入 `TAURI_WEBDRIVER_PORT` / `WDIO_EMBEDDED_SERVER`，轮询 `GET /status` 就绪后直连建 session；Rust 侧 `is_e2e_mode()` 新增 macOS 判定通道（识别内嵌服务端注入的环境变量），Windows / Linux 链路不变。后续收尾修掉 macOS 上合成键盘事件不触发 CM6 快捷键绑定的问题（改用 `browser.execute` 直接派发 KeyboardEvent，绕过插件的事件合成路径），关窗用例则容忍 `close_window` 引发 IPC 通道断开的预期副作用。
+补丁版：关闭窗口 / 退出应用时有未保存改动会先汇总确认；修复拖入图片落点、演示模式缩放留白、菜单快捷键提示、视图菜单、全屏快捷键与 Linux / macOS 本地图片失图；升级依赖清掉 17 条安全告警。
 
 ### Changed
 
-- **关闭窗口 / 退出应用时，有未保存改动会先问一次**（#346，[ADR-0017](docs/adr/0017-close-interception-with-draft-flush-on-exit.md) 部分修订）：此前是**静默落盘**（写草稿 + `tabs.json`，不弹任何对话框）—— 用户既看不到「还有东西没保存」，也没机会在退出前把它落到真实文件。现在把本窗口所有未保存 tab **一次性汇总**成一个三选一确认（与「批量关闭标签」同款：「全部保存并关闭」/「不保存关闭」/「取消」）：选「保存」逐个写回（已命名写盘、未命名走另存为），任一取消或失败即**中止退出**；选「取消」窗口不关、也不落盘（防重入标志会复位，下次仍能触发）；**没有未保存改动时照旧不打扰**。退出时的草稿兜底保留；多窗口下每个窗口各自询问自己的未保存改动（不做跨窗口聚合，已记入 ADR「范围外」）。顺带修正 `CONTEXT.md` 里「未命名 tab 下次启动不恢复」的旧说法 —— 它的正文一直随 `tabs.json` 保留、`restore()` 会用 `persisted.content` 重建。
+- 关闭窗口或退出应用时，如果本窗口还有未保存的改动，会先弹一次汇总确认（全部保存并关闭 / 不保存关闭 / 取消），不再静默写草稿；没有未保存改动时照旧不打扰，多窗口下各窗口各自询问。(#346)
 
 ### Fixed
 
-- 修复**拖入图片的插入位置不准确**（#344）：`toViewportCoords()` 把 Tauri 给的落点当成「相对整个窗口（含标题栏与边框）」的坐标，于是额外减掉一个**经验值**装饰偏移（8 / 31 CSS 像素）。但 wry 在把 OLE 的落点交给上层之前已经调过 `ScreenToClient(hwnd, pt)`（`wry/src/webview2/drag_drop.rs` 的 `DragEnter` / `DragOver` / `Drop`）—— 拿到的是**相对 webview 客户区**的物理像素，与 `clientX/clientY` 同源，只差一次 DPR 折算。现只做 DPR 折算、不再减装饰（插入点此前整体偏上约一个标题栏高度、偏左约一个边框宽）；顺带修掉连带问题：贴近内容区左上角拖入时 `y - 31` 变成负数被判为非法坐标，会静默回退成「插入当前光标」。
-- 修复**演示模式放大后预览不再占满编辑区宽度（右侧留白，放大越多留白越大）**（#337）：缩放包裹层此前写的是 `zoom: z; width: calc(100% / z); height: calc(100% / z)`，注释里的假设是「`zoom` 会把布局尺寸一并放大」。实测（headless Chromium + 视觉命中测试）恰好相反：`zoom` 下百分比尺寸本就按**缩放后的包含块**解析，`width: 100%` 自己就会填满父容器 —— 再除一次 `z` 等于**重复补偿**，包裹层实际只剩面板宽度的 `1/z`（z = 1.1 / 1.5 / 2 时内容右缘分别只到面板的 88% / 61% / 40%）。现在只设 `zoom`，并把这段逻辑抽成纯函数 `presentationZoomStyle()` 以便单测拦住「又加回反向除宽高」；e2e 补一条用 `elementFromPoint` 的视觉命中断言（面板左右边缘都必须落在缩放包裹层内）。
-- 修复**菜单项右侧的快捷键提示直接显示内部写法 `CmdOrCtrl`**（#341）：accelerator 用的是 Tauri 的跨平台 token `CmdOrCtrl`（表达「macOS 上是 ⌘、其余平台是 Ctrl」），而本项目菜单项**没有注册原生 accelerator**（快捷键实际由前端的全局 keydown 处理），这段字符串纯粹是提示文本 —— 原样拼进菜单项文本就会显示成 `CmdOrCtrl+Shift+E`（Win32 还会把 `\t` 之后的部分右对齐显示，于是它正对着用户的视线）。现在 `with_accel()` 统一按平台转换：Windows / Linux 显示 `Ctrl+Shift+E`，macOS 显示 `⌘+Shift+E`，口径与前端 `formatShortcutForDisplay()` 一致（只换主修饰键，其余键位与 `+` 原样保留）。
-- 修复**视图菜单的「文件树视图 / 大纲视图」点了没有任何反应**（#340），三处一起改：
-  - **勾选同步传错了 ID**：`set_sidebar_view_checked` 把**视图名**（`files` / `outline`）当成**菜单项 ID** 传给 `set_checked_by_ids`，而它是按 `item.id() == active_id` 比较的（两个菜单项 ID 是 `toggle-sidebar` / `toggle-outline`）—— 永不相等，于是每次切换后**两项勾选被一起清空**。改为经既有的 `sidebar_menu_id()` 转换（焦点重放路径一直是这么做的，`#194` 修的就是同类问题，这条命令当时漏改）。
-  - **折叠态下切换视图看不到任何变化**：菜单 / 快捷键路径只写 `sidebarView`，**不会展开**侧栏（`expandSidebar()` 只挂在细条的图标按钮上），而折叠态下文件树与大纲共用同一排图标 —— 现在两条路径都走新的 `selectSidebarView()`：先展开再切换。
-  - **非 Markdown 文件下点「大纲视图」是静默回退**：`Sidebar.effectiveView()` 会把大纲强制成文件树，用户只看到「点了没反应」；现在改为给出「大纲仅对 Markdown 文件可用」的说明。
-- 修复**按 `F11`（或菜单「视图 → 全屏」）毫无反应**（#338）：前端 `toggleFullscreen()` 调的是 `plugin:window|set_fullscreen`，但 capability 只声明了 `core:default` + `core:window:allow-close` / `allow-destroy`，而 `core:window:default` 的权限清单里**没有** `allow-set-fullscreen`（只有 `allow-is-fullscreen`），于是该调用被 ACL 拒绝；异常又被 `toggleFullscreen` 的 `try/catch` 吞成一条 `console.error`，对外表现为「按键无效、也不报错」。现补上 `core:window:allow-is-fullscreen` 与 `core:window:allow-set-fullscreen`；顺带把全屏状态改为以 `win.isFullscreen()` 为准（不再自己记一个 ref —— 状态被其它入口改过时本地 ref 会失真，下次按下方向就相反），并补一条 e2e 直接断言该命令未被 ACL 拒绝。
-- **Linux/macOS 本地图片失图（预览与 HTML 导出）**：`sanitizeInlineHtml`（useMarkdownRenderer.render 的统一出口）依赖 DOMPurify 默认 URI 白名单，其中没有 Tauri 的 asset 协议——Windows 上 `convertFileSrc` 产出 `https://asset.localhost/...` 天然命中白名单，Linux/macOS 产出 `asset://localhost/...` 则被 DOMPurify 把 `<img>` 的 `src` 属性整个剥掉，导致这两个平台的预览与 HTML 导出中所有本地图片失图。现以 `ALLOWED_URI_REGEXP` 在默认白名单基础上放行 `asset:`；data URI（Base64 内嵌图）走 DOMPurify 的 DATA_URI_TAGS 单独分支不受影响。同批落地的 Linux e2e 用 3 条 spec（markdown-render 两条 + html-export 一条）坐实该 bug（#339）。
+- 拖入图片的插入位置不再整体偏上；贴近内容区左上角拖入时也不再静默落到光标处。(#344)
+- 演示模式放大后预览不再右侧留白（此前放大越多留白越大）。(#337)
+- 菜单项右侧的快捷键提示不再显示内部写法 `CmdOrCtrl`，按平台显示为 `Ctrl` / `⌘`。(#341)
+- 视图菜单的「文件树视图 / 大纲视图」点击后不再毫无反应（勾选同步、折叠态展开、非 Markdown 文件给出说明三处一起修）。(#340)
+- `F11` 与菜单「视图 → 全屏」现在可用（此前被权限拒绝、异常又被吞掉）。(#338)
+- Linux / macOS 上预览与导出 HTML 中的本地图片不再失图。(#339)
 
 ### Security
 
-- **依赖安全升级（Dependabot，#353 / #354 / #355 / #356，共清掉 17 条告警）**——四个运行期依赖全部升到含安全修复的版本：
-  - `brace-expansion` 2.1.2 → 2.1.7（#353）：修复 4 高危 + 1 中危的 DoS——无界展开长度致 OOM 进程崩溃 [GHSA-mh99-v99m-4gvg](https://github.com/advisories/GHSA-mh99-v99m-4gvg)、无界中间数组绕过 CVE-2026-14257 的既有缓解 [GHSA-rgw5-rvv9-x895](https://github.com/advisories/GHSA-rgw5-rvv9-x895)、`parseCommaParts` 无控递归栈耗尽 [GHSA-6j4f-fj2g-mc7p](https://github.com/advisories/GHSA-6j4f-fj2g-mc7p)、嵌套花括号组无控递归栈耗尽 [GHSA-qhr7-859c-m2p7](https://github.com/advisories/GHSA-qhr7-859c-m2p7)、`{a},b}` 重写的二次复杂度 CPU 耗尽 [GHSA-q2hr-2g5m-vwhr](https://github.com/advisories/GHSA-q2hr-2g5m-vwhr)。
-  - `undici` 7.29.0 → 7.30.0（#354）：修复 2 高危 + 5 中危 + 3 低危——`BalancedPool` 克隆配置时丢弃函数值 `connect`/`tls` 选项（含自定义 TLS 证书校验回调）[GHSA-w293-vg96-wgc3](https://github.com/advisories/GHSA-w293-vg96-wgc3)；WebSocket 服务端在未请求子协议时仍选中子协议，未捕获 `TypeError` 可终止进程（现按 1002 拒绝握手）[GHSA-rfgv-xxqx-mfg5](https://github.com/advisories/GHSA-rfgv-xxqx-mfg5)；permessage-deflate 超过解压上限触发未处理的 zlib 错误 [GHSA-3wwx-pv8p-q78v](https://github.com/advisories/GHSA-3wwx-pv8p-q78v)；`WebSocketStream` 非正常关闭留下未观察的 rejected promise [GHSA-rx4f-c7p8-82vq](https://github.com/advisories/GHSA-rx4f-c7p8-82vq)；共享缓存重放含 `Set-Cookie` 的响应、跨调用泄露 cookie [GHSA-2jfj-6hjv-fm6j](https://github.com/advisories/GHSA-2jfj-6hjv-fm6j)；解压输出无上限（现默认限 64 MiB、可配 `maxSize`）[GHSA-3xpg-4rpp-hhhm](https://github.com/advisories/GHSA-3xpg-4rpp-hhhm)；终态重试失败后响应 body 孤立、消费方挂起 [GHSA-pmjh-fq2x-6v4x](https://github.com/advisories/GHSA-pmjh-fq2x-6v4x)；缓存拦截器重放 `POST`/`DELETE` 等不安全方法的响应 [GHSA-8436-99hf-9mmv](https://github.com/advisories/GHSA-8436-99hf-9mmv)；dump 拦截器把无 `Content-Length` 的超限 chunked 响应误判为已截断 [GHSA-2gqq-gqf2-x968](https://github.com/advisories/GHSA-2gqq-gqf2-x968)；retry 恢复响应时未校验 framing、可致响应分裂 [GHSA-r53p-7pc4-xj5r](https://github.com/advisories/GHSA-r53p-7pc4-xj5r)。
-  - `markdown-it` 14.3.0 → 14.3.2（#355）：`linkify: true` 存在两条二次复杂度路径，几百 KB 的 markdown 可把事件循环阻塞数十秒 [GHSA-253c-mchw-3w2r](https://github.com/advisories/GHSA-253c-mchw-3w2r)。
-  - `dompurify` 3.4.15 → 3.4.16（#356）：`afterSanitize` 钩子移除节点后，分离子树上残留的事件处理器仍可触发、导致 DOM XSS [GHSA-p98j-92pf-mc4p](https://github.com/advisories/GHSA-p98j-92pf-mc4p)。
+- 升级 4 个运行期依赖（`brace-expansion` / `undici` / `markdown-it` / `dompurify`）到含安全修复的版本，清掉 17 条告警。(#353 #354 #355 #356)
 
 ## [0.10.0] - 2026-09-29
 
-本版本围绕「文件打开与拖放体验补全」与「配色单一来源」两条线：拖入窗口即可打开文件 / 文件夹，应用打不开的文件（pdf / zip / exe…）给出兜底出口与拖入提示，图片插入方式可配置，标签栏新增常驻「全部标签」面板；配色收敛为「色阶 → 语义 token」单一来源并让 Mermaid / PlantUML / KaTeX 与 HTML 导出跟随主色，新增 i18n key 与设计 token 两道静态守卫；同时彻底移除自 0.5.0 起就已关闭的 AI Agent 功能，并修掉一批静默失效（重开工作区不再刷树、无后缀大文件点不开、路径写法不同重复开 tab、Windows 上拖入图片失效、导出 HTML 丢图）。
+围绕「文件打开与拖放」与「配色单一来源」两条线：拖入窗口即可打开文件 / 文件夹，打不开的文件给出兜底出口，图片插入方式可配置，新增「全部标签」面板；配色收敛为单一来源并让图表与导出跟随主色；彻底移除 AI Agent 功能。
 
 ### Added
 
-- **打不开的文件有了兜底出口（#307）**：pdf / docx / zip / exe / 未知后缀这类文件此前在文件树里**点击无反应**、右键只有通用项（重命名/剪切/复制/删除…）而**没有「打开」**（拖入窗口也只是静默忽略），现在右键给「用系统默认程序打开」，点击则弹一次说明（附同一个动作），不再让人以为「点了没坏也没用」。实现走新增的 Rust 命令 `open_with_default_app`（Windows 用 `explorer.exe`、macOS `open`、Linux `xdg-open`；与既有的「在资源管理器中显示」同形，不经 shell），**不走 `plugin-shell`**：能力集里的 `shell:default` 只放行 URL，打开本地路径需要把 `allow-open` 的 scope 放宽到 `**`，为兜底入口扩大攻击面不划算。
-- **拖入打不开的文件不再是静默忽略（#317）**：pdf / zip / exe 这类应用打不开的文件，此前拖进窗口**什么都不发生** —— 四个入口（文件树点击、右键、拖入、打开失败）里只剩这一格没有任何反馈。现在拖入会弹一次提示报「已忽略 N 个无法打开的文件」，**恰好 1 个**时附「用系统默认程序打开」动作（≥2 个只报计数：让一个动作拉起 N 个外部程序太跳脱）。计数只算「应用打不开的文件」—— 不存在的路径、以及「多目录 / 目录与文件混投」时被忽略的目录都不计入（后者是「一个窗口只能开一个工作区」的另一件事，已由 #318 单独给出提示）。顺带把「各类型文件怎么打开」的完整矩阵与取舍理由写进新 ADR（[ADR-0020](docs/adr/0020-file-open-strategy-and-fallbacks.md)），并修正 `CONTEXT.md` 里「其他类型 → 暂不支持，提示『无法打开此文件类型』」这句与实现不符的旧描述（#307 之后已改为给出兜底出口）。
-- **拖入被忽略的目录也有提示了（#318）**：拖**多个目录**、或**目录与文件混投**时，目录既不会成为工作区（一个窗口只能有一个工作区，见 [ADR-0018](docs/adr/0018-multi-window-multi-workspace.md)）也不会被打开，此前被**静默忽略** —— 现在拖入结束后提示「已忽略 N 个文件夹（一个窗口只能打开一个工作区）」。**只提示、不给动作**：多个目录时「打开哪一个」没有自然答案，给其中一个会误导；真要一次开多个工作区是另一件事（会改掉「不静默切换工作区」的取舍），需单议。
-- **图片插入方式可配置（#151）**：设置 → 常规新增「图片插入方式」，可选「本地文件」（复制到默认图片目录并插入相对路径，推荐）或「Base64 内嵌」（插入 `data:` URI，单文件便携、不依赖外部资源）。粘贴或拖入图片时按住 `Alt` 可临时用另一种方式（不改设置），无工作区或落盘失败时自动回退内嵌，避免静默丢图。拖入外部图片会插入在**落点**位置，拖拽经过编辑区时给出落点提示；文件树内拖入已有图片仍是相对路径引用，不受该设置影响。
-- 顺带修掉「默认图片目录」设置此前**未生效**的问题：图片一直固定写入 `<工作区>/assets/`，现在按该设置落盘（默认 `assets/images`），并且该目录被限制为工作区内的相对路径（拒绝绝对路径与 `..` 穿越）。
-- **全部标签面板（#168）**：标签栏右端（「+」左侧）新增常驻「全部标签」入口，徽标显示标签总数，标签溢出时也不被压缩掉。点击弹出可搜索的纵向列表：每项显示标题、所在目录、未保存圆点与工作区外角标，点击即定位到该标签并关闭面板。过滤只按「标题 + 所在目录」（定位器而非内容搜索器），顺序与标签栏一致（不按最近使用）；键盘可达——打开即聚焦搜索框，`↓` 进列表 / `↑` 返回，`Enter` 定位，`Esc` 关闭并把焦点还给入口按钮。关闭有未保存改动的标签时面板保持打开，便于连续整理；面板内不做批量操作（批量关闭仍在标签右键菜单）。快捷键命令 `open-all-tabs` 已登记但默认不绑定，可在「设置 → 快捷键」自行分配。
-- **拖拽打开文件/文件夹（#92）**：把系统里的文件或文件夹拖到应用窗口上即可打开 —— 恰好一个目录时按「打开文件夹」的既有决策走：**在新窗口打开**，同一目录已在某窗口打开则聚焦那个窗口（不在当前窗口切换工作区）；文件（可多个）逐个在**当前窗口**打开为标签（只开应用能打开的类型；应用打不开的类型与不存在的路径当时一律静默忽略 —— 前者已由 #317 改为给出提示）；拖拽经过窗口时显示「松开以打开」遮罩。走 Tauri 原生 drag-drop 事件（`onDragDropEvent`）而非 HTML5 拖放（原生事件会拦截系统文件拖放）。图片由拖放链路处理的部分不在本次范围（见 #288），本 PR 不改变粘贴/拖入图片的现有行为。
-
-### Removed
-
-- **移除 AI Agent 功能**（#264）：该功能自 0.5.0 起由 `AGENT_ENABLED = false` 整体关闭、没有任何入口，本次彻底删除，不再保留「改一个常量即恢复」的开关 —— 前端 Agent 引擎（provider / tools / context / proposals）、右侧面板、设置里的 AI 分类与「显示 Agent 面板」开关、相关 i18n 文案，Rust 侧的 agent 文件工具、AI provider（含 DPAPI 密钥读写）与聊天记录命令，以及对应的单测与 e2e 用例；运行期依赖 `openai` 与 Rust 依赖 `reqwest` / `flate2` / `base64` 一并移除。磁盘上既有的 secrets / 聊天记录文件不迁移、不删除（留有旧数据的用户可自行清理）。
-
-### Fixed
-
-- 修复**关闭工作区后再打开同一个文件夹，文件树从此不再自动刷新**（#311）：文件监听盯的是**注册那一刻的目录句柄**，而「重开同一路径」被旧逻辑判成「路径没变」直接跳过注册 —— 那个句柄在目录被外部删除 / 重建（`git clean`、网络盘重挂载、临时目录被清）后早已失效，于是此后外部新建 / 删除 / 重命名都不再反映到树里，而且**没有任何提示**。现在打开 / 切换工作区一律先停后启，窗口重新获得焦点时也顺带重新注册一次（目录被换掉时不会有任何路径变化，只能借这个既有兜底恢复）；关闭工作区时**仍然保留**监听 —— 工作区关了但标签还开着，那些文件继续需要「被外部修改」提醒。同时不再拿「路径字符串相等」当作「监听还活着」的依据。
-- 修复**无后缀文件只要 ≥1MB 就一律打不开**（#308）：此前「无后缀 + 大小」被当成「能不能打开」的门槛，结果最大的那些无后缀文件（构建日志、纯文本产物）反而永远点不开，拖入窗口也被静默忽略。现在无后缀文件一律允许按文本试读 —— 真正的失败点在后端读取（非 UTF-8 时直接报错），不必事先猜。大文件仍有保护：**≥1MB 时先确认**（避免误点几百 MB 的文件把编辑器卡死）；读取失败（无后缀二进制 / 非 UTF-8 / 权限等）不再只弹一句「打开文件失败」就结束，改为提示 +「用系统默认程序打开」的兜底动作（与 #307 同一条出口）。文件树图标分级保持不变（大而无后缀仍按通用文件图标显示）。
-- 修复同一文件因**路径写法不同**（`\` 与 `/` 混用）被当成两个文件（#304）：`openFile` 的「是否已打开」、`getTabByPath` 的查找、外部修改事件的「该文件是否已打开」判断、最近打开列表与全局搜索结果里的去重，此前都按路径字面量比较。现统一走 `src/utils/path.ts` 的 `canonicalPath()`（分隔符归一 + 去尾分隔符 + 大小写），于是重复标签 / 最近列表重复项 / 搜索结果重复项一并消失。
-- 修复两处「引用了不存在的 CSS 变量、fallback 恒生效而静默用错色」的颜色 bug（#293）：更新对话框的说明块用了未定义的 `--murasaki-surface-muted`（实为 `--murasaki-muted`）；快捷键面板的冲突提示用了未定义的 `--murasaki-error`（实为 `--murasaki-state-error`），连带其 `color-mix` 派生的背景与描边一并纠正。
-- 修复从系统拖入外部图片在 Windows 上完全不生效（#288）：Tauri 的 `dragDropEnabled`（默认开）会拦截系统文件拖放，HTML5 `drop` 收不到事件，导致 #151 的「拖入图片」一直无反应。改由 Tauri 原生 drag-drop 事件驱动（`onDragDropEvent` → `useDragDrop` → `useImagePaste`），并**移除** window 级 HTML5 `drop` 这条失效入口（避免双重插入）；插入方式（file/base64）、`Alt` 临时取反、无工作区或落盘失败回退内嵌、落点在鼠标处、多张按顺序插入等既有语义不变。图片字节改由 Rust 侧读取（新增命令 `copy_image_to_workspace` / `read_image_base64`），前端不再直接读本地文件；落点从窗口物理像素换算为视口 CSS 像素（换算不出时回退光标）。
-- 修复导出 HTML 时本地图片不再内联为 Base64（#258）：渲染期图片 src 已被改写成 Tauri asset 协议 URL，而导出侧只认文件路径形态于是静默跳过，导致导出的 HTML 换台机器打开时本地图片全部丢失。现把 asset URL 回解为本地路径后再内联，并让导出渲染临时指向本次导出的文件（避免相对图片按别的目录解析、被内联成错误图片）；顺带修正 Windows 盘符绝对路径此前被误当相对路径处理的问题。
-- 修复 tauri-driver E2E 无法建立 WebDriver session（#255）：WebView2 Runtime 150 起，msedgedriver 改用环境变量 `WEBVIEW2_USER_DATA_FOLDER` 传 user data folder，应用侧漏读该变量，导致 `DevToolsActivePort` 写到 msedgedriver 不轮询的目录、会话建立失败。顺带修掉「用户环境变量恰好含 `--remote-debugging-port=` 时被误判为 E2E，进而禁用单实例锁」的边界情形；E2E 分支之外无行为变化。
+- 打不开的文件（pdf / docx / zip / exe / 未知后缀）右键可「用系统默认程序打开」，点击也会给出说明与同一动作，不再点了没反应。(#307)
+- 拖入打不开的文件不再被静默忽略：会提示「已忽略 N 个无法打开的文件」，恰好 1 个时附「用系统默认程序打开」；拖入多个目录或目录与文件混投也会提示。(#317 #318)
+- 图片插入方式可配置（本地文件 / Base64 内嵌），按住 `Alt` 可临时取反，无工作区或落盘失败时自动回退内嵌；「默认图片目录」设置此前未生效，现已生效并限制在工作区内。(#151)
+- 标签栏新增常驻「全部标签」面板，可搜索、键盘可达，标签多时便于定位。(#168)
+- 把系统里的文件 / 文件夹拖到窗口上即可打开：单个目录在新窗口打开（该目录已在别处打开则聚焦那个窗口），文件在当前窗口开为标签，拖拽经过时显示「松开以打开」遮罩。(#92)
 
 ### Changed
 
-- 依赖：`vue-i18n` 9.14.4 → 11.1.11（跨 v10/v11 两个大版本；应用侧无需改动，仍为 Composition API 模式）
-- **新增 i18n key 守卫（#317）**：`src/locales/i18nKeyGuard.test.ts` 扫描 `src/**` 里 `t("…")` / `$t("…")` 的**字面量** key，逐个在 zh-CN / en / ja 三种语言里解析，解析不到即失败 —— 此前「key 写错或漏写模块前缀」只会在控制台 warn、界面上**原样显示 key 本身**，静默到用户抱怨为止（`locales.test.ts` 只管 locale 之间 key 树一致，#186 的守卫只管硬编码文案，都拦不到）。据它修掉两处：`TreeNode.vue` 的 `toast.cannotOpenFile`（#307 引入，会显示成 `toast.cannotOpenFile`）与本批新增的拖入提示 key。同类守卫见 #186（硬编码文案）与 #296（设计 token）。
-- 依赖：`sha1` 0.10 → 0.11。摘要的十六进制编码抽为 `commands::sha1_hex()`（输出与旧版逐字符一致），草稿、资源与对话文件名不受影响
-- **配色收敛为「色阶 → 语义 token」引用关系（#293）**：`theme.css` 的语义 token（`--murasaki-primary` / `foreground` / `ink-*` / `border` / `muted*` / `line` / `card` / `ring` 等）改为引用紫色阶 / 中性阶，同一颜色只写一遍；色阶无对应值、或不应进色阶的（纯白 `background`/`popover`、`surface`、彩色底上的白色前景、状态四色）保留字面值并就地注明。改一处色阶即改全套。
-- **半透明主色三档统一派生（#294）**：新增 `--murasaki-primary-soft`（12%，选中底）/ `-soft-hover`（20%，hover 加深）/ `-ring-soft`（30%，焦点环），全部由 `color-mix` 从主色派生、随主色联动；源码编辑器当前行底色比三档都淡，就地写 `color-mix(in srgb, var(--murasaki-primary) 6%, transparent)` 保住视觉近等。同时清理 `src/**` 中指向已定义 token 的**全部**死 fallback（颜色 / 尺寸 / 字体 / 时长 / 阴影等一律；token 均已定义，fallback 只会漂移，仅条件定义的 `--murasaki-touch-target` 保留并就地注明）；另把错误文案色 `#c00`（PreviewPane / PlantUML）与通用代码块前景 `--md-codeblock-color` 收敛到 token。
-- **图表与导出联动主色（#295）**：新增 `src/utils/mermaidTheme.ts`，Mermaid 的 `themeVariables` 运行时从 `--murasaki-*` token 派生并缓存，分栏预览与 WYSIWYG 改用同一个初始化入口（消除「WYSIWYG 先渲染就掉回 Mermaid 默认主题」的隐式副作用；Mermaid 仍按需懒加载）；PlantUML 注入最小 skinparam（背景 / 边框 / 线条取 token 值）；KaTeX 公式颜色从信息蓝改为主题内容色（`--md-fg`）；导出 HTML 删除手抄的 token 常量表，改为导出时读运行时 CSS 变量（取不到则跳过该项，不塞兜底色）。
-- **设计 token 守卫与断言加固（#296）**：新增 `src/styles/tokenGuard.test.ts`，扫描 `src/**`（`.css`/`.vue`/`.ts`）里引用的 `--murasaki-*` 与 `theme.css` 的定义集合比对，未定义即失败（「已定义但零引用」仅记录不断言）；`useNaiveTheme` 与 `theme.css` 的一致性单测改为逐项断言**引用关系**（不再复述字面 hex，改主色自动跟随）；e2e 新增图表配色与半透明覆盖层跟随 token 的断言。
+- 配色收敛为「色阶 → 语义 token」的单一来源（同一颜色只写一遍），Mermaid / PlantUML / KaTeX 与导出 HTML 跟随主色。(#293 #294 #295)
+- 新增两道静态守卫：i18n key 存在性与设计 token 引用，防止写错 key 或引用未定义 token 后静默出错。(#296 #317)
+- 运行期依赖升级：`vue-i18n` 9 → 11、`sha1` 0.10 → 0.11（无用户可见影响）。
+
+### Fixed
+
+- 关闭工作区后再打开同一文件夹，文件树恢复自动刷新。(#311)
+- 无后缀文件不再因为 ≥1MB 就一律打不开（≥1MB 仍会先确认，避免误点大文件卡死；读不出来时给出「用系统默认程序打开」兜底）。(#308)
+- 同一文件因路径写法不同（`\` 与 `/` 混用）被当成两个文件的问题修掉，重复标签 / 最近列表 / 搜索结果一并去重。(#304)
+- 从系统拖入外部图片在 Windows 上不再失效。(#288)
+- 导出 HTML 时本地图片重新内联为 Base64，换机器打开不再丢图。(#258)
+- 修掉两处「引用了不存在的 CSS 变量、导致静默用错色」。(#293)
+
+### Removed
+
+- 彻底移除自 0.5.0 起就已关闭、无任何入口的 AI Agent 功能（前端引擎 / 面板 / 设置分类，Rust 侧工具与 provider，相关依赖）。磁盘上已有的密钥与聊天记录不迁移、不删除。(#264)
 
 ### Security
 
-- 升级 `mermaid` 11.16.0 → 11.16.1，修复配置 API 的原型污染漏洞（[CVE-2026-71438](https://github.com/advisories/GHSA-c4c3-pg64-4m4v)，低危；11.16.1 为该漏洞的首个修复版本）
+- 升级 `mermaid` 修掉一个低危原型污染漏洞（CVE-2026-71438）。
 
 ## [0.9.0] - 2026-09-25
 
-本版本为易用性提升 + 多窗口改造：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数/字符数并存，显示模式与加粗/斜体快捷键，视图菜单重构，退出时静默落盘，文件树与右键菜单键盘可达、外部结构变更自动刷新；并把应用从「单窗口 + 单工作区」改造为「多窗口 = 多工作区」（外部入口一律新开窗口且不恢复上次工作区，「打开文件夹」总是新开窗口，关掉最后一个窗口才退出）；同时修复批量关闭标签丢内容、打开文件对话框类型受限与欢迎页版本号过期。
+易用性提升 + 多窗口改造：新增只读演示模式（第 4 种显示模式）与缩放，状态栏字数 / 字符数并存，显示模式与加粗 / 斜体快捷键，视图菜单重构，退出时静默落盘，文件树与右键菜单键盘可达、外部结构变更自动刷新；并把应用从「单窗口 + 单工作区」改造为多窗口 = 多工作区。
 
 ### Added
 
-- **演示模式（第 4 种显示模式，#180）**：新增「演示」模式，只挂预览不挂编辑器，编辑区铺满渲染结果、无工具栏与分隔条，用于纯阅读与演示。内容不可编辑；内部 `.md` 链接仍开新 tab、外部链接走系统浏览器、任务列表复选框只读不写回；大纲点击滚动预览到对应标题。菜单栏与状态栏保持可见。仅对支持预览的文件生效，source-only 文件（yaml/txt 等）强制降级为源码模式。
-- **演示模式缩放（#181）**：整体等比缩放 50%–200%、步进 10%，支持 `Ctrl+=` 放大 / `Ctrl+-` 缩小 / `Ctrl+0` 复位，以及按住 `Ctrl` 滚动鼠标滚轮缩放（拦截 WebView2 默认页面缩放）；缩放值持久化到 `settings.presentationZoom`，状态栏显示当前比例并可点击复位。
-- **状态栏字数与字符数并存（#182）**：字数与 Word/WPS 同口径（CJK 逐字 + 拉丁按空白分词），字符数为不含空白字符的字符总数，两项同时显示；统计逻辑抽为纯函数 `src/utils/textStats.ts` 并配单测。
-- **加粗/斜体快捷键（#183）**：`Ctrl+B` / `Ctrl+I` 默认绑定加粗/斜体，仅在 markdown 文件中生效；可在「设置 → 快捷键」中自定义。
-- **显示模式快捷切换（#187）**：`Ctrl+Shift+1/2/3/4` 分别切换到源码 / 分屏 / 所见即所得 / 演示模式，可自定义；状态栏新增显示模式 chip，点击弹出四项下拉直接选择。
-- **视图菜单重构（#184）**：视图菜单前移到「主题」之前，含「显示模式 ▸」二级子菜单（四态互斥勾选）、文件树视图（`Ctrl+Shift+E`）/ 大纲视图（`Ctrl+Shift+M`）互斥勾选项、状态栏（`Alt+Shift+S`）、全屏（`F11`）。菜单项 ID 与快捷键命令 ID 统一，勾选同步新增 `set_sidebar_view_checked` 命令。
-- **退出前拦截与草稿落盘（#185）**：关闭窗口或 `Ctrl+Q` 时不再弹对话框，Rust 侧拦截 `CloseRequested` 后通知前端，静默落盘所有已命名且已修改的 tab 草稿与状态，再由 `exit_app` 真正退出；含 3 秒超时兜底。未命名标签无磁盘位置不落盘、不提示。详见 [ADR-0017](docs/adr/0017-close-interception-with-draft-flush-on-exit.md)。
-- **i18n 硬编码守卫（#186）**：新增 `i18nHardcodedGuard.test.ts`，扫描 `composables` / `components` / `stores` / `settings` 下 `dialog.*` / `toast.*` 调用实参中的 CJK 字符，出现即测试失败；同步修复 16 处硬编码文案并补齐三语 key。
-- **文件树键盘导航与 ARIA tree（#190）**：文件树改为标准 ARIA tree（容器 `role="tree"`、节点行 `role="treeitem"`，标注 `aria-level` / `aria-selected` / `aria-expanded`，采用 roving tabindex），支持 `↑`/`↓` 移动焦点（首尾不循环）、`→` 展开或进入子项、`←` 折叠或回父级、`Home`/`End` 跳首尾、`Enter`/`Space` 打开文件或切换目录、`Shift+F10`/菜单键在焦点行弹出右键菜单。不包含 `F2` 重命名与 `Delete` 删除（写操作类快捷键应统一由快捷键注册表管理，留待后续版本）。可见条目扁平化与焦点移动计算抽为纯函数 `src/utils/treeNavigation.ts` 并配单测。
-- **右键菜单键盘导航（#191）**：右键菜单支持 `↑`/`↓` 移动高亮（跳过分隔线与禁用项）、`Home`/`End` 跳首尾、`Enter`/`Space` 触发、`Esc` 关闭；打开时焦点进入菜单，`Esc` 关闭后归还给触发元素。键盘触发的右键菜单以触发行位置为锚点。欢迎页「最近打开」列表项由 `li @click` 改为真正的 `<button>`，可 `Tab` 聚焦并回车打开。
-- **文件树空白区右键统一（#189）**：空白区域右键菜单改用全局 `ContextMenuContainer`（与节点右键共用组件与样式），项为 新建文件 / 新建文件夹 / ─── / 粘贴（应用内剪贴板为空时置灰不可点）/ ─── / 在文件资源管理器中打开；`useFileOpsStore` 暴露响应式 `hasClipboard` 供菜单项禁用态使用。
-- **文件树自动刷新（#193）**：`file-changed` 事件负载由裸路径改为 `{ path, kind }`，Rust 侧把 notify 的 `Modify(Name(..))` 单独归类为 `rename`（此前会被当成内容修改而漏刷）。前端除「已打开 tab 的外部修改」外，另起一路处理工作区内的 `create` / `remove` / `rename`：按 500ms 窗口合并后调用 `refreshTree()`，一次爆发（如 git 切换分支）只重扫一次；`modify` 不刷树，避免应用内保存触发全量重扫。窗口重新获得焦点时（2s 节流）兜底刷新一次，覆盖冷启动期间 watcher 未就绪或事件丢失。新增自保存抑制：磁盘 mtime 与 `tab.lastMtime` 相同时直接跳过，不弹窗不重载。
-- **多窗口多工作区（#194）**：一个窗口 = 一个工作区 = 一份独立前端会话。新增 `src-tauri/src/commands/windows.rs`（`WindowRegistry` 窗口↔工作区注册表、`open_path_in_new_window` / `set_window_workspace` / `close_window` 命令、`exit_if_no_other_windows`）与 `src/utils/windowContext.ts`（窗口 label 与 tabs key 派生）。Rust 侧四个进程级单例全部按窗口 label 分片：`WatcherState` 每窗口一个 watcher（不再互相顶替）、`PendingOpenState` 路径按目标窗口分槽、`ClosingState` 按窗口各自只进入一次、`RecentMenuState` 勾选状态拆到 `window_ui`。详见 [ADR-0018](docs/adr/0018-multi-window-multi-workspace.md)。
-- **菜单按焦点窗口跟随（#194）**：app 级共享菜单栏的勾选状态改为按窗口存储，窗口获得焦点时用 `apply_checked_for_window` 重放主题 / 显示模式 / 侧栏视图三组勾选；`set_theme_checked` / `set_mode_checked` / `set_sidebar_view_checked` 携带窗口 label 存储，非活动窗口的初始化同步不抢菜单显示。
-- **外部入口新开窗口（#194）**：single-instance 回调与冷启动 argv 路径统一走「新窗口 + `take_pending_open_path` 拉取」；带路径启动的窗口跳过上次工作区与标签恢复。
+- 演示模式（第 4 种显示模式）：只挂预览不挂编辑器、铺满只读，适合阅读与展示；内部 `.md` 链接开新标签、外部链接走系统浏览器、任务列表复选框只读。(#180)
+- 演示模式缩放：50%–200% 步进 10%，支持 `Ctrl+=` / `Ctrl+-` / `Ctrl+0` 与 `Ctrl+滚轮`，状态栏显示当前比例并可点击复位。(#181)
+- 状态栏字数与字符数并存：字数为 CJK 逐字 + 拉丁分词、字符数不含空白；另有可点击的显示模式下拉与缩放复位入口。(#182 #187)
+- 加粗 / 斜体快捷键 `Ctrl+B` / `Ctrl+I`，仅 Markdown 文件生效，可在设置中自定义。(#183)
+- 显示模式快捷键 `Ctrl+Shift+1/2/3/4`（源码 / 分屏 / 所见即所得 / 演示），可自定义。(#187)
+- 文件树与右键菜单键盘可达：文件树改为标准 ARIA tree（`↑` `↓` `←` `→` / `Home` / `End` / `Enter` / `Space` / `Shift+F10`），空白区右键菜单统一，右键菜单支持方向键与 `Esc` 并归还焦点。(#189 #190 #191)
+- 文件树跟随外部文件变更自动刷新（新建 / 删除 / 重命名），窗口重新获得焦点时兜底刷新一次。(#193)
 
 ### Changed
 
-- **「打开文件夹」总是新开窗口（#194）**：菜单 / 工具栏 / 文件树 / 最近文件夹四个入口统一走 `open_path_in_new_window`；同一文件夹已在某窗口打开时聚焦那个窗口，不重复开窗（避免同目录双 watcher 与文件操作冲突）。
-- **打开单个文件不再自动设工作区（#194）**：删除 `openFile()` 里「无工作区时以文件所在目录为工作区」的隐式行为。应用内 `Ctrl+O` 与最近文件仍在当前窗口开标签，且不清掉当前工作区。
-- **关闭窗口语义去主窗口化（#194）**：所有编辑器窗口都拦截 `CloseRequested` 并各自静默落盘，关闭任一窗口只关该窗口；关掉最后一个窗口才退出应用。菜单「退出」改为 `quit_app`（通知所有窗口各自落盘），`useExitFlush` 改调 `close_window`。
-- **按窗口事件改定向发送**：`app-close-requested` / `menu-event` / `recent-open` / `navigate` / `file-changed` 由广播改为 `emit_to(label)`，前端监听器同步改为 `getCurrentWebviewWindow().listen`——Tauri 的 `emit` 是广播，而裸 `listen` 的 `Any` target 又会匹配一切 emit（定向发送在任一端退化都会让所有窗口一起关窗或重复执行同一命令）。
-- **持久化按窗口分 key**：`tabs.json` 主窗口沿用旧 key `state`（老用户零迁移），其它窗口用 `state:<label>`；`settings.json` / `recent.json` 保持全局共享；`lastWorkspacePath` 只由主窗口写回，避免多窗口互相覆盖。
-- **删除推送型启动监听器**：移除 `single-instance-open-workspace` 与 `open-from-argv` 两个前端监听器（新窗口的家还没到，推送事件必然丢失），统一改拉取。
-- **显示模式作用域**：改为全局默认 + 按文件类型记忆——markdown 文件沿用最后一次选择的模式，source-only 文件始终为源码模式，不按单文件记忆。
-- **视图菜单前移**：菜单栏顺序调整为 文件 / 编辑 / 段落 / 视图 / 主题 / 帮助。
-- **快捷键作用域**：全局与编辑器两个作用域各自独立做冲突检测；修复 `Ctrl+Shift+1` 等上档组合在真实键盘下匹配失败的问题（新增 `SHIFT_BASE_KEYS` 反查归一化）。
-- **「新建文件夹」交互统一（#188）**：有工作区时不再弹输入框，改为落文件树根目录内联命名（与「新建文件」交互一致）；无工作区仍提示需先打开工作区。删除三语 `editor.commands.newFolderPrompt` / `newFolderPlaceholder` 与已无引用的 `common.error.createFolderFailed`。
-- **文档对齐实现（#192）**：CONTEXT.md 主题章节改为预设五套并补 Murasaki（默认）、新增文件树/右键菜单键盘导航与可达性说明、「打开文件」无工作区行为改为「自动以文件所在目录为工作区」；docs/spec.md 的 Out of Scope 删除已上线的 WYSIWYG 编辑模式 / PDF 导出 / 复制为富文本 / 自动更新四项、主题改五套、「检查更新…」改为已实现描述；README.md 主题列表同步。
+- 多窗口 = 多工作区：外部入口（双击文件关联 / 命令行 / 拖到任务栏）一律新开窗口且不恢复上次工作区与标签；「打开文件夹」总是新开窗口（同一文件夹已在某窗口打开则聚焦那个窗口）；每个窗口各自静默落盘，关掉最后一个窗口才退出应用。(#194)
+- 打开单个文件不再自动把所在目录设为工作区。(#194)
+- 视图菜单重构并前移到「主题」之前：含显示模式（互斥勾选）、文件树视图、大纲视图、状态栏、全屏。(#184)
+- 「新建文件夹」改为在文件树根目录内联命名。(#188)
+- 显示模式改为全局默认 + 按文件类型记忆（source-only 文件始终为源码模式）。
 
 ### Fixed
 
-- **批量关闭标签丢失未保存内容（#177）**：关闭其他/左侧/右侧/全部时改为只弹一次汇总确认，取消则整批中止；未命名标签无草稿兜底，文案显式提示内容不可恢复。
-- **打开文件对话框类型受限（#178）**：「打开文件」过滤器改为 Markdown 文档 / 文本与代码文件 / 所有文件三级；另存为同步放开 markdown 扩展名并去掉硬编码过滤器名。
-- **欢迎页版本号过期（#179）**：欢迎页与「关于」统一改为运行时读取打包版本，删除硬编码的 `0.1.0`。
-- **侧栏视图菜单勾选在窗口切换后全空（#194）**：`WindowUiState.sidebar_view` 存的是视图名（`files` / `outline`），而勾选 API 需要菜单项 ID（`toggle-sidebar` / `toggle-outline`），焦点重放时比较对象不一致导致两组勾选都不勾。新增 `sidebar_menu_id()` 统一转换并补单测。
-- **运行时新窗口完全没有插件权限（#194）**：capability 的 `windows` 由 `["main", "settings"]` 改为 `["*"]`。多窗口后 `win-N` 是运行时动态创建的，不在白名单里就**一条插件命令都不许调**（含 `plugin:event|listen`）：前端挂在注册监听器那一步抛错 → 既收不到 `app-close-requested`（窗口关不掉），也走不到消费待打开路径（传入的文件/文件夹不打开、不落盘）。
-- **「打开文件夹」会卡死整个窗口（#194）**：`open_path_in_new_window` 由同步命令改为 `async`。Tauri 的同步命令在主线程执行，而建窗要投递 `Message::CreateWindow`，`send_user_message` 发现已在主线程就**内联执行**——等于在 WebView2 的 IPC 回调里同步创建新的 WebView2 环境，实测死锁（命令永不返回、窗口也建不出来）。改 `async` 后命令跑在 tokio 工作线程，建窗消息正常投递给事件循环。
-- **关闭一个窗口会连带关掉所有窗口（#194）**：Rust 侧虽用 `emit_to(label)` 定向发送，但前端监听器用裸 `listen`（target 为 `Any`），而 Tauri 的 `match_any_or_filter` 让 `Any` 监听器匹配**一切** emit——于是「关闭我」被广播给全部窗口，关新窗口会把主窗口一起落盘关掉、整个应用退出。涉及 `app-close-requested` / `menu-event` / `recent-open` / `navigate` / `file-changed`，前端统一改用 `getCurrentWebviewWindow().listen` 带上窗口级 target。
-- **退出落盘失败时窗口关不掉（#194）**：capability 缺 `core:window:allow-destroy`，`useExitFlush` 里「`close_window` 失败就强制销毁窗口」的兜底会被 ACL 拒绝（`Command plugin:window|close not allowed by ACL` 同理）。补齐 `allow-close` / `allow-destroy`，保证任何情况下窗口都关得掉。
+- 批量关闭标签不再丢失未保存内容（改为只弹一次汇总确认，未命名标签显式提示内容不可恢复）。(#177)
+- 打开文件对话框过滤器改为 Markdown / 文本与代码 / 所有文件三级。(#178)
+- 欢迎页与「关于」的版本号改为运行时读取。(#179)
 
 ## [0.8.5] - 2026-09-24
 
-本版本修复冷启动文件关联未打开目标文件、启动恢复 tabs 时逐个文件切换，以及所见即所得模式下编辑态范围与全选视觉的问题。
+修复冷启动打开文件、启动恢复体验与所见即所得编辑态 / 全选视觉。
 
 ### Fixed
 
-- **冷启动时双击 Markdown 文件未打开目标文件**：应用未运行时通过文件关联（或命令行）传入的文件路径，原先靠 Rust 侧固定延时 800ms 后推送 `open-from-argv` 事件，而前端要等设置、工作区与上次 tabs 恢复完成后才注册监听器，事件在监听前发出即被丢弃，表现为只恢复出上次的 tabs。现改为拉取模型：Rust 在启动时把 argv 路径暂存到状态，前端初始化完成后调用 `take_pending_open_path` 主动取走并复用原有打开逻辑；应用已在运行时（第二实例）仍走事件推送。
-- **启动恢复 tabs 时逐个文件切换**：`restore()` 恢复每个 tab 都会写 `activeTabId`，而编辑器在 `tabId` 变化时会整体替换 EditorState，导致冷启动把每个文件都切换一遍。现恢复阶段只装载内容（`activate: false`），全部恢复完并重排后再一次性激活目标 tab，编辑器只装载一次。
-- **所见即所得编辑态范围过宽**：行内标记（强调/链接/图片/数学公式）的激活判定由「光标所在整段」收窄为「光标所在行」，修复同一段落内无空行的连续多行文本中，光标停在某行时相邻行的标记也被翻回原始源码；同时段落范围按 CommonMark 规则在会中断段落的块级起始行（围栏代码块、ATX 标题、引用块、列表项、分隔线、HTML 块起始）截断，修复光标进入代码块后上方段落的链接/图片误翻回源码。
-- **光标进入代码块时围栏标记消失**：光标在代码块内时以整个块为激活范围，围栏 CodeMark 保持淡化显示（dim）而非按段落范围判定为隐藏。
-- **全选时自带背景的块级部件无选中反馈**：代码块、Mermaid、图表预览卡、表格与 frontmatter 卡片等自带不透明背景的块级部件会盖住选中底色，现叠加 `::after` 半透明紫覆盖层指示选中态（`pointer-events: none`，不挡交互、不设 z-index）。
-- **进出表格即被标记为待保存**：表格编辑失焦/Esc 会触发一次提交，即使内容未改也会 reflow 并写回表格源码。现提交前判重，reflow 后源码与文档原文完全一致则跳过 dispatch。
+- 应用未运行时双击 `.md` 文件现在能正确打开目标文件（此前只会恢复上次的标签）。(#92 #113)
+- 启动恢复上次标签时不再逐个文件切换，编辑器只装载一次。
+- 所见即所得模式的编辑态范围收窄到光标所在行 / 块（相邻行与代码块上方段落的标记不再误翻回源码）。
+- 所见即所得全选时，代码块 / 图表卡片 / 表格等自带背景的块级部件也有选中反馈。
+- 进出表格不再因为一次空提交就把文件标记为待保存。
 
 ## [0.8.4] - 2026-09-03
 
-本版本将显示模式改由菜单切换，新增编辑时大纲实时更新，并增强所见即所得表格编辑体验。
+显示模式改由菜单切换、编辑时大纲实时更新、所见即所得表格编辑增强。
 
 ### Added
 
-- **新增内容后大纲实时更新（#170）**：编辑器中未保存的新增/删除标题会实时反映到大纲面板。内置由 Rust 新增 `parse_outline_str` 命令作为唯一解析源（沿用磁盘解析同款标题逻辑，不读磁盘、不依赖 mtime），前端以 200ms 防抖 + 序列号防回跳驱动；保存后不再手动刷新，打开/切换文件仍以磁盘为权威。
+- 编辑器中未保存的标题增删实时反映到大纲面板。(#170)
 
 ### Changed
 
-- **显示模式改由菜单切换（#147）**：显示模式不再在设置面板中配置，改由菜单栏新增的「视图 / 显示模式」子菜单切换（源码 / 分屏 / 所见即所得，CheckMenu 互斥勾选），切换即时生效并随启动恢复；三语言菜单文案同步更新。
-- **WYSIWYG 表格编辑体验增强**：支持方向键在单元格间导航、表头单元格编辑、删除按钮在行列最小约束下自动禁用；结构化操作（增删行列/对齐）前先同步 DOM 到数据模型，修复调整新列对齐时内容被清空的问题；工具条固定贴合表格正上方并随表格宽度水平居中，含左/中/右对齐与导航/激活态，与设计稿对齐；补齐悬停插入胶囊（右缘/底缘 `＋`）及 jsdom 交互测试。
+- 显示模式不再在设置中配置，改由菜单栏「视图 / 显示模式」互斥切换。(#147)
+- 所见即所得表格支持方向键导航与表头编辑，工具条贴合表格上方并居中。
 
 ### Fixed
 
-- **WYSIWYG 表格编辑回归修复**：表格内按 Ctrl/Cmd+Z 无法正常撤销——表格内改动发生在 contentEditable DOM，撤销改交浏览器原生处理而非走 CodeMirror 事务；失焦离开表格后仍停留在编辑态——失焦提交不再带回锚点，宿主不再把焦点拉回表格；多表格文档中先编辑第一张表后第二张表无法进入编辑——由上述失焦重聚焦抢焦点连带修复；表格工具条改为贴近表格上方并向左对齐。
+- 所见即所得表格：表格内撤销改走浏览器原生处理，失焦后不再停留编辑态，多表格文档可连续编辑。
 
 ## [0.8.3] - 2026-08-29
 
-本版本适配 macOS 原生快捷键显示，并修复所见即所得模式下全选的视觉反馈。
+macOS 快捷键原生适配与所见即所得全选视觉修复。
 
 ### Added
 
-- **macOS 快捷键原生适配**：原生菜单加速器统一改用 `CmdOrCtrl`，macOS 上显示为 ⌘ 而非 Ctrl；设置面板、全局搜索条、右键菜单、Tab 关闭菜单与欢迎页的快捷键提示在 macOS 上均渲染为 ⌘ 符号；用户自定义快捷键同步到原生菜单时同样跟随平台主修饰键。
+- macOS 上快捷键提示统一显示为 ⌘（原生菜单、设置面板、搜索条、右键菜单、标签关闭菜单、欢迎页）。
 
 ### Fixed
 
-- **WYSIWYG 模式 Ctrl+A 视觉未全选**：底层选区已覆盖全文，但代码块、表格、Mermaid 等块级部件及列表符号、任务复选框等不可选中元素不显示高亮；现为块级部件加入选中态高亮（淡紫底 + 描边），全选时整体可见。
+- 所见即所得模式 `Ctrl+A` 全选的视觉反馈补齐（块级部件、列表符号、任务复选框等不再无高亮）。
 
 ## [0.8.2] - 2026-08-24
 
-本版本修复更新下载进度展示与应用更新体验相关的问题。
+修复更新下载进度展示。
 
 ### Fixed
 
-- **更新下载进度条停滞不动**：下载更新时未订阅进度事件，且进度未知（indeterminate）时进度条被渲染为静止的 0%；现订阅 `DownloadEvent` 实时累计字节并显示下载百分比；当服务器不带 `Content-Length`（无法计算百分比）时改为流动动画短条，不再视觉上「卡住」。
+- 下载更新时进度条按实际字节显示百分比；服务器不提供长度时改为流动动画，不再视觉上「卡住」。
 
 ## [0.8.1] - 2026-08-24
 
-本版本为 0.8.0 的修复与体验优化：中文符号转 Markdown 记号支持空格/回车双触发，并可在围栏代码块内输入闭合 ` ``` `；修复 WYSIWYG 模式引用块行高不足导致内容显示不全。
+0.8.0 的修复与体验优化。
 
 ### Changed
 
-- **中文符号转 Markdown 记号支持回车触发**：行首输入连续全角符号后按回车（而非仅空格）即可转换，回车携带的自动缩进一并保留，转换仍合并为一个撤销步。
-- **围栏代码块内可输入闭合 ` ``` `**：原来代码范围一律不转换，导致无法用 `···` 输入闭合围栏；现围栏代码块内行首 `···` 视为闭合围栏（CommonMark 语义）允许转换，块内其他符号仍保持不转换。
+- 中文符号转 Markdown 记号支持回车触发（不只是空格），回车携带的自动缩进一并保留。
+- 围栏代码块内可以输入闭合 ` ``` `。
 
 ### Fixed
 
-- **WYSIWYG 引用块内容显示不全**：引用块 mark decoration 的垂直 padding 无法撑开行盒，多行引用内容被挤压/重叠；改为仅保留水平 padding、用 line-height 提供上下间距，保证内容完整展示。
+- 所见即所得引用块行高不足导致内容显示不全的问题修掉。
 
 ## [0.8.0] - 2026-08-24
 
-本版本聚焦**中文输入与导航体验**：中文符号自动转 Markdown 记号、快捷键自定义、统一全局搜索条取代跨文件搜索面板、Tab 栏区分工作区内外文件，并扩展多语言支持（新增日语）。
+聚焦中文输入与导航体验：中文符号自动转 Markdown 记号、快捷键自定义、统一全局搜索条取代跨文件搜索面板、标签栏区分工作区内外文件，并新增日语支持。
 
 ### Added
 
-- **中文符号自动转 Markdown 记号**：行首输入连续全角符号 + 空格，一次性转换为对应 Markdown 结构记号——`》`→`>`（引用，`》》`→`>>` 嵌套）、`···`→```` ` ````（围栏代码）、`【】`→`[]`、`·`/`＊`/`－`→`-`/`*`/`-`（列表）、`＃`→`#`（标题）、`～`→`~`、`＊＊＊`→`***`。转换保留空格并合并为一个撤销步；代码范围内不转换，仅 `.md`/`.markdown` 文件生效，源码与 WYSIWYG 模式一致；可在设置-编辑器关闭（默认开启）。
-- **快捷键自定义**：设置新增「快捷键」分类，按文件/编辑/段落/视图分组展示全部可自定义快捷键；点击徽标录制新组合键，支持恢复默认与禁用，实时检测与其他命令的绑定冲突，保存后立即生效无需重启。
-- **统一全局搜索条**：`Ctrl+P` / `Ctrl+Shift+F` 拉起顶部居中浮动搜索条，输入关键字混合返回「打开的标签 + 最近文件 + 文件名 + 内容命中（仅 `.md`，含行号与片段）」，回车即打开/切换；支持 `↑`/`↓` 选择、`Tab` 焦点循环、正则/大小写/全词高级选项；取代原 find-in-files 底部面板。
-- **多语言支持扩展**：新增日语（ja）全量翻译；原生菜单改由 `build.rs` 从 locale 单源生成；首次启动按系统语言自动探测（仅语言从未写入时触发一次）。
+- 中文符号自动转 Markdown 记号：行首输入连续全角符号 + 空格（或回车）即转换为对应 Markdown 记号（如 `》`→`>`、`···`→围栏、`＃`→`#`），仅 `.md` / `.markdown` 生效，可在设置中关闭。
+- 快捷键自定义：新增「快捷键」设置分类，支持录制、恢复默认、禁用与冲突检测，保存后即时生效。
+- 统一全局搜索条：`Ctrl+P` / `Ctrl+Shift+F` 拉起顶部悬浮搜索条，混合返回标签 / 最近文件 / 文件名 / 内容命中，支持正则、大小写与全词匹配。
+- 新增日语（ja）全量翻译；首次启动按系统语言自动探测。
 
 ### Changed
 
-- **Tab 栏工作区内外区分**：工作区外文件 tab 前导图标替换为 ↗ 角标（激活态变紫），hover 提示加「工作区外：」前缀；无工作区时隐藏全部角标；不持久化、不改变 tab 顺序。
+- 标签栏区分工作区内外文件：工作区外标签加 ↗ 角标与 hover 提示；无工作区时不显示。
 
 ### Fixed
 
-- **Windows 包启动报「无法定位程序输入点 TaskDialogIndirect」**：0.8.0 的 `build.rs` 为支持菜单单源化而误删了 `tauri_build::build()` 调用，导致应用清单未嵌入 Common Controls v6 依赖、comctl32 回退到 v5；已恢复该调用。
-- **更新弹窗发布说明显示「无发布说明」**：`release.yml` 未向 tauri-action 传 `releaseBody`，导致 `latest.json` 的 `notes` 为空；已透传 CHANGELOG 变更记录作为发布说明。
+- 修复 Windows 包启动报「无法定位程序输入点 TaskDialogIndirect」（构建脚本误删清单嵌入调用）。
+- 修复更新弹窗显示「无发布说明」（Release Notes 未包含 CHANGELOG 内容）。
 
 ## [0.7.1] - 2026-08-19
 
-本版本修复 0.7.0 引入的 HTML 文件相关体验问题：HTML 源码支持左侧编辑、分隔条拖拽跨 iframe 失效。
+修复 0.7.0 引入的 HTML 文件体验问题。
 
 ### Changed
 
-- **HTML 源码可编辑**：HTML 文件左侧源码由只读改为可编辑，右侧仍以沙箱 iframe 实时预览，编辑后预览即时刷新。
+- HTML 文件左侧源码由只读改为可编辑，右侧沙箱预览实时刷新。
 
 ### Fixed
 
-- **分隔条拖拽失效**：分栏模式下分隔条缩小后无法拖回右侧（指针进入 HTML 预览 iframe 后鼠标事件被吞掉）。改用 pointer 事件 + `setPointerCapture`，拖拽跨 iframe / 窗口外均可靠；侧栏右缘拖拽同因一并修复。
+- 分栏模式下分隔条缩小后无法拖回（指针进入 HTML 预览 iframe 后事件被吞）修掉，拖拽跨 iframe 与窗口外均可靠；侧栏右缘拖拽同因一并修复。
 
 ## [0.7.0] - 2026-08-19
 
-本版本聚焦**用户体验改进**：WYSIWYG 模式表格对齐与图表实时预览、阅读字体四档预设、非 Markdown 文件支持（HTML 预览 + 文本/代码文件编辑）、文件树宽度调整与折叠、新建文件内联命名等。
+聚焦用户体验改进：非 Markdown 文件支持、阅读字体四档、文件树宽度调整与折叠、新建文件内联命名。
 
 ### Added
 
-- **非 Markdown 文件支持**：HTML 文件以沙箱 iframe 渲染预览（源码只读），yaml/yml/xml/txt/json/json5/ini/toml/css/js/ts/py/rs 等文本与代码文件以源码模式打开并自动匹配 CodeMirror 语言高亮；无后缀文件小于 1MB 阈值时按文本文档处理。
-- **阅读字体四档预设**：A 文雅楷体（LXGW WenKai）/ B 简净无衬线 / C 学术衬线 / D 技术等宽，默认 D；在设置-编辑器中选择，预览与 WYSIWYG 模式统一生效（--murasaki-font-reading）。
-- **新建文件内联命名**：有工作区时，新建文件（菜单/工具栏/Ctrl+N 入口）直接触发文件树根目录内联命名输入框，确认后即创建；无工作区时才打开空白 tab。
-- **文件树宽度调整与折叠**：左侧文件树支持右缘拖拽调宽（140–600px）与右上角按钮收起成细条（36px），宽度与折叠状态均持久化。
-- **文件树图标分类**：Markdown 文件（紫色 M 徽标）、HTML 文件（紫色角码）、其他文本/代码文件（普通文档图标）三态区分。
+- 非 Markdown 文件支持：HTML 以沙箱 iframe 预览，yaml / xml / txt / json / ini / toml / css / js / ts / py / rs 等文本与代码文件以源码模式打开并自动语法高亮；无后缀且小于 1MB 的文件按文本处理。
+- 阅读字体四档预设（文雅楷体 / 简净无衬线 / 学术衬线 / 技术等宽，默认技术等宽），设置中切换、预览与所见即所得统一生效。
+- 新建文件在有工作区时直接触发文件树内联命名。
+- 文件树支持右缘拖拽调宽（140–600px）与收起成细条，宽度与折叠状态均持久化。
+- 文件树图标区分 Markdown（紫色 M 徽标）/ HTML（角码）/ 其他文本三态。
 
 ### Changed
 
-- **WYSIWYG 图表实时预览**：光标进入 Mermaid/PlantUML 代码块时，在块下方显示实时预览卡片，随输入防抖更新，光标离开或切换后隐藏。
-- **WYSIWYG 表格对齐**：修复表格表头与表内容未对齐问题，与预览视觉一致。
-- **YAML frontmatter 卡片**：修正文字过高无法显示全的问题。
-
-### Fixed
-
-- **WYSIWYG 特殊块展示**：修复单行代码等特殊块在 WYSIWYG 模式下与预览展示不一致的问题。
-- **非工作区文件大纲**：验证并确认直接打开的非工作区 md 文件大纲可正常展示（大纲 tab 点击即显示）。
+- 所见即所得：光标进入 Mermaid / PlantUML 代码块时，在块下方显示实时预览卡片。
+- 所见即所得表格表头与内容对齐；YAML frontmatter 卡片文字不再显示不全。
 
 ## [0.6.0] - 2026-08-11
 
-本版本新增 **PlantUML 图渲染支持**：采用官方纯浏览器方案（TeaVM 编译产物），在浏览器本地渲染 SVG，无需任何服务器。
+新增 PlantUML 图渲染支持。
 
 ### Added
 
-- **PlantUML 图渲染（浏览器本地）**：预览与分栏预览中识别 `plantuml` 代码块，动态加载官方 `plantuml.js`（TeaVM WASM 产物）+ `viz-global.js`（Graphviz 布局引擎）渲染为 SVG，样式与 Mermaid 卡片保持一致。两个大体积产物（约 5.4MB）走 `public/` 目录 + 运行时动态 `import(/* @vite-ignore */)` 懒加载，仅在文档包含 PlantUML 时才加载，不影响启动性能。
-
-### Changed
-
-- **构建产物**：新增 `dist/plantuml/`（plantuml.js + viz-global.js）作为静态资源随包分发。
+- PlantUML：识别 `plantuml` 代码块并在浏览器本地渲染为 SVG（官方 TeaVM 产物，无需服务器），样式与 Mermaid 卡片一致；体积较大的产物按需懒加载，不影响启动性能。
 
 ## [0.5.0] - 2026-08-04
 
-本版本聚焦 **WYSIWYG 模式可用性**：修复样式不一致、模式切换、图片加载、任务列表、大纲跳转等核心问题；移除低 ROI 的深色模式，隐藏不成熟的 Agent 功能并补全日常体验；同时打通自动更新端到端链路。
+聚焦所见即所得模式可用性，并打通自动更新端到端链路。
 
 ### Added
 
-- **WYSIWYG 样式与预览统一（#111 / #116）**：source / split / wysiwyg 三种编辑模式统一使用预览同款阅读字体（`--murasaki-font-reading`），字号/行高/字体族通过 CodeMirror Compartment 动态切换；WYSIWYG widget 对齐 markdown-it class，与预览/导出视觉一致。
-- **本地图片加载（#118）**：基于 Tauri `convertFileSrc` 解析图片，兼容相对路径 / 绝对路径 / URL / Base64，`ImageWidget.eq()` 比较解析后的 src，切 tab 时重新渲染。
-- **Tab 栏滚动与关闭按钮（#117）**：tab 标题 flex 收缩 + 省略号；激活 tab 变化、数量变化及窗口缩放（ResizeObserver）时自动滚入可视区，最右侧 tab 始终可选中/关闭。
-- **启动时打开上次工作区（#96）**：设置项开启后，启动自动恢复上次工作区；打开文件无工作区时自动以文件所在目录为工作区，左侧文件树即时显示。
-- **文件关联（#113）**：`tauri.conf.json` 配置 `fileAssociations`（md/markdown/mdown/mkd），安装包注册到系统"打开方式"。
+- 所见即所得样式与预览统一（三种编辑模式共用预览同款阅读字体与行排版）。
+- 本地图片加载（相对路径 / 绝对路径 / URL / Base64 均可）。
+- 标签栏滚动与关闭按钮（标签溢出时激活标签自动滚入可视区）。
+- 启动时打开上次工作区。
+- 文件关联：安装后 `.md` / `.markdown` 等注册到系统「打开方式」。
 
 ### Changed
 
-- **WYSIWYG 模式切换不刷新（#115）**：通过 `wysiwygComp` Compartment 运行时叠加/移除 WYSIWYG ViewPlugin，不销毁编辑器实例，内容/光标/undo 栈保持不变。
-- **移除深色模式（#114）**：仅移除 UI 层 dark 选项，保留 night 预览主题。
-- **隐藏 Agent（#112）**：`AGENT_ENABLED` 开关置 false，隐藏所有 Agent 入口与弹窗，恢复时仅需置 true。
+- 所见即所得模式切换不再刷新编辑器（内容 / 光标 / 撤销栈保持）。
+- 移除深色模式（保留 night 预览主题）。
+- 隐藏 Agent 功能（入口与弹窗一并隐藏）。
 
 ### Fixed
 
-- **大纲点击未跳转（#120）**：`scrollToLine` 同时移动光标 + `scrollIntoView` + focus，WYSIWYG 模式下块级 widget 替换后也能正确定位。
-- **WYSIWYG 插入列表后光标位置异常（#123）**：`toggleList` 添加列表前缀后把光标定位到 `1. ` 之后，不再落在序号前。
-- **WYSIWYG 任务列表展示（#119）**：任务 checkbox 渲染为可交互 widget，点击精确切换 `[ ]` ↔ `[x]`，不影响行内其他文本、不破坏列表结构。
-- **点击元素修改范围控制（#122）**：checkbox 点击精确替换 `[from,to]` 范围；链接点击仅导航不修改文本；块级元素点击定位到块起始。
-- **自动更新失败（#124）**：`release.yml` 升级 tauri-action 至 `@v1`，build job 补传 `tagName` 并开启 `updaterJsonPreferNsis`，确保 Release 生成并上传 `latest.json` 与 `.sig` 签名文件。
+- 大纲点击跳转在所见即所得下也能正确定位。
+- 插入列表后光标定位到 `1. ` 之后。
+- 所见即所得任务列表可交互勾选并回写源码。
+- 自动更新失败修复（Release 正确生成并上传 `latest.json` 与签名文件）。
 
 ## [0.4.0] - 2026-08-03
 
-本版本聚焦产品交付能力建设：自动更新管道打通、三种导出格式、国际化框架、搜索模块重构、AI Provider 抽象层、WYSIWYG 四项补全。
+聚焦产品交付能力：自动更新管道、三种导出格式、国际化框架、搜索重构、AI Provider 抽象与所见即所得四项补全。
 
 ### Added
 
-- **自动更新（#106）**：Tauri updater + Minisign ed25519 签名体系打通；GitHub Actions Release workflow 自动构建三平台产物（Windows / macOS / Linux）、签名、生成 `latest.json` 并发布到 GitHub Releases；客户端内置公钥，启动后自动检测并提示更新。
-- **PDF 导出（#107）**：基于 Tauri WebView2 `PrintToPdf` 原生 API 的 PDF 导出；支持自定义文件名、A4 纸张、自动分页；`src-tauri/src/commands/export.rs` 封装 Rust 命令；前端 `useExportStore` 统一调度 HTML/PDF/富文本三种导出。
-- **复制为富文本（#108）**：`useCopyRichText` composable 实现；将当前 Markdown 通过预览渲染为 HTML 后以 `text/html` MIME 类型写入系统剪贴板；支持粘贴到 Word / Notion / 微信等富文本目标。
-- **国际化框架（#95）**：vue-i18n 9.x 集成；zh-CN / en 双语言 locale 文件（common / menu / settings / editor / agent 五模块）；Rust 端菜单翻译表 `src-tauri/src/i18n.rs` + `reload_menu` 命令；设置面板语言下拉切换；已完成 useAgentStore / ImagePreviewModal / App.vue / 菜单 文案提取，其余组件逐步迁移。
-- **AI Provider 抽象（#98）**：Provider 接口层 `src/agent/provider.ts` 统一定义；已实现 Claude（官方 SDK）与兼容 REST API 双后端；24 测试覆盖接口契约、错误处理、重试逻辑；Provider 选择与 API Key 通过设置面板管理。
-- **WYSIWYG 四项补全（#99 / #100 / #101 / #103）**：emoji 插入面板（40+ 常用 emoji 分类）、frontmatter 可视化编辑（YAML 键值对表格）、Markdown 脚注语法（`[^ref]` 定义与引用自动同步编号）、HTML 预览净化（DOMPurify 白名单过滤 XSS）。
+- 自动更新：Tauri updater + 签名体系打通，三平台产物自动构建发布，客户端启动后自动检测更新。
+- PDF 导出，以及「复制为富文本」（可直接粘贴到 Word / Notion 等）。
+- 国际化框架（中 / 英双语，原生菜单与前端文案统一）。
+- AI Provider 抽象层（Claude 与兼容 REST API 双后端）。
+- 所见即所得补全：emoji 插入面板、frontmatter 可视化编辑、脚注语法、HTML 预览净化。
 
 ### Changed
 
-- **搜索模块重构（#104）**：`src/composables/useSearch.ts` 重写为异步可取消架构（`AbortController` 支持新查询自动终止旧任务）；搜索结果增量返回（streaming-like UI 更新）；新增 `SearchResultHit` 类型统一标题/路径/匹配位置；搜索导航支持 Tab 打开 / Ctrl+Enter 后台打开。
-
-### Fixed
-
-- **Tauri 签名公钥 baked in**：`tauri.conf.json` updater pubkey 已从占位符替换为实际 ed25519 公钥；私钥与密码已录入 GitHub Secrets，CI/CD 自动签名更新包。
+- 搜索模块重构为异步可取消架构，结果增量返回。
 
 ## [0.3.1] - 2026-08-01
 
-本版本为架构改进与测试稳定性修复版本，无用户可见功能变更。聚焦深化模块边界、消除循环依赖、清理死代码、重塑测试接口，提升代码可维护性与可测试性。
+架构改进与测试稳定性修复，无用户可见功能变更。
 
 ### Changed
 
-- **新建 fileSystem 适配器**：`src/services/fileSystem.ts` 集中所有 Tauri 文件操作（readText / writeText / getMtime / exists / pathType / createFile / createDirectory / deletePath / renamePath / copyFile / revealInExplorer / writeAgentFile / resolveAgentPath），消除 useFileOpsStore / useFileActions / useProposalsStore 中散落的 `invoke` 调用。
-- **统一冲突解析**：`useFileOpsStore` 提取 `checkAndResolveConflict` 辅助函数，消除 renamePath / copyPath 等 4 处重复的 exists + pathType + conflictResolver 模式。
-- **消除循环依赖隐患**：`useProposalsStore` 和 `agent/tools.ts` 用静态 `import` 替换动态 `await import()`，移除运行时 import() 调用。
-- **测试接口 seam 重塑**：移除 `useImagePaste` 的 `__test__` 导出，将 `isImageExt` / `relativePath` 提升为正式命名导出（纯工具函数，属合法模块 API）；`tools.test.ts` 规范化 mock 模式，11 处动态 `await import("@tauri-apps/api/core")` 替换为静态 import + `vi.mocked(invoke)` 习惯用法。
-
-### Removed
-
-- 删除死代码 `usePromiseModal` composable 及其测试（项目未使用）。
-- 移除 `useEditorCommands` 中的测试专用工具函数，迁移到独立的 `src/test/editorTestUtils.ts`。
-
-### Fixed
-
-- 修复 F11 全屏切换 E2E 测试与弱断言声明不一致：测试名声明"不验证 OS 全屏状态"，但代码却做 `.cm-editor.waitForExist` 强断言。`beforeEach` 调用 `closeAllTabs` 后无 tab 残留，根据 `App.vue` 的 `v-if="!tabsStore.hasTabs"` 逻辑此时渲染 WelcomePage 而非 EditorPane，`.cm-editor` 不存在必然超时。改为与测试名一致的 `document.readyState` 弱断言。
+- 集中文件系统操作到单一适配器，统一冲突解析，消除重复代码与循环依赖。
+- 重塑测试接口、删除死代码。
 
 ## [0.3.0] - 2026-07-30
 
-本版本进行整体 UX 对齐与 WYSIWYG 模式实现，建立设计系统基础、反馈系统基础设施、状态展示三兄弟、Agent 面板全量视觉对齐、WYSIWYG 模式（CodeMirror 6 内 Typora 路线）、设置页单入口路由、Markdown 渲染样式统一。
+整体 UX 对齐与所见即所得模式实现：设计系统、反馈系统、状态组件、设置页、Markdown 渲染样式统一。
 
 ### Added
 
-- **设计系统基础对齐（#33, #34）**：引入 lucide-vue-next 统一图标库替换所有 emoji + 内联 SVG + naive-ui NIcon；保留 naive-ui 通过 NConfigProvider + themeOverrides 把颜色/圆角/字体变量映射到 `--murasaki-*` token；补全字号/阴影/menubar-height/transition token；清理 CompareWindow/SearchPanel 等组件的硬编码颜色。
-- **反馈系统基础设施（#36, #37, #38）**：自建 Toast store + Teleport 容器（6 变体：success/info/warning/error/progress/deleted）+ Promise API 对话框（alert/confirm/prompt/conflict 四类型，替换 36 处原生弹窗）+ 数据驱动右键菜单（TabBar/Editor/Agent 消息/TreeNode 四处）；统一视觉：取消在左/确认在右、Escape 等同取消、打开聚焦默认按钮。
-- **状态展示三兄弟（#39）**：自建 EmptyState + ErrorState + Skeleton 组件，共享虚线边框容器与 props 模式，替换 naive-ui NEmpty/NSpin/NSkeleton。
-- **WYSIWYG 模式（#42, #43, #44, #45）**：CodeMirror 6 内 WYSIWYG（Typora 路线），单编辑器实例，markdown 文本为唯一数据源，通过 StateField + Decoration 隐藏/显示语法标记。三种模式（source/split/wysiwyg）共用同一 CM6 实例，全部运行时切换无需重启。光标进入段落时标记 dim 灰色显现，离开后隐藏。P0 行级语法标记隐藏 + P1 块级元素 widget（代码块 Shiki 高亮/链接/图片/表格/KaTeX/Mermaid SVG）全部实现。
-- **WYSIWYG 工具栏（#46, #47）**：编辑器顶部工具栏，源码/WYSIWYG 模式共用，分组按钮（文本格式/标题/列表/插入）+ 分隔符，行为一致修改底层 markdown 文本。
-- **设置窗口多窗口化（#48, #49, #50, #51, #52, #53）**：改为 Tauri 多窗口形态（独立 OS 窗口可独立最小化/关闭）；3 个分类（常规/编辑器/AI）；显式 Save 模型（恢复默认/保存两个按钮，关闭未保存弹确认）；AI 分类含 Provider 列表 + 编辑表单 + 测试连接 + 高级参数折叠区；Provider 删除二次确认。
-- **Markdown 渲染样式统一（#84-#89）**：新建 `src/styles/markdown-content.css` 作为预览/导出/WYSIWYG 共享样式单一来源，5 套主题（murasaki/github/newsprint/night/academic）通过 data-md-theme 切换，Murasaki 紫色品牌主题为默认；Shiki 自定义品牌色主题（keyword 紫 #c084fc / function 蓝 #60a5fa / string 绿 #4ade80）；Mermaid 紫色主题变量；KaTeX 蓝色样式；标题字号对齐设计稿（H1=22px/H2=18px/H3=15px）；WYSIWYG widget 样式与预览像素级对齐。
-- **欢迎页视觉对齐（#40）**：lucide book-open 品牌 + 快捷键提示区 + EmptyState 空最近文件列表。
-- **Agent 面板全量视觉对齐（#41）**：emoji 全换 lucide 图标；工具调用折叠卡片；提案列表卡片；用户/助手消息气泡区分；provider chip；中断标签 alert-triangle。
-- **Murasaki 主题（#84）**：新增紫色品牌主题，OS 原生菜单切换。
-- 0.3.0 全功能 E2E 测试覆盖：WYSIWYG 模式切换、工具栏操作、设置窗口、Toast/Dialog/ContextMenu、Markdown 渲染样式断言（50/50 通过）。
+- 设计系统基础：统一图标库，颜色 / 圆角 / 字体变量映射到设计 token。
+- 反馈系统：自建 Toast、Promise 式对话框（替换原生弹窗）、数据驱动右键菜单。
+- 状态展示组件（空状态 / 错误状态 / 骨架屏）。
+- 所见即所得模式（CodeMirror 6 内 Typora 路线）：单一编辑器实例、Markdown 文本为唯一数据源、三种模式运行时切换，行内标记与块级部件（代码块 / 链接 / 图片 / 表格 / 公式 / Mermaid）渲染。
+- 编辑器工具栏（源码与所见即所得共用）。
+- 设置页：常规 / 编辑器 / AI 三个分类，显式保存模型。
+- Markdown 渲染样式统一（预览 / 导出 / 所见即所得共享单一来源，5 套主题，Murasaki 紫色为默认）。
+- Murasaki 主题、欢迎页与 Agent 面板视觉对齐。
 
 ### Changed
 
-- 标签栏移除主题选择器 NSelect，仅保留 TabBar + 新建按钮；markdown 主题切换通过 OS 原生菜单 + 设置窗口。
-- 状态栏按 ux-panels 规范补全：lucide 图标项 + 文本、已保存指示、孤立会话清理按钮、provider chip。
-- 文件树选中态补 text-primary + font-medium；搜索高亮改紫色 20% alpha。
-- 浮层统一用 naive-ui NPopover + themeOverrides（trigger=click，show-arrow=true）。
-- useHtmlExport 改为读取共享 markdown-content.css，确保导出 HTML 与预览视觉一致。
-
-### Fixed
-
-- 修复 useHtmlExport 中 FRONT_MATTER_CSS 死导入（T1 重构后 useFrontMatter 不再导出）。
-- 修复导出 HTML 中 Mermaid 图表不显示紫色主题（PreviewPane.vue 初始化 Mermaid 主题，确保预览和导出使用相同配置）。
-- 修复 tauri-driver/msedgedriver 孤立 bug（setup.ts 的防御性清理 `Stop-Process -Name msedgedriver` 会杀掉 tauri-driver 的子进程导致永久孤立，改为杀 tauri-driver 让 Windows Job Object 自动带走 msedgedriver）。
-- 修复 webdriverio 9.x attach() "Invalid URL" bug（attachOptions.options 为 undefined 时 detectBackend 返回 undefined 字段，需显式传入 hostname/port/protocol/path）。
-
-### Post-Release Fixes（同版本号内补丁）
-
-- 设置保存后运行时生效（无需重启）：`settings://saved` 监听器调用 `loadSettings()` 重新加载磁盘设置到主窗口 store
-- WYSIWYG 模式可用：修复设置通信断裂导致 WYSIWYG 模式无法触达的问题
-- 设置窗口空白：从 Tauri 多窗口改为单入口路由（index.html#settings），规避 WebView2 第二窗口加载失败
-- 设置窗口双重关闭按钮：删除自绘标题栏，改为 footer 关闭按钮
-- 设置窗口菜单栏污染：单入口路由后自动消失
-- 主题菜单勾选状态：菜单项改用 `CheckMenuItemBuilder`，新增 `set_theme_checked` 命令
-- 撤销到原始内容后 dirty 标记不清：Tab 加 `savedContent` 字段，`updateContent` 对比决定 `isDirty`
-- 刷新按钮卡死：`list_tree` 加 30s 超时兜底 + `refreshTree` 防重入锁
-- WYSIWYG 块级 widget 不渲染：CM6 限制 ViewPlugin 不能提供跨换行块级替换装饰（"Decorations that replace line breaks may not be specified via plugins"），导致代码块/表格/Mermaid 等多行 widget 不渲染。重构为 StateField + 轻量 ViewPlugin 监听器架构：`wysiwygField` (StateField) 通过 `EditorView.decorations.from(f)` 提供装饰不受此限制，`wysiwygSyntaxWatcher` (ViewPlugin) 监听语法树异步解析变化并 dispatch `recomputeWysiwygEffect` 触发重算。
-- 外部链接在 app 内打开：WYSIWYG LinkWidget 未处理点击事件导致链接在 WebView 内导航。改为 Ctrl/Cmd+Click 通过 tauri-plugin-shell 调用系统浏览器打开外部 URL，相对 .md 路径仍走应用内新 tab 打开。
-- WYSIWYG 模式不支持主题切换：wysiwygTheme 硬编码颜色不跟随 markdown 主题。SourceEditor 添加 `markdownTheme` prop 设置 `data-md-theme` 属性，wysiwygTheme 全部改用 `--md-*` 主题变量，与预览/导出视觉一致。
-- 多列表格不渲染：块级元素（代码块/表格）使用段落重叠判断（`inParagraph`），相邻段落无空行时 para 扩展覆盖整个块导致 widget 不生成。改为 `cursorInRange`（光标是否在节点范围内）判断，光标在块内显示源码可编辑，离开则渲染 widget。
-- 任务列表按无序列表渲染：WYSIWYG 装饰计算未处理 `TaskMarker` 节点。新增 TaskMarker 识别逻辑，ListMark + TaskMarker 一起替换为可点击的 checkbox widget，点击切换 [ ]/[x] 状态并 dispatch changes 修改源码。
-- 代码块/表格/公式需点击上方行才能编辑：CodeMirror 默认将光标定位到 widget 附近行而非块范围内。为块级 widget（CodeBlock/Mermaid/Table/Math）添加点击事件，发出 `murasaki-focus-block` 自定义事件，SourceEditor 监听后将光标定位到块起始位置触发原始 markdown 编辑。
-- 短代码 Emoji 未渲染：WYSIWYG 模式未扫描 `:shortcode:` 格式。新增 emojiRe 正则扫描，使用 markdown-it-emoji 的 full 数据映射将 `:smile:` 等短代码替换为 EmojiWidget 渲染实际 emoji 字符，光标在段内时保持原样可编辑。
-- 嵌套引用块换行后引用层级自动加一：@codemirror/lang-markdown 的 `insertNewlineContinueMarkup` 在某些嵌套引用块场景下会错误增加层级。新增自定义 Enter 键处理器 `handleEnterInBlockquote`：非空行换行保持相同 `>` 层级，空行换行退出引用块（单层完全退出，多层减少一层），引用块内含列表标记时交给默认处理器。
-- 设置中修改字体大小无效：SourceEditor 硬编码 `fontSize: 13px` 不响应设置变更。添加 `fontSize/lineHeight/fontFamily` props，通过 `Compartment` 运行时动态切换字体主题，App.vue 将 persistence.settings 的编辑器字体设置透传到 EditorPane → SourceEditor，设置保存后立即生效无需重启。
-
-### Changed（Post-Release）
-
-- 设置页架构：Tauri 多窗口 → 单入口路由（ADR-0009 架构变更，设置页在主窗口内渲染）
-- 主题菜单项：`MenuItem` → `CheckMenuItem`，支持 checked 状态
-- `useTabsStore`：Tab 接口新增 `savedContent` 字段记录已保存内容快照
-
-### E2E 测试（Post-Release）
-
-- 新增 `settings-runtime.spec.ts`：设置保存后运行时生效
-- 新增 `tabs.spec.ts`：撤销到原始内容后 dirty 清除
-- 新增 `workspace.spec.ts`：刷新按钮停止动画
-- 新增 `settings-window.spec.ts`：单入口路由渲染设置页
-- 新增 `verify-wysiwyg-manual.spec.ts`：WYSIWYG 真实用户路径验证（6 个测试）
-- 新增 `wysiwyg-full.spec.ts`：WYSIWYG 全量展示与编辑测试（19 大类 79 用例）
-- 新增 `wysiwyg-widgets.spec.ts`：WYSIWYG 块级 widget 渲染测试（14 用例）
-- 新增 12 个功能盲区 spec：`agent-panel-visual` / `context-menu-business` / `external-modifications` / `file-operations` / `html-export` / `misc-visual` / `outline-navigation` / `persistence-recovery` / `scroll-sync` / `search-navigation` / `settings-explicit-save` / `shortcuts` / `state-display`
+- 标签栏移除主题选择器，主题切换改走原生菜单与设置窗口。
+- 导出 HTML 改用共享 Markdown 样式，与预览一致。
 
 ## [0.2.0] - 2026-07-29
 
-本版本引入完整的 Agent 能力（基于 OpenAI 兼容端点的 BYOK 助手），并刷新整体视觉风格以匹配 Murasaki 品牌。
+引入完整的 Agent 能力（基于 OpenAI 兼容端点的 BYOK 助手），并刷新整体视觉风格。
 
 ### Added
 
-- **Agent 面板与循环骨架（#20）**：右侧固定 380px 面板，支持流式输出（50ms 节流）、AbortController 取消、思考中禁用输入框并发送按钮变红 Stop，无工作区时面板整体禁用。
-- **默认上下文 + CM6 状态类工具（#21）**：4 个前端工具 `get_current_document` / `get_selection` / `get_visible_range` / `get_outline`，默认上下文含完整当前文档（8K 阈值截断）、路径、frontmatter、光标与选区快照，UI 折叠卡片展示已包含项与 token 估算。
-- **文件类工具与工作区边界（#22）**：3 个文件工具 `list_files` / `read_file` / `search_across_files`，Rust 侧解析路径必须落在工作区内，无工作区时 Agent 完全禁用。
-- **Inline proposals + 新文件提案 + 合并关闭弹窗（#23, #24）**：行级 + 字符级 diff（>50 行降级为行级），绿色插入 / 红色删除装饰 + 右侧浮动 ✓/✗ 按钮 + 面板内可点击跳转的提案列表；文档变更后所有提案严格失效；`propose_replace` 超 50 行触发二次确认；`propose_new_file` 走现有"覆盖/重命名/取消"冲突弹窗，无效路径回退"另存为"；Agent 运行中关闭 tab 合并未保存确认弹窗（取消 / 不保存关闭 / 保存并关闭）。
-- **对话持久化 + 工作区隔离 + 单实例锁 + 孤儿清理（#25）**：按工作区哈希隔离的对话历史，`chats/{hash}.json.gz`（gzip + 500ms debounce）+ `chats/index.json` 路径↔哈希映射；同一工作区单实例锁定（tauri-plugin-single-instance 比较 workspacePath argv），不同工作区独立 chat 文件；启动时扫描孤儿 chat 文件并提示手动确认清理。
-- **上下文管理三层压缩 + 安全护栏（#26）**：Layer 1 工具结果省略 → Layer 2 滑动窗口 + 摘要（40K / 60K 阈值）→ 单请求 16K 截断 + 累计 50K 软提示；循环 15 轮上限；token 流式追踪通过 `result.usage.prompt_tokens` 精确累计。
-- **Provider 配置 + DPAPI 加密（#19）**：系统设置内管理 AI Provider，支持新增 / 编辑 / 删除 / 设为活跃 / 测试连接；API Key 通过 Windows DPAPI 加密存储于 `%APPDATA%\murasaki\secrets.json`；DeepSeek 为默认预设；AI 面板顶部显示活跃 Provider 信息卡片与 BYOK 责任提示。
-- AI Provider 配置 E2E 测试用例（#19）。
-- Agent 全功能 E2E 测试覆盖 A–G 七层：Provider 配置（#19）、LLM 调用循环（C 层）、Proposals 渲染与接受（D 层）、对话持久化（E 层）、上下文压缩与护栏（F 层）、取消/中断（G 层），共 137/143 通过，剩余失败为 A 层测试隔离问题。
+- Agent 面板与工具循环（流式输出、可取消、思考中禁用输入）。
+- 前端与文件类工具（读取当前文档 / 选区 / 大纲 / 列文件 / 读文件 / 跨文件搜索），路径限定在工作区内。
+- Inline 提案：行级 / 字符级 diff、浮动接受 / 拒绝按钮与提案列表；新文件提案走统一的冲突弹窗。
+- 对话持久化（按工作区隔离、单实例锁、孤儿清理）。
+- 上下文管理：三层压缩与安全护栏、循环轮次上限。
+- Provider 配置（新增 / 编辑 / 删除 / 测试连接），API Key 经 Windows DPAPI 加密存储。
 
 ### Changed
 
-- 视觉风格整体刷新以匹配 Murasaki 品牌：欢迎页三卡片布局 + 最近文件列表 + 背景装饰；大纲面板 dot 风格分层；文件树改用 SVG 图标；新增窄窗口断点（≤640px）与动画工具类。
+- 视觉风格整体刷新（欢迎页、大纲、文件树图标、窄窗口断点等）。
 
 ### Fixed
 
-- **修复 `OpenAICompatibleProvider.streamChatWithTools` 在 Tauri WebView2 中 hang 的问题**：openai npm 包的 `for await...of` 流迭代器在 WebView2 中无法推进，导致 Agent 发送消息后无响应。改用原生 `fetch` + `ReadableStream` + SSE 行解析替代，恢复流式输出与工具调用累积。
-- **修复 Agent 上下文卡片首次打开 tab 时不渲染的问题**：`SourceEditor.onMounted` 调用 `registerView(view, null)` 会把 `activeDocPath` 重置为 `null`，覆盖 App.vue 中 watch 设置的值，导致 `agent.hasContext` 始终为 false。重构 `registerView` 不再管理 `activeDocPath`（改由 App.vue 的 watch 独占管理），并添加 `{ flush: 'post' }` 确保触发顺序。
-- 修复 `search_across_files` 工具错误拒绝空 query 字符串：前端校验 `!query` 将空字符串视为参数缺失返回 "missing required parameter"，改为 `query == null` 仅拒绝 undefined/null，与 Rust 后端行为对齐。
-- 修复 `search.rs` 存量测试失败：`test_search_regex` 因测试数据中 "Murasaki" 与 "editor" 不在同一行导致 0 vs 1 断言失败；`test_search_context_lines` 上下文行数断言与测试数据不匹配，已更新 `intro.md` 测试数据并修正断言。
-- 修复 Tauri CLI 2.11+ 要求 `CI` 环境变量为 `"true"`/`"false"` 而 TRAE Sandbox 默认 `CI=1` 导致生产构建失败的问题，在 [tauri-build.ps1](scripts/tauri-build.ps1) 中覆盖为 `"true"`。
+- 修复 Agent 在 WebView2 中流式输出挂起（改用原生 `fetch` + SSE 解析）。
+- 修复 Agent 上下文卡片首次打开标签时不渲染。
+- 修复跨文件搜索工具误拒空查询。
 
 ## [0.1.0] - 2026-07-23
 
@@ -455,18 +330,18 @@ Murasaki 首个正式版本：基于 Tauri 2.x + Vue 3 的本地 Markdown 文件
 
 ### Added
 
-- 工作区（文件夹）管理 + 文件树（locale-aware 自然序排序：数字 → 英文 → 中文 → 其他）。
-- 文件 / 文件夹拖拽物理移动、外部文件拖入复制、统一"覆盖/重命名/取消"冲突弹窗、删除走系统回收站。
-- 多 tab 编辑（Ctrl+W 关闭、Ctrl+Tab 切换、中键关闭、关闭末尾 tab 回欢迎页）。
-- CodeMirror 6 源码编辑（行号 + 软折行默认开启）+ Shiki 高亮 + markdown-it 解析。
-- 实时预览：Mermaid 图、KaTeX 公式、emoji 短代码、任务列表可勾选回写源码、YAML frontmatter 卡片、内部链接新 tab 打开 / 外部链接系统浏览器 / 锚点滚动。
-- 跨文件搜索（Ctrl+Shift+F）底部面板，支持正则、文件名与内容匹配。
-- HTML 导出（Base64 内嵌图片 + 当前主题 CSS）。
-- 状态栏：文件路径、光标位置、Unicode 字符数（不含空格），Alt+Shift+S 切换显隐。
-- 系统设置（编辑分类含行号 / 软折行开关、AI Provider 配置）。
-- 全屏 F11 自动隐藏状态栏；Ctrl+Shift+E 文件树 / Ctrl+Shift+M 大纲侧栏切换。
+- 工作区（文件夹）管理 + 文件树（区域感知自然序）。
+- 文件 / 文件夹拖拽移动、外部文件拖入复制、统一的「覆盖 / 重命名 / 取消」冲突对话框、删除走系统回收站。
+- 多标签编辑（`Ctrl+W` 关闭、`Ctrl+Tab` 切换、中键关闭）。
+- CodeMirror 6 源码编辑（行号 + 软换行）+ Shiki 高亮 + markdown-it 解析。
+- 实时预览：Mermaid、KaTeX、emoji 短代码、可勾选回写的任务列表、YAML frontmatter 卡片、内部链接新标签打开 / 外部链接系统浏览器。
+- 跨文件搜索（`Ctrl+Shift+F`），支持正则与文件名 / 内容匹配。
+- HTML 导出（图片 Base64 内嵌 + 当前主题样式）。
+- 状态栏：文件路径、光标位置、字数与字符数。
+- 全屏 `F11`，侧栏切换 `Ctrl+Shift+E` / `Ctrl+Shift+M`。
 
-[Unreleased]: https://github.com/CatInRl/Murasaki/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/CatInRl/Murasaki/compare/v0.10.3...HEAD
+[0.10.3]: https://github.com/CatInRl/Murasaki/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/CatInRl/Murasaki/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/CatInRl/Murasaki/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/CatInRl/Murasaki/compare/v0.9.0...v0.10.0
