@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **编辑 / 所见即所得模式的默认行距调宽（#416）**：编辑器正文行高一直取自设置 `editorLineHeight`（默认 1.6），而预览 / 演示用的是 1.75——同一份内容在编辑态比预览态更紧，正是「演示模式看起来好一点」的来源。现把默认行高 1.6 → **1.8**（设置面板里本就有该档位，1.4 / 1.6 仍可手动选回），源码 / 分屏 / 所见即所得三种模式一并变宽，贴近预览与演示的舒展观感；已显式选择过行高的用户保持原值。
+
 ### Fixed
 
 - 修复**双击 `.md` 文件打开时不把应用窗口置前**（#414）：应用**已在运行**时，外部入口（双击 `.md` / 命令行 / 拖到任务栏）经 single-instance 插件回调建新窗口，而这条建窗路径**漏了聚焦**。插件其实已经把「设置前台窗口」的权限交给回调（第二实例退出前调 `AllowSetForegroundWindow`，源码注释即 *Hand that right over before we exit, so focusing a window from the callback works*），但建窗时 tao 对 `focused: true` 只做 `ShowWindow(SW_SHOW)`（含 `force_window_active` 的强抢前台只在 fullscreen 建窗分支里调），应用不在前台时这次激活会被 Windows 前台锁拒掉 —— 新窗口只闪一下任务栏、拿不到前台与键盘焦点。现在 `create_editor_window` 建窗后显式 `window.set_focus()`（tauri → tao `force_window_active`：先试 `SetForegroundWindow`，被拒时再以合成 ALT 键抢前台权限），与「目录已在别处打开 → 聚焦那个窗口」分支的做法对齐，单一改动覆盖所有建窗入口（双击文件 / 命令行 / 拖到任务栏 / 打开文件夹 / 同目录未命中）。

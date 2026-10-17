@@ -207,7 +207,7 @@ export interface SettingsState {
   reopenLastWorkspace: boolean;
   /** 编辑器字体大小（px，12-20） */
   editorFontSize: number;
-  /** 编辑器行高 */
+  /** 编辑器行高（默认 1.8，贴近预览/演示的 1.75，issue #416） */
   editorLineHeight: number;
   /** 编辑器等宽字体族 */
   editorFontFamily: string;
@@ -257,7 +257,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   lastWorkspacePath: null,
   reopenLastWorkspace: true,
   editorFontSize: 14,
-  editorLineHeight: 1.6,
+  editorLineHeight: 1.8,
   editorFontFamily: "JetBrains Mono",
   editorFontPreset: "d",
   defaultImageDir: "assets/images",

@@ -56,7 +56,7 @@ const props = withDefaults(defineProps<Props>(), {
   workspacePath: null,
   editorMode: "split",
   fontSize: 14,
-  lineHeight: 1.6,
+  lineHeight: 1.8,
   fontFamily: "JetBrains Mono",
   fullwidthToMarkdown: false,
   zoom: 100,
