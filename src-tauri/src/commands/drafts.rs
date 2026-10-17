@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use super::atomic_write::write_atomic;
 use super::sha1_hex;
 use serde::{Deserialize, Serialize};
 
@@ -79,12 +80,14 @@ pub fn save_draft(
     if let Some(parent) = draft_path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    fs::write(&draft_path, content).map_err(|e| e.to_string())?;
+    // 先原子写正文，再写 sidecar：若中间崩溃，meta 偏旧会让下次打开走冲突裁决，
+    // 而不是把旧草稿误当成最新内容
+    write_atomic(&draft_path, content.as_bytes()).map_err(|e| e.to_string())?;
     // 写 sidecar 元数据（known_mtime）以支持启动恢复时的冲突检测
     let meta = DraftMetaFile { known_mtime };
     let meta_path = draft_meta_path_for(&path)?;
     let meta_json = serde_json::to_string(&meta).map_err(|e| e.to_string())?;
-    fs::write(&meta_path, meta_json).map_err(|e| e.to_string())?;
+    write_atomic(&meta_path, meta_json.as_bytes()).map_err(|e| e.to_string())?;
     let saved_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
