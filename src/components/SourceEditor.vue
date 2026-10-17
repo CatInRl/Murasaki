@@ -242,7 +242,7 @@ const props = withDefaults(defineProps<Props>(), {
   readOnly: false,
   editorMode: "split",
   fontSize: 14,
-  lineHeight: 1.6,
+  lineHeight: 1.8,
   fontFamily: "JetBrains Mono",
   markdownTheme: "murasaki",
   currentFilePath: null,
