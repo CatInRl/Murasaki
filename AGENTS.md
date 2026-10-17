@@ -195,9 +195,16 @@ milestone 可以并存（例如 `0.9.5` 与 `1.0.0` 各挂各的 issue），但*
 
 完整 changelog 详见 [CHANGELOG.md](CHANGELOG.md)。版本发布时必须同步更新该文件。
 
-### 当前版本：0.10.2（2026-10-07）
+### 当前版本：0.10.3（2026-10-17）
 
-**依赖升级 + Mermaid/预览修复**：Tauri 生态（Rust crate 与 npm 包）升到 2.12，`notify` / `dirs` 各跨一个主版本；修复 HTML 文件演示模式无法缩放及其遗留的分屏模式缩放失效、Mermaid 节点文字超过约 4 行被方框裁切与 gantt 图「今日」标记线毁图；e2e 文件树抖动根因链三层修复（纯测试基建，应用行为零变化）。
+**外部打开置前 + 编辑态默认行距调宽**：应用运行中从外部入口（双击 `.md` / 命令行 / 任务栏拖入）打开时，新窗口现在真正置于最前并拿到键盘焦点（此前只闪一下任务栏、要 Alt+Tab 才看到）；编辑模式与所见即所得模式的默认正文行高由 1.6 提到 1.8，向预览 / 演示的舒展观感看齐。
+
+- 外部打开置前（#414）：外部入口在应用**已在运行**时经 single-instance 插件回调建新窗口——插件其实已把「设置前台窗口」的权限交给回调（第二实例退出前调 `AllowSetForegroundWindow`，源码注释即 *Hand that right over before we exit, so focusing a window from the callback works*），但建窗时 tao 对 `focused: true` 只做 `ShowWindow(SW_SHOW)`（含 `force_window_active` 的强抢前台只在 fullscreen 建窗分支里调），应用不在前台时这次激活会被 Windows 前台锁拒掉、新窗口拿不到前台与键盘焦点。现 `create_editor_window` 建窗后显式 `window.set_focus()`（tauri → tao `force_window_active`：先试 `SetForegroundWindow`，被拒再以合成 ALT 键抢前台权限），与「同目录已在别处打开 → 聚焦那个窗口」分支的做法对齐；单一改动覆盖全部建窗入口（双击文件 / 命令行 / 拖到任务栏 / 打开文件夹 / 同目录未命中），冷启动路径不经该函数、行为不变。注：新行为目前只有手测覆盖（`e2e/specs/multi-window.spec.ts` 无置前 / 焦点断言）
+- 编辑态默认行高（#416）：编辑器正文行高取自设置 `editorLineHeight`，而预览 / 演示用 `.markdown-body p` 与 `PreviewPane` 根的 1.75——同一份内容编辑态比预览态更紧，这正是「演示模式看起来好一点」的来源。现把默认值 1.6 → 1.8（设置面板本就有该档位，1.4 / 1.6 仍可手动选回），源码 / 分屏 / 所见即所得三模式一并变宽；两处 prop 兜底值（`EditorPane.vue` / `SourceEditor.vue`）同步改 1.8。**注意**持久化按 `{...DEFAULT_SETTINGS, ...saved}` 合并，磁盘上已存过 1.6 的安装（含从未手改过的）不会被新默认值覆盖，需在 设置 → 编辑器 → 行高 里手动选 1.8
+
+### 历史版本
+
+- 0.10.2（2026-10-07）：**依赖升级 + Mermaid/预览修复**：Tauri 生态（Rust crate 与 npm 包）升到 2.12，`notify` / `dirs` 各跨一个主版本；修复 HTML 文件演示模式无法缩放及其遗留的分屏模式缩放失效、Mermaid 节点文字超过约 4 行被方框裁切与 gantt 图「今日」标记线毁图；e2e 文件树抖动根因链三层修复（纯测试基建，应用行为零变化）。
 
 - 依赖（#362/#363）：Tauri 生态升 2.12——Rust 侧 `tauri` 2.11.6 → 2.12.0、`wry` 0.55.1 → 0.57.0、`tao` 0.35.3 → 0.37.1，插件同步升级；前端 `@tauri-apps/api` 2.11.1 → 2.12.0 与各插件包对齐，另升 `katex` 0.18.9、`vue-i18n` 11.4.12。Rust 与 npm 的 major/minor 必须一致（Tauri CLI 在 `tauri build` 时校验，不一致报 `Found version mismatched Tauri packages`），故两侧必须同批落地；顺带把 `webview2-com` 钉 0.39 / `windows` 钉 0.62.2 与升版后的 wry 对齐（否则 `pdf.rs` 的 `NavigationCompletedEventHandler` 与 wry 出现两套 `windows` 类型、编译报 `E0277`）；`notify` 7.0.0 → 8.2.0、`dirs` 5.0.1 → 6.0.0
 - HTML 演示模式缩放（#405）：HTML 预览是沙箱 iframe，Ctrl+滚轮与键盘事件不跨 iframe 边界冒泡，挂在父文档的缩放监听与快捷键全部收不到、缩放 chip 恒为 100%；现利用 sandbox 既有的 `allow-same-origin` 由父侧在子文档上补挂 wheel / keydown 监听把事件接回（keydown 被消费时把 `defaultPrevented` 同步回传，防 WebView2 浏览器级加速键在 iframe 内照常触发、与应用行为叠加）；挂载用低频轮询幂等完成而非 `@load` 时序——WebKit 系 srcdoc 文档「可交互」早于 load 且初建会先以 about:blank 触发一次 load，轮询同时跳过 about:blank 占位文档并去掉 `loading="lazy"`。附带收益：焦点在 HTML 预览内时 Ctrl+S / Ctrl+P 同样可用（分屏模式同生效）
