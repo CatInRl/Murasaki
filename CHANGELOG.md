@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- 修复**双击 `.md` 文件打开时不把应用窗口置前**（#414）：应用**已在运行**时，外部入口（双击 `.md` / 命令行 / 拖到任务栏）经 single-instance 插件回调建新窗口，而这条建窗路径**漏了聚焦**。插件其实已经把「设置前台窗口」的权限交给回调（第二实例退出前调 `AllowSetForegroundWindow`，源码注释即 *Hand that right over before we exit, so focusing a window from the callback works*），但建窗时 tao 对 `focused: true` 只做 `ShowWindow(SW_SHOW)`（含 `force_window_active` 的强抢前台只在 fullscreen 建窗分支里调），应用不在前台时这次激活会被 Windows 前台锁拒掉 —— 新窗口只闪一下任务栏、拿不到前台与键盘焦点。现在 `create_editor_window` 建窗后显式 `window.set_focus()`（tauri → tao `force_window_active`：先试 `SetForegroundWindow`，被拒时再以合成 ALT 键抢前台权限），与「目录已在别处打开 → 聚焦那个窗口」分支的做法对齐，单一改动覆盖所有建窗入口（双击文件 / 命令行 / 拖到任务栏 / 打开文件夹 / 同目录未命中）。
+
 ## [0.10.2] - 2026-10-07
 
 本版本为 0.10.1 的常规迭代：Tauri 生态（Rust crate 与 npm 包）升到 2.12，`notify` / `dirs` 各跨一个主版本；修复 HTML 文件演示模式无法缩放及其遗留的分屏模式缩放失效、Mermaid 节点文字超过约 4 行被方框裁切与 gantt 图「今日」标记线毁图，并根治 e2e 文件树抖动的根因链（纯测试基建，应用行为零变化）。

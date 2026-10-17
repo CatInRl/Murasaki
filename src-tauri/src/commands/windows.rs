@@ -173,9 +173,23 @@ pub fn create_editor_window(app: &AppHandle, path: Option<String>) -> Result<Str
         builder = builder.additional_browser_args(&extra_args);
     }
 
-    builder
+    let window = builder
         .build()
         .map_err(|e| format!("创建窗口失败: {}", e))?;
+
+    // 显式置前（issue #414）。
+    //
+    // 外部入口（双击 .md / 命令行 / 拖到任务栏）在应用**已运行**时走 single-instance
+    // 回调：插件在第二实例退出前调了 `AllowSetForegroundWindow`，把「设置前台窗口」的
+    // 权限交给回调，期望**回调自己 focus**。但建窗时 tao 对 `focused: true` 只做
+    // `ShowWindow(SW_SHOW)`（`force_window_active` 仅用于 fullscreen 建窗分支），应用
+    // 不在前台时这次激活会被 Windows 前台锁拒掉 —— 新窗口只闪一下任务栏、拿不到前台
+    // 与键盘焦点。上面「目录已在别处打开 → 聚焦」的分支有同样的 `set_focus()`，这条
+    // 建窗路径漏了。
+    //
+    // `set_focus()` 走 tao → `force_window_active`：先试 `SetForegroundWindow`
+    // （此时插件已交权限，通常直接成功），被拒时再以合成 ALT 键抢前台权限。
+    let _ = window.set_focus();
 
     if let Some(p) = path {
         // 目录预留注册表位，让后续同目录请求能命中（前端上报后会覆盖）
