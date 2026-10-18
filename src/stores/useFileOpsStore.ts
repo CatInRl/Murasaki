@@ -10,6 +10,7 @@ import {
   isPathUnder,
   isSamePath,
   joinPaths,
+  normalizePath,
   relativeFromDir,
 } from "../utils/path";
 
@@ -164,8 +165,9 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     const dir = dirname(oldPath);
     const newPath = joinPaths(dir, newName);
 
-    // 同名：无需操作
-    if (isSamePath(oldPath, newPath)) {
+    // 同名：无需操作。这里必须精确比较：仅大小写不同也是改名，
+    // 用 isSamePath（无条件小写化）会把 a.md → A.md 当成同名而静默丢弃。
+    if (normalizePath(oldPath) === normalizePath(newPath)) {
       return null;
     }
 

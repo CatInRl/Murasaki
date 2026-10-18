@@ -138,6 +138,23 @@ describe("useFileOpsStore", () => {
       expect(mockedInvoke).not.toHaveBeenCalled();
     });
 
+    it("仅大小写不同的改名照常执行（Windows 盘符路径）", async () => {
+      // 大小写敏感的文件系统上 a.md → A.md 是真实改名，
+      // 不能因为「归一化比较键相同」而被当成同名静默丢弃
+      mockedInvoke.mockResolvedValueOnce(false);
+      const fakeNode = { name: "A.md", path: "C:/ws/A.md", type: "file" as const };
+      mockedInvoke.mockResolvedValueOnce(fakeNode);
+
+      const store = useFileOpsStore();
+      const result = await store.renamePath("C:\\ws\\a.md", "A.md");
+
+      expect(result).toEqual(fakeNode);
+      expect(mockedInvoke).toHaveBeenCalledWith("rename_path", {
+        from: "C:\\ws\\a.md",
+        to: "C:/ws/A.md",
+      });
+    });
+
     it("目标已存在且是目录时抛出错误", async () => {
       // path_exists 返回 true
       mockedInvoke.mockResolvedValueOnce(true);

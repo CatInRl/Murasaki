@@ -24,7 +24,7 @@ import { useSearchStore } from "../stores/useSearchStore";
 import { useTabsStore } from "../stores/useTabsStore";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
-import { basename, normalizePath } from "../utils/path";
+import { basename, isPathUnder, relativeFromDir } from "../utils/path";
 import { isMarkdownFile } from "../utils/fileKind";
 import { useShortcuts } from "../shortcuts/useShortcuts";
 import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
@@ -72,18 +72,16 @@ const recentsSource = computed(() =>
 
 /** 递归展平文件树为文件列表（副标题用相对工作区目录） */
 function flattenTree(nodes: TreeNode[]): SearchFileSource[] {
-  const rootNorm = workspace.workspacePath
-    ? normalizePath(workspace.workspacePath).replace(/\/$/, "")
-    : null;
+  const root = workspace.workspacePath;
   const out: SearchFileSource[] = [];
   const walk = (list: TreeNode[]): void => {
     for (const node of list) {
       if (node.type === "file") {
-        const normPath = normalizePath(node.path);
+        // 路径口径统一走 utils/path（#435）：大小写、分隔符、目录边界与其它组件一致
         let relativeDir = "";
-        if (rootNorm && normPath.startsWith(rootNorm + "/")) {
-          const rel = normPath.slice(rootNorm.length + 1);
-          relativeDir = rel.split("/").slice(0, -1).join("/");
+        if (root && isPathUnder(root, node.path)) {
+          const rel = relativeFromDir(root, node.path);
+          relativeDir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "";
         }
         out.push({ path: node.path, title: node.name, relativeDir });
       }

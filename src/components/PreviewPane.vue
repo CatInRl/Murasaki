@@ -8,9 +8,9 @@ import "../styles/markdown-content.css";
 import { renderMermaidDiagram, sanitizeMermaidSvg } from "../utils/mermaidTheme";
 import {
   isAnchorLink,
-  isExternalUrl,
   resolveInternalMarkdownLink,
 } from "../utils/internalLink";
+import { isExternalUrl } from "../utils/url";
 
 interface Props {
   source: string;

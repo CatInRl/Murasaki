@@ -36,6 +36,7 @@ import { parseTable } from "./tableReflow";
 import { TableEditor } from "./tableEditor";
 import { renderFrontMatterCard } from "../../composables/useFrontMatter";
 import { resolveImageSrc } from "../../utils/imagePath";
+import { isExternalUrl } from "../../utils/url";
 import { renderPlantUmlCode } from "../../utils/plantuml";
 import { renderMermaidDiagram, sanitizeMermaidSvg } from "../../utils/mermaidTheme";
 
@@ -368,7 +369,7 @@ class LinkWidget extends WysiwygBlockWidget {
       e.stopPropagation();
       const href = this.url;
       // 外部 URL → 系统浏览器
-      if (/^(https?:|ftp:|file:|mailto:|tel:)/i.test(href)) {
+      if (isExternalUrl(href)) {
         try {
           const { open } = await import("@tauri-apps/plugin-shell");
           await open(href);

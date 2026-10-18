@@ -5,13 +5,9 @@
  * 路径口径统一走 utils/path，避免组件里再长出一套「自研路径实现」。
  */
 import { dirname, extname, resolveRelative } from "./path";
+import { isExternalUrl } from "./url";
 
 const MD_EXTENSIONS = ["md", "markdown", "mdown", "mkd"];
-
-/** 外部 URL（交给系统浏览器/默认行为处理） */
-export function isExternalUrl(href: string): boolean {
-  return /^(https?:|ftp:|file:|mailto:|tel:)/i.test(href);
-}
 
 /** 页内锚点（#section） */
 export function isAnchorLink(href: string): boolean {

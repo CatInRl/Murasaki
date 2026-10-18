@@ -40,7 +40,9 @@ export function dirname(path: string): string {
   const leadingSlash = norm.startsWith("/") ? "/" : "";
   const parts = norm.split("/").filter(Boolean);
   parts.pop();
-  return parts.length > 0 ? leadingSlash + parts.join("/") : path;
+  // 根目录下的文件（/a.md）：父目录就是根，而不是文件自身
+  if (parts.length === 0) return leadingSlash || path;
+  return leadingSlash + parts.join("/");
 }
 
 /**
@@ -91,23 +93,21 @@ export function resolveRelative(base: string, relative: string): string {
   if (/^([a-zA-Z]:)?\//.test(normalizedRel)) {
     return normalizedRel;
   }
-  const baseParts = normalizePath(base).split("/").filter(Boolean);
-  const relParts = normalizedRel.split("/").filter(Boolean);
-  for (const part of relParts) {
+  const baseNorm = normalizePath(base);
+  const baseParts = baseNorm.split("/").filter(Boolean);
+  // 根不能被 `..` 弹出：Windows 盘符（C:）与 Unix 根（保留前导 /）都是地板
+  const hasDrive = /^[a-zA-Z]:$/.test(baseParts[0] ?? "");
+  const floor = hasDrive ? 1 : 0;
+  for (const part of normalizedRel.split("/").filter(Boolean)) {
     if (part === ".") continue;
     if (part === "..") {
-      baseParts.pop();
+      if (baseParts.length > floor) baseParts.pop();
     } else {
       baseParts.push(part);
     }
   }
-  // 保留 Windows 盘符前缀（如 C:）
-  const baseNorm = normalizePath(base);
-  const isWindowsDrive = /^[a-zA-Z]:/.test(baseNorm);
-  const joined = baseParts.join("/");
-  return isWindowsDrive && !joined.startsWith("/") && /^[a-zA-Z]:/.test(joined)
-    ? joined
-    : (baseNorm.startsWith("/") ? "/" : "") + joined;
+  const prefix = baseNorm.startsWith("/") ? "/" : "";
+  return prefix + baseParts.join("/");
 }
 
 /**
@@ -210,24 +210,10 @@ export function relativeFromDir(fromDir: string, to: string): string {
  *      relativePath("C:/docs/a.md", "C:/docs/sub/b.md") → "sub/b.md"
  */
 export function relativePath(from: string, to: string): string {
-  // from 视为文件路径：取目录部分
+  // from 视为文件路径：先取目录部分（裸文件名没有目录，基准为空）
   const fromNorm = normalizePath(from);
-  const fromParts = fromNorm.split("/").filter(Boolean);
-  fromParts.pop(); // 去掉文件名
-  const toParts = normalizePath(to).split("/").filter(Boolean);
-  // 找到共同前缀
-  let i = 0;
-  while (
-    i < fromParts.length &&
-    i < toParts.length &&
-    fromParts[i].toLowerCase() === toParts[i].toLowerCase()
-  ) {
-    i++;
-  }
-  const upCount = fromParts.length - i;
-  const downParts = toParts.slice(i);
-  const ups: string[] = [];
-  for (let k = 0; k < upCount; k++) ups.push("..");
-  const result = [...ups, ...downParts].join("/");
-  return result || basename(to);
+  const fromDir = fromNorm.includes("/") ? dirname(fromNorm) : "";
+  const relative = relativeFromDir(fromDir, to);
+  // 目标就是基准目录自身时，回到「文件名」口径（保持既有调用方预期）
+  return relative === "." ? basename(to) : relative;
 }

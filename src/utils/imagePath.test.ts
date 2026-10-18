@@ -11,7 +11,6 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import {
   resolveImageSrc,
-  isExternalUrl,
   isDataUrl,
   isAbsolutePath,
   isAssetUrl,
@@ -66,25 +65,6 @@ describe("内嵌图片 data URI（issue #151：base64 插入方式）", () => {
 });
 
 describe("utils/imagePath", () => {
-  describe("isExternalUrl", () => {
-    it("识别 http/https URL", () => {
-      expect(isExternalUrl("https://example.com/img.png")).toBe(true);
-      expect(isExternalUrl("http://example.com/img.png")).toBe(true);
-    });
-    it("识别 ftp/mailto/tel/file 协议", () => {
-      expect(isExternalUrl("ftp://example.com/file")).toBe(true);
-      expect(isExternalUrl("mailto:test@example.com")).toBe(true);
-      expect(isExternalUrl("tel:+8613800000000")).toBe(true);
-      expect(isExternalUrl("file:///C:/path/file.txt")).toBe(true);
-    });
-    it("非 URL 返回 false", () => {
-      expect(isExternalUrl("assets/img.png")).toBe(false);
-      expect(isExternalUrl("C:\\images\\img.png")).toBe(false);
-      expect(isExternalUrl("/home/user/img.png")).toBe(false);
-      expect(isExternalUrl("data:image/png;base64,...")).toBe(false);
-    });
-  });
-
   describe("isDataUrl", () => {
     it("识别 data URL", () => {
       expect(isDataUrl("data:image/png;base64,iVBORw0KGgo=")).toBe(true);

@@ -13,14 +13,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type MarkdownIt from "markdown-it";
 import { dirname, resolveRelative, normalizePath } from "./path";
-
-/**
- * 判断 src 是否为 URL（http/https/ftp/mailto/tel/file 协议）。
- * 这些协议在 WebView 中可直接加载，无需转换。
- */
-export function isExternalUrl(src: string): boolean {
-  return /^(https?:|ftp:|file:|mailto:|tel:)/i.test(src);
-}
+import { isExternalUrl } from "./url";
 
 /**
  * 判断 src 是否为 Base64 data URL。

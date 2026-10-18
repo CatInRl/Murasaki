@@ -124,6 +124,12 @@ describe("utils/path", () => {
     it("反斜杠基准与正斜杠相对路径混用", () => {
       expect(resolveRelative("C:\\ws\\docs", "../b.md")).toBe("C:/ws/b.md");
     });
+    it("越过盘符根时夹在盘符处（不丢盘符）", () => {
+      expect(resolveRelative("C:/ws", "../../b.md")).toBe("C:/b.md");
+    });
+    it("越过 Unix 根时夹在根处", () => {
+      expect(resolveRelative("/ws", "../../b.md")).toBe("/b.md");
+    });
   });
 
   describe("relativeFromDir", () => {
