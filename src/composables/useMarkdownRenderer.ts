@@ -177,39 +177,50 @@ function attachSourceLinePlugin(md: MarkdownIt) {
  * - 相对/绝对本地路径 → tauri://localhost/... 协议 URL（Tauri WebView 可加载）
  * - URL / Base64 → 原样保留
  *
- * 通过模块级 currentFilePath 状态获取当前文件路径（由 setCurrentFilePath 设置）。
+ * 基准文件路径来自本次渲染的 env（`render(source, { filePath })`），
+ * 不再读取模块级单例，因此预览与导出并发时不会串用彼此的路径（#434）。
  */
 function imageSrcPlugin(md: MarkdownIt) {
-  md.renderer.rules.image = (tokens, idx, options, _env, self) => {
+  md.renderer.rules.image = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
     const src = token.attrGet("src") ?? "";
-    const resolved = resolveImageSrc(src, currentFilePath);
+    const filePath = (env as RenderEnv).filePath ?? null;
+    const resolved = resolveImageSrc(src, filePath);
     if (resolved !== src) {
       token.attrSet("src", resolved);
     }
     // alt 属性必须设置（即使为空），复用默认行为
     // token.children 可能为 null（无 alt 文本），传入空数组以保持类型安全
-    token.attrSet("alt", self.renderInlineAsText(token.children ?? [], options, _env));
+    token.attrSet("alt", self.renderInlineAsText(token.children ?? [], options, env));
     return self.renderToken(tokens, idx, options);
   };
 }
 
-/**
- * 最近一次解析的 YAML front-matter 原文。
- * 供前端渲染为卡片使用（见 spec：YAML frontmatter 必须解析并渲染为样式化卡片）。
- */
-let lastFrontMatter = "";
+/** 单次渲染的上下文（随 env 传给 markdown-it 插件）。 */
+export interface RenderEnv {
+  /** 基准文件路径：解析相对图片 / 链接用；null = 未知 */
+  filePath: string | null;
+}
 
-export function getFrontMatter(): string {
-  return lastFrontMatter;
+/** 渲染上下文（调用方显式传入，#434）。 */
+export interface RenderContext {
+  /** 当前文件路径（相对图片按它所在目录解析） */
+  filePath?: string | null;
+}
+
+/** 单次渲染的结果（front-matter 与正文一起返回，不落模块状态）。 */
+export interface RenderResult {
+  html: string;
+  /** 文档起始的 YAML front-matter 原文；没有则为空字符串 */
+  frontMatter: string;
 }
 
 /**
- * 当前文件路径（模块级状态）。
- * 供 image renderer 与 WYSIWYG ImageWidget 解析相对图片路径使用（ADR-0015）。
+ * WYSIWYG 专用：当前文件路径（模块级状态）。
  *
- * 由 PreviewPane / SourceEditor 在切换文件时通过 setCurrentFilePath() 设置。
- * 单例 renderer 在 render() 时读取此状态解析图片 src。
+ * 预览与导出已改为显式传参（`render(source, { filePath })`，#434）；
+ * 这里只服务 CodeMirror 的 ImageWidget —— 它在 toDOM 时无法拿到 Vue props，
+ * 由 SourceEditor 在切换文件时写入（单窗口单文件，不存在跨文档串用）。
  */
 let currentFilePath: string | null = null;
 
@@ -275,9 +286,6 @@ function configureFootnoteInline(md: MarkdownIt): void {
  * 创建带完整插件链的 markdown-it 实例。
  */
 function createMarkdownIt(): MarkdownIt {
-  // 重置状态
-  lastFrontMatter = "";
-
   const md = new MarkdownIt({
     html: true,
     linkify: true,
@@ -290,10 +298,9 @@ function createMarkdownIt(): MarkdownIt {
   allowInlineImageDataUris(md);
 
   md.use(markdownItEmoji);
-  // front-matter 插件要求传入回调，回调会在解析到 front-matter 时被调用
-  md.use(markdownItFrontMatter, (fm: string) => {
-    lastFrontMatter = fm;
-  });
+  // front-matter 插件要求传入回调；正文里的 front_matter token 才是数据来源
+  // （render() 直接从 tokens 读取，不落模块状态，#434）
+  md.use(markdownItFrontMatter, () => {});
   md.use(markdownItTaskLists, {
     enabled: true,
     label: true,
@@ -374,8 +381,11 @@ async function highlightCodeBlocks(container: HTMLElement) {
 export interface UseMarkdownRenderer {
   /** markdown-it 实例（同步可用，代码块为占位） */
   md: MarkdownIt;
-  /** 同步渲染 HTML（代码块占位，Mermaid 占位） */
-  render(source: string): string;
+  /**
+   * 同步渲染 HTML（代码块占位，Mermaid 占位）。
+   * `context.filePath` 只影响本次渲染的相对图片解析；front-matter 随结果返回（#434）。
+   */
+  render(source: string, context?: RenderContext): RenderResult;
   /** DOM 渲染后异步替换代码块高亮 */
   highlight(container: HTMLElement): Promise<void>;
   /** 当前使用的 Shiki 主题名 */
@@ -394,14 +404,20 @@ export function useMarkdownRenderer(): UseMarkdownRenderer {
     return md.value;
   }
 
-  function render(source: string): string {
-    // 重置 front-matter 缓存：若文档含 front-matter，回调会重新赋值
-    lastFrontMatter = "";
+  function render(source: string, context?: RenderContext): RenderResult {
+    const md = getMd();
+    const env: RenderEnv = { filePath: context?.filePath ?? null };
+    // parse + renderer.render 等价于 md.render，但能拿到 token（front-matter 数据来源）
+    const tokens = md.parse(source, env);
+    const frontMatterToken = tokens.find((token) => token.type === "front_matter");
+    const frontMatter =
+      typeof frontMatterToken?.meta === "string" ? frontMatterToken.meta : "";
     // T6.4 (#103)：净化 HTML 输出 —— markdown-it 配置 html:true 会原样透传内联 HTML，
     // 此处用 DOMPurify 清除 script/iframe/on*/javascript: 等 XSS 向量。
     // 覆盖 PreviewPane 预览 + useHtmlExport 导出（均调用 render()）。
     // data-source-line / data-lang 等 data-* 属性保留（DOMPurify 默认允许）。
-    return sanitizeInlineHtml(getMd().render(source));
+    const html = sanitizeInlineHtml(md.renderer.render(tokens, md.options, env));
+    return { html, frontMatter };
   }
 
   async function highlight(container: HTMLElement) {
