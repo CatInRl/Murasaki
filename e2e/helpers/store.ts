@@ -284,14 +284,37 @@ export async function openFileInTab(
   browser: Browser,
   path: string
 ): Promise<void> {
-  await browser.executeAsync((filePath: string, done: (res: unknown) => void) => {
+  const appPath = toAppPath(path);
+
+  // 不能 await openFile：若草稿基线与磁盘 mtime 不一致（#425），它会阻塞在
+  // 冲突对话框的 Promise 上，executeAsync 等到脚本超时。这里改为「发起 + 轮询」，
+  // 途中遇到草稿冲突时按测试默认策略选择「加载磁盘版本」（unsaved 的中间按钮）。
+  await browser.execute((filePath: string) => {
     // @ts-ignore
-    const pinia = window.__pinia__;
-    const tabs = pinia._s.get("tabs");
-    Promise.resolve(tabs.openFile(filePath))
-      .then(() => done(null))
-      .catch((err: unknown) => done(err ? String(err) : null));
-  }, toAppPath(path));
+    void window.__pinia__._s.get("tabs").openFile(filePath).catch(() => {});
+  }, appPath);
+
+  await browser.waitUntil(
+    async () =>
+      await browser.execute((filePath: string) => {
+        const norm = (value: string) => value.replace(/\\/g, "/").toLowerCase();
+        // @ts-ignore
+        const pinia = window.__pinia__;
+        const tabs = pinia._s.get("tabs");
+        if (tabs.tabs.some((tab: { path: string | null }) => tab.path && norm(tab.path) === norm(filePath))) {
+          return true;
+        }
+        const dialog = pinia._s.get("dialog");
+        if (dialog.current?.kind === "unsaved") {
+          dialog.unsavedDiscard();
+        }
+        return false;
+      }, appPath),
+    { timeout: 15000, interval: 100 }
+  );
+
+  // 等 openFile 的收尾（最近列表等）落地，避免后续断言抢跑
+  await browser.pause(50);
 }
 
 /**
