@@ -13,6 +13,7 @@ vi.mock("../services/fileSystem", () => ({
     getMtime: vi.fn(async () => 1_700_000_000_000),
     draftExists: vi.fn(async () => false),
     saveDraft: vi.fn(async () => undefined),
+    deleteDraft: vi.fn(async () => undefined),
   },
 }));
 
@@ -245,6 +246,38 @@ describe("useTabsStore", () => {
       await store.reloadFromDisk("C:\\docs\\a.md");
 
       expect(saveDraft).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("关闭时「不保存」的草稿语义（#426）", () => {
+    it("keepDraft=false：不写草稿并删除已有草稿", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const saveDraft = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+      const deleteDraft = fileSystem.deleteDraft as unknown as ReturnType<typeof vi.fn>;
+      saveDraft.mockClear();
+      deleteDraft.mockClear();
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "用户明确不要的修改");
+
+      await store.doCloseTab(tab.id, { keepDraft: false });
+
+      expect(saveDraft).not.toHaveBeenCalled();
+      expect(deleteDraft).toHaveBeenCalledWith("C:\\docs\\a.md");
+      expect(store.tabs).toHaveLength(0);
+    });
+
+    it("默认仍保留草稿（关闭窗口 / 崩溃兜底）", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const saveDraft = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+      saveDraft.mockClear();
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "需要兜底");
+
+      await store.doCloseTab(tab.id);
+
+      expect(saveDraft).toHaveBeenCalledWith("C:\\docs\\a.md", "需要兜底", tab.lastMtime);
     });
   });
 });
