@@ -34,9 +34,13 @@ export interface AppStartupDeps {
     loadSettings(): Promise<unknown>;
     loadRecent(): Promise<unknown>;
     updateSettings(patch: Record<string, unknown>): Promise<unknown>;
-    settings: StartupSettings;
-    /** 从未写入过 language（首次启动，需要探测系统语言） */
-    languageEmpty: boolean;
+    /**
+     * 读取当前设置。必须是 getter 而不是对象快照：
+     * `loadSettings()` 会用新对象替换 store 里的 settings，启动编排在加载之后才读取。
+     */
+    getSettings(): StartupSettings;
+    /** 是否从未写入过 language（首次启动，需要探测系统语言） */
+    isLanguageEmpty(): boolean;
   };
   applyTheme(theme: string): void;
   applyReadingFont(preset: ReadingFontPreset): void;
@@ -109,18 +113,33 @@ export async function bootstrapApp(deps: AppStartupDeps): Promise<AppStartupHand
     }
   };
 
+  try {
+    return await runStartup(deps, cleanups, dispose);
+  } catch (err) {
+    // 启动中途失败：已注册的监听必须撤销，否则窗口卸载时无人清理
+    dispose();
+    throw err;
+  }
+}
+
+async function runStartup(
+  deps: AppStartupDeps,
+  cleanups: Array<() => void>,
+  dispose: () => void
+): Promise<AppStartupHandle> {
   // ===== 1. 持久化状态 =====
   await deps.persistence.loadSettings();
   await deps.persistence.loadRecent();
 
-  const settings = deps.persistence.settings;
+  // 必须在 loadSettings 之后取：store 会用新对象替换 settings
+  const settings = deps.persistence.getSettings();
   if (settings.markdownTheme) deps.applyTheme(settings.markdownTheme);
   deps.applyReadingFont(settings.editorFontPreset);
   deps.applyEditorMode(settings.editorMode);
 
   // 首次启动（language 从未写入）探测系统语言并持久化；既有用户保持原设置
   let effectiveLanguage: AppLocale = settings.language;
-  if (deps.persistence.languageEmpty) {
+  if (deps.persistence.isLanguageEmpty()) {
     try {
       const detected = await deps.detectSystemLocale();
       effectiveLanguage = deps.i18n.mapSystemLocale(detected);
@@ -162,7 +181,9 @@ export async function bootstrapApp(deps: AppStartupDeps): Promise<AppStartupHand
   if (!pendingOpen) {
     if (settings.reopenLastWorkspace && settings.lastWorkspacePath) {
       try {
+        console.log("[Murasaki] 恢复工作区:", settings.lastWorkspacePath);
         await deps.openWorkspace(settings.lastWorkspacePath);
+        console.log("[Murasaki] 恢复工作区成功");
       } catch (err) {
         console.warn("[Murasaki] 恢复工作区失败:", err);
       }
@@ -206,7 +227,6 @@ export async function bootstrapApp(deps: AppStartupDeps): Promise<AppStartupHand
   // ===== 7. 初始化完成（watcher 开始落盘；E2E 就绪信号）=====
   deps.initialized.value = true;
   deps.markAppReady();
-  deps.exposeTestHooks();
 
   // ===== 8. 打开待打开路径（监听已就绪）=====
   if (pendingOpen) {
@@ -217,6 +237,9 @@ export async function bootstrapApp(deps: AppStartupDeps): Promise<AppStartupHand
   if (settings.checkUpdatesOnStartup) {
     deps.checkForUpdates(true);
   }
+
+  // 最后暴露测试钩子（与启动流程无关）
+  deps.exposeTestHooks();
 
   return { dispose };
 }

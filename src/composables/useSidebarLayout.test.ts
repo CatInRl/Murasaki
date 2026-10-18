@@ -57,4 +57,46 @@ describe("useSidebarLayout", () => {
     await nextTick();
     expect(updateSettings).toHaveBeenCalledWith({ sidebarWidth: 280 });
   });
+
+  it("拖拽调宽会夹在上下限内，并在 pointerup 后复位状态", () => {
+    const { layout } = setup();
+    layout.width.value = 300;
+    const el = document.createElement("div");
+    el.setPointerCapture = vi.fn();
+
+    layout.startResize({
+      currentTarget: el,
+      clientX: 100,
+      pointerId: 1,
+      preventDefault: vi.fn(),
+    } as unknown as PointerEvent);
+    expect(layout.dragging.value).toBe(true);
+    expect(document.body.style.userSelect).toBe("none");
+
+    // 向右拖到超上限
+    window.dispatchEvent(Object.assign(new Event("pointermove"), { clientX: 900 }));
+    expect(layout.width.value).toBe(SIDEBAR_MAX_WIDTH);
+
+    // 向左拖到超下限
+    window.dispatchEvent(Object.assign(new Event("pointermove"), { clientX: -900 }));
+    expect(layout.width.value).toBe(SIDEBAR_MIN_WIDTH);
+
+    window.dispatchEvent(new Event("pointerup"));
+    expect(layout.dragging.value).toBe(false);
+    expect(document.body.style.userSelect).toBe("");
+  });
+
+  it("折叠状态下不允许拖拽", () => {
+    const { layout } = setup();
+    layout.collapse();
+
+    layout.startResize({
+      currentTarget: document.createElement("div"),
+      clientX: 100,
+      pointerId: 1,
+      preventDefault: vi.fn(),
+    } as unknown as PointerEvent);
+
+    expect(layout.dragging.value).toBe(false);
+  });
 });

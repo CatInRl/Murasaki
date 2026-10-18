@@ -26,24 +26,34 @@ function settingsOf(overrides: Partial<StartupSettings> = {}): StartupSettings {
 function makeDeps(
   options: {
     settings?: Partial<StartupSettings>;
+    /** loadSettings 之后 store 里的设置（模拟 store 整体替换 settings 对象） */
+    settingsAfterLoad?: Partial<StartupSettings>;
     languageEmpty?: boolean;
     pending?: { path: string; type?: string } | null;
     setupDragDrop?: () => Promise<void>;
+    failAt?: string;
   } = {}
 ): { deps: AppStartupDeps; calls: string[]; initialized: Ref<boolean> } {
   const calls: string[] = [];
   const record = (name: string) => vi.fn(async () => {
     calls.push(name);
+    if (options.failAt === name) throw new Error(`fail at ${name}`);
   });
   const initialized = ref(false);
+  let currentSettings = settingsOf(options.settings);
   const deps: AppStartupDeps = {
     initialized,
     persistence: {
-      loadSettings: record("loadSettings"),
+      loadSettings: vi.fn(async () => {
+        calls.push("loadSettings");
+        if (options.settingsAfterLoad) {
+          currentSettings = settingsOf(options.settingsAfterLoad);
+        }
+      }),
       loadRecent: record("loadRecent"),
       updateSettings: vi.fn(async () => undefined),
-      settings: settingsOf(options.settings),
-      languageEmpty: options.languageEmpty ?? false,
+      getSettings: () => currentSettings,
+      isLanguageEmpty: () => options.languageEmpty ?? false,
     },
     applyTheme: vi.fn(() => calls.push("applyTheme")),
     applyReadingFont: vi.fn(() => calls.push("applyReadingFont")),
@@ -132,10 +142,27 @@ describe("bootstrapApp", () => {
       "setupDragDrop",
       "setConflictResolver",
       "markAppReady",
-      "exposeTestHooks",
       "checkForUpdates",
+      "exposeTestHooks",
     ]);
     expect(initialized.value).toBe(true);
+  });
+
+  it("设置在 loadSettings 之后读取（避免用默认值启动）", async () => {
+    const { deps } = makeDeps({
+      settings: { markdownTheme: "murasaki" },
+      settingsAfterLoad: {
+        markdownTheme: "night",
+        editorMode: "source",
+        lastWorkspacePath: "C:/saved",
+      },
+    });
+
+    await bootstrapApp(deps);
+
+    expect(deps.applyTheme).toHaveBeenCalledWith("night");
+    expect(deps.applyEditorMode).toHaveBeenCalledWith("source");
+    expect(deps.openWorkspace).toHaveBeenCalledWith("C:/saved");
   });
 
   it("有外部入口的待打开路径：跳过会话恢复，监听就绪后才打开", async () => {
@@ -183,6 +210,16 @@ describe("bootstrapApp", () => {
 
     expect(calls).toContain("setConflictResolver");
     expect(initialized.value).toBe(true);
+  });
+
+  it("中途失败时撤销已注册的监听并抛出", async () => {
+    const { deps, calls } = makeDeps({ failAt: "syncRecentMenu" });
+
+    await expect(bootstrapApp(deps)).rejects.toThrow("fail at syncRecentMenu");
+
+    expect(calls).toContain("disposeCloseListener");
+    expect(calls).toContain("disposeListeners");
+    expect(calls).not.toContain("startFileWatcher");
   });
 
   it("dispose 按注册的逆序撤销监听与后台任务", async () => {

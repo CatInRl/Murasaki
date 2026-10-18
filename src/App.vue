@@ -64,7 +64,7 @@ import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import type { SidebarView, EditorMode } from "./types";
 import type { SearchEntry } from "./search/searchLogic";
 import { resolveSearchJumpLine } from "./search/searchLogic";
-import { READING_FONT_PRESETS } from "./types";
+import { applyReadingFontPreset } from "./utils/readingFont";
 import {
   PRESENTATION_ZOOM_DEFAULT,
   stepPresentationZoom,
@@ -229,8 +229,8 @@ const sidebarView = ref<SidebarView>("files");
 const allTabsOpen = ref(false);
 
 // ===== 侧栏宽度（可拖拽调整 + 折叠成细条，均持久化）=====
-// 状态、拖拽与持久化集中在 useSidebarLayout（#433）；实例在 initialized 之后创建，
-// 此处仅声明视图切换的编排函数（调用发生在 setup 之后）。
+// 状态、拖拽与持久化集中在 useSidebarLayout（#433）；实例在 setup 阶段创建，
+// initialized 由启动流程在恢复完成后置位（之前不写回设置）。
 
 /** 大纲视图可用性（与 Sidebar 一致：仅 markdown 文件） */
 const canShowOutline = computed(() =>
@@ -441,18 +441,14 @@ onMounted(async () => {
       loadSettings: () => persistence.loadSettings(),
       loadRecent: () => persistence.loadRecent(),
       updateSettings: (patch) => persistence.updateSettings(patch),
-      settings: persistence.settings,
-      languageEmpty: persistence.languageEmpty,
+      // getter：loadSettings 会整体替换 settings 对象，必须在加载之后读取
+      getSettings: () => persistence.settings,
+      isLanguageEmpty: () => persistence.languageEmpty,
     },
     applyTheme: (theme) => {
       currentTheme.value = theme;
     },
-    applyReadingFont: (preset) => {
-      document.documentElement.style.setProperty(
-        "--murasaki-font-reading",
-        READING_FONT_PRESETS[preset] ?? READING_FONT_PRESETS.d
-      );
-    },
+    applyReadingFont: (preset) => applyReadingFontPreset(preset),
     applyEditorMode: (mode) => editorBridge.setEditorMode(mode),
     sidebar: {
       setView: (view) => {
