@@ -51,6 +51,8 @@
     "noWorkspace": "未打开工作区",
     "noWorkspaceDesc": "打开一个文件夹开始编辑",
     "openFolder": "打开文件夹",
+    "emptyFolder": "此文件夹为空",
+    "emptyFolderDesc": "新建一个文件，或打开其他文件夹",
     "newFilePlaceholder": "新文件名.md",
     "newFolderPlaceholder": "新文件夹名",
     "createFailed": "新建失败: {error}",
@@ -121,7 +123,11 @@
     "emptyNoResults": "未找到匹配项",
     "emptyHint": "试试文件名或内容关键词",
     "loadingScan": "内容扫描中…",
+    "searchFailed": "搜索失败",
+    "noWorkspace": "未打开工作区，无法搜索文件内容",
+    "noWorkspaceHint": "仍可搜索已打开的标签与最近文件",
     "truncated": "内容结果已截断，请细化查询",
+    "searchCancelled": "搜索已取消，仅显示已扫描到的部分结果",
     "resultCount": "{count} 项结果"
   },
   "toolbar": {

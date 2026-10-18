@@ -18,12 +18,17 @@ interface Props {
   actionText?: string;
   /** 操作按钮图标（lucide 组件，可选） */
   actionIcon?: Component;
+  /** 次要操作按钮文字（提供则显示为文字按钮） */
+  secondaryActionText?: string;
+  /** 次要操作按钮图标（lucide 组件，可选） */
+  secondaryActionIcon?: Component;
 }
 
 defineProps<Props>();
 
 const emit = defineEmits<{
   (e: "action"): void;
+  (e: "secondary-action"): void;
 }>();
 
 function onAction(): void {
@@ -44,6 +49,15 @@ function onAction(): void {
     >
       <component :is="actionIcon" v-if="actionIcon" :size="14" />
       <span>{{ actionText }}</span>
+    </button>
+    <button
+      v-if="secondaryActionText"
+      type="button"
+      class="empty-action empty-action--secondary"
+      @click="emit('secondary-action')"
+    >
+      <component :is="secondaryActionIcon" v-if="secondaryActionIcon" :size="14" />
+      <span>{{ secondaryActionText }}</span>
     </button>
   </div>
 </template>
@@ -96,5 +110,13 @@ function onAction(): void {
 }
 .empty-action:hover {
   background: var(--murasaki-purple-50);
+}
+.empty-action--secondary {
+  margin-top: 4px;
+  border-color: transparent;
+  color: var(--murasaki-muted-foreground);
+}
+.empty-action--secondary:hover {
+  color: var(--murasaki-primary);
 }
 </style>
