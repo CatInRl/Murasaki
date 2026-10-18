@@ -1,11 +1,19 @@
-use std::path::PathBuf;
-use std::sync::Mutex;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use notify::event::ModifyKind;
 use notify::{Watcher, RecursiveMode, EventKind, RecommendedWatcher};
 use crate::errors::{CommandError, ErrorCode};
+
+/// 事件合并窗口（毫秒）：把一次爆发期（`git checkout` / `npm install` / 自动保存）
+/// 产生的成百上千条事件压成「每个路径一条」。
+const DEBOUNCE_MS: u64 = 150;
 
 /// 某窗口的监听器实例与它监听的路径
 struct WatcherEntry {
@@ -13,6 +21,56 @@ struct WatcherEntry {
     #[allow(dead_code)]
     watcher: RecommendedWatcher,
     path: String,
+    /// 通知合并线程退出（drop 时置 true）
+    stop: Arc<AtomicBool>,
+}
+
+impl Drop for WatcherEntry {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
+}
+
+/// 待发送的变更：路径 → 事件类型。
+///
+/// 同一路径在一个窗口内可能连续收到 modify + rename 等事件，
+/// 结构变化（create / rename / remove）优先于内容修改。
+#[derive(Default)]
+struct PendingChanges {
+    events: HashMap<String, &'static str>,
+}
+
+impl PendingChanges {
+    fn push(&mut self, path: String, kind: &'static str) {
+        let slot = self.events.entry(path).or_insert(kind);
+        if kind_rank(kind) > kind_rank(slot) {
+            *slot = kind;
+        }
+    }
+
+    fn drain(&mut self) -> Vec<(String, &'static str)> {
+        self.events.drain().collect()
+    }
+}
+
+fn kind_rank(kind: &str) -> u8 {
+    match kind {
+        "modify" => 0,
+        "create" => 1,
+        "rename" => 2,
+        "remove" => 3,
+        _ => 0,
+    }
+}
+
+/// 是否属于文件树同样忽略的噪音（`.git` / `node_modules` 等）。
+fn is_ignored(path: &Path) -> bool {
+    path.components().any(|component| {
+        component
+            .as_os_str()
+            .to_str()
+            .is_some_and(crate::commands::files::is_noise)
+    })
 }
 
 /// 文件监听器状态：保存各窗口已激活的 watcher 实例（多窗口改造见 spec #194 / T1.2）。
@@ -93,28 +151,29 @@ pub fn start_watching(
         }
     }
 
-    let app_handle = app.clone();
-    // 事件只发给本窗口：裸 `emit` 是广播，多窗口下所有窗口都会收到
-    // 别的窗口工作区的变更通知（前端虽按 workspacePath 过滤，但仍是无谓的
-    // 跨窗口噪音，且同目录多窗口时会互相触发重载）。
-    let emit_label = label.clone();
+    // 合并缓冲：notify 回调只做「分类 + 去重入桶」，真正的 emit 交给下面的合并线程，
+    // 避免一次爆发期把成百上千条 IPC 直接打给前端。
+    let pending = Arc::new(Mutex::new(PendingChanges::default()));
+    let stop = Arc::new(AtomicBool::new(false));
+    let callback_pending = Arc::clone(&pending);
     let mut watcher = match notify::recommended_watcher(move |res: Result<notify::Event, _>| {
-        if let Ok(event) = res {
-            // 只关心内容修改 / 新建 / 删除 / 重命名
-            let Some(kind) = classify_event(&event.kind) else {
-                return;
-            };
-            // 对每个受影响的路径，发送事件到前端
-            for p in &event.paths {
-                let _ = app_handle.emit_to(
-                    emit_label.as_str(),
-                    "file-changed",
-                    FileChangedPayload {
-                        path: p.to_string_lossy().to_string(),
-                        kind,
-                    },
-                );
+        let Ok(event) = res else {
+            return;
+        };
+        // 只关心内容修改 / 新建 / 删除 / 重命名
+        let Some(kind) = classify_event(&event.kind) else {
+            return;
+        };
+        let mut changes = match callback_pending.lock() {
+            Ok(changes) => changes,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        for p in &event.paths {
+            // 与文件树共用同一份噪音清单（.git / node_modules 等）
+            if is_ignored(p) {
+                continue;
             }
+            changes.push(p.to_string_lossy().to_string(), kind);
         }
     }) {
         Ok(w) => w,
@@ -134,12 +193,40 @@ pub fn start_watching(
         return Err(CommandError::internal(format!("watch: {e}")).with_param("path", path.clone()));
     }
 
+    // 合并线程：每 150ms 把桶里的变更按路径各发一条。
+    // 事件只发给本窗口：裸 `emit` 是广播，多窗口下所有窗口都会收到
+    // 别的窗口工作区的变更通知（前端虽按 workspacePath 过滤，但仍是无谓的
+    // 跨窗口噪音，且同目录多窗口时会互相触发重载）。
+    let flusher_pending = Arc::clone(&pending);
+    let flusher_stop = Arc::clone(&stop);
+    let flusher_app = app.clone();
+    let flusher_label = label.clone();
+    thread::spawn(move || {
+        while !flusher_stop.load(Ordering::Relaxed) {
+            thread::sleep(Duration::from_millis(DEBOUNCE_MS));
+            let batch = match flusher_pending.lock() {
+                Ok(mut changes) => changes.drain(),
+                Err(poisoned) => poisoned.into_inner().drain(),
+            };
+            for (changed_path, kind) in batch {
+                let _ = flusher_app.emit_to(
+                    flusher_label.as_str(),
+                    "file-changed",
+                    FileChangedPayload {
+                        path: changed_path,
+                        kind,
+                    },
+                );
+            }
+        }
+    });
+
     // 保存本窗口的 watcher（顶掉该窗口的旧实例，不影响其它窗口）
     let mut map = state
         .watchers
         .lock()
         .map_err(|e| CommandError::internal(format!("watcher lock: {e}")))?;
-    map.insert(label, WatcherEntry { watcher, path });
+    map.insert(label, WatcherEntry { watcher, path, stop });
 
     Ok(())
 }
@@ -184,6 +271,7 @@ mod tests {
                 WatcherEntry {
                     watcher: notify::recommended_watcher(|_| {}).unwrap(),
                     path: "/tmp/a".to_string(),
+                    stop: Arc::new(AtomicBool::new(false)),
                 },
             );
             map.insert(
@@ -191,6 +279,7 @@ mod tests {
                 WatcherEntry {
                     watcher: notify::recommended_watcher(|_| {}).unwrap(),
                     path: "/tmp/b".to_string(),
+                    stop: Arc::new(AtomicBool::new(false)),
                 },
             );
         }
@@ -233,5 +322,50 @@ mod tests {
     fn test_classify_ignored_events() {
         assert_eq!(classify_event(&EventKind::Access(notify::event::AccessKind::Read)), None);
         assert_eq!(classify_event(&EventKind::Other), None);
+    }
+
+    #[test]
+    fn pending_changes_merge_same_path() {
+        let mut pending = PendingChanges::default();
+        pending.push("/ws/a.md".to_string(), "modify");
+        pending.push("/ws/a.md".to_string(), "modify");
+        pending.push("/ws/b.md".to_string(), "create");
+
+        let mut batch = pending.drain();
+        batch.sort();
+        assert_eq!(
+            batch,
+            vec![
+                ("/ws/a.md".to_string(), "modify"),
+                ("/ws/b.md".to_string(), "create"),
+            ]
+        );
+    }
+
+    #[test]
+    fn pending_changes_keep_structural_kind() {
+        let mut pending = PendingChanges::default();
+        pending.push("/ws/a.md".to_string(), "modify");
+        pending.push("/ws/a.md".to_string(), "remove");
+        // 结构变化优先，不会被随后的 modify 盖回去
+        pending.push("/ws/a.md".to_string(), "modify");
+
+        assert_eq!(pending.drain(), vec![("/ws/a.md".to_string(), "remove")]);
+    }
+
+    #[test]
+    fn pending_changes_drain_empties_bucket() {
+        let mut pending = PendingChanges::default();
+        pending.push("/ws/a.md".to_string(), "modify");
+        assert_eq!(pending.drain().len(), 1);
+        assert!(pending.drain().is_empty());
+    }
+
+    #[test]
+    fn is_ignored_skips_noise_components() {
+        assert!(is_ignored(Path::new("/ws/.git/objects/ab/cd")));
+        assert!(is_ignored(Path::new("C:/ws/node_modules/pkg/index.js")));
+        assert!(is_ignored(Path::new("/ws/.DS_Store")));
+        assert!(!is_ignored(Path::new("/ws/docs/readme.md")));
     }
 }

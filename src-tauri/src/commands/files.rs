@@ -36,7 +36,7 @@ const NOISE_NAMES: &[&str] = &[
     "node_modules",
 ];
 
-fn is_noise(name: &str) -> bool {
+pub(crate) fn is_noise(name: &str) -> bool {
     NOISE_NAMES.iter().any(|n| *n == name)
 }
 
