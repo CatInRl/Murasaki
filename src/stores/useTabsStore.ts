@@ -447,10 +447,39 @@ export const useTabsStore = defineStore("tabs", () => {
     tab.hasExternalChange = false;
   }
 
+  /** 合并写窗口：高频输入时最多每 1.5s 落一次盘（#429） */
+  const PERSIST_THROTTLE_MS = 1500;
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 落盘串行链：后一次写快照必须等前一次写完，避免旧快照后落覆盖新快照 */
+  let persistChain: Promise<void> = Promise.resolve();
+
+  function cancelPendingPersist(): void {
+    if (persistTimer !== null) {
+      clearTimeout(persistTimer);
+      persistTimer = null;
+    }
+  }
+
   /**
-   * 持久化当前 tabs 状态（用于启动恢复）
+   * 排一次合并落盘（#429）。
+   *
+   * 定时器已在等待时不重置 —— 连续输入期间也保证最多 1.5s 落一次盘，
+   * 不会因为「一直有改动」而无限延后（固定窗口节流，不是 trailing debounce）。
    */
-  async function persist(): Promise<void> {
+  function schedulePersist(): void {
+    if (persistTimer !== null) return;
+    persistTimer = setTimeout(() => {
+      persistTimer = null;
+      void persist();
+    }, PERSIST_THROTTLE_MS);
+  }
+
+  /**
+   * 持久化当前 tabs 状态（用于启动恢复）。
+   * 会先取消已排队的合并写：本次调用写的就是最新状态，再写一次纯属浪费。
+   */
+  function persist(): Promise<void> {
+    cancelPendingPersist();
     const persistence = usePersistenceStore();
     const toSave: PersistedTab[] = tabs.value.map((t) => ({
       path: t.path,
@@ -459,7 +488,14 @@ export const useTabsStore = defineStore("tabs", () => {
       cursor: t.cursor,
       scroll: t.scroll,
     }));
-    await persistence.saveTabs(toSave, Math.max(0, activeIndex.value));
+    const indexSnapshot = Math.max(0, activeIndex.value);
+    // 串行而非并发：定时器触发的写与退出时的强制 flush 可能撞在一起
+    persistChain = persistChain
+      .then(() => persistence.saveTabs(toSave, indexSnapshot))
+      .catch(() => {
+        // saveTabs 内部已记录错误；链上不能留 rejected，否则后续写全被跳过
+      });
+    return persistChain;
   }
 
   /**
@@ -545,6 +581,8 @@ export const useTabsStore = defineStore("tabs", () => {
    * 在 restoring=true 时触发。
    */
   function clearAll(): void {
+    // 已排队但尚未触发的合并写必须取消：否则它会在清空后把 [] 写进 tabs.json
+    cancelPendingPersist();
     restoring.value = true;
     tabs.value = [];
     activeTabId.value = null;
@@ -574,6 +612,7 @@ export const useTabsStore = defineStore("tabs", () => {
     updateActiveContent,
     saveTab,
     saveTabAs,
+    schedulePersist,
     persist,
     restore,
     clearAll,

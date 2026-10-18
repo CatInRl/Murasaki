@@ -18,10 +18,14 @@ vi.mock("../services/fileSystem", () => ({
 }));
 
 // useTabsStore 依赖持久化 store，这里只关心标签本身，故整个替换掉
+// saveTabs 用 hoisted 单例，便于断言落盘次数（#429）
+const { saveTabsSpy } = vi.hoisted(() => ({
+  saveTabsSpy: vi.fn(async (_tabs: Array<{ content: string }>, _activeIndex: number) => {}),
+}));
 vi.mock("./usePersistenceStore", () => ({
   usePersistenceStore: () => ({
     loadTabs: vi.fn(async () => ({ tabs: [], activeIndex: 0 })),
-    saveTabs: vi.fn(async () => {}),
+    saveTabs: saveTabsSpy,
   }),
 }));
 
@@ -34,6 +38,7 @@ vi.mock("./useToastStore", () => ({
 beforeEach(() => {
   setActivePinia(createPinia());
   warningSpy.mockClear();
+  saveTabsSpy.mockClear();
 });
 
 describe("useTabsStore", () => {
@@ -325,6 +330,102 @@ describe("useTabsStore", () => {
       await store.doCloseTab(tab.id);
 
       expect(saveDraft).toHaveBeenCalledWith("C:\\docs\\a.md", "需要兜底", tab.lastMtime);
+    });
+  });
+
+  describe("tabs.json 合并写入（#429）", () => {
+    it("高频变更只落盘一次，写入的是最新内容", async () => {
+      vi.useFakeTimers();
+      try {
+        const store = useTabsStore();
+        const tab = store.newTab("a");
+        for (let i = 1; i <= 20; i++) {
+          store.updateContent(tab.id, "a".repeat(i));
+          store.schedulePersist();
+        }
+        expect(saveTabsSpy).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1500);
+
+        expect(saveTabsSpy).toHaveBeenCalledTimes(1);
+        const saved = saveTabsSpy.mock.calls[0][0];
+        expect(saved[0].content).toBe("a".repeat(20));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("合并窗口结束后再次变更会重新排一次写（持续输入不会被无限延后）", async () => {
+      vi.useFakeTimers();
+      try {
+        const store = useTabsStore();
+        const tab = store.newTab("a");
+        store.schedulePersist();
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(saveTabsSpy).toHaveBeenCalledTimes(1);
+
+        store.updateContent(tab.id, "b");
+        store.schedulePersist();
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(saveTabsSpy).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("显式 persist（退出路径）立即落盘，并取消已排队的合并写", async () => {
+      vi.useFakeTimers();
+      try {
+        const store = useTabsStore();
+        store.newTab("a");
+        store.schedulePersist();
+
+        await store.persist();
+        expect(saveTabsSpy).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(saveTabsSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("clearAll 取消已排队的合并写，不会把空数组写进 tabs.json", async () => {
+      vi.useFakeTimers();
+      try {
+        const store = useTabsStore();
+        store.newTab("a");
+        store.schedulePersist();
+
+        store.clearAll();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(saveTabsSpy).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("落盘串行执行：前一次没写完时，后一次排队等待", async () => {
+      const store = useTabsStore();
+      store.newTab("a");
+
+      let release: (() => void) | undefined;
+      saveTabsSpy.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          })
+      );
+
+      const first = store.persist();
+      const second = store.persist();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(saveTabsSpy).toHaveBeenCalledTimes(1);
+
+      release?.();
+      await Promise.all([first, second]);
+      expect(saveTabsSpy).toHaveBeenCalledTimes(2);
     });
   });
 });
