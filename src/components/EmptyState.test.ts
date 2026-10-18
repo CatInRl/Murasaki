@@ -51,6 +51,31 @@ describe("EmptyState", () => {
     expect(wrapper.find(".empty-action").findAll("svg")).toHaveLength(1);
   });
 
+  it("未提供 secondaryActionText 时不渲染次要按钮", () => {
+    const wrapper = mount(EmptyState, {
+      props: { icon: FileText, title: "空", actionText: "新建" },
+    });
+    expect(wrapper.find(".empty-action--secondary").exists()).toBe(false);
+  });
+
+  it("提供 secondaryActionText 时渲染次要按钮并 emits secondary-action", async () => {
+    const wrapper = mount(EmptyState, {
+      props: {
+        icon: FileText,
+        title: "空",
+        actionText: "新建",
+        secondaryActionText: "打开文件夹",
+      },
+    });
+    const buttons = wrapper.findAll(".empty-action");
+    expect(buttons).toHaveLength(2);
+    const secondary = wrapper.find(".empty-action--secondary");
+    expect(secondary.text()).toContain("打开文件夹");
+    await secondary.trigger("click");
+    expect(wrapper.emitted("secondary-action")).toBeTruthy();
+    expect(wrapper.emitted("action")).toBeFalsy();
+  });
+
   it("根容器具备 role=status 与 aria-live=polite", () => {
     const wrapper = mount(EmptyState, {
       props: { icon: FileText, title: "空" },

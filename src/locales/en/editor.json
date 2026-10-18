@@ -108,6 +108,7 @@
     "noWorkspace": "Open a workspace to search file contents",
     "noWorkspaceHint": "You can still search open tabs and recent files",
     "truncated": "Content results truncated. Refine your query.",
+    "searchCancelled": "Search cancelled. Showing the partial results found so far.",
     "resultCount": "{count} results"
   },
   "toolbar": {

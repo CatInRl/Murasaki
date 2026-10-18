@@ -14,6 +14,7 @@ import {
   Files,
   FolderX,
   History,
+  Info,
   Loader2,
   Search,
   SearchX,
@@ -26,6 +27,7 @@ import { useTabsStore } from "../stores/useTabsStore";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { basename, isPathUnder, relativeFromDir } from "../utils/path";
+import { formatCommandError } from "../utils/commandError";
 import { isMarkdownFile } from "../utils/fileKind";
 import { useShortcuts } from "../shortcuts/useShortcuts";
 import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
@@ -131,11 +133,7 @@ const flatEntries = computed<SearchEntry[]>(() => {
 const hasQuery = computed(() => searchStore.query.trim().length > 0);
 /** 有查询、但工作区未打开：内容搜索不可用，给出明确说明而不是「无结果」 */
 const showNoWorkspace = computed(
-  () =>
-    hasQuery.value &&
-    !workspace.hasWorkspace &&
-    !searchStore.loading &&
-    flatEntries.value.length === 0
+  () => hasQuery.value && !workspace.hasWorkspace && !searchStore.loading
 );
 const showEmpty = computed(
   () =>
@@ -143,8 +141,13 @@ const showEmpty = computed(
     workspace.hasWorkspace &&
     !searchStore.loading &&
     !searchStore.error &&
+    !searchStore.cancelled &&
     flatEntries.value.length === 0 &&
     contentSource.value.length === 0
+);
+/** 错误文案按当前语言渲染（store 里存结构化错误，切语言后跟随） */
+const errorMessage = computed(() =>
+  searchStore.error ? formatCommandError(searchStore.error) : ""
 );
 /** 扫描进度文案（总数为 0 时退回只显示命中数） */
 const progressText = computed(() => {
@@ -316,9 +319,7 @@ function toggleOption(key: "regex" | "caseSensitive" | "wholeWord"): void {
 }
 
 function onClear(): void {
-  searchStore.setQuery("");
-  searchStore.results = [];
-  void searchStore.cancelSearch();
+  searchStore.clear();
   inputRef.value?.focus();
 }
 
@@ -493,27 +494,32 @@ watch(
       </div>
 
       <!-- 结果区 -->
-      <div class="gsb__results">
-        <!-- 出错：给出原因与重试，而不是伪装成「无结果」 -->
-        <div v-if="searchStore.error" class="gsb__empty gsb__error" role="alert">
-          <TriangleAlert :size="20" class="gsb__empty-icon" aria-hidden="true" />
-          <span>{{ t('editor.searchBar.searchFailed') }}</span>
-          <span class="gsb__empty__hint">{{ searchStore.error }}</span>
-          <button class="gsb__error__retry" type="button" @click="retrySearch">
+      <div class="gsb__results" :aria-busy="searchStore.loading">
+        <!-- 出错：给出原因与重试；不遮蔽本地已有的标签 / 最近文件命中 -->
+        <div
+          v-if="hasQuery && searchStore.error"
+          class="gsb__notice gsb__notice--error"
+          role="alert"
+        >
+          <TriangleAlert :size="16" class="gsb__notice__icon" aria-hidden="true" />
+          <span class="gsb__notice__text">{{ t('editor.searchBar.searchFailed') }}</span>
+          <span class="gsb__hint">{{ errorMessage }}</span>
+          <button class="gsb__action" type="button" @click="retrySearch">
             {{ t('common.retry') }}
           </button>
         </div>
-        <!-- 未打开工作区 -->
-        <div v-else-if="showNoWorkspace" class="gsb__empty">
-          <FolderX :size="20" class="gsb__empty-icon" aria-hidden="true" />
-          <span>{{ t('editor.searchBar.noWorkspace') }}</span>
-          <span class="gsb__empty__hint">{{ t('editor.searchBar.noWorkspaceHint') }}</span>
+        <!-- 未打开工作区：内容搜索不可用，但标签 / 最近文件仍可命中 -->
+        <div v-if="showNoWorkspace" class="gsb__notice">
+          <FolderX :size="16" class="gsb__notice__icon" aria-hidden="true" />
+          <span class="gsb__notice__text">{{ t('editor.searchBar.noWorkspace') }}</span>
+          <span class="gsb__hint">{{ t('editor.searchBar.noWorkspaceHint') }}</span>
         </div>
+
         <!-- 空态 -->
-        <div v-else-if="showEmpty" class="gsb__empty">
+        <div v-if="showEmpty" class="gsb__empty">
           <SearchX :size="20" class="gsb__empty-icon" aria-hidden="true" />
           <span>{{ t('editor.searchBar.emptyNoResults') }}</span>
-          <span class="gsb__empty__hint">{{ t('editor.searchBar.emptyHint') }}</span>
+          <span class="gsb__hint">{{ t('editor.searchBar.emptyHint') }}</span>
         </div>
 
         <!-- 分组 -->
@@ -572,21 +578,25 @@ watch(
             </div>
           </div>
 
-          <!-- 内容扫描加载中 -->
+          <!-- 内容扫描加载中：即使已有命中也要能继续看进度与取消 -->
           <div
-            v-if="searchStore.loading && hasQuery && workspace.hasWorkspace && contentSource.length === 0"
+            v-if="searchStore.loading && hasQuery && workspace.hasWorkspace"
             class="gsb__loading"
-            role="status"
-            aria-live="polite"
             aria-busy="true"
           >
             <span class="gsb__spinner" aria-hidden="true"></span>
             <span>{{ progressText }}</span>
-            <button class="gsb__loading__cancel" type="button" @click="cancelContentSearch">
+            <button class="gsb__action" type="button" @click="cancelContentSearch">
               {{ t('editor.search.cancelSearch') }}
             </button>
           </div>
         </template>
+      </div>
+
+      <!-- 已取消：结果不完整，与「无结果 / 已截断」区分 -->
+      <div v-if="searchStore.cancelled" class="gsb__cancelled">
+        <Info :size="12" class="gsb__cancelled__icon" aria-hidden="true" />
+        <span>{{ t('editor.searchBar.searchCancelled') }}</span>
       </div>
 
       <!-- 截断提示 -->
@@ -963,7 +973,30 @@ watch(
   font-size: 13px;
 }
 .gsb__empty-icon { color: var(--murasaki-ink-3); }
-.gsb__empty__hint { font-size: 11px; color: var(--murasaki-ink-3); }
+.gsb__hint { font-size: 11px; color: var(--murasaki-ink-3); }
+
+/* 横幅提示（错误 / 未打开工作区）：不阻断下方本地命中分组 */
+.gsb__notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--murasaki-border);
+  border-radius: var(--murasaki-radius-sm);
+  background: var(--murasaki-muted);
+  font-size: 12px;
+  color: var(--murasaki-ink-2);
+}
+.gsb__notice--error {
+  border-color: color-mix(in srgb, var(--murasaki-state-error) 30%, transparent);
+  background: color-mix(in srgb, var(--murasaki-state-error) 8%, transparent);
+}
+.gsb__notice__icon { color: var(--murasaki-ink-3); flex: 0 0 auto; }
+.gsb__notice--error .gsb__notice__icon { color: var(--murasaki-state-error); }
+.gsb__notice__text { font-weight: 500; }
+.gsb__notice .gsb__action { margin-left: auto; }
 .gsb__spinner {
   width: 16px;
   height: 16px;
@@ -973,9 +1006,8 @@ watch(
   animation: gsb-spin 0.7s linear infinite;
 }
 @keyframes gsb-spin { to { transform: rotate(360deg); } }
-.gsb__error__retry,
-.gsb__loading__cancel {
-  margin-top: 4px;
+/* 结果区内的按钮（重试 / 取消扫描） */
+.gsb__action {
   padding: 4px 12px;
   border: 1px solid var(--murasaki-border);
   border-radius: var(--murasaki-radius-sm);
@@ -984,10 +1016,24 @@ watch(
   font-size: 12px;
   cursor: pointer;
 }
-.gsb__error__retry:hover,
-.gsb__loading__cancel:hover {
+.gsb__action:hover {
   background: var(--murasaki-purple-50);
 }
+
+/* —— 取消提示（结果不完整） —— */
+.gsb__cancelled {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 8px;
+  padding: 4px 8px;
+  background: var(--murasaki-muted);
+  border: 1px solid var(--murasaki-border);
+  border-radius: var(--murasaki-radius-sm);
+  font-size: 11px;
+  color: var(--murasaki-ink-2);
+}
+.gsb__cancelled__icon { color: var(--murasaki-ink-3); flex: 0 0 auto; }
 
 /* —— 截断提示 —— */
 .gsb__truncate {

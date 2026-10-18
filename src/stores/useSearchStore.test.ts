@@ -69,6 +69,8 @@ describe("useSearchStore", () => {
       expect(store.matchedFiles).toBe(0);
       expect(store.matchedCount).toBe(0);
       expect(store.truncated).toBe(false);
+      expect(store.cancelled).toBe(false);
+      expect(store.error).toBeNull();
     });
 
     it("DEFAULT_MAX_RESULTS 等于 1000", () => {
@@ -218,8 +220,8 @@ describe("useSearchStore", () => {
       expect(store.results).toEqual([]);
       expect(store.truncated).toBe(false);
       expect(store.loading).toBe(false);
-      // #441：失败原因暴露给搜索条，而不是伪装成「无结果」
-      expect(store.error).toBe("boom");
+      // #441：失败原因暴露给搜索条，而不是伪装成「无结果」；存结构化错误以便切换语言
+      expect(store.error).toEqual({ code: "unknown", params: { detail: "boom" } });
     });
 
     it("成功搜索会清掉上一次的错误", async () => {
@@ -230,7 +232,7 @@ describe("useSearchStore", () => {
       const store = useSearchStore();
       store.setQuery("hello");
       await store.search();
-      expect(store.error).toBe("boom");
+      expect(store.error).toEqual({ code: "unknown", params: { detail: "boom" } });
 
       mockedInvoke.mockImplementation((cmd: string) =>
         cmd === "cancel_search"
@@ -244,6 +246,33 @@ describe("useSearchStore", () => {
       );
       await store.search();
       expect(store.error).toBeNull();
+    });
+
+    it("被取消的搜索保留部分结果并标记 cancelled，不当作权威全集", async () => {
+      const partial: SearchResponse = {
+        contentResults: [
+          {
+            filePath: "/test/workspace/a.md",
+            matches: [
+              { lineNumber: 1, lineContent: "hello", contextBefore: [], contextAfter: [], ranges: [] },
+            ],
+          },
+        ],
+        filenameResults: [],
+        truncated: false,
+        cancelled: true,
+      };
+      mockedInvoke.mockResolvedValueOnce(partial);
+      const store = useSearchStore();
+      store.setQuery("hello");
+
+      await store.search();
+
+      expect(store.cancelled).toBe(true);
+      expect(store.results).toEqual(partial.contentResults);
+      // 取消与「结果过多被截断」是两回事
+      expect(store.truncated).toBe(false);
+      expect(store.loading).toBe(false);
     });
 
     it("search 成功后 resultsQuery 记录产生结果的查询", async () => {

@@ -108,6 +108,7 @@
     "noWorkspace": "未打开工作区，无法搜索文件内容",
     "noWorkspaceHint": "仍可搜索已打开的标签与最近文件",
     "truncated": "内容结果已截断，请细化查询",
+    "searchCancelled": "搜索已取消，仅显示已扫描到的部分结果",
     "resultCount": "{count} 项结果"
   },
   "toolbar": {

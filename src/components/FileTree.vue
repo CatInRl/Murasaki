@@ -280,10 +280,11 @@ function retryLoad(): void {
           :action-icon="FilePlus"
           @action="fileOps.beginRootCreate('file')"
           :secondary-action-text="$t('editor.fileTree.openFolder')"
-          :secondary-action-icon="FolderOpen"
           @secondary-action="onOpenWorkspace"
         />
+        <!-- 空文件夹时不渲染空的无障碍树容器，避免读屏读到一棵空树 -->
         <div
+          v-if="workspace.fileTree.length > 0"
           class="tree-root"
           role="tree"
           :aria-label="$t('editor.fileTree.ariaLabel')"

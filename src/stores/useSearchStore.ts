@@ -3,7 +3,7 @@ import { ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type EventTarget as TauriEventTarget, type UnlistenFn } from "@tauri-apps/api/event";
 import { currentWindowLabel } from "../utils/windowContext";
-import { formatCommandError } from "../utils/commandError";
+import { parseCommandError, type CommandErrorInfo } from "../utils/commandError";
 import type {
   SearchProgressEvent,
   SearchResponse,
@@ -79,8 +79,10 @@ export const useSearchStore = defineStore("search", () => {
   const matchedCount = ref(0);
   /** 是否因达到上限而被截断 */
   const truncated = ref(false);
-  /** 搜索失败的原因（IPC / 正则等）；null 表示没有错误 */
-  const error = ref<string | null>(null);
+  /** 用户是否取消了本次扫描（结果不完整，不应与「无结果 / 已截断」混淆） */
+  const cancelled = ref(false);
+  /** 搜索失败的原因（IPC / 正则等，存结构化错误以便按当前语言渲染）；null 表示没有错误 */
+  const error = ref<CommandErrorInfo | null>(null);
 
   // ===== 内部：事件监听器清理 =====
   let unlistenProgress: UnlistenFn | null = null;
@@ -111,6 +113,7 @@ export const useSearchStore = defineStore("search", () => {
     matchedFiles.value = 0;
     matchedCount.value = 0;
     truncated.value = false;
+    cancelled.value = false;
     error.value = null;
   }
 
@@ -147,6 +150,8 @@ export const useSearchStore = defineStore("search", () => {
     resetResults();
     resetProgressState();
     cancelToken.value = null;
+    // token 被清空后，在途请求的 finally 不再收尾，需在此复位
+    loading.value = false;
   }
 
   /**
@@ -189,6 +194,8 @@ export const useSearchStore = defineStore("search", () => {
       resetResults();
       resetProgressState();
       cancelToken.value = null;
+      // token 被清空后，在途请求的 finally 不再收尾，需在此复位
+      loading.value = false;
       return { contentResults: [], filenameResults: [], truncated: false, cancelled: false };
     }
 
@@ -248,6 +255,20 @@ export const useSearchStore = defineStore("search", () => {
         cancelToken: token,
         maxResults: DEFAULT_MAX_RESULTS,
       });
+      // 期间可能已被新的搜索取代：旧请求（多为 cancelled）不得覆盖新状态
+      if (cancelToken.value !== token) return resp;
+      if (resp.cancelled) {
+        // 用户取消：保留已扫到的部分结果，但标记为不完整，不当作权威全集
+        results.value = resp.contentResults;
+        resultsQuery.value = currentQuery;
+        cancelled.value = true;
+        matchedFiles.value = resp.contentResults.length;
+        matchedCount.value = resp.contentResults.reduce(
+          (sum, r) => sum + r.matches.length,
+          0
+        );
+        return resp;
+      }
       // 用权威结果覆盖（保证与 Rust 端最终状态一致，避免增量事件丢失/乱序）
       results.value = resp.contentResults;
       resultsQuery.value = currentQuery;
@@ -261,14 +282,22 @@ export const useSearchStore = defineStore("search", () => {
       matchedFiles.value = resp.contentResults.length;
       return resp;
     } catch (err) {
+      // 已被新搜索取代的旧请求失败不影响当前搜索
+      if (cancelToken.value !== token) {
+        return { contentResults: [], filenameResults: [], truncated: false, cancelled: false };
+      }
       console.error("内容搜索失败:", err);
       resetResults();
       truncated.value = false;
-      error.value = formatCommandError(err);
+      cancelled.value = false;
+      error.value = parseCommandError(err);
       return { contentResults: [], filenameResults: [], truncated: false, cancelled: false };
     } finally {
-      loading.value = false;
-      clearListeners();
+      // 只有当前搜索才能收尾：旧请求的 finally 不能清掉新搜索的 loading / 监听器
+      if (cancelToken.value === token) {
+        loading.value = false;
+        clearListeners();
+      }
       // 保留 cancelToken 直到下次搜索开始（便于 cancelSearch 幂等调用）
       // 不立即清空，避免错过最终 cancel 状态
     }
@@ -294,6 +323,7 @@ export const useSearchStore = defineStore("search", () => {
     matchedFiles,
     matchedCount,
     truncated,
+    cancelled,
     error,
     // actions
     setQuery,
