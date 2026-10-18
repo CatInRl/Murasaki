@@ -87,6 +87,11 @@
     "openLargeFileConfirm": "The file \"{name}\" is large ({size} MB). Opening it as text may be slow. Open it anyway?",
     "reloadDiscardConfirm": "Reloading will discard unsaved changes in \"{name}\" (a draft will be kept). Continue?",
     "reloadConfirmAction": "Reload",
+    "draftConflictTitle": "Draft and disk versions differ",
+    "draftConflictMessage": "\"{name}\" changed on disk after it was closed.\n\nDisk version ({diskTime}): {diskPreview}\nDraft version ({draftTime}): {draftPreview}",
+    "draftConflictKeep": "Keep draft",
+    "draftConflictLoadDisk": "Load disk version",
+    "draftConflictLater": "Decide later",
     "openFileFirst": "Open a file first"
   },
   "error": {

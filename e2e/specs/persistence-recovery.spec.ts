@@ -263,8 +263,14 @@ describe("持久化恢复", () => {
     // 等待 mtime 变化（确保 mtime 不同）
     await new Promise((r) => setTimeout(r, 1100));
 
-    // 再次打开文件：草稿应被丢弃（mtime 不匹配），使用磁盘内容
-    await openFileInTab(browser, path);
+    // 再次打开文件：mtime 不匹配 → 弹窗。openFile 会阻塞在弹窗上，不能 await
+    await browser.execute((p: string) => {
+      // @ts-ignore
+      void window.__pinia__._s.get("tabs").openFile(p);
+    }, path);
+    await waitForPresent(browser, ".dialog-overlay", 5000);
+    const buttons = await browser.$$(".dialog-footer .dialog-btn");
+    await buttons[1].click();
     await browser.pause(500);
 
     const restoredContent = await getActiveContent(browser);
@@ -286,6 +292,68 @@ describe("持久化恢复", () => {
         .catch((err: unknown) => done({ error: err ? String(err) : null }));
     }, path);
     expect((draftExists as any).exists).toBe(false);
+  });
+
+  it("草稿冲突：选择「保留草稿」采用草稿内容并标记未保存（#425）", async () => {
+    const introPath = resolve(wsPath, "intro.md");
+    const path = introPath.replace(/\\/g, "/");
+
+    await openFileInTab(browser, path);
+    await browser.pause(300);
+    const mtime = await browser.execute(() => {
+      // @ts-ignore
+      const tabs = window.__pinia__._s.get("tabs");
+      return tabs.activeTab?.lastMtime;
+    });
+    await closeAllTabs(browser);
+    await browser.pause(200);
+
+    // 写入一份「基线过期」的草稿
+    const draftContent = "# 保留这份草稿\n";
+    await browser.executeAsync(
+      (p: string, c: string, mt: number, done: (res: unknown) => void) => {
+        // @ts-ignore
+        window.__TAURI_INTERNALS__.invoke("save_draft", { path: p, content: c, knownMtime: mt })
+          .then(() => done(null))
+          .catch((err: unknown) => done(err ? String(err) : null));
+      },
+      path,
+      draftContent,
+      Math.max(0, (mtime ?? 0) - 1)
+    );
+
+    // openFile 会阻塞在弹窗上，不能 await
+    await browser.execute((p: string) => {
+      // @ts-ignore
+      void window.__pinia__._s.get("tabs").openFile(p);
+    }, path);
+    await waitForPresent(browser, ".dialog-overlay", 5000);
+    // 主按钮 = 保留草稿
+    const primary = await browser.$(".dialog-footer .dialog-btn.primary");
+    await primary.click();
+    await browser.pause(500);
+
+    expect(await getActiveContent(browser)).toBe(draftContent);
+    const isDirty = await browser.execute(() => {
+      // @ts-ignore
+      const tabs = window.__pinia__._s.get("tabs");
+      return tabs.activeTab?.isDirty;
+    });
+    expect(isDirty).toBe(true);
+
+    // 清理：关闭标签，再删除测试草稿
+    await browser.executeAsync((done) => {
+      // @ts-ignore
+      const tabs = window.__pinia__._s.get("tabs");
+      Promise.resolve(tabs.doCloseTab(tabs.activeTabId))
+        .then(() => done(null), (e: unknown) => done(String(e)));
+    });
+    await browser.executeAsync((p: string, done: (res: unknown) => void) => {
+      // @ts-ignore
+      window.__TAURI_INTERNALS__.invoke("delete_draft", { path: p })
+        .then(() => done(null))
+        .catch((err: unknown) => done(err ? String(err) : null));
+    }, path);
   });
 
   it("未保存的新文件 tab（无 path）持久化后恢复", async () => {
