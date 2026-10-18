@@ -597,22 +597,10 @@ pub fn run() {
             dialogs::pick_folder,
         ])
         .setup(|app| {
-            // 路径访问策略（#437）：APPDATA + 上次会话用到的路径；E2E 额外放行夹具目录
-            security::seed_from_persistence();
-            security::seed_e2e_roots();
-            if let Some(base) = dirs::data_dir() {
-                let _ = app.asset_protocol_scope().allow_directory(&base, true);
-            }
-            if crate::is_e2e_mode() {
-                if let Ok(cwd) = std::env::current_dir() {
-                    let _ = app
-                        .asset_protocol_scope()
-                        .allow_directory(cwd.join("e2e").join(".workspace"), true);
-                }
-                let _ = app
-                    .asset_protocol_scope()
-                    .allow_directory(std::env::temp_dir(), true);
-            }
+            // 路径访问策略（#437）：应用数据目录 + 上次会话用到的路径；E2E 额外放行夹目录
+            // （grant_* 会同时扩展 asset protocol scope，预览里的本地图片才加载得出来）
+            security::seed_from_persistence(&app.handle());
+            security::seed_e2e_roots(&app.handle());
 
             // 手动创建主窗口（tauri.conf.json 中 windows 数组为空）
             // 这样可以根据命令行参数动态注入 WebView2 additional_browser_args

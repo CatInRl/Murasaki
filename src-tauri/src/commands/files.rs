@@ -244,7 +244,7 @@ fn build_tree_inner(
 /// 超过深度 / 节点数上限时返回 `truncated = true`。
 #[tauri::command]
 pub async fn list_tree(path: String, show_hidden: Option<bool>) -> Result<TreeListing, CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_read(&path)?;
     tauri::async_runtime::spawn_blocking(move || {
         let dir = PathBuf::from(&path);
         if !dir.exists() {
@@ -268,7 +268,7 @@ pub async fn list_tree(path: String, show_hidden: Option<bool>) -> Result<TreeLi
 /// 创建文件（若已存在则报错）
 #[tauri::command]
 pub fn create_file(path: String) -> Result<TreeNode, CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_write(&path)?;
     let p = PathBuf::from(&path);
     if p.exists() {
         return Err(CommandError::path(ErrorCode::AlreadyExists, &path));
@@ -294,7 +294,7 @@ pub fn create_file(path: String) -> Result<TreeNode, CommandError> {
 /// 创建目录（若已存在则报错）
 #[tauri::command]
 pub fn create_directory(path: String) -> Result<TreeNode, CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_write(&path)?;
     let p = PathBuf::from(&path);
     if p.exists() {
         return Err(CommandError::path(ErrorCode::AlreadyExists, &path));
@@ -316,7 +316,7 @@ pub fn create_directory(path: String) -> Result<TreeNode, CommandError> {
 /// 删除文件或目录（走系统回收站）
 #[tauri::command]
 pub fn delete_path(path: String) -> Result<(), CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_write(&path)?;
     let p = PathBuf::from(&path);
     if !p.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &path));
@@ -337,8 +337,8 @@ pub fn delete_path(path: String) -> Result<(), CommandError> {
 /// 重命名/移动文件或目录
 #[tauri::command]
 pub fn rename_path(from: String, to: String) -> Result<TreeNode, CommandError> {
-    policy().ensure(&from)?;
-    policy().ensure(&to)?;
+    policy().ensure_write(&from)?;
+    policy().ensure_write(&to)?;
     let src = PathBuf::from(&from);
     let dst = PathBuf::from(&to);
     if !src.exists() {
@@ -375,8 +375,8 @@ pub fn rename_path(from: String, to: String) -> Result<TreeNode, CommandError> {
 /// 复制文件（仅文件，不复制目录）
 #[tauri::command]
 pub fn copy_file(from: String, to: String) -> Result<TreeNode, CommandError> {
-    policy().ensure(&from)?;
-    policy().ensure(&to)?;
+    policy().ensure_write(&from)?;
+    policy().ensure_write(&to)?;
     let src = PathBuf::from(&from);
     let dst = PathBuf::from(&to);
     if !src.exists() {
@@ -413,7 +413,7 @@ pub fn copy_file(from: String, to: String) -> Result<TreeNode, CommandError> {
 /// #432：`async` + `spawn_blocking` —— 大文件或网络盘读取不再占用主线程。
 #[tauri::command]
 pub async fn read_text_file(path: String) -> Result<String, CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_read(&path)?;
     tauri::async_runtime::spawn_blocking(move || {
         fs::read_to_string(&path).map_err(|e| CommandError::io_at(&e, &path))
     })
@@ -427,7 +427,7 @@ pub async fn read_text_file(path: String) -> Result<String, CommandError> {
 /// #432：`async` + `spawn_blocking`。
 #[tauri::command]
 pub async fn read_binary_file(path: String) -> Result<Vec<u8>, CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_read(&path)?;
     tauri::async_runtime::spawn_blocking(move || {
         fs::read(&path).map_err(|e| CommandError::io_at(&e, &path))
     })
@@ -440,7 +440,7 @@ pub async fn read_binary_file(path: String) -> Result<Vec<u8>, CommandError> {
 /// #432：`async` + `spawn_blocking` —— 原子替换含 fsync，大文件写盘不再阻塞主线程。
 #[tauri::command]
 pub async fn write_text_file(path: String, content: String) -> Result<(), CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_write(&path)?;
     tauri::async_runtime::spawn_blocking(move || {
         write_atomic(Path::new(&path), content.as_bytes())
             .map_err(|e| CommandError::io_at(&e, &path))
@@ -452,14 +452,14 @@ pub async fn write_text_file(path: String, content: String) -> Result<(), Comman
 /// 检查路径是否存在
 #[tauri::command]
 pub fn path_exists(path: String) -> Result<bool, CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_read(&path)?;
     Ok(Path::new(&path).exists())
 }
 
 /// 获取路径类型："file" | "directory" | "none"
 #[tauri::command]
 pub fn path_type(path: String) -> Result<String, CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_read(&path)?;
     let p = Path::new(&path);
     if p.is_file() {
         Ok("file".to_string())
@@ -476,7 +476,7 @@ pub fn path_type(path: String) -> Result<String, CommandError> {
 /// 读取**之前**做，否则几百 MB 的文件已经把内容读进内存了。
 #[tauri::command]
 pub fn get_file_size(path: String) -> Result<u64, CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_read(&path)?;
     let p = Path::new(&path);
     if !p.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &path));
@@ -488,7 +488,7 @@ pub fn get_file_size(path: String) -> Result<u64, CommandError> {
 /// 在系统资源管理器中显示文件（Windows: explorer.exe /select,）
 #[tauri::command]
 pub fn reveal_in_explorer(path: String) -> Result<(), CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_read(&path)?;
     let p = PathBuf::from(&path);
     if !p.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &path));
@@ -527,7 +527,7 @@ pub fn reveal_in_explorer(path: String) -> Result<(), CommandError> {
 /// 为一个兜底入口扩大攻击面不划算。这里与 `reveal_in_explorer` 同形，用系统命令。
 #[tauri::command]
 pub fn open_with_default_app(path: String) -> Result<(), CommandError> {
-    policy().ensure(&path)?;
+    policy().ensure_read(&path)?;
     if !Path::new(&path).exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &path));
     }

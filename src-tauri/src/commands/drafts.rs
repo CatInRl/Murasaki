@@ -197,7 +197,7 @@ pub fn get_app_data_dir() -> Result<String, CommandError> {
 /// 若文件不存在返回错误
 #[tauri::command]
 pub fn get_file_mtime(path: String) -> Result<u64, CommandError> {
-    crate::security::policy().ensure(&path)?;
+    crate::security::policy().ensure_read(&path)?;
     let p = Path::new(&path);
     if !p.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &path));

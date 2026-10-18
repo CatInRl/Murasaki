@@ -193,7 +193,7 @@ pub async fn search_workspace(
     }
     let opts = options.unwrap_or_default();
     let regex = build_search_regex(&query, &opts)?;
-    crate::security::policy().ensure(&workspace)?;
+    crate::security::policy().ensure_read(&workspace)?;
     let workspace_path = PathBuf::from(&workspace);
     if !workspace_path.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &workspace));

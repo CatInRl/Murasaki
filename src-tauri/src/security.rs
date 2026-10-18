@@ -1,9 +1,10 @@
 //! 路径访问策略（#437）。
 //!
-//! 命令层不再接受任意绝对路径：只有落在**已授权根**（工作区 / APPDATA）里的路径，
-//! 或用户通过对话框 / 系统入口明确选中的单个文件，才允许读写删复制。
+//! 命令层不再接受任意绝对路径：只有落在**已授权根**（工作区 / 应用数据目录）里的路径，
+//! 或用户通过对话框 / 系统入口明确选中的文件，才允许读写删复制。
 //! 授权只发生在可信入口（Rust 侧对话框、系统拖放、命令行 / 文件关联、启动恢复），
-//! 渲染进程无法自行扩大白名单。
+//! 渲染进程在本次运行期间无法自行扩大白名单；跨重启按 APPDATA 中的持久化状态
+//! （settings / recent / tabs）重建上次会话的授权。
 //!
 //! 白名单不持久化：每次启动按 APPDATA 里的 `settings.json` / `recent.json` /
 //! `tabs.json` 重新授权上次会话用到的路径（asset scope 同样如此）。
@@ -15,7 +16,7 @@ use tauri::Manager;
 
 use crate::errors::{CommandError, ErrorCode};
 
-/// 授权目录：命令白名单 + asset 协议（预览 / 导出要读本地图片）。
+/// 授权目录：命令白名单（读写）+ asset 协议（预览 / 导出要读本地图片）。
 pub fn grant_dir(app: &tauri::AppHandle, path: impl AsRef<Path>) {
     let path = path.as_ref();
     policy().allow_root(path);
@@ -31,12 +32,13 @@ pub fn grant_path(app: &tauri::AppHandle, path: &Path) {
     }
 }
 
-/// 授权单个文件：命令白名单 + asset 协议，并放行其所在目录（同目录相对图片）。
+/// 授权单个文件：可读写，并把它所在的目录列为**只读**（同目录图片、导出内联）。
 pub fn grant_file(app: &tauri::AppHandle, path: impl AsRef<Path>) {
     let path = path.as_ref();
     policy().allow_file(path);
     let _ = app.asset_protocol_scope().allow_file(path);
     if let Some(parent) = path.parent() {
+        policy().allow_read_root(parent);
         let _ = app.asset_protocol_scope().allow_directory(parent, true);
     }
 }
@@ -44,8 +46,10 @@ pub fn grant_file(app: &tauri::AppHandle, path: impl AsRef<Path>) {
 /// 进程级路径白名单。
 #[derive(Default)]
 pub struct PathPolicy {
-    /// 目录根（含其全部子路径）
+    /// 可读可写：工作区根、应用数据目录
     roots: RwLock<Vec<String>>,
+    /// 只读：已打开文件所在目录（预览同目录图片 / 导出内联图片）
+    read_roots: RwLock<Vec<String>>,
     /// 单个文件（用户选中的、不在已授权根内的文件）
     files: RwLock<Vec<String>>,
 }
@@ -58,42 +62,60 @@ pub fn policy() -> &'static PathPolicy {
 }
 
 impl PathPolicy {
-    /// 授权一个目录（含子目录）。
+    /// 授权一个目录（读写，含子目录）。
     pub fn allow_root(&self, path: impl AsRef<Path>) {
-        push_unique(&self.roots, key(path.as_ref()));
+        push_unique(&self.roots, comparison_key(path.as_ref()));
     }
 
-    /// 授权单个文件。
+    /// 授权一个目录（只读，含子目录）。
+    pub fn allow_read_root(&self, path: impl AsRef<Path>) {
+        push_unique(&self.read_roots, comparison_key(path.as_ref()));
+    }
+
+    /// 授权单个文件（读写）。
     pub fn allow_file(&self, path: impl AsRef<Path>) {
-        push_unique(&self.files, key(path.as_ref()));
+        push_unique(&self.files, comparison_key(path.as_ref()));
     }
 
-    /// 路径是否已授权。
-    pub fn is_allowed(&self, path: &Path) -> bool {
-        let target = key(path);
-        if self
-            .roots
-            .read()
-            .map(|roots| roots.iter().any(|root| is_under(root, &target)))
-            .unwrap_or(false)
-        {
-            return true;
-        }
-        self.files
-            .read()
-            .map(|files| files.iter().any(|file| *file == target))
-            .unwrap_or(false)
+    /// 是否允许写入（删除 / 重命名 / 复制目标）。
+    pub fn can_write(&self, path: &Path) -> bool {
+        let target = comparison_key(path);
+        contains(&self.roots, &target) || contains(&self.files, &target)
     }
 
-    /// 未授权时返回 `outside_workspace`（不区分「不存在」，避免泄露文件系统信息）。
-    pub fn ensure(&self, path: impl AsRef<Path>) -> Result<(), CommandError> {
+    /// 是否允许读取（含只读目录）。
+    pub fn can_read(&self, path: &Path) -> bool {
+        let target = comparison_key(path);
+        contains(&self.roots, &target)
+            || contains(&self.read_roots, &target)
+            || contains(&self.files, &target)
+    }
+
+    /// 读写权限校验；未授权时返回 `outside_workspace`。
+    pub fn ensure_write(&self, path: impl AsRef<Path>) -> Result<(), CommandError> {
         let path = path.as_ref();
-        if self.is_allowed(path) {
+        if self.can_write(path) {
             Ok(())
         } else {
             Err(CommandError::path(ErrorCode::OutsideWorkspace, path))
         }
     }
+
+    /// 读权限校验；未授权时返回 `outside_workspace`。
+    pub fn ensure_read(&self, path: impl AsRef<Path>) -> Result<(), CommandError> {
+        let path = path.as_ref();
+        if self.can_read(path) {
+            Ok(())
+        } else {
+            Err(CommandError::path(ErrorCode::OutsideWorkspace, path))
+        }
+    }
+}
+
+fn contains(list: &RwLock<Vec<String>>, target: &str) -> bool {
+    list.read()
+        .map(|items| items.iter().any(|item| is_under(item, target)))
+        .unwrap_or(false)
 }
 
 fn push_unique(list: &RwLock<Vec<String>>, value: String) {
@@ -107,7 +129,7 @@ fn push_unique(list: &RwLock<Vec<String>>, value: String) {
 }
 
 /// 路径归一化后的比较键：解析符号链接 / `..`，统一分隔符，Windows 下忽略大小写。
-fn key(path: &Path) -> String {
+fn comparison_key(path: &Path) -> String {
     let normalized = resolve(path).to_string_lossy().replace('\\', "/");
     if cfg!(windows) {
         normalized.to_lowercase()
@@ -157,31 +179,44 @@ fn lexical(path: &Path) -> PathBuf {
 
 /// `target` 是否等于 `root` 或位于其下（按路径分段比较，避免 `/a/bc` 命中 `/a/b`）。
 fn is_under(root: &str, target: &str) -> bool {
-    target == root
-        || target
-            .strip_prefix(root)
-            .is_some_and(|rest| rest.starts_with('/'))
+    if target == root {
+        return true;
+    }
+    let normalized_root = root.strip_suffix('/').unwrap_or(root);
+    // 盘根（`c:`）与 Unix 根（空）都要能匹配
+    if normalized_root.is_empty() {
+        return target.starts_with('/');
+    }
+    target
+        .strip_prefix(normalized_root)
+        .is_some_and(|rest| rest.starts_with('/'))
 }
 
 /// 启动时按上次会话的持久化状态重新授权（asset scope 不持久化）。
 ///
-/// 数据来源都在 APPDATA 内：`settings.json`（上次工作区）、`recent.json`（最近打开）、
-/// `tabs.json`（各窗口恢复的标签）。读取失败时静默跳过，不影响启动。
-pub fn seed_from_persistence() {
-    let Some(base) = dirs::data_dir() else {
+/// 数据来源：应用的配置目录（`settings.json` / `recent.json` / `tabs.json`）与草稿目录。
+/// 读取失败时静默跳过，不影响启动。
+pub fn seed_from_persistence(app: &tauri::AppHandle) {
+    // 设置 / 最近文件 / 标签 / 草稿：应用自身的数据，始终放行
+    let config_dir = app.path().app_config_dir().ok();
+    if let Some(dir) = &config_dir {
+        grant_dir(app, dir);
+    }
+    if let Some(dir) = dirs::data_dir().map(|base| base.join("murasaki")) {
+        grant_dir(app, &dir);
+    }
+
+    let Some(config_dir) = config_dir else {
         return;
     };
-    // 应用自身的设置 / 草稿 / 日志都写在这里，始终放行
-    policy().allow_root(&base);
 
-    let app_dir = base.join("com.murasaki.app");
-    if let Some(state) = read_json(&app_dir.join("settings.json")).get("state") {
+    if let Some(state) = read_json(&config_dir.join("settings.json")).get("state") {
         if let Some(path) = state.get("lastWorkspacePath").and_then(|v| v.as_str()) {
-            policy().allow_root(path);
+            grant_dir(app, path);
         }
     }
 
-    if let Some(entries) = read_json(&app_dir.join("recent.json"))
+    if let Some(entries) = read_json(&config_dir.join("recent.json"))
         .get("entries")
         .and_then(|v| v.as_array())
     {
@@ -190,22 +225,22 @@ pub fn seed_from_persistence() {
             let kind = entry.get("type").and_then(|v| v.as_str());
             if let Some(path) = path {
                 if kind == Some("folder") {
-                    policy().allow_root(path);
+                    grant_dir(app, path);
                 } else {
-                    policy().allow_file(path);
+                    grant_file(app, path);
                 }
             }
         }
     }
 
-    if let Some(stores) = read_json(&app_dir.join("tabs.json")).as_object() {
+    if let Some(stores) = read_json(&config_dir.join("tabs.json")).as_object() {
         for value in stores.values() {
             let Some(tabs) = value.get("tabs").and_then(|v| v.as_array()) else {
                 continue;
             };
             for tab in tabs {
                 if let Some(path) = tab.get("path").and_then(|v| v.as_str()) {
-                    policy().allow_file(path);
+                    grant_file(app, path);
                 }
             }
         }
@@ -219,15 +254,24 @@ fn read_json(path: &Path) -> serde_json::Value {
         .unwrap_or(serde_json::Value::Null)
 }
 
-/// E2E：允许测试夹具目录与临时目录（测试通过 Pinia 直接指定工作区，不经过对话框）。
-pub fn seed_e2e_roots() {
+/// E2E：放行测试夹具目录与临时目录（测试通过 Pinia 直接指定工作区，不经过对话框）。
+pub fn seed_e2e_roots(app: &tauri::AppHandle) {
     if !crate::is_e2e_mode() {
         return;
     }
-    if let Ok(cwd) = std::env::current_dir() {
-        policy().allow_root(cwd.join("e2e").join(".workspace"));
+    // 覆盖 e2e/.workspace 与各类 .workspace-* / fixtures；
+    // 应用进程的 cwd 可能是仓库根，也可能是 src-tauri，向上找几层
+    let mut dir = std::env::current_dir().ok();
+    for _ in 0..3 {
+        let Some(current) = dir else { break };
+        let candidate = current.join("e2e");
+        if candidate.is_dir() {
+            grant_dir(app, &candidate);
+            break;
+        }
+        dir = current.parent().map(Path::to_path_buf);
     }
-    policy().allow_root(std::env::temp_dir());
+    grant_dir(app, std::env::temp_dir());
 }
 
 #[cfg(test)]
@@ -257,8 +301,8 @@ mod tests {
         let policy = PathPolicy::default();
         policy.allow_root(&root);
 
-        assert!(policy.is_allowed(&nested));
-        assert!(policy.is_allowed(&root.join("not-created-yet.md")));
+        assert!(policy.can_write(&nested));
+        assert!(policy.can_write(&root.join("not-created-yet.md")));
     }
 
     #[test]
@@ -273,8 +317,8 @@ mod tests {
         let policy = PathPolicy::default();
         policy.allow_root(&root);
 
-        assert!(!policy.is_allowed(&sibling.join("x.md")));
-        let err = policy.ensure(&sibling.join("x.md")).unwrap_err();
+        assert!(!policy.can_read(&sibling.join("x.md")));
+        let err = policy.ensure_read(&sibling.join("x.md")).unwrap_err();
         assert_eq!(err.code, ErrorCode::OutsideWorkspace);
 
         let _ = std::fs::remove_dir_all(&root);
@@ -287,7 +331,7 @@ mod tests {
         let policy = PathPolicy::default();
         policy.allow_root(&root);
 
-        assert!(!policy.is_allowed(&root.join("..").join("escape.md")));
+        assert!(!policy.can_read(&root.join("..").join("escape.md")));
 
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -301,9 +345,29 @@ mod tests {
         let policy = PathPolicy::default();
         policy.allow_file(&file);
 
-        assert!(policy.is_allowed(&file));
-        assert!(!policy.is_allowed(&root.join("other.md")));
+        assert!(policy.can_write(&file));
+        assert!(!policy.can_write(&root.join("other.md")));
 
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn read_root_allows_reads_but_not_writes() {
+        let dir = temp_root();
+        let policy = PathPolicy::default();
+        policy.allow_read_root(&dir);
+
+        assert!(policy.can_read(&dir.join("img.png")));
+        assert!(!policy.can_write(&dir.join("img.png")));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn drive_root_matches_everything_on_that_drive() {
+        assert!(is_under("c:", "c:/users/a.md"));
+        assert!(is_under("c:/", "c:/users/a.md"));
+        assert!(!is_under("c:", "d:/users/a.md"));
+        assert!(is_under("/", "/home/a.md"));
     }
 }

@@ -57,25 +57,49 @@ fn builder(
     dialog
 }
 
-/// 选择单个文件；选中后授权该文件（读 + asset）。
+/// 三种选择模式共享「弹窗 → 拿到路径 → 当场授权」的流程
+#[derive(Clone, Copy)]
+enum PickMode {
+    File,
+    Save,
+    Folder,
+}
+
+async fn pick(
+    window: WebviewWindow,
+    app: AppHandle,
+    mode: PickMode,
+    options: Option<FileDialogOptions>,
+) -> Result<Option<String>, CommandError> {
+    let dialog = builder(&app, &window, options.unwrap_or_default());
+    let picked = tauri::async_runtime::spawn_blocking(move || match mode {
+        PickMode::File => dialog.blocking_pick_file(),
+        PickMode::Save => dialog.blocking_save_file(),
+        PickMode::Folder => dialog.blocking_pick_folder(),
+    })
+    .await
+    .map_err(|e| CommandError::internal(format!("file dialog join: {e}")))?;
+    let Some(selected) = picked else {
+        return Ok(None);
+    };
+    let path = selected
+        .into_path()
+        .map_err(|e| CommandError::internal(format!("file dialog path: {e}")))?;
+    match mode {
+        PickMode::Folder => security::grant_dir(&app, &path),
+        PickMode::File | PickMode::Save => security::grant_file(&app, &path),
+    }
+    Ok(Some(path.to_string_lossy().to_string()))
+}
+
+/// 选择单个文件；选中后授权该文件（读写 + 同目录只读）。
 #[tauri::command]
 pub async fn pick_file(
     window: WebviewWindow,
     app: AppHandle,
     options: Option<FileDialogOptions>,
 ) -> Result<Option<String>, CommandError> {
-    let dialog = builder(&app, &window, options.unwrap_or_default());
-    let picked = tauri::async_runtime::spawn_blocking(move || dialog.blocking_pick_file())
-        .await
-        .map_err(|e| CommandError::internal(format!("pick_file join: {e}")))?;
-    let Some(file) = picked else {
-        return Ok(None);
-    };
-    let path = file
-        .into_path()
-        .map_err(|e| CommandError::internal(format!("pick_file path: {e}")))?;
-    security::grant_file(&app, &path);
-    Ok(Some(path.to_string_lossy().to_string()))
+    pick(window, app, PickMode::File, options).await
 }
 
 /// 选择保存位置；选中后授权目标文件（可尚不存在）的写入。
@@ -85,18 +109,7 @@ pub async fn pick_save(
     app: AppHandle,
     options: Option<FileDialogOptions>,
 ) -> Result<Option<String>, CommandError> {
-    let dialog = builder(&app, &window, options.unwrap_or_default());
-    let picked = tauri::async_runtime::spawn_blocking(move || dialog.blocking_save_file())
-        .await
-        .map_err(|e| CommandError::internal(format!("pick_save join: {e}")))?;
-    let Some(file) = picked else {
-        return Ok(None);
-    };
-    let path = file
-        .into_path()
-        .map_err(|e| CommandError::internal(format!("pick_save path: {e}")))?;
-    security::grant_file(&app, &path);
-    Ok(Some(path.to_string_lossy().to_string()))
+    pick(window, app, PickMode::Save, options).await
 }
 
 /// 选择文件夹；选中后授权该目录（工作区根）。
@@ -106,16 +119,5 @@ pub async fn pick_folder(
     app: AppHandle,
     options: Option<FileDialogOptions>,
 ) -> Result<Option<String>, CommandError> {
-    let dialog = builder(&app, &window, options.unwrap_or_default());
-    let picked = tauri::async_runtime::spawn_blocking(move || dialog.blocking_pick_folder())
-        .await
-        .map_err(|e| CommandError::internal(format!("pick_folder join: {e}")))?;
-    let Some(folder) = picked else {
-        return Ok(None);
-    };
-    let path = folder
-        .into_path()
-        .map_err(|e| CommandError::internal(format!("pick_folder path: {e}")))?;
-    security::grant_dir(&app, &path);
-    Ok(Some(path.to_string_lossy().to_string()))
+    pick(window, app, PickMode::Folder, options).await
 }

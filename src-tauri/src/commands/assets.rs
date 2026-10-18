@@ -112,7 +112,7 @@ pub fn save_image_asset(
     ext: String,
     dir: Option<String>,
 ) -> Result<SaveImageResult, CommandError> {
-    crate::security::policy().ensure(&workspace)?;
+    crate::security::policy().ensure_write(&workspace)?;
     let ws = PathBuf::from(&workspace);
     if !ws.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &workspace));
@@ -152,7 +152,7 @@ pub fn copy_image_to_workspace(
     workspace: String,
     dir: Option<String>,
 ) -> Result<SaveImageResult, CommandError> {
-    crate::security::policy().ensure(&source_path)?;
+    crate::security::policy().ensure_read(&source_path)?;
     let src = Path::new(&source_path);
     if !src.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &source_path));
@@ -174,7 +174,7 @@ pub fn copy_image_to_workspace(
 /// 前端不直接读本地文件；MIME 由前端按扩展名推断（单一来源见 `mimeForImageExt`）。
 #[tauri::command]
 pub fn read_image_base64(source_path: String) -> Result<String, CommandError> {
-    crate::security::policy().ensure(&source_path)?;
+    crate::security::policy().ensure_read(&source_path)?;
     let src = Path::new(&source_path);
     if !src.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &source_path));
