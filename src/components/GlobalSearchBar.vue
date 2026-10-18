@@ -582,6 +582,8 @@ watch(
           <div
             v-if="searchStore.loading && hasQuery && workspace.hasWorkspace"
             class="gsb__loading"
+            role="status"
+            aria-live="off"
             aria-busy="true"
           >
             <span class="gsb__spinner" aria-hidden="true"></span>
