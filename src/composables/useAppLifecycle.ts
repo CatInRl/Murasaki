@@ -159,6 +159,9 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
       path: string;
       type: "file" | "folder";
     }>("recent-open", (event) => {
+      // 最近打开由 Rust 直接 emit，不经过 handleMenuEvent：
+      // 设置页覆盖时必须在这里一并拦住，否则会在背后打开 / 切换文档（#442）
+      if (settingsVisible.value) return;
       const { path, type } = event.payload;
       void onOpenRecent(path, type);
     });

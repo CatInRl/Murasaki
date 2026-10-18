@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { NConfigProvider } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
@@ -132,6 +132,31 @@ const activeContent = computed({
 });
 
 const currentFilePath = computed(() => activeTab.value?.path ?? null);
+
+/**
+ * 窗口标题（#442）：有工作区用工作区名，否则用当前标签名。
+ * 多窗口下「无工作区」窗口此前都叫 Murasaki，任务栏与窗口切换器无法区分。
+ */
+const windowTitle = computed(() => {
+  const base = workspace.hasWorkspace
+    ? workspace.workspaceName
+    : activeTab.value
+      ? tabsStore.getTabTitle(activeTab.value, t("common.untitled"))
+      : "";
+  return base ? `${base} — Murasaki` : "Murasaki";
+});
+
+watch(
+  windowTitle,
+  (title) => {
+    void invoke("set_window_title", { title }).catch((err: unknown) =>
+      console.warn("同步窗口标题失败:", err)
+    );
+  },
+  // 启动后立即推一次权威标题：Rust 只负责建窗时的初始标题，
+  // 工作区恢复失败等场景不会再有人来纠正
+  { immediate: true }
+);
 
 // ===== 当前文件类型（issue 0.x：非 md 文件强制源码模式）=====
 // 无路径（未命名新文件）默认按 markdown 处理
@@ -323,6 +348,12 @@ function selectSidebarView(view: SidebarView): void {
   expandSidebar(view);
 }
 
+/** WelcomePage 的「新建文件」入口（#442）：与菜单一致，先让文件树内联命名框可见 */
+function onNewFileFromWelcome(): void {
+  if (workspace.hasWorkspace) selectSidebarView("files");
+  onNewFile();
+}
+
 // ===== 状态栏 / 全屏 =====
 const statusBarVisible = ref(true);
 
@@ -373,6 +404,48 @@ function onPreviewImage(path: string): void {
 
 // ===== 设置页（单入口路由，在主窗口内通过 navigate 事件切换） =====
 const settingsVisible = ref(false);
+const settingsRef = ref<InstanceType<typeof SettingsApp> | null>(null);
+
+/**
+ * 设置页关闭 / 退出前先让设置页处理未保存草稿（#442）。
+ * 返回 false 表示用户选择「取消」（或确认过程本身出错）。
+ *
+ * 确认期间复用同一个 Promise：连按 Ctrl+Q / 关窗请求与退出请求叠加时，
+ * 不会向对话框队列压入第二张「设置未保存」确认框。
+ */
+let settingsCloseRequest: Promise<boolean> | null = null;
+
+async function confirmSettingsClosed(): Promise<boolean> {
+  if (!settingsVisible.value) return true;
+  if (settingsCloseRequest) return settingsCloseRequest;
+  settingsCloseRequest = (async () => {
+    try {
+      // 刚由 navigate 事件切到设置页时组件可能尚未挂载，等一拍再取 ref
+      await nextTick();
+      return (await settingsRef.value?.requestClose()) ?? true;
+    } catch (err) {
+      // 保存 / 弹窗异常按「取消」处理：宁可关不掉，也不要静默丢稿
+      console.error("[Murasaki] 设置页关闭确认失败，按取消处理:", err);
+      return false;
+    } finally {
+      settingsCloseRequest = null;
+    }
+  })();
+  return settingsCloseRequest;
+}
+
+/**
+ * 退出应用（菜单 / Ctrl+Q）。设置页打开时先走它的未保存确认，
+ * 否则 Ctrl+Q 会静默丢掉设置草稿（#442）。
+ */
+async function quitApp(): Promise<void> {
+  if (!(await confirmSettingsClosed())) return;
+  try {
+    await invoke("quit_app");
+  } catch (err) {
+    console.error("退出失败:", err);
+  }
+}
 
 async function openSettings(): Promise<void> {
   try {
@@ -385,6 +458,12 @@ async function openSettings(): Promise<void> {
     });
   }
 }
+
+// 设置页出现时把焦点从编辑器移走：只靠按键拦截挡不住 CodeMirror 的
+// 编辑器级快捷键（Ctrl+F / Ctrl+B）与直接输入（#442）
+watch(settingsVisible, (visible) => {
+  if (visible) editorRef.value?.getView()?.contentDOM.blur();
+});
 
 // ===== 更新检查（T1.1 / ADR-0012）=====
 const updateDialogVisible = ref(false);
@@ -454,6 +533,23 @@ async function resolveUnsavedOnExit(dirty: readonly ExitFlushTab[]): Promise<Exi
 const { onExitRequested } = useExitFlush(tabsStore, {
   resolveUnsaved: resolveUnsavedOnExit,
 });
+
+/**
+ * 关窗 / 退出入口（#442）：设置页覆盖时先确认它的未保存草稿。
+ * 取消时必须显式 cancel_close —— Rust 侧已登记本窗口的关闭流程，
+ * 不复位的话下次点关闭会被直接吞掉。
+ */
+async function onExitRequestedWithSettings(): Promise<void> {
+  if (!(await confirmSettingsClosed())) {
+    try {
+      await invoke("cancel_close");
+    } catch (err) {
+      console.error("[Murasaki] cancel_close 失败:", err);
+    }
+    return;
+  }
+  await onExitRequested();
+}
 
 /** 启动编排句柄：onBeforeUnmount 时统一撤销监听与后台任务 */
 let startup: AppStartupHandle | null = null;
@@ -551,7 +647,7 @@ onMounted(async () => {
     teardownDragDrop,
     setConflictResolver: () => fileOps.setConflictResolver(askConflict),
     clearConflictResolver: () => fileOps.setConflictResolver(null),
-    onExitRequested,
+    onExitRequested: onExitRequestedWithSettings,
     openPath: (path, type) => {
       void onOpenPath(path, type);
     },
@@ -676,6 +772,8 @@ const { handleMenuEvent, onKeyDown } = useCommands({
   zoomIn,
   zoomOut,
   zoomReset,
+  isSettingsVisible: () => settingsVisible.value,
+  quitApp,
 });
 
 // ===== 拖拽/命令行打开文件或文件夹（issue #92 / #113）=====
@@ -777,9 +875,11 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
     :locale="null"
     :date-locale="null"
   >
+    <!-- 设置页覆盖时整个应用外壳 inert：键盘焦点、点击与编辑器快捷键都到不了背后文档（#442） -->
     <div
       class="murasaki-shell"
       :class="{ 'has-sidebar': workspace.hasWorkspace || tabsStore.hasTabs }"
+      :inert="settingsVisible ? true : undefined"
     >
       <!-- Sidebar: 文件树 / 大纲 -->
       <aside
@@ -925,7 +1025,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             v-if="!tabsStore.hasTabs"
             @open-folder="onOpenFolder"
             @open-file="onOpenFile"
-            @new-file="onNewFile"
+            @new-file="onNewFileFromWelcome"
             @open-recent="onOpenRecent"
             @open-settings="openSettings"
           />
@@ -1006,7 +1106,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
     </Teleport>
 
     <!-- 设置页（单入口路由，覆盖主窗口） -->
-    <SettingsApp v-if="settingsVisible" @close="settingsVisible = false" />
+    <SettingsApp v-if="settingsVisible" ref="settingsRef" @close="settingsVisible = false" />
 
     <!-- 对话框容器（Ticket #66，含 conflict/alert/confirm/prompt/unsaved 五类） -->
     <DialogContainer />

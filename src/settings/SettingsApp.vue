@@ -105,20 +105,25 @@ function handleRestoreDefault(): void {
  * - 不保存：直接关闭
  * - 取消：留在设置页
  *
+ * 返回 false 表示用户取消（调用方据此中止关窗 / 退出，#442）。
  * 通过 emit "close" 通知父组件（App.vue）隐藏设置页（单入口路由）
  */
-async function handleClose(): Promise<void> {
+async function handleClose(): Promise<boolean> {
   if (isDirty(draft.value, snapshot.value)) {
     const choice = await dialog.unsavedChanges({
       message: t("settings.unsavedMessage"),
     });
-    if (choice === "cancel") return;
+    if (choice === "cancel") return false;
     if (choice === "save") {
       await handleSave();
     }
   }
   emitClose("close");
+  return true;
 }
+
+// 供 App.vue 在关窗 / 退出前调用（#442）：与点「关闭」共用同一套未保存确认
+defineExpose({ requestClose: handleClose });
 </script>
 
 <template>
