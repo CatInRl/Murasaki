@@ -57,7 +57,7 @@
     "refreshTimeout": "刷新超时",
     "refreshTimeoutDesc": "可能是工作区过大或网络盘响应慢",
     "truncated": "文件树已截断",
-    "truncatedDesc": "目录过大或层级过深，仅显示前 2 万个条目"
+    "truncatedDesc": "目录过大或层级过深，部分内容已省略"
   },
   "outline": {
     "title": "大纲",

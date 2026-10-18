@@ -38,6 +38,23 @@ fn is_noise(name: &str) -> bool {
     NOISE_NAMES.iter().any(|n| *n == name)
 }
 
+/// 是否展示该条目：show_hidden=false 时过滤 NOISE_NAMES 清单与 dotfile
+fn is_visible_name(name: &str, show_hidden: bool) -> bool {
+    show_hidden || !(is_noise(name) || name.starts_with('.'))
+}
+
+/// 目录下是否还有会展示的子项（到达深度上限时用来判断「是否真的截断」）
+fn has_visible_children(dir: &Path, show_hidden: bool) -> bool {
+    fs::read_dir(dir)
+        .map(|entries| {
+            entries.flatten().any(|entry| {
+                let name = entry.file_name().to_string_lossy().to_string();
+                is_visible_name(&name, show_hidden)
+            })
+        })
+        .unwrap_or(false)
+}
+
 /// 排序键：按"数字 → 英文 → 中文 → 其他"分组，组内自然序
 fn category_of(s: &str) -> u8 {
     let c = s.chars().next().unwrap_or(' ');
@@ -104,7 +121,8 @@ fn is_markdown(name: &str) -> bool {
     lower.ends_with(".md") || lower.ends_with(".markdown") || lower.ends_with(".mdown") || lower.ends_with(".mkd")
 }
 
-/// 文件树递归深度上限（含根目录的第 0 层）：超过后不再向下展开子目录。
+/// 文件树递归深度上限（根目录为第 0 层）。
+/// 达到该层时仍返回目录节点，但不再展开其子目录。
 pub const MAX_TREE_DEPTH: usize = 20;
 
 /// 文件树节点总数上限：超过后停止遍历并返回 `truncated = true`。
@@ -164,7 +182,7 @@ fn build_tree_inner(
         // 默认（show_hidden=false）：
         //   - 跳过 spec 列出的噪音项（.git/.svn/.hg/.DS_Store/Thumbs.db/node_modules）
         //   - 跳过其他 dotfile（以 . 开头）
-        if !show_hidden && (is_noise(&name) || name.starts_with('.')) {
+        if !is_visible_name(&name, show_hidden) {
             continue;
         }
         let metadata = match entry.metadata() {
@@ -175,12 +193,21 @@ fn build_tree_inner(
             if !budget.take() {
                 break;
             }
-            // 达到深度上限：保留目录节点但不再展开，并标记截断
+            // 达到深度上限：保留目录节点但不再展开；只有确实还有内容时才算截断
             let children = if depth + 1 >= MAX_TREE_DEPTH {
-                budget.truncated = true;
+                if has_visible_children(&path, show_hidden) {
+                    budget.truncated = true;
+                }
                 Vec::new()
             } else {
-                build_tree_inner(&path, show_hidden, depth + 1, budget).unwrap_or_default()
+                match build_tree_inner(&path, show_hidden, depth + 1, budget) {
+                    Ok(children) => children,
+                    Err(_) => {
+                        // 子目录不可读：内容确实缺失，标记截断让用户知道
+                        budget.truncated = true;
+                        Vec::new()
+                    }
+                }
             };
             nodes.push(TreeNode {
                 name,
@@ -590,6 +617,23 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    /// #432：未超限时不得标记截断
+    #[test]
+    fn build_tree_inner_not_truncated_when_within_limits() {
+        let dir = std::env::temp_dir().join("murasaki-432-no-truncate");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        fs::write(dir.join("sub").join("a.md"), "x").unwrap();
+
+        let mut budget = TreeBudget::new(MAX_TREE_NODES);
+        let nodes = build_tree_inner(&dir, false, 0, &mut budget).unwrap();
+
+        assert_eq!(nodes.len(), 1);
+        assert!(!budget.truncated, "未超限不得标记截断");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// #432：达到深度上限时保留目录节点但不再展开，并标记截断
     #[test]
     fn build_tree_inner_truncates_at_depth_limit() {
@@ -607,6 +651,23 @@ mod tests {
         assert_eq!(nodes[0].node_type, "directory");
         assert_eq!(nodes[0].children.as_ref().map(|c| c.len()), Some(0));
         assert!(budget.truncated, "深度截断必须标记 truncated");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #432：深度上限处的空目录（或只含噪音的目录）不算截断
+    #[test]
+    fn build_tree_inner_depth_limit_empty_dir_is_not_truncated() {
+        let dir = std::env::temp_dir().join("murasaki-432-depth-empty");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("empty")).unwrap();
+        fs::create_dir_all(dir.join("only-noise").join("node_modules")).unwrap();
+
+        let mut budget = TreeBudget::new(MAX_TREE_NODES);
+        let nodes = build_tree_inner(&dir, false, MAX_TREE_DEPTH - 1, &mut budget).unwrap();
+
+        assert_eq!(nodes.len(), 2);
+        assert!(!budget.truncated, "没有省略任何内容时不得标记截断");
 
         let _ = fs::remove_dir_all(&dir);
     }
