@@ -47,10 +47,22 @@ export function dirname(path: string): string {
  * 拼接多个路径段
  * 自动处理斜杠：内部使用正斜杠
  * 例如：joinPaths("C:/docs", "sub", "file.md") → "C:/docs/sub/file.md"
+ *
+ * 首个片段若是绝对路径，其根前缀会被保留（Unix `/` 与 UNC `//`）——
+ * 否则 `/Users/me/ws` 会被拼成相对路径 `Users/me/ws/...`，在 macOS/Linux 上失图。
  */
 export function joinPaths(...parts: string[]): string {
-  const normalized = parts.map((p) => normalizePath(p).replace(/^\/+|\/+$/g, ""));
-  return normalized.filter(Boolean).join("/");
+  const normalized = parts.map((p) => normalizePath(p)).filter((p) => p.length > 0);
+  if (normalized.length === 0) return "";
+
+  const first = normalized[0];
+  const leading = first.startsWith("//") ? "//" : first.startsWith("/") ? "/" : "";
+  const segments = [
+    first.replace(/^\/+|\/+$/g, ""),
+    ...normalized.slice(1).map((p) => p.replace(/^\/+|\/+$/g, "")),
+  ].filter(Boolean);
+
+  return leading + segments.join("/");
 }
 
 /**

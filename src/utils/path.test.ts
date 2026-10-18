@@ -76,6 +76,13 @@ describe("utils/path", () => {
     it("忽略空段", () => {
       expect(joinPaths("C:/docs", "", "file.md")).toBe("C:/docs/file.md");
     });
+    it("保留 Unix 根前缀（macOS/Linux 相对图片解析）", () => {
+      expect(joinPaths("/Users/me/ws", "./assets/a.png")).toBe("/Users/me/ws/./assets/a.png");
+      expect(joinPaths("/", "a")).toBe("/a");
+    });
+    it("保留 UNC 双斜杠前缀", () => {
+      expect(joinPaths("//server/share", "a.md")).toBe("//server/share/a.md");
+    });
   });
 
   describe("extname", () => {

@@ -90,6 +90,7 @@ function makeDeps(overrides: Partial<CopyRichTextDeps> = {}): CopyRichTextDeps {
     toast: {
       success: vi.fn(),
       error: vi.fn(),
+      info: vi.fn(),
     },
     ...overrides,
   } as never;
@@ -138,7 +139,7 @@ describe("useCopyRichText - copyRichText", () => {
 
   it("成功 → 写入剪贴板 text/html + text/plain，toast success", async () => {
     const fullHtml = `<html><head><style>.a{color:red}</style></head><body><h1>Hi</h1></body></html>`;
-    mockedExportHtml.mockResolvedValue(fullHtml);
+    mockedExportHtml.mockResolvedValue({ html: fullHtml, failedImages: [] });
     mockWrite.mockResolvedValue(undefined);
 
     const deps = makeDeps();
@@ -183,7 +184,7 @@ describe("useCopyRichText - copyRichText", () => {
   });
 
   it("clipboard.write 抛错 → toast error", async () => {
-    mockedExportHtml.mockResolvedValue("<body><p>ok</p></body>");
+    mockedExportHtml.mockResolvedValue({ html: "<body><p>ok</p></body>", failedImages: [] });
     mockWrite.mockRejectedValue(new Error("clipboard denied"));
     const deps = makeDeps();
     const { copyRichText } = useCopyRichText(deps);
@@ -193,7 +194,7 @@ describe("useCopyRichText - copyRichText", () => {
   });
 
   it("无标题 tab（path=null）也能复制", async () => {
-    mockedExportHtml.mockResolvedValue("<body><p>untitled</p></body>");
+    mockedExportHtml.mockResolvedValue({ html: "<body><p>untitled</p></body>", failedImages: [] });
     mockWrite.mockResolvedValue(undefined);
     const deps = makeDeps({
       activeTab: { value: makeTab({ path: null, content: "untitled content" }) },
