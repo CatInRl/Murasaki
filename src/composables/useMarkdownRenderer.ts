@@ -196,9 +196,9 @@ function imageSrcPlugin(md: MarkdownIt) {
   };
 }
 
-/** 单次渲染的上下文（随 env 传给 markdown-it 插件）。 */
-export interface RenderEnv {
-  /** 基准文件路径：解析相对图片 / 链接用；null = 未知 */
+/** 单次渲染的上下文（随 env 传给 markdown-it 插件，模块内部使用）。 */
+interface RenderEnv {
+  /** 基准文件路径：解析相对图片用；null = 未知 */
   filePath: string | null;
 }
 
@@ -219,8 +219,8 @@ export interface RenderResult {
  * WYSIWYG 专用：当前文件路径（模块级状态）。
  *
  * 预览与导出已改为显式传参（`render(source, { filePath })`，#434）；
- * 这里只服务 CodeMirror 的 ImageWidget —— 它在 toDOM 时无法拿到 Vue props，
- * 由 SourceEditor 在切换文件时写入（单窗口单文件，不存在跨文档串用）。
+ * 这里只服务 CodeMirror 的 ImageWidget —— 它在构造时解析相对图片 src，
+ * 拿不到 Vue props，由 SourceEditor 在切换文件时写入（单窗口单文件，不存在跨文档串用）。
  */
 let currentFilePath: string | null = null;
 
@@ -352,9 +352,9 @@ function katexEngine(expr: string, opts: { displayMode?: boolean }) {
 /**
  * 异步高亮 <pre><code data-lang="..."> 块。
  * 在 HTML 注入 DOM 后调用，把占位替换为 Shiki 高亮后的 HTML。
- * 使用当前 currentShikiThemeName 作为高亮主题。
+ * `theme` 显式传入时用它高亮（#434），省略时回落到当前预览主题。
  */
-async function highlightCodeBlocks(container: HTMLElement) {
+async function highlightCodeBlocks(container: HTMLElement, theme?: string) {
   const blocks = container.querySelectorAll<HTMLElement>(
     'pre code[data-lang]'
   );
@@ -364,7 +364,7 @@ async function highlightCodeBlocks(container: HTMLElement) {
     try {
       const html = await codeToHtml(code, {
         lang,
-        theme: resolveShikiThemeOption(currentShikiThemeName),
+        theme: resolveShikiThemeOption(theme ?? currentShikiThemeName),
       });
       const wrapper = document.createElement("div");
       wrapper.innerHTML = html;
@@ -379,15 +379,16 @@ async function highlightCodeBlocks(container: HTMLElement) {
 }
 
 export interface UseMarkdownRenderer {
-  /** markdown-it 实例（同步可用，代码块为占位） */
-  md: MarkdownIt;
   /**
    * 同步渲染 HTML（代码块占位，Mermaid 占位）。
    * `context.filePath` 只影响本次渲染的相对图片解析；front-matter 随结果返回（#434）。
    */
   render(source: string, context?: RenderContext): RenderResult;
-  /** DOM 渲染后异步替换代码块高亮 */
-  highlight(container: HTMLElement): Promise<void>;
+  /**
+   * DOM 渲染后异步替换代码块高亮。
+   * `theme` 显式传入时用它高亮；省略时用当前预览主题。
+   */
+  highlight(container: HTMLElement, theme?: string): Promise<void>;
   /** 当前使用的 Shiki 主题名 */
   getShikiTheme(): string;
   /** 切换 Shiki 主题（切换后需重新 highlight 才生效） */
@@ -420,8 +421,8 @@ export function useMarkdownRenderer(): UseMarkdownRenderer {
     return { html, frontMatter };
   }
 
-  async function highlight(container: HTMLElement) {
-    await highlightCodeBlocks(container);
+  async function highlight(container: HTMLElement, theme?: string) {
+    await highlightCodeBlocks(container, theme);
   }
 
   function getShikiTheme(): string {
@@ -434,7 +435,6 @@ export function useMarkdownRenderer(): UseMarkdownRenderer {
   }
 
   return {
-    md: getMd(),
     render,
     highlight,
     getShikiTheme,

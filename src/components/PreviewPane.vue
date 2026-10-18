@@ -89,8 +89,8 @@ async function update() {
   // 共享实现：PreviewPane 与 useHtmlExport 必须使用同一渲染函数
   const fmCard = renderFrontMatterCard(frontMatter);
   container.innerHTML = fmCard + bodyHtml;
-  // 异步高亮代码块
-  await renderer.highlight(container);
+  // 异步高亮代码块（主题显式传入，见 #434）
+  await renderer.highlight(container, resolveShikiTheme(props.theme));
   // 异步渲染 Mermaid
   await renderMermaid(container);
   // 异步渲染 PlantUML

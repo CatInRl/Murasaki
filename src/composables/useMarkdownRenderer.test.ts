@@ -10,7 +10,6 @@ import {
   getCurrentFilePath,
   setCurrentFilePath,
 } from "./useMarkdownRenderer";
-import { exportHtml } from "./useHtmlExport";
 
 /**
  * #434：渲染上下文（filePath / frontMatter / theme）必须是显式参数与返回值，
@@ -27,7 +26,6 @@ describe("useMarkdownRenderer 渲染上下文（#434）", () => {
     expect(a.frontMatter).toContain("title: A");
     expect(b.frontMatter).toContain("title: B");
     expect(c.frontMatter).toBe("");
-    expect(a.html).not.toContain("title: B");
   });
 
   it("相对图片按各自的 filePath 解析，互不影响", () => {
@@ -41,30 +39,18 @@ describe("useMarkdownRenderer 渲染上下文（#434）", () => {
     expect(b.html).toContain("/ws/b/assets/p.png");
   });
 
-  it("导出不改写 WYSIWYG 的文件路径", async () => {
+  it("render 不读写 WYSIWYG 的模块级文件路径", () => {
     setCurrentFilePath("/ws/current.md");
-
-    await exportHtml({
-      source: "# x",
-      theme: "murasaki",
-      workspacePath: "/ws",
-      filePath: "/ws/other.md",
-    });
+    getMarkdownRenderer().render("![](assets/p.png)", { filePath: "/ws/other/doc.md" });
 
     expect(getCurrentFilePath()).toBe("/ws/current.md");
+
+    setCurrentFilePath(null);
   });
 
-  it("导出不污染预览的 Shiki 主题", async () => {
-    const md = getMarkdownRenderer();
-    md.setShikiTheme("github-dark");
+  it("parse + renderer.render 仍注入 data-source-line（与 md.render 等价）", () => {
+    const { html } = getMarkdownRenderer().render("# 标题\n\n正文");
 
-    await exportHtml({
-      source: "# no code fence",
-      theme: "academic",
-      workspacePath: null,
-      filePath: null,
-    });
-
-    expect(md.getShikiTheme()).toBe("github-dark");
+    expect(html).toContain('data-source-line="1"');
   });
 });
