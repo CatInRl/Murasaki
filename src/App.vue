@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from "vue";
 import { storeToRefs } from "pinia";
 import {
   NConfigProvider,
@@ -146,11 +146,17 @@ const windowTitle = computed(() => {
   return base ? `${base} — Murasaki` : "Murasaki";
 });
 
-watch(windowTitle, (title) => {
-  void invoke("set_window_title", { title }).catch((err: unknown) =>
-    console.warn("同步窗口标题失败:", err)
-  );
-});
+watch(
+  windowTitle,
+  (title) => {
+    void invoke("set_window_title", { title }).catch((err: unknown) =>
+      console.warn("同步窗口标题失败:", err)
+    );
+  },
+  // 启动后立即推一次权威标题：Rust 只负责建窗时的初始标题，
+  // 工作区恢复失败等场景不会再有人来纠正
+  { immediate: true }
+);
 
 // ===== 当前文件类型（issue 0.x：非 md 文件强制源码模式）=====
 // 无路径（未命名新文件）默认按 markdown 处理
@@ -316,6 +322,12 @@ function selectSidebarView(view: SidebarView): void {
   expandSidebar(view);
 }
 
+/** WelcomePage 的「新建文件」入口（#442）：与菜单一致，先让文件树内联命名框可见 */
+function onNewFileFromWelcome(): void {
+  if (workspace.hasWorkspace) selectSidebarView("files");
+  onNewFile();
+}
+
 // ===== 状态栏 / 全屏 =====
 const statusBarVisible = ref(true);
 
@@ -370,11 +382,30 @@ const settingsRef = ref<InstanceType<typeof SettingsApp> | null>(null);
 
 /**
  * 设置页关闭 / 退出前先让设置页处理未保存草稿（#442）。
- * 返回 false 表示用户选择「取消」。
+ * 返回 false 表示用户选择「取消」（或确认过程本身出错）。
+ *
+ * 确认期间复用同一个 Promise：连按 Ctrl+Q / 关窗请求与退出请求叠加时，
+ * 不会向对话框队列压入第二张「设置未保存」确认框。
  */
+let settingsCloseRequest: Promise<boolean> | null = null;
+
 async function confirmSettingsClosed(): Promise<boolean> {
   if (!settingsVisible.value) return true;
-  return (await settingsRef.value?.requestClose()) ?? true;
+  if (settingsCloseRequest) return settingsCloseRequest;
+  settingsCloseRequest = (async () => {
+    try {
+      // 刚由 navigate 事件切到设置页时组件可能尚未挂载，等一拍再取 ref
+      await nextTick();
+      return (await settingsRef.value?.requestClose()) ?? true;
+    } catch (err) {
+      // 保存 / 弹窗异常按「取消」处理：宁可关不掉，也不要静默丢稿
+      console.error("[Murasaki] 设置页关闭确认失败，按取消处理:", err);
+      return false;
+    } finally {
+      settingsCloseRequest = null;
+    }
+  })();
+  return settingsCloseRequest;
 }
 
 /**
@@ -398,6 +429,12 @@ async function openSettings(): Promise<void> {
     dialog.alert({ message: t("common.error.openSettingsFailed", { error: formatCommandError(err) }), variant: "error" });
   }
 }
+
+// 设置页出现时把焦点从编辑器移走：只靠按键拦截挡不住 CodeMirror 的
+// 编辑器级快捷键（Ctrl+F / Ctrl+B）与直接输入（#442）
+watch(settingsVisible, (visible) => {
+  if (visible) editorRef.value?.getView()?.contentDOM.blur();
+});
 
 // ===== 更新检查（T1.1 / ADR-0012）=====
 const updateDialogVisible = ref(false);
@@ -789,7 +826,12 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
 
 <template>
   <NConfigProvider :theme="naiveTheme" :theme-overrides="naiveThemeOverrides" :locale="null" :date-locale="null">
-    <div class="murasaki-shell" :class="{ 'has-sidebar': workspace.hasWorkspace || tabsStore.hasTabs }">
+    <!-- 设置页覆盖时整个应用外壳 inert：键盘焦点、点击与编辑器快捷键都到不了背后文档（#442） -->
+    <div
+      class="murasaki-shell"
+      :class="{ 'has-sidebar': workspace.hasWorkspace || tabsStore.hasTabs }"
+      :inert="settingsVisible ? true : undefined"
+    >
       <!-- Sidebar: 文件树 / 大纲 -->
       <aside
         v-if="workspace.hasWorkspace || tabsStore.hasTabs"
@@ -896,7 +938,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             v-if="!tabsStore.hasTabs"
             @open-folder="onOpenFolder"
             @open-file="onOpenFile"
-            @new-file="onNewFile"
+            @new-file="onNewFileFromWelcome"
             @open-recent="onOpenRecent"
             @open-settings="openSettings"
           />

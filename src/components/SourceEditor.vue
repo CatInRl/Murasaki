@@ -10,7 +10,7 @@ import { languages } from "@codemirror/language-data";
 import { languageForFile } from "../editor/language";
 import { isMarkdownFile } from "../utils/fileKind";
 import { basename } from "../utils/path";
-import { searchKeymap, highlightSelectionMatches, openSearchPanel } from "@codemirror/search";
+import { searchKeymap, highlightSelectionMatches, openSearchPanel, searchPanelOpen, closeSearchPanel } from "@codemirror/search";
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { tags } from "@lezer/highlight";
 import {
@@ -673,8 +673,12 @@ watch(
 );
 
 // 界面语言切换 → 重建查找/替换面板短语（#442）
+// 面板文案在构造时写死、不随 facet 更新，只能关掉；下次打开即为新语言
 watch(locale, () => {
-  viewRef.value?.dispatch({
+  const view = viewRef.value;
+  if (!view) return;
+  if (searchPanelOpen(view.state)) closeSearchPanel(view);
+  view.dispatch({
     effects: searchPhrasesComp.reconfigure(EditorState.phrases.of(buildSearchPhrases())),
   });
 });
