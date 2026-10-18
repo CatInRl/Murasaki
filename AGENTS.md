@@ -7,7 +7,7 @@
 
 - **Murasaki** — 基于 Tauri 2.x + Vue 3 的桌面 Markdown 编辑器
 - 仓库：https://github.com/CatInRl/Murasaki
-- 详细产品规格见 [docs/spec.md](docs/spec.md)
+- 详细产品规格见 [docs/spec.md](docs/spec.md)（**历史规格，停在 0.9.x 基线**，现行行为以 CONTEXT.md 与 CHANGELOG.md 为准）
 - 详细项目术语表见 [CONTEXT.md](CONTEXT.md)
 
 ## 开发环境（关键！）

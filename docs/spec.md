@@ -1,5 +1,12 @@
 # Murasaki — 本地 Markdown 文件管理工具
 
+> **文档状态：历史规格（停在 0.9.x 基线）**
+>
+> 本文是 0.2–0.9 的需求基线与用户故事，**不再随版本更新**。0.10 之后的变更没有回填到这里。
+> 当前行为的事实源：[CONTEXT.md](../CONTEXT.md)（术语与语义）、[CHANGELOG.md](../CHANGELOG.md)（逐版本变更）、
+> [AGENTS.md](../AGENTS.md)（工程流程与约束）、[docs/specs/](specs/)（新特性的规格）。
+> 请把本文当作「为什么做这些功能」的背景，而不是现行功能清单。
+
 ## Problem Statement
 
 在 Windows 上撰写 Markdown 文档时，用户面临以下困境：
