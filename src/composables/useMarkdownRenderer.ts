@@ -346,12 +346,16 @@ function katexEngine(expr: string, opts: { displayMode?: boolean }) {
  * 异步高亮 <pre><code data-lang="..."> 块。
  * 在 HTML 注入 DOM 后调用，把占位替换为 Shiki 高亮后的 HTML。
  * 使用当前 currentShikiThemeName 作为高亮主题。
+ *
+ * `isStale`（#431）：每次 await 之后自检，已过期就停止处理剩余代码块，
+ * 避免为已被新渲染覆盖的 DOM 做无用功。
  */
-async function highlightCodeBlocks(container: HTMLElement) {
+async function highlightCodeBlocks(container: HTMLElement, isStale?: () => boolean) {
   const blocks = container.querySelectorAll<HTMLElement>(
     'pre code[data-lang]'
   );
   for (const block of Array.from(blocks)) {
+    if (isStale?.()) return;
     const lang = block.getAttribute("data-lang") || "text";
     const code = block.textContent || "";
     try {
@@ -359,6 +363,7 @@ async function highlightCodeBlocks(container: HTMLElement) {
         lang,
         theme: resolveShikiThemeOption(currentShikiThemeName),
       });
+      if (isStale?.()) return;
       const wrapper = document.createElement("div");
       wrapper.innerHTML = html;
       const replacement = wrapper.firstElementChild as HTMLElement | null;
@@ -376,8 +381,11 @@ export interface UseMarkdownRenderer {
   md: MarkdownIt;
   /** 同步渲染 HTML（代码块占位，Mermaid 占位） */
   render(source: string): string;
-  /** DOM 渲染后异步替换代码块高亮 */
-  highlight(container: HTMLElement): Promise<void>;
+  /**
+   * DOM 渲染后异步替换代码块高亮。
+   * `isStale` 返回 true 时停止处理剩余代码块（预览已过期，#431）。
+   */
+  highlight(container: HTMLElement, isStale?: () => boolean): Promise<void>;
   /** 当前使用的 Shiki 主题名 */
   getShikiTheme(): string;
   /** 切换 Shiki 主题（切换后需重新 highlight 才生效） */
@@ -404,8 +412,8 @@ export function useMarkdownRenderer(): UseMarkdownRenderer {
     return sanitizeInlineHtml(getMd().render(source));
   }
 
-  async function highlight(container: HTMLElement) {
-    await highlightCodeBlocks(container);
+  async function highlight(container: HTMLElement, isStale?: () => boolean) {
+    await highlightCodeBlocks(container, isStale);
   }
 
   function getShikiTheme(): string {

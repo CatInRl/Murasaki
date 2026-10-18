@@ -17,6 +17,17 @@ export interface TreeNode {
 }
 
 /**
+ * `list_tree` 的返回（与 Rust 端 TreeListing 对齐，#432）
+ *
+ * `truncated` 为 true 表示因深度或节点数上限省略了部分内容，
+ * 前端仍展示已返回的部分并提示用户。
+ */
+export interface TreeListing {
+  nodes: TreeNode[];
+  truncated: boolean;
+}
+
+/**
  * 大纲项（与 Rust 端 OutlineItem 对齐）
  */
 export interface OutlineItem {
