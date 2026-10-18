@@ -4,7 +4,7 @@ import type { Tab, PersistedTab } from "../types";
 import { usePersistenceStore } from "./usePersistenceStore";
 import { useToastStore } from "./useToastStore";
 import { fileSystem } from "../services/fileSystem";
-import { basename, isSamePath } from "../utils/path";
+import { basename, isPathUnder, isSamePath, normalizePath } from "../utils/path";
 import { i18n } from "../i18n";
 
 /**
@@ -226,6 +226,41 @@ export const useTabsStore = defineStore("tabs", () => {
    *  同样按归一化路径比较 —— 外部修改事件的路径写法未必与打开时一致（见 isSamePath）。 */
   function getTabByPath(filePath: string): Tab | null {
     return tabs.value.find((t) => t.path !== null && isSamePath(t.path, filePath)) ?? null;
+  }
+
+  /**
+   * 应用内重命名/移动后同步标签路径（#427）。
+   * 文件与其所在目录都要处理：目录被移动时，其下所有已打开文件的路径前缀一起替换。
+   * 草稿以原路径为键，因此同时把脏标签的草稿迁到新键下，避免旧草稿成为孤儿。
+   */
+  async function syncPathsAfterMove(oldPath: string, newPath: string): Promise<void> {
+    const oldNorm = normalizePath(oldPath).replace(/\/+$/g, "");
+    const newNorm = normalizePath(newPath).replace(/\/+$/g, "");
+    const moved: Array<{ tab: Tab; previousPath: string }> = [];
+
+    for (const tab of tabs.value) {
+      if (tab.path === null) continue;
+      const tabNorm = normalizePath(tab.path);
+      let nextPath: string | null = null;
+      if (isSamePath(tabNorm, oldNorm)) {
+        nextPath = newNorm;
+      } else if (isPathUnder(oldNorm, tabNorm)) {
+        // isPathUnder 大小写不敏感，但长度一致，可直接按长度截取后缀
+        nextPath = newNorm + tabNorm.slice(oldNorm.length);
+      }
+      if (nextPath === null) continue;
+
+      moved.push({ tab, previousPath: tab.path });
+      tab.path = nextPath;
+    }
+
+    for (const { tab, previousPath } of moved) {
+      // 先写新键再删旧键：写失败时旧草稿仍在，不会同时丢掉两份兜底
+      if (tab.isDirty && tab.path) {
+        await persistDraftQuietly(tab.path, tab.content, tab.lastMtime ?? 0);
+      }
+      await fileSystem.deleteDraft(previousPath);
+    }
   }
 
   /**
@@ -544,6 +579,7 @@ export const useTabsStore = defineStore("tabs", () => {
     clearAll,
     // 外部修改相关
     getTabByPath,
+    syncPathsAfterMove,
     applyExternalResolution,
     markExternalChange,
     reloadFromDisk,
