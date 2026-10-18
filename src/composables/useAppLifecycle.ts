@@ -15,6 +15,8 @@ export interface AppLifecycleDeps {
     activeTabId: string | null;
     /** 是否正在从持久化恢复（true 时 watcher 跳过 persist，避免覆盖 tabs.json） */
     restoring: boolean;
+    /** 合并落盘（#429）：高频输入时最多每 1.5s 写一次 tabs.json */
+    schedulePersist(): void;
     persist(): Promise<unknown>;
   };
   persistence: {
@@ -83,11 +85,13 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
 
   // 1. Tab 状态变化时持久化（gated）
   //    restoring=true 时跳过（clearAll/restore 期间不 persist，避免覆盖 tabs.json）
+  //    #429：输入时每个字符都会触发本 watcher，落盘改走 schedulePersist 合并，
+  //    避免每键一次全文序列化 + 磁盘写；退出路径仍由 persist() 立即落盘。
   watch(
     () => [tabsStore.tabs, tabsStore.activeTabId],
     () => {
       if (initialized.value && !tabsStore.restoring) {
-        void tabsStore.persist();
+        tabsStore.schedulePersist();
       }
     },
     { deep: true }

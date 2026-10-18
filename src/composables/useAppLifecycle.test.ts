@@ -34,6 +34,7 @@ function makeDeps(overrides: Partial<AppLifecycleDeps> = {}): AppLifecycleDeps {
       tabs: [] as unknown[],
       activeTabId: null as string | null,
       restoring: false,
+      schedulePersist: vi.fn(),
       persist: vi.fn().mockResolvedValue(undefined),
     }) as never,
     persistence: {
@@ -136,6 +137,21 @@ describe("useAppLifecycle", () => {
       expect(deps.persistence.updateSettings).toHaveBeenCalledWith({
         lastWorkspacePath: "/new/workspace",
       });
+      scope.stop();
+    });
+
+    it("tabs 变化时走合并落盘（schedulePersist），不直接 persist（#429）", async () => {
+      const deps = makeDeps();
+      const scope = effectScope();
+      const { initialized } = scope.run(() => useAppLifecycle(deps))!;
+      initialized.value = true;
+      await nextTick();
+
+      (deps.tabsStore.tabs as unknown[]).push({ id: "t1", content: "x" });
+      await nextTick();
+
+      expect(deps.tabsStore.schedulePersist).toHaveBeenCalledTimes(1);
+      expect(deps.tabsStore.persist).not.toHaveBeenCalled();
       scope.stop();
     });
 
