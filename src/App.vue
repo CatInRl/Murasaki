@@ -80,6 +80,34 @@ const dialog = useDialogStore();
 const toastStore = useToastStore();
 const { t } = useI18n();
 
+// ===== 草稿冲突裁决（#425）=====
+// 草稿基线与磁盘 mtime 不一致时，让用户选择「保留草稿」还是「加载磁盘版本」，
+// 而不是静默丢弃草稿。取消 = 用磁盘内容打开，草稿文件保留。
+tabsStore.setDraftConflictResolver(async ({ path, diskContent, draftContent, diskMtime, draftSavedAt }) => {
+  const preview = (text: string): string => {
+    const line = text.split(/\r?\n/).find((item) => item.trim().length > 0) ?? "";
+    return line.length > 40 ? `${line.slice(0, 40)}…` : line;
+  };
+  const formatTime = (ms: number): string => (ms > 0 ? new Date(ms).toLocaleString() : "");
+
+  const choice = await dialog.unsavedChanges({
+    title: t("common.dialog.draftConflictTitle"),
+    message: t("common.dialog.draftConflictMessage", {
+      name: basename(path),
+      diskTime: formatTime(diskMtime),
+      diskPreview: preview(diskContent),
+      draftTime: formatTime(draftSavedAt),
+      draftPreview: preview(draftContent),
+    }),
+    saveText: t("common.dialog.draftConflictKeep"),
+    discardText: t("common.dialog.draftConflictLoadDisk"),
+    cancelText: t("common.dialog.draftConflictLater"),
+  });
+  if (choice === "save") return "keep-draft";
+  if (choice === "discard") return "load-disk";
+  return "cancel";
+});
+
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
 
