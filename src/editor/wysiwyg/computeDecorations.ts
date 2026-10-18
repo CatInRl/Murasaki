@@ -211,7 +211,7 @@ export interface ComputeInput {
    * 纯光标跨行移动时传「旧光标行 ∪ 新光标行」，窗口外的装饰与光标无关，
    * 由调用方沿用旧装饰，避免整篇文档遍历。省略则全量计算。
    */
-  viewport?: { from: number; to: number };
+  recomputeWindow?: { from: number; to: number };
 }
 
 function isBlankLine(text: string): boolean {
@@ -247,7 +247,7 @@ function getCursorLineRange(doc: string, pos: number): { from: number; to: numbe
  * 注意：GFM 表格（|）要求表格前有空行，不会与段落无空行相邻，无需在此处理；
  * 有序列表非 1 开头（如 5.）按 CommonMark 属于段落延续，不视为边界。
  */
-function startsBlockLine(line: string): boolean {
+export function startsBlockLine(line: string): boolean {
   return /^ {0,3}(?:```|~~~|#{1,6}(?:[ \t]|$)|>(?:[ \t]|$)|[-*+][ \t]|1\.[ \t]|(?:\*{3,}|-{3,}|_{3,})[ \t]*$|<[a-zA-Z!/])/.test(line);
 }
 
@@ -299,13 +299,13 @@ export function getParagraphRange(doc: string, pos: number): { from: number; to:
 }
 
 /** 判断节点是否在视口内（含边界）。 */
-function inViewport(
+function intersectsWindow(
   nodeFrom: number,
   nodeTo: number,
-  viewport: { from: number; to: number } | undefined
+  recomputeWindow: { from: number; to: number } | undefined
 ): boolean {
-  if (!viewport) return true;
-  return nodeTo >= viewport.from && nodeFrom <= viewport.to;
+  if (!recomputeWindow) return true;
+  return nodeTo >= recomputeWindow.from && nodeFrom <= recomputeWindow.to;
 }
 
 /** 判断 [from,to] 是否落在任一代码范围内（用于排除数学公式匹配）。 */
@@ -357,13 +357,13 @@ interface MathRange {
 function findMathRanges(
   doc: string,
   codeRanges: Array<{ from: number; to: number }>,
-  viewport?: { from: number; to: number }
+  recomputeWindow?: { from: number; to: number }
 ): MathRange[] {
   const result: MathRange[] = [];
-  const scanTo = viewport ? Math.min(viewport.to, doc.length) : doc.length;
+  const scanTo = recomputeWindow ? Math.min(recomputeWindow.to, doc.length) : doc.length;
   const displayRe = /\$\$([\s\S]+?)\$\$/g;
   let m: RegExpExecArray | null;
-  if (viewport) displayRe.lastIndex = viewport.from;
+  if (recomputeWindow) displayRe.lastIndex = recomputeWindow.from;
   while ((m = displayRe.exec(doc)) !== null) {
     if (m.index >= scanTo) break;
     const from = m.index;
@@ -372,7 +372,7 @@ function findMathRanges(
     result.push({ from, to, expr: m[1], displayMode: true });
   }
   const inlineRe = /\$([^\$\n]+?)\$/g;
-  if (viewport) inlineRe.lastIndex = viewport.from;
+  if (recomputeWindow) inlineRe.lastIndex = recomputeWindow.from;
   while ((m = inlineRe.exec(doc)) !== null) {
     if (m.index >= scanTo) break;
     const from = m.index;
@@ -391,7 +391,7 @@ function findMathRanges(
  * 返回的描述符已按 (from, to) 排序，可直接转换为 CodeMirror DecorationSet。
  */
 export function computeDecorations(input: ComputeInput): ComputedDeco[] {
-  const { doc, selectionHead, tree, viewport } = input;
+  const { doc, selectionHead, tree, recomputeWindow } = input;
   const cursorLine = getCursorLineRange(doc, selectionHead);
   // 提前计算 frontmatter 范围：供块内 HorizontalRule 避让用（frontmatter 的 --- 分隔符
   // 属于卡片整体，不应被替换为 hr widget）。
@@ -408,8 +408,8 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
 
   tree.iterate({
     // 有重算窗口时只遍历与其相交的节点（#430）：纯光标移动不必走完整棵树
-    from: viewport?.from,
-    to: viewport?.to,
+    from: recomputeWindow?.from,
+    to: recomputeWindow?.to,
     enter(ref) {
       const { name, from, to } = ref;
 
@@ -418,7 +418,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       // 背景/圆角与预览一致，避免 WYSIWYG 仍使用高亮样式（固定紫色背景）导致差异。
       if (name === "InlineCode") {
         codeRanges.push({ from, to });
-        if (!inViewport(from, to, viewport)) return;
+        if (!intersectsWindow(from, to, recomputeWindow)) return;
         decos.push({
           type: "render",
           from,
@@ -434,7 +434,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
         // （否则相邻段落无空行时 para 会扩展覆盖整个块，导致 widget 不生成）
         const cursorInRange = selectionHead >= from && selectionHead <= to;
         codeRanges.push({ from, to });
-        if (!inViewport(from, to, viewport)) return false;
+        if (!intersectsWindow(from, to, recomputeWindow)) return false;
 
         if (cursorInRange) {
           // 光标在代码块内：整个块为激活范围，块内 CodeMark 保持 dim
@@ -474,7 +474,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
 
       // 链接 / 图片：行内 widget
       if (name === "Link" || name === "Image") {
-        if (!inViewport(from, to, viewport)) return;
+        if (!intersectsWindow(from, to, recomputeWindow)) return;
 
         const inParagraph = to >= cursorLine.from && from <= cursorLine.to;
         if (inParagraph) {
@@ -510,7 +510,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
 
       // 表格：块级 widget（就地可编辑，始终渲染）
       if (name === "Table") {
-        if (!inViewport(from, to, viewport)) return false;
+        if (!intersectsWindow(from, to, recomputeWindow)) return false;
 
         // T1.2 就地编辑：表格始终渲染为可编辑 <table> widget，不随光标翻回源码。
         // 语义：光标在表内/表外都显示可编辑表格；CM 文档与 contentEditable DOM 分离，
@@ -528,7 +528,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       // 不含内容与闭合标签，无法独立渲染为有意义的 widget。
       // 行内 HTML 的渲染由预览/导出管线（sanitizeInlineHtml）保证安全与样式。
       if (name === "HTMLBlock") {
-        if (!inViewport(from, to, viewport)) return false;
+        if (!intersectsWindow(from, to, recomputeWindow)) return false;
 
         // 块级：光标在节点范围内 → 显示源码可编辑
         const cursorInRange = selectionHead >= from && selectionHead <= to;
@@ -541,7 +541,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
 
       // 行级标记：hide / dim
       if (INLINE_MARK_TYPES.has(name)) {
-        if (!inViewport(from, to, viewport)) return;
+        if (!intersectsWindow(from, to, recomputeWindow)) return;
 
         // 光标在代码块内：以整个块为激活范围（围栏 CodeMark 保持 dim）；
         // 否则按当前段判断（段内标记 dim，段外标记 hide）。
@@ -598,7 +598,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
 
       // 分隔线：段内 dim，离开替换为 hr widget
       if (name === "HorizontalRule") {
-        if (!inViewport(from, to, viewport)) return;
+        if (!intersectsWindow(from, to, recomputeWindow)) return;
         // frontmatter 的 --- 分隔符属于卡片整体：不生成 hr widget，保持 dim 可编辑
         const inFrontmatter = fmRange && from >= fmRange.from && to <= fmRange.to;
         const inParagraph = inFrontmatter || (to >= cursorLine.from && from <= cursorLine.to);
@@ -622,7 +622,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
       const atxMatch = /^ATXHeading([1-6])$/.exec(name);
       const setextMatch = /^SetextHeading([1-2])$/.exec(name);
       if (atxMatch || setextMatch) {
-        if (!inViewport(from, to, viewport)) return false;
+        if (!intersectsWindow(from, to, recomputeWindow)) return false;
         const level = Number(atxMatch ? atxMatch[1] : setextMatch![1]);
         // 正文文本范围：ATX 从 HeaderMark（# 前缀）之后开始；Setext 到 HeaderMark（下划线）之前结束。
         let textFrom = from;
@@ -649,9 +649,9 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   });
 
   // 数学公式：正则扫描（语法树不解析 $...$）
-  const mathRanges = findMathRanges(doc, codeRanges, viewport);
+  const mathRanges = findMathRanges(doc, codeRanges, recomputeWindow);
   for (const mr of mathRanges) {
-    if (!inViewport(mr.from, mr.to, viewport)) continue;
+    if (!intersectsWindow(mr.from, mr.to, recomputeWindow)) continue;
     const inParagraph = mr.to >= cursorLine.from && mr.from <= cursorLine.to;
     if (inParagraph) continue; // 光标在段内：显示原始 markdown（可编辑）
     decos.push({
@@ -668,8 +668,8 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   // 跳过代码范围内的匹配（代码块/行内代码内的冒号不解析）
   // 有重算窗口时只扫描窗口内（#430），不再每次光标移动都扫全篇
   const emojiRe = /:([a-z0-9_+-]+):/g;
-  const scanTo = viewport ? Math.min(viewport.to, doc.length) : doc.length;
-  if (viewport) emojiRe.lastIndex = viewport.from;
+  const scanTo = recomputeWindow ? Math.min(recomputeWindow.to, doc.length) : doc.length;
+  if (recomputeWindow) emojiRe.lastIndex = recomputeWindow.from;
   let em: RegExpExecArray | null;
   while ((em = emojiRe.exec(doc)) !== null) {
     if (em.index >= scanTo) break;
@@ -681,7 +681,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
     if (!emojiChar) continue; // 未知 shortcode：保持原样
     // 跳过代码范围内的匹配
     if (inAnyCodeRange(from, to, codeRanges)) continue;
-    if (!inViewport(from, to, viewport)) continue;
+    if (!intersectsWindow(from, to, recomputeWindow)) continue;
     const inParagraph = to >= cursorLine.from && from <= cursorLine.to;
     if (inParagraph) continue; // 光标在段内：显示原始 shortcode（可编辑）
     decos.push({
@@ -697,7 +697,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   // Frontmatter 卡片：检测文档起始的 YAML frontmatter（T6.2 / #100）
   // 光标离开 frontmatter 范围 → 渲染为样式化卡片 widget；光标进入 → 显示原始文本可编辑
   if (fmRange) {
-    if (inViewport(fmRange.from, fmRange.to, viewport)) {
+    if (intersectsWindow(fmRange.from, fmRange.to, recomputeWindow)) {
       const cursorInRange =
         selectionHead >= fmRange.from && selectionHead <= fmRange.to;
       if (!cursorInRange) {

@@ -19,7 +19,7 @@
  * 详见 ADR-0008（CodeMirror 6 内 WYSIWYG / Typora 路线）。
  */
 import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, WidgetType } from "@codemirror/view";
-import { EditorState, StateField, StateEffect, type Range } from "@codemirror/state";
+import { EditorState, StateField, StateEffect } from "@codemirror/state";
 import { syntaxTree, syntaxTreeAvailable } from "@codemirror/language";
 import { codeToHtml } from "shiki";
 import katex from "katex";
@@ -32,6 +32,7 @@ import {
 } from "./computeDecorations";
 import { findEmojiShortcodesInRange } from "./emojiReplacement";
 import { planDecorationUpdate } from "./decorationUpdatePlan";
+import { mergeWindowDecorations } from "./decorationMerge";
 import { sanitizeInlineHtml } from "./htmlSanitizer";
 import { parseTable } from "./tableReflow";
 import { TableEditor } from "./tableEditor";
@@ -834,32 +835,9 @@ function computeDecorationsForState(
     doc: state.doc.toString(),
     selectionHead: state.selection.main.head,
     tree: syntaxTree(state),
-    viewport: recomputeWindow,
+    recomputeWindow,
   });
   return toDecorationSet(decos, nextMermaidId, selection);
-}
-
-/**
- * 只替换窗口内的装饰（#430）：窗口外的旧装饰原样保留，窗口内的先剔除再合并新算的。
- *
- * 新算的装饰可能超出窗口（例如跨行代码块 widget 覆盖整块），`fresh.between` 会
- * 把这些相交的装饰整条取出，因此不会只留下半截范围。
- */
-function mergeWindowDecorations(
-  previous: DecorationSet,
-  fresh: DecorationSet,
-  recomputeWindow: { from: number; to: number }
-): DecorationSet {
-  const added: Range<Decoration>[] = [];
-  fresh.between(recomputeWindow.from, recomputeWindow.to, (from, to, value) => {
-    added.push(value.range(from, to));
-  });
-  return previous.update({
-    filterFrom: recomputeWindow.from,
-    filterTo: recomputeWindow.to,
-    filter: () => false,
-    add: added,
-  });
 }
 
 /**
@@ -868,21 +846,17 @@ function mergeWindowDecorations(
  * 通过 `EditorView.decorations.from(f)` 提供装饰，不受 ViewPlugin 的
  * "不能跨换行块级替换" 限制，因此可以渲染代码块/表格/Mermaid 等多行 widget。
  *
- * 重算时机：
- * - docChanged / selectionSet → 立即重算（光标移动改变段范围，标记 hide/dim 切换）
- * - recomputeWysiwygEffect → 重算（语法树异步解析完成）
- * - 其他 → 映射现有装饰到新位置（保持 widget 实例，避免重渲染）
+ * 重算时机（#430）：
+ * - 文档改动 / 语法树异步解析完成 → 全量重算
+ * - 纯光标同行走动 → 装饰不变，仅映射位置
+ * - 纯光标跨行走动 → 只重算光标所在段落 / 块级节点的窗口
+ * - 选区非空 → 全量重算（块级 widget 的选中叠加会变）
  */
 export const wysiwygField = StateField.define<DecorationSet>({
   create(state) {
     return computeDecorationsForState(state);
   },
   update(decos, tr) {
-    // 装饰只依赖光标所在行与光标落在哪个块级节点内（#430）：
-    // - 文档改动 / 语法树解析完成 → 全量重算
-    // - 光标同行走动 → 装饰不变，直接映射
-    // - 光标跨行走动 → 只重算「旧行 ∪ 新行」窗口，窗口外沿用旧装饰
-    // - 选区非空 → 全量重算（块级 widget 的选中叠加会变）
     const plan = planDecorationUpdate({
       docChanged: tr.docChanged,
       recomputeRequested: tr.effects.some((e) => e.is(recomputeWysiwygEffect)),
@@ -895,7 +869,7 @@ export const wysiwygField = StateField.define<DecorationSet>({
     if (plan.kind === "window") {
       return mergeWindowDecorations(decos, computeDecorationsForState(tr.state, plan), plan);
     }
-    // 其他事务：映射装饰到新位置（不重算，保持 widget 实例稳定）
+    // 其他事务：映射装饰到新位置（保持 widget 实例稳定）
     return decos.map(tr.changes);
   },
   provide: (f) => EditorView.decorations.from(f),
