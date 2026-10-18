@@ -29,8 +29,15 @@ export interface ExitFlushTab {
 export interface ExitFlushDeps {
   tabs: readonly ExitFlushTab[];
   saveDraft(path: string, content: string, knownMtime: number): Promise<void>;
+  /** 用户明确「不保存」时清理已有草稿 */
+  deleteDraft?(path: string): Promise<void>;
   persist(): Promise<unknown>;
+  /** 用户明确「不保存」时传 false：不写草稿并清掉已有草稿 */
+  writeDrafts?: boolean;
 }
+
+/** 退出确认结果：save 先保存，discard 不保存且不留草稿，cancel 中止退出 */
+export type ExitFlushChoice = "save" | "discard" | "cancel";
 
 /** 落盘超时上限：超时后仍然退出，避免前端异常导致窗口关不掉 */
 export const EXIT_FLUSH_TIMEOUT_MS = 3000;
@@ -41,13 +48,25 @@ export const EXIT_FLUSH_TIMEOUT_MS = 3000;
  */
 export async function flushUnsavedOnExit(deps: ExitFlushDeps): Promise<number> {
   let failed = 0;
-  for (const tab of deps.tabs) {
-    if (!tab.isDirty || !tab.path) continue;
-    try {
-      await deps.saveDraft(tab.path, tab.content, tab.lastMtime ?? 0);
-    } catch (err) {
-      failed++;
-      console.error("[Murasaki] 退出前保存草稿失败:", err);
+  if (deps.writeDrafts !== false) {
+    for (const tab of deps.tabs) {
+      if (!tab.isDirty || !tab.path) continue;
+      try {
+        await deps.saveDraft(tab.path, tab.content, tab.lastMtime ?? 0);
+      } catch (err) {
+        failed++;
+        console.error("[Murasaki] 退出前保存草稿失败:", err);
+      }
+    }
+  } else {
+    // 「不保存」：清掉已有草稿，否则下次打开会把它读回来
+    for (const tab of deps.tabs) {
+      if (!tab.isDirty || !tab.path) continue;
+      try {
+        await deps.deleteDraft?.(tab.path);
+      } catch (err) {
+        console.error("[Murasaki] 退出前清理草稿失败:", err);
+      }
     }
   }
   try {
@@ -65,10 +84,10 @@ export interface ExitFlushStoreSlice {
 
 export interface ExitFlushOptions {
   /**
-   * 有未保存改动时询问用户（返回 `false` = 取消退出，窗口不关也不落盘）。
-   * 未注入则保持旧行为：不询问、静默落盘。
+   * 有未保存改动时询问用户（返回 `cancel` = 取消退出，窗口不关也不落盘；
+   * 返回 `discard` = 不写文件也不留草稿）。未注入则保持旧行为：不询问、静默落盘。
    */
-  resolveUnsaved?: (dirty: readonly ExitFlushTab[]) => Promise<boolean>;
+  resolveUnsaved?: (dirty: readonly ExitFlushTab[]) => Promise<ExitFlushChoice>;
 }
 
 /**
@@ -88,14 +107,15 @@ export function useExitFlush(
     // 未保存改动确认（issue #346）：这是「正常退出」的路径，让用户自己决定要不要保存；
     // 确认本身出差错时按「取消退出」处理 —— 宁可关不掉，也不要静默丢掉改动。
     const dirty = tabsStore.tabs.filter((tab) => tab.isDirty);
+    let writeDrafts = true;
     if (dirty.length > 0 && options.resolveUnsaved) {
-      let proceed = false;
+      let choice: ExitFlushChoice = "cancel";
       try {
-        proceed = await options.resolveUnsaved(dirty);
+        choice = await options.resolveUnsaved(dirty);
       } catch (err) {
         console.error("[Murasaki] 退出前的未保存确认失败，按「取消退出」处理:", err);
       }
-      if (!proceed) {
+      if (choice === "cancel") {
         inFlight = false;
         // issue #377：Rust 侧 ClosingState 已登记本窗口，必须显式退出拦截，
         // 否则下次 CloseRequested 被 intercept_close_request 吞掉，窗口永远关不掉
@@ -106,6 +126,7 @@ export function useExitFlush(
         }
         return;
       }
+      writeDrafts = choice !== "discard";
     }
 
     try {
@@ -114,7 +135,9 @@ export function useExitFlush(
           tabs: tabsStore.tabs,
           saveDraft: (path, content, knownMtime) =>
             fileSystem.saveDraft(path, content, knownMtime),
+          deleteDraft: (path) => fileSystem.deleteDraft(path),
           persist: () => tabsStore.persist(),
+          writeDrafts,
         }),
         new Promise((resolve) => setTimeout(resolve, EXIT_FLUSH_TIMEOUT_MS)),
       ]);

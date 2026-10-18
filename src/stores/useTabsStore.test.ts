@@ -12,6 +12,7 @@ vi.mock("../services/fileSystem", () => ({
     readText: vi.fn(async (path: string) => `content of ${path}`),
     getMtime: vi.fn(async () => 1_700_000_000_000),
     draftExists: vi.fn(async () => false),
+    readDraft: vi.fn(),
     saveDraft: vi.fn(async () => undefined),
     deleteDraft: vi.fn(async () => undefined),
   },
@@ -298,6 +299,107 @@ describe("useTabsStore", () => {
       await store.reloadFromDisk("C:\\docs\\a.md");
 
       expect(saveDraft).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("草稿与磁盘冲突（#425）", () => {
+    const draftMeta = {
+      path: "C:\\docs\\a.md",
+      draftPath: "/tmp/draft",
+      knownMtime: 1,
+      savedAt: 2,
+    };
+
+    async function openWithDraft() {
+      const { fileSystem } = await import("../services/fileSystem");
+      const draftExists = fileSystem.draftExists as unknown as ReturnType<typeof vi.fn>;
+      const readDraft = fileSystem.readDraft as unknown as ReturnType<typeof vi.fn>;
+      draftExists.mockResolvedValueOnce(true);
+      readDraft.mockResolvedValueOnce(["草稿内容", draftMeta]);
+      const store = useTabsStore();
+      return { store, fileSystem };
+    }
+
+    it("选择保留草稿：采用草稿内容并标记未保存，草稿不被删除", async () => {
+      const { store, fileSystem } = await openWithDraft();
+      const deleteDraft = fileSystem.deleteDraft as unknown as ReturnType<typeof vi.fn>;
+      deleteDraft.mockClear();
+      store.setDraftConflictResolver(async () => "keep-draft");
+
+      const tab = await store.openFile("C:\\docs\\a.md");
+
+      expect(tab.content).toBe("草稿内容");
+      expect(tab.isDirty).toBe(true);
+      expect(deleteDraft).not.toHaveBeenCalled();
+    });
+
+    it("未注入裁决器：使用磁盘内容但不删除草稿", async () => {
+      const { store, fileSystem } = await openWithDraft();
+      const deleteDraft = fileSystem.deleteDraft as unknown as ReturnType<typeof vi.fn>;
+      deleteDraft.mockClear();
+
+      const tab = await store.openFile("C:\\docs\\a.md");
+
+      expect(tab.content).toBe("content of C:\\docs\\a.md");
+      expect(deleteDraft).not.toHaveBeenCalled();
+    });
+
+    it("选择加载磁盘：采用磁盘内容并删除草稿", async () => {
+      const { store, fileSystem } = await openWithDraft();
+      const deleteDraft = fileSystem.deleteDraft as unknown as ReturnType<typeof vi.fn>;
+      deleteDraft.mockClear();
+      store.setDraftConflictResolver(async () => "load-disk");
+
+      const tab = await store.openFile("C:\\docs\\a.md");
+
+      expect(tab.content).toBe("content of C:\\docs\\a.md");
+      expect(tab.isDirty).toBe(false);
+      expect(deleteDraft).toHaveBeenCalledWith("C:\\docs\\a.md");
+    });
+
+    it("取消：使用磁盘内容但保留草稿文件", async () => {
+      const { store, fileSystem } = await openWithDraft();
+      const deleteDraft = fileSystem.deleteDraft as unknown as ReturnType<typeof vi.fn>;
+      deleteDraft.mockClear();
+      store.setDraftConflictResolver(async () => "cancel");
+
+      const tab = await store.openFile("C:\\docs\\a.md");
+
+      expect(tab.content).toBe("content of C:\\docs\\a.md");
+      expect(tab.isDirty).toBe(false);
+      expect(deleteDraft).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("关闭时「不保存」的草稿语义（#426）", () => {
+    it("keepDraft=false：不写草稿并删除已有草稿", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const saveDraft = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+      const deleteDraft = fileSystem.deleteDraft as unknown as ReturnType<typeof vi.fn>;
+      saveDraft.mockClear();
+      deleteDraft.mockClear();
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "用户明确不要的修改");
+
+      await store.doCloseTab(tab.id, { keepDraft: false });
+
+      expect(saveDraft).not.toHaveBeenCalled();
+      expect(deleteDraft).toHaveBeenCalledWith("C:\\docs\\a.md");
+      expect(store.tabs).toHaveLength(0);
+    });
+
+    it("默认仍保留草稿（关闭窗口 / 崩溃兜底）", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const saveDraft = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+      saveDraft.mockClear();
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "需要兜底");
+
+      await store.doCloseTab(tab.id);
+
+      expect(saveDraft).toHaveBeenCalledWith("C:\\docs\\a.md", "需要兜底", tab.lastMtime);
     });
   });
 
