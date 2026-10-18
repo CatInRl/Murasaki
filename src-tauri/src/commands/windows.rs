@@ -35,7 +35,11 @@ pub struct WindowRegistry {
 fn normalize_path(path: &str) -> String {
     let unified = path.replace('\\', "/");
     let trimmed = unified.trim_end_matches('/');
-    let result = if trimmed.is_empty() { unified.as_str() } else { trimmed };
+    let result = if trimmed.is_empty() {
+        unified.as_str()
+    } else {
+        trimmed
+    };
     if cfg!(windows) {
         result.to_lowercase()
     } else {
@@ -217,8 +221,10 @@ pub fn is_editor_window(label: &str) -> bool {
 /// 清理某窗口在各全局状态里的残留（窗口销毁时调用）。
 pub fn cleanup_window_state(app: &AppHandle, label: &str) {
     app.state::<WindowRegistry>().remove(label);
-    app.state::<super::watcher::WatcherState>().remove_window(label);
-    app.state::<super::menu::RecentMenuState>().remove_window_ui(label);
+    app.state::<super::watcher::WatcherState>()
+        .remove_window(label);
+    app.state::<super::menu::RecentMenuState>()
+        .remove_window_ui(label);
 }
 
 /// 前端调用：在**新窗口**中打开路径（「打开文件夹」入口）。

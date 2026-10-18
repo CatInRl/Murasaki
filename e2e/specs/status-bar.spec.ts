@@ -14,7 +14,14 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, dismissAllDialogs } from "../helpers/store";
+import {
+  openWorkspace,
+  closeWorkspace,
+  openFileInTab,
+  closeAllTabs,
+  waitForPinia,
+  dismissAllDialogs,
+} from "../helpers/store";
 import { isRendered, readText, textOfElement, waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
@@ -30,18 +37,29 @@ describe("状态栏", () => {
   });
 
   beforeEach(async () => {
-    try { await closeAllTabs(browser); } catch { /* ignore */ }
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await closeAllTabs(browser);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
     await dismissAllDialogs(browser);
   });
 
   it("无文件时显示「未打开文件」", async () => {
     // 确保有 tab（EditorPane 挂载）但无文件路径
     // 关闭工作区后状态栏应显示"未打开文件"
-    await browser.waitUntil(async () => {
-      const statusBar = await browser.$(".status-bar");
-      return statusBar.isExisting();
-    }, { timeout: 10000 });
+    await browser.waitUntil(
+      async () => {
+        const statusBar = await browser.$(".status-bar");
+        return statusBar.isExisting();
+      },
+      { timeout: 10000 }
+    );
 
     await waitForPresent(browser, ".status-filename", 10000);
     // 前序 spec 可能持久化了 tabs，closeAllTabs 后 Vue 异步渲染需要时间更新状态栏
@@ -85,14 +103,17 @@ describe("状态栏", () => {
     await openFileInTab(browser, `${wsPath}\\intro.md`);
 
     // 等待字符数显示
-    await browser.waitUntil(async () => {
-      const groups = await browser.$$(".status-group");
-      for (const g of groups) {
-        const text = await textOfElement(browser, g);
-        if (text.includes("字符")) return true;
-      }
-      return false;
-    }, { timeout: 10000 });
+    await browser.waitUntil(
+      async () => {
+        const groups = await browser.$$(".status-group");
+        for (const g of groups) {
+          const text = await textOfElement(browser, g);
+          if (text.includes("字符")) return true;
+        }
+        return false;
+      },
+      { timeout: 10000 }
+    );
 
     const groups = await browser.$$(".status-group");
     let foundCharCount = false;

@@ -32,8 +32,7 @@ export default defineConfig(async () => ({
     //
     // 注意：直接 `npm run build`（例如 CI）时 TAURI_ENV_PLATFORM 未设置，会落到 safari13
     // 分支 —— 更保守，符合预期；只有 `tauri build` 才会让 Windows 用 chrome105。
-    target:
-      process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
+    target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
     // Vite 8 起打包器换成 Rolldown，配置项随之更名（旧名 rollupOptions 经兼容层
     // 仍可用但已废弃）
     rolldownOptions: {

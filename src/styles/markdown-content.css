@@ -45,7 +45,11 @@
   --md-text-color: var(--murasaki-ink-2);
   --md-list-marker-color: inherit;
   --md-checkbox-accent: var(--murasaki-primary);
-  --md-fm-card-bg: linear-gradient(135deg, var(--murasaki-purple-50) 0%, var(--murasaki-surface-2) 100%);
+  --md-fm-card-bg: linear-gradient(
+    135deg,
+    var(--murasaki-purple-50) 0%,
+    var(--murasaki-surface-2) 100%
+  );
   --md-fm-card-border: var(--murasaki-purple-200);
   --md-fm-title-color: var(--murasaki-purple-800);
   --md-fm-key-color: var(--murasaki-purple-700);
@@ -79,7 +83,11 @@
   --md-text-color: var(--murasaki-ink-2);
   --md-list-marker-color: inherit;
   --md-checkbox-accent: var(--murasaki-primary);
-  --md-fm-card-bg: linear-gradient(135deg, var(--murasaki-purple-50) 0%, var(--murasaki-surface-2) 100%);
+  --md-fm-card-bg: linear-gradient(
+    135deg,
+    var(--murasaki-purple-50) 0%,
+    var(--murasaki-surface-2) 100%
+  );
   --md-fm-card-border: var(--murasaki-purple-200);
   --md-fm-title-color: var(--murasaki-purple-800);
   --md-fm-key-color: var(--murasaki-purple-700);
@@ -113,7 +121,11 @@
   --md-text-color: #2a2a2a;
   --md-list-marker-color: inherit;
   --md-checkbox-accent: #5b21b6;
-  --md-fm-card-bg: linear-gradient(135deg, var(--murasaki-purple-50) 0%, var(--murasaki-surface-2) 100%);
+  --md-fm-card-bg: linear-gradient(
+    135deg,
+    var(--murasaki-purple-50) 0%,
+    var(--murasaki-surface-2) 100%
+  );
   --md-fm-card-border: var(--murasaki-purple-200);
   --md-fm-title-color: var(--murasaki-purple-800);
   --md-fm-key-color: var(--murasaki-purple-700);
@@ -147,7 +159,11 @@
   --md-text-color: #1a1a1a;
   --md-list-marker-color: inherit;
   --md-checkbox-accent: #6b21a8;
-  --md-fm-card-bg: linear-gradient(135deg, var(--murasaki-purple-50) 0%, var(--murasaki-surface-2) 100%);
+  --md-fm-card-bg: linear-gradient(
+    135deg,
+    var(--murasaki-purple-50) 0%,
+    var(--murasaki-surface-2) 100%
+  );
   --md-fm-card-border: var(--murasaki-purple-200);
   --md-fm-title-color: var(--murasaki-purple-800);
   --md-fm-key-color: var(--murasaki-purple-700);
@@ -473,7 +489,7 @@
   overflow: hidden;
 }
 .markdown-body .front-matter-card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -564,8 +580,12 @@
 
 /* 紧凑窗口：减小标题字号 */
 @media (max-width: 980px) {
-  .markdown-body h1 { font-size: 22px; }
-  .markdown-body h2 { font-size: 18px; }
+  .markdown-body h1 {
+    font-size: 22px;
+  }
+  .markdown-body h2 {
+    font-size: 18px;
+  }
 }
 
 /* 触屏：增加点击区 */

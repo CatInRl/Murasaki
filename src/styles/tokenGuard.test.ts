@@ -67,10 +67,7 @@ function collectSourceFiles(dir: string): string[] {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
       files.push(...collectSourceFiles(full));
-    } else if (
-      /\.(css|vue|ts)$/.test(entry) &&
-      !/\.(test|spec)\.ts$/.test(entry)
-    ) {
+    } else if (/\.(css|vue|ts)$/.test(entry) && !/\.(test|spec)\.ts$/.test(entry)) {
       files.push(full);
     }
   }
@@ -97,10 +94,9 @@ describe("设计 token 守卫：引用的 --murasaki-* 必须在 theme.css 定�
         offenders.push(`${relative(SRC_ROOT, file).replace(/\\/g, "/")} → ${name}`);
       }
     }
-    expect(
-      offenders,
-      `发现引用了但未定义的 --murasaki-* token：\n${offenders.join("\n")}`
-    ).toEqual([]);
+    expect(offenders, `发现引用了但未定义的 --murasaki-* token：\n${offenders.join("\n")}`).toEqual(
+      []
+    );
   });
 
   it("反向：列出「已定义但全仓零引用」的 token（仅记录，不断言）", () => {
@@ -112,12 +108,15 @@ describe("设计 token 守卫：引用的 --murasaki-* 必须在 theme.css 定�
     }
     const unreferenced = [...defined].filter((name) => !referenced.has(name));
     if (unreferenced.length > 0) {
-      console.info(`[tokenGuard] 已定义但零引用的 token（${unreferenced.length}）：\n${unreferenced.join("\n")}`);
+      console.info(
+        `[tokenGuard] 已定义但零引用的 token（${unreferenced.length}）：\n${unreferenced.join("\n")}`
+      );
     }
   });
 
   it("守卫本身能识别未定义 token（样例验证）", () => {
-    const bad = `:root { --murasaki-real: #9333ea; }\n` +
+    const bad =
+      `:root { --murasaki-real: #9333ea; }\n` +
       `.x { color: var(--murasaki-real); background: var(--murasaki-does-not-exist); }`;
     const defs = extractDefinedTokens(bad);
     expect(defs.has("--murasaki-real")).toBe(true);

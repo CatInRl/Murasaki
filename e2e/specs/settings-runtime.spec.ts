@@ -43,8 +43,16 @@ describe("设置保存后运行时生效", () => {
   });
 
   beforeEach(async () => {
-    try { await closeAllTabs(browser); } catch { /* ignore */ }
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await closeAllTabs(browser);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
   });
 
   it("emit settings://saved 后主窗口 persistence.settings 被刷新", async () => {
@@ -76,31 +84,35 @@ describe("设置保存后运行时生效", () => {
     await browser.pause(300);
 
     // 验证回滚成功：内存应为 source
-    let memMode = await browser.execute(() =>
-      // @ts-ignore
-      window.__pinia__._s.get("persistence").settings.editorMode
+    let memMode = await browser.execute(
+      () =>
+        // @ts-ignore
+        window.__pinia__._s.get("persistence").settings.editorMode
     );
     expect(memMode).toBe("source");
 
     // 3. emit settings://saved event（模拟设置窗口保存）
     await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "settings://saved",
-        payload: { settings: { editorMode: "wysiwyg" } },
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "settings://saved",
+          payload: { settings: { editorMode: "wysiwyg" } },
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     });
 
     // 4. 等待 listener 处理（loadSettings 是异步的）
     await browser.pause(500);
 
     // 5. 验证 persistence.settings 被刷新为 wysiwyg（从磁盘/Rust 缓存重载）
-    memMode = await browser.execute(() =>
-      // @ts-ignore
-      window.__pinia__._s.get("persistence").settings.editorMode
+    memMode = await browser.execute(
+      () =>
+        // @ts-ignore
+        window.__pinia__._s.get("persistence").settings.editorMode
     );
     expect(memMode).toBe("wysiwyg");
   });
@@ -141,31 +153,35 @@ describe("设置保存后运行时生效", () => {
     await browser.pause(300);
 
     // 验证 editorBridge 当前为 source（watch 已触发）
-    let editorMode = await browser.execute(() =>
-      // @ts-ignore
-      window.__pinia__._s.get("editorBridge").editorMode
+    let editorMode = await browser.execute(
+      () =>
+        // @ts-ignore
+        window.__pinia__._s.get("editorBridge").editorMode
     );
     expect(editorMode).toBe("source");
 
     // 3. emit settings://saved（模拟设置窗口保存）
     await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "settings://saved",
-        payload: { settings: { editorMode: "wysiwyg" } },
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "settings://saved",
+          payload: { settings: { editorMode: "wysiwyg" } },
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     });
 
     // 4. 等待 listener + watch + Vue 渲染
     await browser.pause(600);
 
     // 5. 验证 editorBridge.editorMode === "wysiwyg"
-    editorMode = await browser.execute(() =>
-      // @ts-ignore
-      window.__pinia__._s.get("editorBridge").editorMode
+    editorMode = await browser.execute(
+      () =>
+        // @ts-ignore
+        window.__pinia__._s.get("editorBridge").editorMode
     );
     expect(editorMode).toBe("wysiwyg");
 

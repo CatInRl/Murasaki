@@ -16,7 +16,6 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import {
   openWorkspace,
-  closeWorkspace,
   closeAllTabs,
   waitForPinia,
   dismissAllDialogs,
@@ -262,7 +261,7 @@ async function waitForSelector(
 ): Promise<WebdriverIO.Element> {
   const el = await b.$(selector);
   await waitForPresent(b, selector, timeout);
-  return el;
+  return el as unknown as WebdriverIO.Element;
 }
 
 describe("WYSIWYG 模式全量测试", () => {
@@ -285,7 +284,11 @@ describe("WYSIWYG 模式全量测试", () => {
 
   afterEach(async () => {
     // 每个测试后关闭所有 tab，避免下一个测试受影响
-    try { await closeAllTabs(browser); } catch { /* ignore */ }
+    try {
+      await closeAllTabs(browser);
+    } catch {
+      /* ignore */
+    }
   });
 
   // ========================================================================
@@ -399,7 +402,9 @@ describe("WYSIWYG 模式全量测试", () => {
       const wrapper = await waitForSelector(browser, ".murasaki-wysiwyg-codeblock-wrapper");
       expect(await wrapper.isExisting()).toBe(true);
       // 语言标签经 CSS text-transform: uppercase 渲染为 "TS"，用大小写不敏感比较
-      expect((await readText(browser, ".murasaki-wysiwyg-code-lang-label")).toLowerCase()).toContain("ts");
+      expect(
+        (await readText(browser, ".murasaki-wysiwyg-code-lang-label")).toLowerCase()
+      ).toContain("ts");
     });
 
     it("2.2 代码块 widget 渲染（无语言）", async () => {
@@ -428,10 +433,7 @@ describe("WYSIWYG 模式全量测试", () => {
     });
 
     it("2.5 表格 widget 渲染", async () => {
-      await setContentAndWait(
-        browser,
-        "| A | B |\n|---|---|\n| 1 | 2 |\n\n正文"
-      );
+      await setContentAndWait(browser, "| A | B |\n|---|---|\n| 1 | 2 |\n\n正文");
       await setCursorToEnd(browser);
       const table = await waitForSelector(browser, ".murasaki-wysiwyg-table");
       expect(await table.isExisting()).toBe(true);
@@ -454,14 +456,17 @@ describe("WYSIWYG 模式全量测试", () => {
     });
 
     it("2.8 Mermaid 图表 widget 渲染", async () => {
-      await setContentAndWait(
-        browser,
-        "```mermaid\ngraph TD\n  A-->B\n```\n\n正文"
-      );
+      await setContentAndWait(browser, "```mermaid\ngraph TD\n  A-->B\n```\n\n正文");
       await setCursorToEnd(browser);
       // mermaid 异步渲染，等待更长时间
-      const mermaid = await browser.$(".murasaki-wysiwyg-mermaid, .murasaki-wysiwyg-codeblock-wrapper");
-      await waitForPresent(browser, ".murasaki-wysiwyg-mermaid, .murasaki-wysiwyg-codeblock-wrapper", 10000);
+      const mermaid = await browser.$(
+        ".murasaki-wysiwyg-mermaid, .murasaki-wysiwyg-codeblock-wrapper"
+      );
+      await waitForPresent(
+        browser,
+        ".murasaki-wysiwyg-mermaid, .murasaki-wysiwyg-codeblock-wrapper",
+        10000
+      );
       expect(await mermaid.isExisting()).toBe(true);
     });
   });
@@ -487,16 +492,9 @@ describe("WYSIWYG 模式全量测试", () => {
     });
 
     it("3.3 列表内的代码块", async () => {
-      await setContentAndWait(
-        browser,
-        "- 项1\n  ```js\n  const x = 1;\n  ```\n- 项2\n\n正文"
-      );
+      await setContentAndWait(browser, "- 项1\n  ```js\n  const x = 1;\n  ```\n- 项2\n\n正文");
       await setCursorToEnd(browser);
-      const codeblock = await waitForSelector(
-        browser,
-        ".murasaki-wysiwyg-codeblock-wrapper",
-        8000
-      );
+      const codeblock = await waitForSelector(browser, ".murasaki-wysiwyg-codeblock-wrapper", 8000);
       expect(await codeblock.isExisting()).toBe(true);
     });
 
@@ -512,18 +510,11 @@ describe("WYSIWYG 模式全量测试", () => {
     });
 
     it("3.5 引用块内的代码块", async () => {
-      await setContentAndWait(
-        browser,
-        "> ```js\n> const x = 1;\n> ```\n\n正文"
-      );
+      await setContentAndWait(browser, "> ```js\n> const x = 1;\n> ```\n\n正文");
       await setCursorToEnd(browser);
       const blockquote = await browser.$(".murasaki-wysiwyg-blockquote");
       expect(await blockquote.isExisting()).toBe(true);
-      const codeblock = await waitForSelector(
-        browser,
-        ".murasaki-wysiwyg-codeblock-wrapper",
-        8000
-      );
+      const codeblock = await waitForSelector(browser, ".murasaki-wysiwyg-codeblock-wrapper", 8000);
       expect(await codeblock.isExisting()).toBe(true);
     });
 
@@ -550,16 +541,9 @@ describe("WYSIWYG 模式全量测试", () => {
   // ========================================================================
   describe("4. 展示 - 失败回退", () => {
     it("4.1 未知语言的代码块回退为普通 pre/code", async () => {
-      await setContentAndWait(
-        browser,
-        "```unknownlang\ncode here\n```\n\n正文"
-      );
+      await setContentAndWait(browser, "```unknownlang\ncode here\n```\n\n正文");
       await setCursorToEnd(browser);
-      const wrapper = await waitForSelector(
-        browser,
-        ".murasaki-wysiwyg-codeblock-wrapper",
-        8000
-      );
+      const wrapper = await waitForSelector(browser, ".murasaki-wysiwyg-codeblock-wrapper", 8000);
       expect(await wrapper.isExisting()).toBe(true);
       // Shiki 失败应回退为 <pre><code>
       const pre = await browser.$(".murasaki-wysiwyg-codeblock-wrapper pre");
@@ -567,14 +551,13 @@ describe("WYSIWYG 模式全量测试", () => {
     });
 
     it("4.2 无效 Mermaid 语法回退为源码占位", async () => {
-      await setContentAndWait(
-        browser,
-        "```mermaid\ninvalid syntax @#$\n```\n\n正文"
-      );
+      await setContentAndWait(browser, "```mermaid\ninvalid syntax @#$\n```\n\n正文");
       await setCursorToEnd(browser);
       // 等待 mermaid 渲染尝试（会失败并回退）
       await browser.pause(3000);
-      const wrapper = await browser.$(".murasaki-wysiwyg-codeblock-wrapper, .murasaki-wysiwyg-mermaid");
+      const wrapper = await browser.$(
+        ".murasaki-wysiwyg-codeblock-wrapper, .murasaki-wysiwyg-mermaid"
+      );
       expect(await wrapper.isExisting()).toBe(true);
     });
 
@@ -589,24 +572,17 @@ describe("WYSIWYG 模式全量测试", () => {
     });
 
     it("4.4 malformed 表格回退为源码文本", async () => {
-      await setContentAndWait(
-        browser,
-        "| A | B |\n无对齐行\n| 1 | 2 |\n\n正文"
-      );
+      await setContentAndWait(browser, "| A | B |\n无对齐行\n| 1 | 2 |\n\n正文");
       await setCursor(browser, 25);
       // 表格解析失败，可能不生成 table widget
       await browser.pause(500);
-      const table = await browser.$(".murasaki-wysiwyg-table");
       // 可能回退为源码文本（table widget 不生成）
       const visibleText = await getVisibleText(browser);
       expect(visibleText.length).toBeGreaterThan(0);
     });
 
     it("4.5 引用式链接回退为 dim 标记（不生成 widget）", async () => {
-      await setContentAndWait(
-        browser,
-        "[文本][ref]\n\n[ref]: https://example.com"
-      );
+      await setContentAndWait(browser, "[文本][ref]\n\n[ref]: https://example.com");
       await setCursor(browser, 30);
       // 引用式链接 extractAnchorData 返回 null，不生成 link widget
       const link = await browser.$(".murasaki-wysiwyg-link");
@@ -625,18 +601,15 @@ describe("WYSIWYG 模式全量测试", () => {
       await setContentAndWait(browser, "# 标题\n\n正文");
       // 光标在标题
       await setCursor(browser, 2);
-      const dimCount1 = await browser.execute(() =>
-        document.querySelectorAll(".cm-content .murasaki-wysiwyg-mark-dim").length
+      const dimCount1 = await browser.execute(
+        () => document.querySelectorAll(".cm-content .murasaki-wysiwyg-mark-dim").length
       );
       expect(dimCount1).toBeGreaterThan(0);
 
       // 光标移到正文
       await setCursor(browser, 6);
-      const dimCount2 = await browser.execute(() =>
-        document.querySelectorAll(".cm-content .murasaki-wysiwyg-mark-dim").length
-      );
-      const hideCount2 = await browser.execute(() =>
-        document.querySelectorAll(".cm-content .murasaki-wysiwyg-mark-hide").length
+      const hideCount2 = await browser.execute(
+        () => document.querySelectorAll(".cm-content .murasaki-wysiwyg-mark-hide").length
       );
       expect(hideCount2).toBeGreaterThan(0);
     });
@@ -646,8 +619,8 @@ describe("WYSIWYG 模式全量测试", () => {
       // 光标在第二项
       await setCursor(browser, 8);
       // 整个列表块的标记应 dim（而非 hide）
-      const dimCount = await browser.execute(() =>
-        document.querySelectorAll(".cm-content .murasaki-wysiwyg-mark-dim").length
+      const dimCount = await browser.execute(
+        () => document.querySelectorAll(".cm-content .murasaki-wysiwyg-mark-dim").length
       );
       expect(dimCount).toBeGreaterThan(0);
     });
@@ -659,8 +632,8 @@ describe("WYSIWYG 模式全量测试", () => {
       await setCursor(browser, 10);
       await setCursor(browser, 16);
       // 最终状态应以最后一次位置为准
-      const hideCount = await browser.execute(() =>
-        document.querySelectorAll(".cm-content .murasaki-wysiwyg-mark-hide").length
+      const hideCount = await browser.execute(
+        () => document.querySelectorAll(".cm-content .murasaki-wysiwyg-mark-hide").length
       );
       expect(hideCount).toBeGreaterThan(0);
     });
@@ -831,7 +804,9 @@ describe("WYSIWYG 模式全量测试", () => {
       });
       await browser.pause(100);
       // 点击 Bold 按钮（多种选择器兼容）
-      const boldBtn = await browser.$('button[title*="粗体"], button[title*="Bold"], button[aria-label*="bold"], .toolbar-btn[title*="粗体"]');
+      const boldBtn = await browser.$(
+        'button[title*="粗体"], button[title*="Bold"], button[aria-label*="bold"], .toolbar-btn[title*="粗体"]'
+      );
       if (await boldBtn.isExisting()) {
         await boldBtn.click();
         await browser.pause(200);
@@ -1246,7 +1221,9 @@ describe("WYSIWYG 模式全量测试", () => {
       // 等待异步渲染
       await browser.pause(5000);
       // 两个 mermaid 块都应渲染
-      const mermaids = await browser.$$(".murasaki-wysiwyg-mermaid, .murasaki-wysiwyg-codeblock-wrapper");
+      const mermaids = await browser.$$(
+        ".murasaki-wysiwyg-mermaid, .murasaki-wysiwyg-codeblock-wrapper"
+      );
       expect(mermaids.length).toBeGreaterThanOrEqual(2);
     });
   });

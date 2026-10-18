@@ -35,10 +35,8 @@ export function flattenVisibleTree(
   const out: FlatTreeItem[] = [];
   const walk = (list: TreeNode[], level: number): void => {
     for (const node of list) {
-      const hasChildren =
-        node.type === "directory" && (node.children?.length ?? 0) > 0;
-      const expanded =
-        node.type === "directory" && hasChildren && isExpanded(node.path);
+      const hasChildren = node.type === "directory" && (node.children?.length ?? 0) > 0;
+      const expanded = node.type === "directory" && hasChildren && isExpanded(node.path);
       out.push({
         path: node.path,
         name: node.name,
@@ -57,10 +55,7 @@ export function flattenVisibleTree(
 }
 
 /** 可见条目列表中某路径的下标；未找到返回 -1 */
-export function indexOfPath(
-  items: FlatTreeItem[],
-  path: string | null
-): number {
+export function indexOfPath(items: FlatTreeItem[], path: string | null): number {
   if (!path) return -1;
   return items.findIndex((item) => item.path === path);
 }
@@ -109,9 +104,7 @@ export function rightArrowAction(
   if (!item || item.type !== "directory") return null;
   if (item.expanded) {
     const next = items[currentIndex + 1];
-    return next && next.level > item.level
-      ? { kind: "focus", index: currentIndex + 1 }
-      : null;
+    return next && next.level > item.level ? { kind: "focus", index: currentIndex + 1 } : null;
   }
   return item.hasChildren ? { kind: "expand", path: item.path } : null;
 }
@@ -119,10 +112,7 @@ export function rightArrowAction(
 /**
  * ← 键：展开的目录 → 折叠；其余情况 → 聚焦最近的父节点（层级更浅的上一项）。
  */
-export function leftArrowAction(
-  items: FlatTreeItem[],
-  currentIndex: number
-): TreeNavAction | null {
+export function leftArrowAction(items: FlatTreeItem[], currentIndex: number): TreeNavAction | null {
   const item = items[currentIndex];
   if (!item) return null;
   if (item.type === "directory" && item.expanded) {

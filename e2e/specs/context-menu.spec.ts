@@ -50,13 +50,10 @@ describe("右键菜单", () => {
     await browser.execute(() => {
       // @ts-ignore
       const menu = window.__pinia__._s.get("contextMenu");
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [
-          { label: "重命名" },
-          { label: "删除", danger: true },
-        ]
-      );
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
+        { label: "重命名" },
+        { label: "删除", danger: true },
+      ]);
     });
 
     await waitForPresent(browser, ".murasaki-context-menu", 5000);
@@ -81,18 +78,15 @@ describe("右键菜单", () => {
       const menu = window.__pinia__._s.get("contextMenu");
       // @ts-ignore
       window.__actionCalled = false;
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [
-          {
-            label: "点击我",
-            action: () => {
-              // @ts-ignore
-              window.__actionCalled = true;
-            },
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
+        {
+          label: "点击我",
+          action: () => {
+            // @ts-ignore
+            window.__actionCalled = true;
           },
-        ]
-      );
+        },
+      ]);
     });
 
     const item = await browser.$(".murasaki-context-menu-item");
@@ -116,19 +110,16 @@ describe("右键菜单", () => {
       const menu = window.__pinia__._s.get("contextMenu");
       // @ts-ignore
       window.__disabledActionCalled = false;
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [
-          {
-            label: "禁用项",
-            disabled: true,
-            action: () => {
-              // @ts-ignore
-              window.__disabledActionCalled = true;
-            },
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
+        {
+          label: "禁用项",
+          disabled: true,
+          action: () => {
+            // @ts-ignore
+            window.__disabledActionCalled = true;
           },
-        ]
-      );
+        },
+      ]);
     });
 
     const item = await browser.$(".murasaki-context-menu-item");
@@ -153,14 +144,11 @@ describe("右键菜单", () => {
     await browser.execute(() => {
       // @ts-ignore
       const menu = window.__pinia__._s.get("contextMenu");
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [
-          { label: "剪切" },
-          { separator: true },
-          { label: "删除" },
-        ]
-      );
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
+        { label: "剪切" },
+        { separator: true },
+        { label: "删除" },
+      ]);
     });
 
     await waitForPresent(browser, ".murasaki-context-menu", 5000);
@@ -176,10 +164,7 @@ describe("右键菜单", () => {
     await browser.execute(() => {
       // @ts-ignore
       const menu = window.__pinia__._s.get("contextMenu");
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [{ label: "测试" }]
-      );
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [{ label: "测试" }]);
     });
 
     await waitForPresent(browser, ".murasaki-context-menu", 5000);
@@ -193,10 +178,7 @@ describe("右键菜单", () => {
     await browser.execute(() => {
       // @ts-ignore
       const menu = window.__pinia__._s.get("contextMenu");
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [{ label: "测试" }]
-      );
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [{ label: "测试" }]);
     });
 
     await waitForPresent(browser, ".murasaki-context-menu", 5000);
@@ -239,12 +221,9 @@ describe("右键菜单", () => {
         // @ts-ignore
         const menu = window.__pinia__._s.get("contextMenu");
         menu.hide();
-        menu.show(
-          new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-          [
-            { label: "重命名", shortcut: "F2" },
-          ]
-        );
+        menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
+          { label: "重命名", shortcut: "F2" },
+        ]);
       });
 
       try {

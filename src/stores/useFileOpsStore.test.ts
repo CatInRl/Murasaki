@@ -64,9 +64,7 @@ describe("useFileOpsStore", () => {
       mockedInvoke.mockRejectedValueOnce(new Error("文件已存在"));
 
       const store = useFileOpsStore();
-      await expect(
-        store.createFile("/test/workspace", "exists.md")
-      ).rejects.toThrow("文件已存在");
+      await expect(store.createFile("/test/workspace", "exists.md")).rejects.toThrow("文件已存在");
     });
   });
 
@@ -115,10 +113,7 @@ describe("useFileOpsStore", () => {
       mockedInvoke.mockResolvedValueOnce(fakeNode);
 
       const store = useFileOpsStore();
-      const result = await store.renamePath(
-        "/test/workspace/old.md",
-        "renamed.md"
-      );
+      const result = await store.renamePath("/test/workspace/old.md", "renamed.md");
 
       expect(result).toEqual(fakeNode);
       expect(mockedInvoke).toHaveBeenCalledWith("rename_path", {
@@ -129,10 +124,7 @@ describe("useFileOpsStore", () => {
 
     it("同名重命名返回 null（不调用 rename_path）", async () => {
       const store = useFileOpsStore();
-      const result = await store.renamePath(
-        "/test/workspace/same.md",
-        "same.md"
-      );
+      const result = await store.renamePath("/test/workspace/same.md", "same.md");
       expect(result).toBeNull();
       // 不应调用任何 invoke
       expect(mockedInvoke).not.toHaveBeenCalled();
@@ -162,9 +154,9 @@ describe("useFileOpsStore", () => {
       mockedInvoke.mockResolvedValueOnce("directory");
 
       const store = useFileOpsStore();
-      await expect(
-        store.renamePath("/test/workspace/a.md", "existing-dir")
-      ).rejects.toThrow("无法覆盖目录");
+      await expect(store.renamePath("/test/workspace/a.md", "existing-dir")).rejects.toThrow(
+        "无法覆盖目录"
+      );
     });
 
     it("目标已存在且用户选择取消时返回 null", async () => {
@@ -173,17 +165,12 @@ describe("useFileOpsStore", () => {
       // path_type 返回 "file"
       mockedInvoke.mockResolvedValueOnce("file");
 
-      const resolver: ConflictResolver = vi
-        .fn()
-        .mockResolvedValue({ action: "cancel" });
+      const resolver: ConflictResolver = vi.fn().mockResolvedValue({ action: "cancel" });
 
       const store = useFileOpsStore();
       store.setConflictResolver(resolver);
 
-      const result = await store.renamePath(
-        "/test/workspace/a.md",
-        "existing.md"
-      );
+      const result = await store.renamePath("/test/workspace/a.md", "existing.md");
 
       expect(result).toBeNull();
       expect(resolver).toHaveBeenCalledWith(
@@ -208,17 +195,12 @@ describe("useFileOpsStore", () => {
       };
       mockedInvoke.mockResolvedValueOnce(fakeNode);
 
-      const resolver: ConflictResolver = vi
-        .fn()
-        .mockResolvedValue({ action: "overwrite" });
+      const resolver: ConflictResolver = vi.fn().mockResolvedValue({ action: "overwrite" });
 
       const store = useFileOpsStore();
       store.setConflictResolver(resolver);
 
-      const result = await store.renamePath(
-        "/test/workspace/a.md",
-        "existing.md"
-      );
+      const result = await store.renamePath("/test/workspace/a.md", "existing.md");
 
       expect(result).toEqual(fakeNode);
       // 验证 delete_path 被调用
@@ -254,10 +236,7 @@ describe("useFileOpsStore", () => {
       const store = useFileOpsStore();
       store.setConflictResolver(resolver);
 
-      const result = await store.renamePath(
-        "/test/workspace/a.md",
-        "existing.md"
-      );
+      const result = await store.renamePath("/test/workspace/a.md", "existing.md");
 
       expect(result).toEqual(fakeNode);
       // 验证最终 rename_path 用新名字
@@ -275,9 +254,9 @@ describe("useFileOpsStore", () => {
 
       const store = useFileOpsStore();
       // 不设置 resolver
-      await expect(
-        store.renamePath("/test/workspace/a.md", "existing.md")
-      ).rejects.toThrow("未配置冲突对话框");
+      await expect(store.renamePath("/test/workspace/a.md", "existing.md")).rejects.toThrow(
+        "未配置冲突对话框"
+      );
     });
   });
 

@@ -110,9 +110,7 @@ describe("useUpdater - check", () => {
     const result = await check();
 
     expect(result).toBeNull();
-    expect(deps.toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("检查更新失败")
-    );
+    expect(deps.toast.error).toHaveBeenCalledWith(expect.stringContaining("检查更新失败"));
   });
 
   it("静默模式下检查失败不 toast", async () => {
@@ -230,9 +228,7 @@ describe("useUpdater - downloadAndInstall", () => {
       currentVersion: "0.3.1",
     });
 
-    expect(deps.toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("无可安装")
-    );
+    expect(deps.toast.error).toHaveBeenCalledWith(expect.stringContaining("无可安装"));
     expect(mockUpdate.downloadAndInstall).not.toHaveBeenCalled();
   });
 
@@ -247,9 +243,7 @@ describe("useUpdater - downloadAndInstall", () => {
     await downloadAndInstall(info!);
 
     expect(deps.toast.dismiss).toHaveBeenCalledWith("toast-1");
-    expect(deps.toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("下载更新失败")
-    );
+    expect(deps.toast.error).toHaveBeenCalledWith(expect.stringContaining("下载更新失败"));
     expect(mockedRelaunch).not.toHaveBeenCalled();
   });
 
@@ -295,8 +289,6 @@ describe("useUpdater - restart", () => {
 
     await restart();
 
-    expect(deps.toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("重启失败")
-    );
+    expect(deps.toast.error).toHaveBeenCalledWith(expect.stringContaining("重启失败"));
   });
 });

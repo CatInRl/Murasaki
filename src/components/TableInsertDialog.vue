@@ -53,33 +53,21 @@ function onCancel(): void {
     <NCard :bordered="false" size="small">
       <div class="table-form">
         <div class="form-row">
-          <NText class="form-label">{{ $t('editor.tableDialog.rowsLabel') }}</NText>
-          <NInputNumber
-            v-model:value="rows"
-            :min="1"
-            :max="50"
-            size="small"
-            style="width: 120px"
-          />
+          <NText class="form-label">{{ $t("editor.tableDialog.rowsLabel") }}</NText>
+          <NInputNumber v-model:value="rows" :min="1" :max="50" size="small" style="width: 120px" />
         </div>
         <div class="form-row">
-          <NText class="form-label">{{ $t('editor.tableDialog.colsLabel') }}</NText>
-          <NInputNumber
-            v-model:value="cols"
-            :min="1"
-            :max="20"
-            size="small"
-            style="width: 120px"
-          />
+          <NText class="form-label">{{ $t("editor.tableDialog.colsLabel") }}</NText>
+          <NInputNumber v-model:value="cols" :min="1" :max="20" size="small" style="width: 120px" />
         </div>
       </div>
     </NCard>
 
     <template #footer>
       <NSpace justify="end">
-        <NButton size="small" @click="onCancel">{{ $t('common.cancel') }}</NButton>
+        <NButton size="small" @click="onCancel">{{ $t("common.cancel") }}</NButton>
         <NButton size="small" type="primary" @click="onConfirm">
-          {{ $t('editor.tableDialog.insert') }}
+          {{ $t("editor.tableDialog.insert") }}
         </NButton>
       </NSpace>
     </template>

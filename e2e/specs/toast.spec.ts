@@ -29,7 +29,11 @@ describe("吐司系统", () => {
   });
 
   beforeEach(async () => {
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
     // 清空所有吐司
     await browser.execute(() => {
       // @ts-ignore
@@ -118,16 +122,18 @@ describe("吐司系统", () => {
     await closeBtn.click();
 
     // 等待 toast 从 store 中移除（Vue transition 可能使 DOM 元素延迟消失）
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("toast").toasts.length === 0;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("toast").toasts.length === 0;
+        });
+      },
+      { timeout: 5000 }
+    );
   });
 
   it("action 按钮触发回调并关闭吐司", async () => {
-    let actionCalled = false;
     await browser.execute(() => {
       // @ts-ignore
       const toast = window.__pinia__._s.get("toast");
@@ -152,12 +158,15 @@ describe("吐司系统", () => {
     await actionBtn.click();
 
     // 等待 toast 从 store 中移除
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("toast").toasts.length === 0;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("toast").toasts.length === 0;
+        });
+      },
+      { timeout: 5000 }
+    );
 
     // action 应被调用
     const called = await browser.execute(() => {
@@ -177,12 +186,15 @@ describe("吐司系统", () => {
     });
 
     // 等待 3 条吐司渲染（store 中应有 3 条）
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("toast").toasts.length === 3;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("toast").toasts.length === 3;
+        });
+      },
+      { timeout: 5000 }
+    );
     // 等待 DOM 渲染
     await browser.pause(200);
 
@@ -194,12 +206,15 @@ describe("吐司系统", () => {
 
     // 检查 store（source of truth）而非 DOM：transition-group 的 leave 动画
     // 可能在 timeout 窗口内仍保留 DOM 元素
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("toast").toasts.length === 0;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("toast").toasts.length === 0;
+        });
+      },
+      { timeout: 5000 }
+    );
   });
 
   it("success 变体 3 秒后自动消失", async () => {

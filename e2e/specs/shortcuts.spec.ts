@@ -49,18 +49,25 @@ async function pressShortcut(
   key: string,
   opts: { ctrl?: boolean; shift?: boolean; alt?: boolean; meta?: boolean } = {}
 ): Promise<void> {
-  await browser.execute((k: string, c: boolean, s: boolean, a: boolean, m: boolean) => {
-    const ev = new KeyboardEvent("keydown", {
-      key: k,
-      bubbles: true,
-      cancelable: true,
-      ctrlKey: c,
-      shiftKey: s,
-      altKey: a,
-      metaKey: m,
-    });
-    window.dispatchEvent(ev);
-  }, key, !!opts.ctrl, !!opts.shift, !!opts.alt, !!opts.meta);
+  await browser.execute(
+    (k: string, c: boolean, s: boolean, a: boolean, m: boolean) => {
+      const ev = new KeyboardEvent("keydown", {
+        key: k,
+        bubbles: true,
+        cancelable: true,
+        ctrlKey: c,
+        shiftKey: s,
+        altKey: a,
+        metaKey: m,
+      });
+      window.dispatchEvent(ev);
+    },
+    key,
+    !!opts.ctrl,
+    !!opts.shift,
+    !!opts.alt,
+    !!opts.meta
+  );
 }
 
 /**
@@ -95,13 +102,15 @@ async function setShortcutOverrides(
 async function emitSettingsSaved(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
     // @ts-ignore
-    window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-      event: "settings://saved",
-      payload: {},
-    }).then(
-      () => done(null),
-      (err: unknown) => done(err ? String(err) : null)
-    );
+    window.__TAURI_INTERNALS__
+      .invoke("plugin:event|emit", {
+        event: "settings://saved",
+        payload: {},
+      })
+      .then(
+        () => done(null),
+        (err: unknown) => done(err ? String(err) : null)
+      );
   });
   await browser.pause(500);
 }
@@ -164,11 +173,12 @@ describe("快捷键", () => {
       return count === 2;
     });
 
-    let state: { count: number; activeId?: string | null; activeTitle?: string } = await browser.execute(() => {
-      // @ts-ignore
-      const tabs = window.__pinia__._s.get("tabs");
-      return { count: tabs.tabs.length, activeId: tabs.activeTabId };
-    });
+    let state: { count: number; activeId?: string | null; activeTitle?: string } =
+      await browser.execute(() => {
+        // @ts-ignore
+        const tabs = window.__pinia__._s.get("tabs");
+        return { count: tabs.tabs.length, activeId: tabs.activeTabId };
+      });
     expect(state.count).toBe(2);
 
     // Ctrl+W 关闭当前 tab（notes.md）
@@ -187,7 +197,10 @@ describe("快捷键", () => {
     state = await browser.execute(() => {
       // @ts-ignore
       const tabs = window.__pinia__._s.get("tabs");
-      return { count: tabs.tabs.length, activeTitle: tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null };
+      return {
+        count: tabs.tabs.length,
+        activeTitle: tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null,
+      };
     });
     expect(state.count).toBe(1);
     expect(state.activeTitle).toBe("intro.md");
@@ -272,9 +285,7 @@ describe("快捷键", () => {
 
   it("Ctrl+R 有未保存修改时先确认：取消保留、确认后重载", async () => {
     // 此测试需要自定义 fixture（reload.md），保留 resetWorkspace 调用
-    const reloadWsPath = resetWorkspace([
-      { path: "reload.md", content: "# 原始内容\n" },
-    ]);
+    const reloadWsPath = resetWorkspace([{ path: "reload.md", content: "# 原始内容\n" }]);
     await openWorkspace(browser, reloadWsPath);
     await openFileInTab(browser, `${reloadWsPath}\\reload.md`);
     // 等待 reload.md 打开为活动 tab
@@ -348,29 +359,35 @@ describe("快捷键", () => {
   it("Alt+Shift+S 切换状态栏显隐", async () => {
     // 初始状态栏应可见
     const statusBar = await browser.$(".status-bar, [class*='status-bar']");
-    let exists = await statusBar.isExisting();
+    const exists = await statusBar.isExisting();
     expect(exists).toBe(true);
 
     // Alt+Shift+S 隐藏
     await pressShortcut(browser, "s", { alt: true, shift: true });
 
     // 状态栏应消失
-    await browser.waitUntil(async () => {
-      const visible = await browser.execute(() => {
-        return !!document.querySelector(".status-bar");
-      });
-      return !visible;
-    }, { timeout: 3000, interval: 100 });
+    await browser.waitUntil(
+      async () => {
+        const visible = await browser.execute(() => {
+          return !!document.querySelector(".status-bar");
+        });
+        return !visible;
+      },
+      { timeout: 3000, interval: 100 }
+    );
 
     // 再次按 Alt+Shift+S 显示
     await pressShortcut(browser, "s", { alt: true, shift: true });
 
-    await browser.waitUntil(async () => {
-      const visible = await browser.execute(() => {
-        return !!document.querySelector(".status-bar");
-      });
-      return visible;
-    }, { timeout: 3000, interval: 100 });
+    await browser.waitUntil(
+      async () => {
+        const visible = await browser.execute(() => {
+          return !!document.querySelector(".status-bar");
+        });
+        return visible;
+      },
+      { timeout: 3000, interval: 100 }
+    );
   });
 
   // ============ M6: Ctrl+Shift+E 切换到文件树侧栏 ============
@@ -384,16 +401,22 @@ describe("快捷键", () => {
       (window as any).__setSidebarView__("outline");
     });
     // 等待切换到大纲视图生效（文件树消失）
-    await browser.waitUntil(async () => {
-      return !(await isRendered(browser, ".file-tree"));
-    }, { timeout: 3000, interval: 100 });
+    await browser.waitUntil(
+      async () => {
+        return !(await isRendered(browser, ".file-tree"));
+      },
+      { timeout: 3000, interval: 100 }
+    );
 
     // Ctrl+Shift+E 切换回文件树
     await pressShortcut(browser, "e", { ctrl: true, shift: true });
     // 等待文件树重新可见
-    await browser.waitUntil(async () => {
-      return await isRendered(browser, ".file-tree");
-    }, { timeout: 3000, interval: 100 });
+    await browser.waitUntil(
+      async () => {
+        return await isRendered(browser, ".file-tree");
+      },
+      { timeout: 3000, interval: 100 }
+    );
 
     // 文件树应可见
     expect(await isRendered(browser, ".file-tree")).toBe(true);
@@ -408,16 +431,17 @@ describe("快捷键", () => {
     // Ctrl+Shift+M 切换到大纲
     await pressShortcut(browser, "m", { ctrl: true, shift: true });
     // 等待大纲面板出现
-    await browser.waitUntil(async () => {
-      const outline = await browser.$(".outline-pane, [class*='outline']");
-      return await outline.isExisting().catch(() => false);
-    }, { timeout: 3000, interval: 100 });
+    await browser.waitUntil(
+      async () => {
+        const outline = await browser.$(".outline-pane, [class*='outline']");
+        return await outline.isExisting().catch(() => false);
+      },
+      { timeout: 3000, interval: 100 }
+    );
 
     // 应显示大纲面板（而非文件树）
     const outline = await browser.$(".outline-pane, [class*='outline']");
     expect(await outline.isExisting()).toBe(true);
-    // 文件树应隐藏或大纲面板可见
-    const fileTreeVisible = await browser.$(".file-tree").isExisting();
     // 切换后文件树应消失或大纲面板成为主视图
     // （Sidebar.vue 通过 activeView prop 控制显示）
   });
@@ -450,14 +474,17 @@ describe("快捷键", () => {
     await pressShortcut(browser, "m", { ctrl: true, shift: true });
 
     // 应弹出一条说明（alert 入队），而不是静默什么都不做
-    await browser.waitUntil(async () => {
-      const kinds = await browser.execute(() => {
-        // @ts-ignore
-        const dialog = window.__pinia__._s.get("dialog");
-        return ((dialog.queue ?? []) as { kind: string }[]).map((item) => item.kind);
-      });
-      return kinds.includes("alert");
-    }, { timeout: 5000, interval: 100 });
+    await browser.waitUntil(
+      async () => {
+        const kinds = await browser.execute(() => {
+          // @ts-ignore
+          const dialog = window.__pinia__._s.get("dialog");
+          return ((dialog.queue ?? []) as { kind: string }[]).map((item) => item.kind);
+        });
+        return kinds.includes("alert");
+      },
+      { timeout: 5000, interval: 100 }
+    );
 
     // 视图仍是文件树（大纲对非 md 不可用，不做无意义的切换）
     expect(await (await browser.$(".file-tree")).isExisting()).toBe(true);
@@ -584,12 +611,14 @@ describe("快捷键", () => {
     // 直接调用 Rust 命令（重建后的 release 二进制），验证覆盖表能同步到原生菜单
     const err = await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("update_shortcut_labels", {
-        overrides: { "toggle-statusbar": "Alt+Shift+T", "close-tab": null },
-      }).then(
-        () => done(null),
-        (e: unknown) => done(e ? String(e) : null)
-      );
+      window.__TAURI_INTERNALS__
+        .invoke("update_shortcut_labels", {
+          overrides: { "toggle-statusbar": "Alt+Shift+T", "close-tab": null },
+        })
+        .then(
+          () => done(null),
+          (e: unknown) => done(e ? String(e) : null)
+        );
     });
     expect(err).toBe(null);
 

@@ -12,12 +12,14 @@ import { pickSave } from "../utils/fileDialog";
 
 const mockedPickSave = pickSave as unknown as ReturnType<typeof vi.fn>;
 
-function makeTab(overrides: Partial<{
-  id: string;
-  path: string | null;
-  content: string;
-  isDirty: boolean;
-}> = {}) {
+function makeTab(
+  overrides: Partial<{
+    id: string;
+    path: string | null;
+    content: string;
+    isDirty: boolean;
+  }> = {}
+) {
   return {
     id: "tab1",
     path: "/test/file.md",
@@ -178,11 +180,7 @@ describe("useTabClose", () => {
       const doCloseTab = vi.fn().mockResolvedValue(undefined);
       const deps = makeDeps({
         tabsStore: {
-          tabs: [
-            makeTab({ id: "t1" }),
-            makeTab({ id: "t2" }),
-            makeTab({ id: "t3" }),
-          ],
+          tabs: [makeTab({ id: "t1" }), makeTab({ id: "t2" }), makeTab({ id: "t3" })],
           activeTabId: "t2",
           closeTab: vi.fn(),
           doCloseTab,
@@ -236,7 +234,9 @@ describe("useTabClose", () => {
     it("选「不保存关闭」→ 全部关闭", async () => {
       const deps = batchDeps(
         [makeTab({ id: "t1", isDirty: true }), makeTab({ id: "t2", isDirty: true })],
-        { dialog: { unsavedChanges: vi.fn().mockResolvedValue("discard"), alert: vi.fn() } as never }
+        {
+          dialog: { unsavedChanges: vi.fn().mockResolvedValue("discard"), alert: vi.fn() } as never,
+        }
       );
       await useTabClose(deps).onCloseAllTabs();
       expect(deps.tabsStore.saveTab).not.toHaveBeenCalled();
@@ -277,10 +277,9 @@ describe("useTabClose", () => {
 
     it("保存被取消（另存为对话框取消）→ 整批中止，不关闭任何标签", async () => {
       mockedPickSave.mockResolvedValue(null);
-      const deps = batchDeps(
-        [makeTab({ id: "t1", path: null, isDirty: true })],
-        { dialog: { unsavedChanges: vi.fn().mockResolvedValue("save"), alert: vi.fn() } as never }
-      );
+      const deps = batchDeps([makeTab({ id: "t1", path: null, isDirty: true })], {
+        dialog: { unsavedChanges: vi.fn().mockResolvedValue("save"), alert: vi.fn() } as never,
+      });
       await useTabClose(deps).onCloseAllTabs();
       expect(mockedPickSave).toHaveBeenCalled();
       expect(deps.tabsStore.doCloseTab).not.toHaveBeenCalled();

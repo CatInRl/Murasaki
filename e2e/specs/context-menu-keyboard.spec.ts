@@ -21,9 +21,7 @@ let browser: Browser;
 /** 在菜单上派发 keydown（菜单的 keydown 监听挂在 window 捕获阶段） */
 async function pressMenuKey(b: Browser, key: string): Promise<void> {
   await b.execute((k: string) => {
-    window.dispatchEvent(
-      new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true })
-    );
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
   }, key);
   await b.pause(200);
 }
@@ -54,9 +52,7 @@ async function showTestMenu(b: Browser): Promise<void> {
   await b.execute(() => {
     // @ts-ignore
     window.__menuAction = null;
-    const trigger = document.querySelector(
-      ".status-mode-chip"
-    ) as HTMLElement | null;
+    const trigger = document.querySelector(".status-mode-chip") as HTMLElement | null;
     trigger?.focus();
 
     const menu = window.__pinia__._s.get("contextMenu");

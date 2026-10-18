@@ -14,7 +14,14 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
+import {
+  openWorkspace,
+  closeWorkspace,
+  openFileInTab,
+  closeAllTabs,
+  waitForPinia,
+  resetPersistenceSettings,
+} from "../helpers/store";
 import { isRendered, waitForPresent, waitForInBrowser } from "../helpers/wait";
 
 let browser: Browser;
@@ -33,8 +40,16 @@ describe("WYSIWYG 模式切换", () => {
     // 重置持久化设置：前序 spec 可能把 editorMode 持久化为 wysiwyg/source，
     // 若不重置，本 spec 的「默认 split 模式」前提不成立（实测读到 mode-wysiwyg）
     await resetPersistenceSettings(browser);
-    try { await closeAllTabs(browser); } catch { /* ignore */ }
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await closeAllTabs(browser);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
   });
 
   it("默认 split 模式显示预览区", async () => {
@@ -134,9 +149,7 @@ describe("WYSIWYG 模式切换", () => {
 
   it("wysiwyg 模式下标题标记被隐藏", async () => {
     // 准备含标题 + 正文两段的 markdown（光标需移到标题段之外才能触发 hide）
-    const wsPath = resetWorkspace([
-      { path: "heading.md", content: "# 大标题\n\n正文内容\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "heading.md", content: "# 大标题\n\n正文内容\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\heading.md`);
 

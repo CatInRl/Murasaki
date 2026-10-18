@@ -27,8 +27,7 @@ fn main() {
 
         langs.push(lang.clone());
         let text = std::fs::read_to_string(&menu_file).expect("读取 menu.json 失败");
-        let value: serde_json::Value =
-            serde_json::from_str(&text).expect("解析 menu.json 失败");
+        let value: serde_json::Value = serde_json::from_str(&text).expect("解析 menu.json 失败");
 
         // 展平嵌套 JSON，收集所有「点号 key → 字符串值」
         flatten(&lang, "", &value, &mut entries);
@@ -42,10 +41,7 @@ fn main() {
 
     let mut rust = String::new();
     rust.push_str("/// 由 build.rs 从 src/locales/**/menu.json 自动生成，勿手改\n");
-    let lang_list: Vec<String> = langs
-        .iter()
-        .map(|l| format!("\"{}\"", escape(l)))
-        .collect();
+    let lang_list: Vec<String> = langs.iter().map(|l| format!("\"{}\"", escape(l))).collect();
     rust.push_str(&format!(
         "pub const SUPPORTED_LANGS: &[&str] = &[{}];\n",
         lang_list.join(", ")
@@ -69,7 +65,12 @@ fn main() {
 }
 
 /// 递归展平 JSON。仅当叶子为字符串时收录。
-fn flatten(lang: &str, prefix: &str, value: &serde_json::Value, out: &mut Vec<(String, String, String)>) {
+fn flatten(
+    lang: &str,
+    prefix: &str,
+    value: &serde_json::Value,
+    out: &mut Vec<(String, String, String)>,
+) {
     match value {
         serde_json::Value::Object(map) => {
             for (key, v) in map {

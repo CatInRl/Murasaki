@@ -28,7 +28,11 @@ describe("对话框系统", () => {
   });
 
   beforeEach(async () => {
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
     // 确保队列清空
     await browser.execute(() => {
       // @ts-ignore
@@ -55,13 +59,16 @@ describe("对话框系统", () => {
     await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 通过 store 状态验证对话框已入队（比 DOM 文本更可靠，Transition 可能延迟文本渲染）
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        const cur = window.__pinia__._s.get("dialog").current;
-        return cur !== null && cur.message === "测试提示";
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          const cur = window.__pinia__._s.get("dialog").current;
+          return cur !== null && cur.message === "测试提示";
+        });
+      },
+      { timeout: 5000 }
+    );
 
     // 等待 DOM 渲染稳定后验证文本
     await browser.pause(200);
@@ -72,12 +79,15 @@ describe("对话框系统", () => {
     await confirmBtn.click();
 
     // 通过 store 状态判断对话框已关闭（Vue Transition 可能使 DOM 元素延迟消失）
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("dialog").current === null;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("dialog").current === null;
+        });
+      },
+      { timeout: 5000 }
+    );
 
     const result = await browser.execute(() => {
       // @ts-ignore
@@ -105,12 +115,15 @@ describe("对话框系统", () => {
     await confirmBtn.click();
 
     // 通过 store 状态判断对话框已关闭
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("dialog").current === null;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("dialog").current === null;
+        });
+      },
+      { timeout: 5000 }
+    );
 
     const result = await browser.execute(() => {
       // @ts-ignore
@@ -138,12 +151,15 @@ describe("对话框系统", () => {
     await cancelBtn.click();
 
     // 通过 store 状态判断对话框已关闭
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("dialog").current === null;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("dialog").current === null;
+        });
+      },
+      { timeout: 5000 }
+    );
 
     const result = await browser.execute(() => {
       // @ts-ignore
@@ -203,12 +219,15 @@ describe("对话框系统", () => {
     await browser.keys(["Escape"]);
 
     // 通过 store 状态判断对话框已关闭
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("dialog").current === null;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("dialog").current === null;
+        });
+      },
+      { timeout: 5000 }
+    );
 
     const result = await browser.execute(() => {
       // @ts-ignore
@@ -236,12 +255,15 @@ describe("对话框系统", () => {
     await overwriteBtn.click();
 
     // 通过 store 状态判断对话框已关闭
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("dialog").current === null;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("dialog").current === null;
+        });
+      },
+      { timeout: 5000 }
+    );
 
     const result = await browser.execute(() => {
       // @ts-ignore
@@ -270,12 +292,15 @@ describe("对话框系统", () => {
     await saveBtn.click();
 
     // 通过 store 状态判断对话框已关闭
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("dialog").current === null;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("dialog").current === null;
+        });
+      },
+      { timeout: 5000 }
+    );
 
     const result = await browser.execute(() => {
       // @ts-ignore
@@ -304,13 +329,16 @@ describe("对话框系统", () => {
 
     // 先等第一个对话框成为 store 的 current（与文件内其它用例一致，
     // 用 store 状态判定比在 Transition 未完成时读 DOM 文本可靠）
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        const cur = window.__pinia__._s.get("dialog").current;
-        return cur !== null && cur.message === "第一个";
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          const cur = window.__pinia__._s.get("dialog").current;
+          return cur !== null && cur.message === "第一个";
+        });
+      },
+      { timeout: 5000 }
+    );
 
     // 第一个对话框应显示「第一个」：readText 每次重新查询选择器并轮询到确切文案，
     // 同时消掉「读到过渡中的空串」与「读太早读到旧文案」两类失败
@@ -321,27 +349,33 @@ describe("对话框系统", () => {
     await confirmBtn.click();
 
     // 等待第二个对话框变为当前（store 状态变化）
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        const cur = window.__pinia__._s.get("dialog").current;
-        return cur !== null && cur.message === "第二个";
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore
+          const cur = window.__pinia__._s.get("dialog").current;
+          return cur !== null && cur.message === "第二个";
+        });
+      },
+      { timeout: 5000 }
+    );
 
     // 确认第二个
     const confirmBtn2 = await browser.$(".dialog-footer .dialog-btn.primary");
     await confirmBtn2.click();
 
     // 两个都应 resolved
-    await browser.waitUntil(async () => {
-      const r = await browser.execute(() => ({
-        // @ts-ignore
-        d1: window.__d1,
-        // @ts-ignore
-        d2: window.__d2,
-      }));
-      return r.d1 === "resolved" && r.d2 === "resolved";
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        const r = await browser.execute(() => ({
+          // @ts-ignore
+          d1: window.__d1,
+          // @ts-ignore
+          d2: window.__d2,
+        }));
+        return r.d1 === "resolved" && r.d2 === "resolved";
+      },
+      { timeout: 5000 }
+    );
   });
 });

@@ -41,11 +41,19 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
+          node-version: "lts/*"
+          cache: "npm"
 
       - name: 安装 npm 依赖
         run: npm ci
+
+      # 静态质量门禁（#443）：ESLint 与 Prettier 不再只靠人眼
+      - name: 静态检查（ESLint + Prettier）
+        run: npm run lint && npm run format:check
+
+      # e2e 有 1.6 万行 TypeScript，此前完全不进类型检查
+      - name: e2e 类型检查
+        run: npm run typecheck:e2e
 
       - name: 单元测试
         run: npm test
@@ -63,8 +71,8 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
+          node-version: "lts/*"
+          cache: "npm"
 
       - name: 安装 Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -86,6 +94,13 @@ jobs:
         env:
           TAURI_ENV_PLATFORM: windows
 
+      # 静态质量门禁（#443）
+      - name: Rust 格式检查
+        run: cd src-tauri && cargo fmt --check
+
+      - name: Rust Clippy
+        run: cd src-tauri && cargo clippy --all-targets -- -D warnings
+
       - name: Rust 测试
         run: npm run test:rust
 
@@ -100,8 +115,8 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
+          node-version: "lts/*"
+          cache: "npm"
 
       - name: 安装 Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -158,8 +173,8 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
+          node-version: "lts/*"
+          cache: "npm"
 
       - name: 安装 Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -203,7 +218,7 @@ jobs:
         run: xvfb-run -a --server-args="-screen 0 1280x1024x24" npm run test:e2e
         env:
           TMPDIR: ${{ runner.temp }}
-          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
+          WEBKIT_DISABLE_DMABUF_RENDERER: "1"
 
       # 失败时留诊断日志（与 Windows job 同名文件，artifact 名必须不同）
       - name: 上传失败诊断日志
@@ -225,8 +240,8 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
+          node-version: "lts/*"
+          cache: "npm"
 
       - name: 安装 Rust stable
         uses: dtolnay/rust-toolchain@stable

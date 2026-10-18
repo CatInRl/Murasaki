@@ -41,19 +41,16 @@ let wsPath: string;
 
 /** 设置图片插入方式 + 默认图片目录（保证用例不受前序 spec 残留设置影响） */
 async function setImageSettings(b: Browser, mode: "file" | "base64"): Promise<void> {
-  await b.executeAsync(
-    (m: string, done: (r: unknown) => void) => {
-      // @ts-ignore
-      const persistence = window.__pinia__._s.get("persistence");
-      Promise.resolve(
-        persistence.updateSettings({ imageInsertMode: m, defaultImageDir: "assets/images" })
-      ).then(
-        () => done(null),
-        (err: unknown) => done(String(err))
-      );
-    },
-    mode
-  );
+  await b.executeAsync((m: string, done: (r: unknown) => void) => {
+    // @ts-ignore
+    const persistence = window.__pinia__._s.get("persistence");
+    Promise.resolve(
+      persistence.updateSettings({ imageInsertMode: m, defaultImageDir: "assets/images" })
+    ).then(
+      () => done(null),
+      (err: unknown) => done(String(err))
+    );
+  }, mode);
   await b.pause(200);
 }
 
@@ -66,13 +63,15 @@ async function dropImagePaths(
   const res = (await b.executeAsync(
     (ps: string[], pos: { x: number; y: number }, done: (r: unknown) => void) => {
       // @ts-ignore 应用内部 WebView，仅应用代码可访问
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "tauri://drag-drop",
-        payload: { paths: ps, position: pos },
-      }).then(
-        () => done({ ok: true }),
-        (err: unknown) => done({ error: String(err) })
-      );
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "tauri://drag-drop",
+          payload: { paths: ps, position: pos },
+        })
+        .then(
+          () => done({ ok: true }),
+          (err: unknown) => done({ error: String(err) })
+        );
     },
     paths,
     position
@@ -146,7 +145,10 @@ describe("外部拖入图片（Tauri 原生 drag-drop，issue #288）", () => {
     await setImageSettings(browser, "file");
     await openIntro();
 
-    const img = writeSourceImage("source.png", [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+    const img = writeSourceImage(
+      "source.png",
+      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]
+    );
     await dropImagePaths(browser, [img], { x: 300, y: 300 });
 
     // 等引用出现：相对路径（非 data URI）

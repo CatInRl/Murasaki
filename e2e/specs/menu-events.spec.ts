@@ -21,7 +21,7 @@ import {
   emitMenuEvent,
   waitForPinia,
   ensureSplitMode,
-  resetPersistenceSettings
+  resetPersistenceSettings,
 } from "../helpers/store";
 import { waitForPresent } from "../helpers/wait";
 
@@ -94,10 +94,9 @@ describe("菜单事件链", () => {
       const ws = resetWorkspace(defaultFixtureFiles());
       await openFileInTab(browser, `${ws}/intro.md`);
       await openFileInTab(browser, `${ws}/notes.md`);
-      await browser.waitUntil(
-        async () => (await getTabsState(browser)).tabs.length >= 2,
-        { timeout: 5000 }
-      );
+      await browser.waitUntil(async () => (await getTabsState(browser)).tabs.length >= 2, {
+        timeout: 5000,
+      });
       const before = (await getTabsState(browser)).tabs.length;
 
       await emitMenuEvent(browser, "close-tab");
@@ -172,7 +171,9 @@ describe("菜单事件链", () => {
           try {
             // @ts-ignore
             window.__TAURI_INTERNALS__.invoke("plugin:window|close", { label: "settings" });
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
           done(null);
         });
         await browser.pause(500);

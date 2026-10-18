@@ -36,13 +36,7 @@ export type DecorationUpdatePlan =
   | ({ kind: "window" } & TextRange);
 
 /** 需要整块重算的块级节点（进出时整块的标记都要切换 dim / hide）。 */
-const WHOLE_BLOCK_NODES = new Set([
-  "FencedCode",
-  "CodeBlock",
-  "HTMLBlock",
-  "Table",
-  "Blockquote",
-]);
+const WHOLE_BLOCK_NODES = new Set(["FencedCode", "CodeBlock", "HTMLBlock", "Table", "Blockquote"]);
 
 /**
  * 光标所在行范围。非空选区返回 null —— 选区变化会改变块级 widget 的选中叠加，

@@ -18,7 +18,7 @@ import {
   getTabsState,
   waitForPinia,
   resetPersistenceSettings,
-  dismissAllDialogs
+  dismissAllDialogs,
 } from "../helpers/store";
 import { isRendered, readText, waitForPresent, waitForAbsent } from "../helpers/wait";
 
@@ -129,13 +129,12 @@ describe("多 Tab 管理", () => {
     await openFileInTab(browser, `${ws}/intro.md`);
     await openFileInTab(browser, `${ws}/notes.md`);
 
-    await browser.waitUntil(
-      async () => (await getTabsState(browser)).tabs.length >= 2,
-      { timeout: 5000 }
-    );
+    await browser.waitUntil(async () => (await getTabsState(browser)).tabs.length >= 2, {
+      timeout: 5000,
+    });
 
     const state = await getTabsState(browser);
-    const titles = state.tabs.map(t => t.title);
+    const titles = state.tabs.map((t) => t.title);
     expect(titles).toEqual(expect.arrayContaining(["intro.md", "notes.md"]));
   });
 
@@ -157,17 +156,16 @@ describe("多 Tab 管理", () => {
     await openFileInTab(browser, `${ws}/notes.md`);
 
     // 等待两个 tab 都出现
-    await browser.waitUntil(
-      async () => (await getTabsState(browser)).tabs.length >= 2,
-      { timeout: 5000 }
-    );
+    await browser.waitUntil(async () => (await getTabsState(browser)).tabs.length >= 2, {
+      timeout: 5000,
+    });
 
     // 点击 intro.md tab
     await clickWithOverlayGuard(".tab-title=intro.md");
 
     // activeTabId 应对应 intro.md 的 tab
     const state = await getTabsState(browser);
-    const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+    const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
     expect(activeTab?.title).toBe("intro.md");
 
     // 视觉上：.active class 应该在 intro.md tab 上
@@ -179,19 +177,17 @@ describe("多 Tab 管理", () => {
     await openFileInTab(browser, `${ws}/intro.md`);
     await openFileInTab(browser, `${ws}/notes.md`);
 
-    await browser.waitUntil(
-      async () => (await getTabsState(browser)).tabs.length >= 2,
-      { timeout: 5000 }
-    );
+    await browser.waitUntil(async () => (await getTabsState(browser)).tabs.length >= 2, {
+      timeout: 5000,
+    });
     const before = (await getTabsState(browser)).tabs.length;
 
     // 关闭 intro.md tab（第一个 .close-btn）
     await clickWithOverlayGuard(".tab-bar-container .tab-item .close-btn");
 
-    await browser.waitUntil(
-      async () => (await getTabsState(browser)).tabs.length === before - 1,
-      { timeout: 5000 }
-    );
+    await browser.waitUntil(async () => (await getTabsState(browser)).tabs.length === before - 1, {
+      timeout: 5000,
+    });
   });
 
   it("修改内容后 Tab 显示 dirty 标记", async () => {
@@ -213,14 +209,12 @@ describe("多 Tab 管理", () => {
 
     // store 中 isDirty 应为 true
     const state = await getTabsState(browser);
-    const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+    const activeTab = state.tabs.find((t) => t.id === state.activeTabId);
     expect(activeTab?.isDirty).toBe(true);
   });
 
   it("撤销到原始内容后 dirty 标记清除", async () => {
-    const wsPath = resetWorkspace([
-      { path: "undo-test.md", content: "# 标题\n\n正文\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "undo-test.md", content: "# 标题\n\n正文\n" }]);
     await openFileInTab(browser, `${wsPath}\\undo-test.md`);
 
     // 等待编辑器加载（CodeMirror 6 的 .cm-content）
@@ -241,14 +235,17 @@ describe("多 Tab 管理", () => {
     });
 
     // 等待 store 同步（CodeMirror updateListener 异步触发 updateContent）
-    await browser.waitUntil(async () => {
-      const isDirty = await browser.execute(() => {
-        // @ts-ignore
-        const tabs = window.__pinia__._s.get("tabs");
-        return tabs.activeTab?.isDirty;
-      });
-      return isDirty === true;
-    }, { timeout: 3000, timeoutMsg: "输入后 dirty 标记未出现" });
+    await browser.waitUntil(
+      async () => {
+        const isDirty = await browser.execute(() => {
+          // @ts-ignore
+          const tabs = window.__pinia__._s.get("tabs");
+          return tabs.activeTab?.isDirty;
+        });
+        return isDirty === true;
+      },
+      { timeout: 3000, timeoutMsg: "输入后 dirty 标记未出现" }
+    );
 
     // 验证 dirty 标记存在
     let isDirty = await browser.execute(() => {
@@ -263,19 +260,26 @@ describe("多 Tab 管理", () => {
       // @ts-ignore
       if (!window.__editorRef__?.undo) return done("no undo");
       // @ts-ignore
-      try { window.__editorRef__.undo(); done(null); }
-      catch (e) { done(String(e)); }
+      try {
+        window.__editorRef__.undo();
+        done(null);
+      } catch (e) {
+        done(String(e));
+      }
     });
 
     // 等待 store 同步（undo 触发 updateListener → updateContent → 与 savedContent 对比）
-    await browser.waitUntil(async () => {
-      const isDirty = await browser.execute(() => {
-        // @ts-ignore
-        const tabs = window.__pinia__._s.get("tabs");
-        return tabs.activeTab?.isDirty;
-      });
-      return isDirty === false;
-    }, { timeout: 3000, timeoutMsg: "撤销后 dirty 标记未清除" });
+    await browser.waitUntil(
+      async () => {
+        const isDirty = await browser.execute(() => {
+          // @ts-ignore
+          const tabs = window.__pinia__._s.get("tabs");
+          return tabs.activeTab?.isDirty;
+        });
+        return isDirty === false;
+      },
+      { timeout: 3000, timeoutMsg: "撤销后 dirty 标记未清除" }
+    );
 
     // 验证 dirty 标记消失
     isDirty = await browser.execute(() => {

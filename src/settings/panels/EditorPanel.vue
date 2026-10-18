@@ -42,15 +42,15 @@ function stepFontSize(delta: number): void {
 
 <template>
   <div>
-    <h1 class="settings-page-title">{{ $t('settings.editor.title') }}</h1>
+    <h1 class="settings-page-title">{{ $t("settings.editor.title") }}</h1>
 
     <!-- 编辑器显示 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">{{ $t('settings.editor.display') }}</h2>
+      <h2 class="settings-section-title">{{ $t("settings.editor.display") }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.editor.showLineNumbers') }}</span>
-          <span class="setting-description">{{ $t('settings.editor.showLineNumbersDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.editor.showLineNumbers") }}</span>
+          <span class="setting-description">{{ $t("settings.editor.showLineNumbersDesc") }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">
@@ -66,8 +66,8 @@ function stepFontSize(delta: number): void {
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.editor.softWrap') }}</span>
-          <span class="setting-description">{{ $t('settings.editor.softWrapDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.editor.softWrap") }}</span>
+          <span class="setting-description">{{ $t("settings.editor.softWrapDesc") }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">
@@ -83,11 +83,15 @@ function stepFontSize(delta: number): void {
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.editor.entryOverflow') }}</span>
-          <span class="setting-description">{{ $t('settings.editor.entryOverflowDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.editor.entryOverflow") }}</span>
+          <span class="setting-description">{{ $t("settings.editor.entryOverflowDesc") }}</span>
         </div>
         <div class="setting-control-column">
-          <div class="segmented-control" role="radiogroup" :aria-label="$t('settings.editor.entryOverflow')">
+          <div
+            class="segmented-control"
+            role="radiogroup"
+            :aria-label="$t('settings.editor.entryOverflow')"
+          >
             <button
               v-for="opt in [
                 { v: 'hover', l: $t('settings.editor.entryOverflowHover') },
@@ -107,12 +111,14 @@ function stepFontSize(delta: number): void {
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.editor.fontSize') }}</span>
-          <span class="setting-description">{{ $t('settings.editor.fontSizeDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.editor.fontSize") }}</span>
+          <span class="setting-description">{{ $t("settings.editor.fontSizeDesc") }}</span>
         </div>
         <div class="setting-control-column">
           <div class="number-stepper">
-            <button class="stepper-btn" type="button" aria-label="−" @click="stepFontSize(-1)">−</button>
+            <button class="stepper-btn" type="button" aria-label="−" @click="stepFontSize(-1)">
+              −
+            </button>
             <input
               class="stepper-input"
               type="number"
@@ -121,25 +127,37 @@ function stepFontSize(delta: number): void {
               :value="draft.editorFontSize"
               @input="patch('editorFontSize', Number(($event.target as HTMLInputElement).value))"
             />
-            <button class="stepper-btn" type="button" aria-label="+" @click="stepFontSize(1)">+</button>
+            <button class="stepper-btn" type="button" aria-label="+" @click="stepFontSize(1)">
+              +
+            </button>
           </div>
         </div>
       </div>
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.editor.lineHeight') }}</span>
-          <span class="setting-description">{{ $t('settings.editor.lineHeightDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.editor.lineHeight") }}</span>
+          <span class="setting-description">{{ $t("settings.editor.lineHeightDesc") }}</span>
         </div>
         <div class="setting-control-column">
           <div class="select-wrapper">
             <select
               :value="draft.editorLineHeight"
-              @change="patch('editorLineHeight', Number(($event.target as HTMLSelectElement).value))"
+              @change="
+                patch('editorLineHeight', Number(($event.target as HTMLSelectElement).value))
+              "
             >
               <option v-for="lh in LINE_HEIGHTS" :key="lh" :value="lh">{{ lh }}</option>
             </select>
-            <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              class="select-chevron"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
@@ -148,11 +166,15 @@ function stepFontSize(delta: number): void {
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.editor.fontPreset') }}</span>
-          <span class="setting-description">{{ $t('settings.editor.fontPresetDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.editor.fontPreset") }}</span>
+          <span class="setting-description">{{ $t("settings.editor.fontPresetDesc") }}</span>
         </div>
         <div class="setting-control-column">
-          <div class="font-preset-grid" role="radiogroup" :aria-label="$t('settings.editor.fontPreset')">
+          <div
+            class="font-preset-grid"
+            role="radiogroup"
+            :aria-label="$t('settings.editor.fontPreset')"
+          >
             <button
               v-for="p in FONT_PRESET_OPTIONS"
               :key="p.value"
@@ -173,8 +195,8 @@ function stepFontSize(delta: number): void {
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.editor.fontFamily') }}</span>
-          <span class="setting-description">{{ $t('settings.editor.fontFamilyDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.editor.fontFamily") }}</span>
+          <span class="setting-description">{{ $t("settings.editor.fontFamilyDesc") }}</span>
         </div>
         <div class="setting-control-column">
           <div class="select-wrapper">
@@ -184,7 +206,15 @@ function stepFontSize(delta: number): void {
             >
               <option v-for="ff in FONT_FAMILIES" :key="ff" :value="ff">{{ ff }}</option>
             </select>
-            <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              class="select-chevron"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
@@ -192,8 +222,10 @@ function stepFontSize(delta: number): void {
       </div>
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.editor.fullwidthToMarkdown') }}</span>
-          <span class="setting-description">{{ $t('settings.editor.fullwidthToMarkdownDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.editor.fullwidthToMarkdown") }}</span>
+          <span class="setting-description">{{
+            $t("settings.editor.fullwidthToMarkdownDesc")
+          }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">
@@ -212,16 +244,24 @@ function stepFontSize(delta: number): void {
         <table>
           <thead>
             <tr>
-              <th>{{ $t('settings.editor.fullwidthToMarkdownTableInput') }}</th>
-              <th>{{ $t('settings.editor.fullwidthToMarkdownTableOutput') }}</th>
-              <th v-if="FULLWIDTH_TO_MARKDOWN_MAPPINGS.some(m => m.note)">{{ $t('settings.editor.fullwidthToMarkdownTableNote') }}</th>
+              <th>{{ $t("settings.editor.fullwidthToMarkdownTableInput") }}</th>
+              <th>{{ $t("settings.editor.fullwidthToMarkdownTableOutput") }}</th>
+              <th v-if="FULLWIDTH_TO_MARKDOWN_MAPPINGS.some((m) => m.note)">
+                {{ $t("settings.editor.fullwidthToMarkdownTableNote") }}
+              </th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="m in FULLWIDTH_TO_MARKDOWN_MAPPINGS" :key="m.input">
-              <td><code>{{ m.input }}</code></td>
-              <td><code>{{ m.output }}</code></td>
-              <td v-if="FULLWIDTH_TO_MARKDOWN_MAPPINGS.some(mm => mm.note)">{{ m.note ?? "" }}</td>
+              <td>
+                <code>{{ m.input }}</code>
+              </td>
+              <td>
+                <code>{{ m.output }}</code>
+              </td>
+              <td v-if="FULLWIDTH_TO_MARKDOWN_MAPPINGS.some((mm) => mm.note)">
+                {{ m.note ?? "" }}
+              </td>
             </tr>
           </tbody>
         </table>

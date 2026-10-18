@@ -52,9 +52,7 @@ export function stepPresentationZoom(current: number, direction: 1 | -1): number
  * @param percent 缩放百分比（100 = 不缩放，此时不产出样式）
  * @returns 行内样式；无 zoom 需要时返回 undefined
  */
-export function presentationZoomStyle(
-  percent: number
-): Record<string, string> | undefined {
+export function presentationZoomStyle(percent: number): Record<string, string> | undefined {
   const z = percent / 100;
   if (!Number.isFinite(z) || z === 1) return undefined;
   return { zoom: String(z) };

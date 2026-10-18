@@ -175,14 +175,15 @@ describe("持久化恢复", () => {
 
     // 通过 Tauri 命令写入草稿（模拟关闭未保存 tab 时保存草稿）
     const draftContent = "# 这是未保存的草稿内容\n\n不应丢失。\n";
-    const draftResult = await browser.executeAsync(
+    const draftResult = await browser.executeAsync<unknown, [string, string, number]>(
       (path: string, content: string, mt: number, done: (res: unknown) => void) => {
         // @ts-ignore
-        window.__TAURI_INTERNALS__.invoke("save_draft", {
-          path,
-          content,
-          knownMtime: mt,
-        })
+        window.__TAURI_INTERNALS__
+          .invoke("save_draft", {
+            path,
+            content,
+            knownMtime: mt,
+          })
           .then(() => done({ ok: true }))
           .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
       },
@@ -195,7 +196,8 @@ describe("持久化恢复", () => {
     // 验证草稿存在
     const exists = await browser.executeAsync((path: string, done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("draft_exists", { path })
+      window.__TAURI_INTERNALS__
+        .invoke("draft_exists", { path })
         .then((r: boolean) => done({ ok: true, exists: r }))
         .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
     }, introPath);
@@ -220,7 +222,8 @@ describe("持久化恢复", () => {
     // 清理草稿
     await browser.executeAsync((path: string, done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("delete_draft", { path })
+      window.__TAURI_INTERNALS__
+        .invoke("delete_draft", { path })
         .then(() => done(null))
         .catch((err: unknown) => done(err ? String(err) : null));
     }, introPath);
@@ -244,10 +247,11 @@ describe("持久化恢复", () => {
 
     // 写入草稿（knownMtime = originalMtime）
     const draftContent = "# 草稿内容\n";
-    await browser.executeAsync(
+    await browser.executeAsync<unknown, [string, string, number]>(
       (p: string, c: string, mt: number, done: (res: unknown) => void) => {
         // @ts-ignore
-        window.__TAURI_INTERNALS__.invoke("save_draft", { path: p, content: c, knownMtime: mt })
+        window.__TAURI_INTERNALS__
+          .invoke("save_draft", { path: p, content: c, knownMtime: mt })
           .then(() => done(null))
           .catch((err: unknown) => done(err ? String(err) : null));
       },
@@ -287,7 +291,8 @@ describe("持久化恢复", () => {
     // 草稿应已被清理
     const draftExists = await browser.executeAsync((p: string, done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("draft_exists", { path: p })
+      window.__TAURI_INTERNALS__
+        .invoke("draft_exists", { path: p })
         .then((r: boolean) => done({ exists: r }))
         .catch((err: unknown) => done({ error: err ? String(err) : null }));
     }, path);
@@ -313,7 +318,8 @@ describe("持久化恢复", () => {
     await browser.executeAsync(
       (p: string, c: string, mt: number, done: (res: unknown) => void) => {
         // @ts-ignore
-        window.__TAURI_INTERNALS__.invoke("save_draft", { path: p, content: c, knownMtime: mt })
+        window.__TAURI_INTERNALS__
+          .invoke("save_draft", { path: p, content: c, knownMtime: mt })
           .then(() => done(null))
           .catch((err: unknown) => done(err ? String(err) : null));
       },
@@ -345,12 +351,15 @@ describe("持久化恢复", () => {
     await browser.executeAsync((done) => {
       // @ts-ignore
       const tabs = window.__pinia__._s.get("tabs");
-      Promise.resolve(tabs.doCloseTab(tabs.activeTabId))
-        .then(() => done(null), (e: unknown) => done(String(e)));
+      Promise.resolve(tabs.doCloseTab(tabs.activeTabId)).then(
+        () => done(null),
+        (e: unknown) => done(String(e))
+      );
     });
     await browser.executeAsync((p: string, done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("delete_draft", { path: p })
+      window.__TAURI_INTERNALS__
+        .invoke("delete_draft", { path: p })
         .then(() => done(null))
         .catch((err: unknown) => done(err ? String(err) : null));
     }, path);

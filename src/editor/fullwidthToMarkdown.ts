@@ -11,11 +11,7 @@
  * 实现方式：CM6 输入层统一实现（源码/WYSIWYG 共用同一编辑器实例），
  * 通过 transactionFilter 在"键入空格"的事务上叠加转换，合并为一个撤销步。
  */
-import {
-  EditorState,
-  Transaction,
-  type Extension,
-} from "@codemirror/state";
+import { EditorState, Transaction, type Extension } from "@codemirror/state";
 import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 
 /** 映射表条目（固定内置，设置面板只读展示用） */
@@ -45,9 +41,9 @@ export const FULLWIDTH_TO_MARKDOWN_MAPPINGS: FullwidthToMarkdownMapping[] = [
 ];
 
 /** 按 input 长度降序的规则表（多字符规则优先，如 `···` 优先于 `·`） */
-const RULES_BY_LENGTH: FullwidthToMarkdownMapping[] = [
-  ...FULLWIDTH_TO_MARKDOWN_MAPPINGS,
-].sort((a, b) => b.input.length - a.input.length);
+const RULES_BY_LENGTH: FullwidthToMarkdownMapping[] = [...FULLWIDTH_TO_MARKDOWN_MAPPINGS].sort(
+  (a, b) => b.input.length - a.input.length
+);
 
 /** 行首转换结果（行内字符偏移） */
 export interface LineStartSymbolConversion {
@@ -105,11 +101,7 @@ export function convertLineStartSymbol(
  * @param pos    符号串起点（绝对坐标）
  * @param output 转换后的 Markdown 记号（如 ```）
  */
-function isBlockedByCodeRange(
-  state: EditorState,
-  pos: number,
-  output: string
-): boolean {
+function isBlockedByCodeRange(state: EditorState, pos: number, output: string): boolean {
   const tree = ensureSyntaxTree(state, pos + 1) ?? syntaxTree(state);
   let inside: string | null = null;
   tree.iterate({
@@ -117,9 +109,7 @@ function isBlockedByCodeRange(
       if (inside || ref.to <= pos) return false;
       if (
         ref.from <= pos &&
-        (ref.name === "FencedCode" ||
-          ref.name === "CodeBlock" ||
-          ref.name === "InlineCode")
+        (ref.name === "FencedCode" || ref.name === "CodeBlock" || ref.name === "InlineCode")
       ) {
         inside = ref.name;
         return false;

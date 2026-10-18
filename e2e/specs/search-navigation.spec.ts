@@ -81,27 +81,30 @@ describe("跨文件搜索结果跳转", () => {
       search.setOptions({ regex: false, caseSensitive: false, wholeWord: false });
       search.setQuery("abc123");
       Promise.resolve(search.search())
-        .then(() => done({
-          ok: true,
-          resultsCount: search.results.length,
-          results: search.results.map((r: any) => ({
-            filePath: r.filePath,
-            firstLine: r.matches?.[0]?.lineNumber ?? null,
-            preview: r.matches?.[0]?.lineContent?.substring(0, 50) ?? "",
-          })),
-        }))
+        .then(() =>
+          done({
+            ok: true,
+            resultsCount: search.results.length,
+            results: search.results.map((r: any) => ({
+              filePath: r.filePath,
+              firstLine: r.matches?.[0]?.lineNumber ?? null,
+              preview: r.matches?.[0]?.lineContent?.substring(0, 50) ?? "",
+            })),
+          })
+        )
         .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
     });
 
     expect(result as any).toMatchObject({ ok: true });
     // abc123 应在 file-a.md 和 sub/file-c.md 中找到
     expect((result as any).resultsCount).toBeGreaterThanOrEqual(2);
-    const filePaths = (result as any).results
-      .map((r: any) => r.filePath.replace(/\\/g, "/"));
-    expect(filePaths).toEqual(expect.arrayContaining([
-      resolve(wsPath, "file-a.md").replace(/\\/g, "/"),
-      resolve(wsPath, "sub/file-c.md").replace(/\\/g, "/"),
-    ]));
+    const filePaths = (result as any).results.map((r: any) => r.filePath.replace(/\\/g, "/"));
+    expect(filePaths).toEqual(
+      expect.arrayContaining([
+        resolve(wsPath, "file-a.md").replace(/\\/g, "/"),
+        resolve(wsPath, "sub/file-c.md").replace(/\\/g, "/"),
+      ])
+    );
   });
 
   it("点击搜索结果打开对应文件到新 tab", async () => {
@@ -205,10 +208,12 @@ describe("跨文件搜索结果跳转", () => {
       search.setOptions({ regex: true, caseSensitive: false, wholeWord: false });
       search.setQuery("abc\\d+"); // 匹配 abc123
       Promise.resolve(search.search())
-        .then(() => done({
-          ok: true,
-          count: search.results.length,
-        }))
+        .then(() =>
+          done({
+            ok: true,
+            count: search.results.length,
+          })
+        )
         .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
     });
 
@@ -240,8 +245,6 @@ describe("跨文件搜索结果跳转", () => {
     const texts = await items.map((i) => textOfElement(browser, i));
     // 条目渲染为「图标字形 + 文件名分段」多行文本（实测形如 "M\nfile-b\n.md"），
     // 直接 includes("file-b.md") 会被换行卡住，故先去掉所有空白再比对
-    expect(
-      texts.some((t) => t.replace(/\s/g, "").includes("file-b.md"))
-    ).toBe(true);
+    expect(texts.some((t) => t.replace(/\s/g, "").includes("file-b.md"))).toBe(true);
   });
 });

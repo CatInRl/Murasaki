@@ -15,7 +15,13 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia } from "../helpers/store";
+import {
+  openWorkspace,
+  closeWorkspace,
+  openFileInTab,
+  closeAllTabs,
+  waitForPinia,
+} from "../helpers/store";
 import { waitForPresent } from "../helpers/wait";
 
 let browser: Browser;
@@ -31,14 +37,20 @@ describe("编辑器工具栏", () => {
   });
 
   beforeEach(async () => {
-    try { await closeAllTabs(browser); } catch { /* ignore */ }
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await closeAllTabs(browser);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
   });
 
   it("工具栏渲染格式化按钮", async () => {
-    const wsPath = resetWorkspace([
-      { path: "test.md", content: "# 测试\n\n正文。\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "test.md", content: "# 测试\n\n正文。\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\test.md`);
 
@@ -50,9 +62,7 @@ describe("编辑器工具栏", () => {
   });
 
   it("Bold 按钮插入 ** 标记", async () => {
-    const wsPath = resetWorkspace([
-      { path: "bold.md", content: "正文内容\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "bold.md", content: "正文内容\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\bold.md`);
 
@@ -86,9 +96,7 @@ describe("编辑器工具栏", () => {
   });
 
   it("Italic 按钮插入 * 标记", async () => {
-    const wsPath = resetWorkspace([
-      { path: "italic.md", content: "正文内容\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "italic.md", content: "正文内容\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\italic.md`);
 
@@ -120,9 +128,7 @@ describe("编辑器工具栏", () => {
   });
 
   it("标题按钮切换标题级别", async () => {
-    const wsPath = resetWorkspace([
-      { path: "heading.md", content: "正文\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "heading.md", content: "正文\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\heading.md`);
 
@@ -155,9 +161,7 @@ describe("编辑器工具栏", () => {
   });
 
   it("无序列表按钮插入 - 标记", async () => {
-    const wsPath = resetWorkspace([
-      { path: "list.md", content: "列表项\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "list.md", content: "列表项\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\list.md`);
 
@@ -188,9 +192,7 @@ describe("编辑器工具栏", () => {
   });
 
   it("工具栏按钮 title 属性正确", async () => {
-    const wsPath = resetWorkspace([
-      { path: "titles.md", content: "# 测试\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "titles.md", content: "# 测试\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\titles.md`);
 
@@ -199,7 +201,9 @@ describe("编辑器工具栏", () => {
     // 收集所有按钮的 title
     const titles = await browser.execute(() => {
       const btns = document.querySelectorAll(".editor-toolbar .tb-btn");
-      return Array.from(btns).map((b) => b.getAttribute("title")).filter(Boolean);
+      return Array.from(btns)
+        .map((b) => b.getAttribute("title"))
+        .filter(Boolean);
     });
 
     expect(titles).toContain("加粗");

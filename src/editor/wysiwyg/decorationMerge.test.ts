@@ -9,9 +9,7 @@ import { mergeWindowDecorations } from "./decorationMerge";
  * 其余旧装饰原样保留。
  */
 function setOf(items: Array<[number, number, string]>): DecorationSet {
-  const ranges = items.map(([from, to, cls]) =>
-    Decoration.mark({ class: cls }).range(from, to)
-  );
+  const ranges = items.map(([from, to, cls]) => Decoration.mark({ class: cls }).range(from, to));
   return Decoration.set(ranges, true);
 }
 

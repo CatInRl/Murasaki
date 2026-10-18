@@ -72,9 +72,7 @@ async function focusedRow(b: Browser): Promise<{
 
 async function focusFirstRow(b: Browser): Promise<void> {
   const focused = await b.execute(() => {
-    const el = document.querySelector(
-      '[role="tree"] .node-row'
-    ) as HTMLElement | null;
+    const el = document.querySelector('[role="tree"] .node-row') as HTMLElement | null;
     if (!el) return false;
     el.focus();
     return true;
@@ -211,11 +209,11 @@ describe("文件树键盘导航", () => {
     }, dirIndex);
     await browser.pause(200);
 
-    const before = await browser.$$('[role="treeitem"]');
+    const before = (await browser.$$('[role="treeitem"]')) as unknown as WebdriverIO.ElementArray;
     await pressTreeKey(browser, "ArrowRight"); // 展开
     await browser.pause(300);
     await pressTreeKey(browser, "ArrowRight"); // 进入第一个子项
-    const after = await browser.$$('[role="treeitem"]');
+    const after = (await browser.$$('[role="treeitem"]')) as unknown as WebdriverIO.ElementArray;
     expect(after.length).toBeGreaterThan(before.length);
 
     const child = await focusedRow(browser);
@@ -241,10 +239,9 @@ describe("文件树键盘导航", () => {
     await browser.pause(200);
 
     await pressTreeKey(browser, "Enter");
-    await browser.waitUntil(
-      async () => (await getTabsState(browser)).tabs.length > 0,
-      { timeout: 10000 }
-    );
+    await browser.waitUntil(async () => (await getTabsState(browser)).tabs.length > 0, {
+      timeout: 10000,
+    });
   });
 
   it("Shift+F10 在焦点行弹出右键菜单", async () => {

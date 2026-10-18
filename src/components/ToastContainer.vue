@@ -13,15 +13,7 @@
  * - deleted 变体突出撤销 action
  */
 import { computed } from "vue";
-import {
-  CheckCircle2,
-  Info,
-  AlertTriangle,
-  XCircle,
-  Loader2,
-  Trash2,
-  X,
-} from "lucide-vue-next";
+import { CheckCircle2, Info, AlertTriangle, XCircle, Loader2, Trash2, X } from "lucide-vue-next";
 import { useToastStore, type ToastVariant } from "../stores/useToastStore";
 
 const toastStore = useToastStore();
@@ -57,7 +49,12 @@ function onAction(id: string, onClick: () => void): void {
 
 <template>
   <Teleport to="body">
-    <div class="toast-container" role="region" :aria-label="$t('common.toast.regionAriaLabel')" aria-live="polite">
+    <div
+      class="toast-container"
+      role="region"
+      :aria-label="$t('common.toast.regionAriaLabel')"
+      aria-live="polite"
+    >
       <transition-group name="toast">
         <div
           v-for="toast in toasts"
@@ -79,16 +76,15 @@ function onAction(id: string, onClick: () => void): void {
               {{ toast.description }}
             </div>
             <!-- 进度条（仅 progress 变体） -->
-            <div
-              v-if="toast.variant === 'progress'"
-              class="toast-progress-track"
-            >
+            <div v-if="toast.variant === 'progress'" class="toast-progress-track">
               <div
                 class="toast-progress-bar"
                 :class="{ indeterminate: toast.progress === undefined }"
-                :style="toast.progress === undefined
-                  ? undefined
-                  : { width: `${Math.max(0, Math.min(100, toast.progress))}%` }"
+                :style="
+                  toast.progress === undefined
+                    ? undefined
+                    : { width: `${Math.max(0, Math.min(100, toast.progress))}%` }
+                "
               />
             </div>
           </div>
@@ -156,8 +152,12 @@ function onAction(id: string, onClick: () => void): void {
 }
 
 @keyframes murasaki-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .toast-body {
@@ -203,8 +203,12 @@ function onAction(id: string, onClick: () => void): void {
 }
 
 @keyframes murasaki-indeterminate {
-  0% { margin-left: -40%; }
-  100% { margin-left: 100%; }
+  0% {
+    margin-left: -40%;
+  }
+  100% {
+    margin-left: 100%;
+  }
 }
 
 .toast-actions {
@@ -241,7 +245,8 @@ function onAction(id: string, onClick: () => void): void {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
     color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 
@@ -252,12 +257,14 @@ function onAction(id: string, onClick: () => void): void {
 
 /* transition-group 进入/离开动画 */
 .toast-enter-active {
-  transition: opacity var(--murasaki-duration-base) var(--murasaki-ease-out),
+  transition:
+    opacity var(--murasaki-duration-base) var(--murasaki-ease-out),
     transform var(--murasaki-duration-base) var(--murasaki-ease-out);
 }
 
 .toast-leave-active {
-  transition: opacity var(--murasaki-duration-fast) var(--murasaki-ease),
+  transition:
+    opacity var(--murasaki-duration-fast) var(--murasaki-ease),
     transform var(--murasaki-duration-fast) var(--murasaki-ease);
   position: absolute;
   right: 0;

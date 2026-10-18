@@ -178,7 +178,7 @@ async function createEmbeddedSession(): Promise<Browser> {
   const env = {
     ...process.env,
     TAURI_WEBDRIVER_PORT: String(EMBEDDED_DRIVER_PORT),
-    WDIO_EMBEDDED_SERVER: "true"
+    WDIO_EMBEDDED_SERVER: "true",
   };
 
   let lastError: unknown = null;
@@ -187,7 +187,7 @@ async function createEmbeddedSession(): Promise<Browser> {
     try {
       embeddedAppProcess = spawn(binary, [], {
         stdio: ["ignore", "pipe", "pipe"],
-        env
+        env,
       });
       embeddedAppProcess.stdout?.on("data", (d: Buffer) =>
         process.stdout.write(`[app] ${d.toString()}`)
@@ -211,7 +211,7 @@ async function createEmbeddedSession(): Promise<Browser> {
         port: EMBEDDED_DRIVER_PORT,
         protocol: "http",
         path: "/",
-        capabilities: { alwaysMatch: {} }
+        capabilities: { alwaysMatch: {} },
       } as any);
       // 同 #300：attach 不合并 remote() 默认配置，必须显式补 waitUntil 重试参数
       browser.options.waitforInterval = WAITFOR_INTERVAL;
@@ -255,10 +255,7 @@ async function createEmbeddedSession(): Promise<Browser> {
  * @param body 请求体：Windows/Linux 带 tauri:options.application（driver 负责拉起应用）；
  *              macOS 空 alwaysMatch（内嵌服务端不校验 capability，应用已由 harness 拉起）
  */
-function createSessionViaHttp(
-  port: number,
-  body: string
-): Promise<{ sessionId: string }> {
+function createSessionViaHttp(port: number, body: string): Promise<{ sessionId: string }> {
   return new Promise((resolve, reject) => {
     const req = http.request(
       {
@@ -268,8 +265,8 @@ function createSessionViaHttp(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(body)
-        }
+          "Content-Length": Buffer.byteLength(body),
+        },
       },
       (res) => {
         let data = "";
@@ -295,11 +292,9 @@ function createSessionViaHttp(
               return;
             }
             resolve({ sessionId });
-          } catch (e) {
+          } catch {
             reject(
-              new Error(
-                `Session creation failed: invalid JSON response\n${data.substring(0, 500)}`
-              )
+              new Error(`Session creation failed: invalid JSON response\n${data.substring(0, 500)}`)
             );
           }
         });
@@ -316,9 +311,7 @@ function createSessionViaHttp(
   });
 }
 
-export async function createSession(
-  _opts: CreateSessionOptions = {}
-): Promise<Browser> {
+export async function createSession(_opts: CreateSessionOptions = {}): Promise<Browser> {
   // macOS 走内嵌服务端：无 tauri-driver，应用由本文件 spawn
   if (IS_MACOS) return createEmbeddedSession();
 
@@ -351,9 +344,9 @@ export async function createSession(
         JSON.stringify({
           capabilities: {
             alwaysMatch: {
-              "tauri:options": { application: binary }
-            }
-          }
+              "tauri:options": { application: binary },
+            },
+          },
         })
       );
 
@@ -368,9 +361,9 @@ export async function createSession(
         path: "/",
         capabilities: {
           alwaysMatch: {
-            "tauri:options": { application: binary }
-          }
-        } as any
+            "tauri:options": { application: binary },
+          },
+        } as any,
       } as any);
 
       // 关键（#300）：补上 waitUntil 的重试间隔默认值。
@@ -513,7 +506,10 @@ export async function closeSession(browser: Browser): Promise<void> {
         rmSync(webviewDir, { recursive: true, force: true });
       } catch (err) {
         // 忽略：偶发 EPERM（WebView2 子进程残留句柄）
-        console.warn(`[driver] failed to clean EBWebView:`, err instanceof Error ? err.message : String(err));
+        console.warn(
+          `[driver] failed to clean EBWebView:`,
+          err instanceof Error ? err.message : String(err)
+        );
       }
     }
   }

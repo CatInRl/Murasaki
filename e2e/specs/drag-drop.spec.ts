@@ -45,10 +45,7 @@ let wsPath: string;
 let mainHandle: string;
 
 type DragEventName =
-  | "tauri://drag-enter"
-  | "tauri://drag-over"
-  | "tauri://drag-drop"
-  | "tauri://drag-leave";
+  "tauri://drag-enter" | "tauri://drag-over" | "tauri://drag-drop" | "tauri://drag-leave";
 
 /** 通过 Tauri 事件插件派发一个原生 drag-drop 事件（见文件头注释） */
 async function emitDragEvent(
@@ -206,10 +203,10 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await dropPaths(browser, [wsPath]);
 
     // 目录 → 走「打开文件夹」路径 → 新开窗口
-    await browser.waitUntil(
-      async () => (await browser.getWindowHandles()).length > before.length,
-      { timeout: 30000, interval: 500 }
-    );
+    await browser.waitUntil(async () => (await browser.getWindowHandles()).length > before.length, {
+      timeout: 30000,
+      interval: 500,
+    });
     const handles = await browser.getWindowHandles();
     const newHandle = handles.find((h) => !before.includes(h));
     expect(newHandle).toBeDefined();

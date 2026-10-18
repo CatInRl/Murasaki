@@ -8,11 +8,7 @@
  * - 修饰键顺序固定：Ctrl > Shift > Alt
  * - Ctrl 视为主修饰键：匹配 e.ctrlKey 或 e.metaKey（跨平台，macOS 上对应 Cmd）
  */
-import {
-  SHORTCUT_COMMANDS,
-  commandById,
-  type ShortcutCommand,
-} from "./shortcutRegistry";
+import { SHORTCUT_COMMANDS, commandById, type ShortcutCommand } from "./shortcutRegistry";
 import { isMac } from "../utils/platform";
 
 // ===== 键名规范化 =====
@@ -74,9 +70,16 @@ export function normalizeKeyName(key: string): string {
 
 /** 修饰键别名（统一小写后匹配） */
 const MOD_WORDS = [
-  "ctrl", "control", "cmd", "command", "meta", "win", "super",
+  "ctrl",
+  "control",
+  "cmd",
+  "command",
+  "meta",
+  "win",
+  "super",
   "shift",
-  "alt", "option",
+  "alt",
+  "option",
 ];
 
 /**
@@ -89,7 +92,10 @@ function splitHyphenatedToken(token: string): string[] {
   const modGroup = MOD_WORDS.join("|");
   const pattern = new RegExp(`^(${modGroup})(-(${modGroup}))*-.+$`);
   if (pattern.test(lower)) {
-    return token.split("-").map((s) => s.trim()).filter(Boolean);
+    return token
+      .split("-")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   return [token];
 }
@@ -142,9 +148,7 @@ export function normalizeShortcut(input: string | null | undefined): string | nu
  * 规范等价形式的快捷键（修饰键重排为固定顺序 Ctrl > Shift > Alt）。
  * 仅用于相等性比较（冲突检测 / 去重），不做展示。顺序不同但按键相同 → 相同值。
  */
-export function canonicalizeShortcut(
-  input: string | null | undefined
-): string | null {
+export function canonicalizeShortcut(input: string | null | undefined): string | null {
   const normalized = normalizeShortcut(input);
   const parsed = parseShortcut(normalized);
   if (!parsed) return null;
@@ -186,10 +190,27 @@ export function parseShortcut(shortcut: string | null | undefined): ParsedShortc
  * 若不回退到基础键，数字/标点类的 Shift 组合永远匹配不上、录制也会存成 "!"。
  */
 const SHIFT_BASE_KEYS: Record<string, string> = {
-  "~": "`", "!": "1", "@": "2", "#": "3", "$": "4", "%": "5", "^": "6",
-  "&": "7", "*": "8", "(": "9", ")": "0", "_": "-", "+": "=",
-  "{": "[", "}": "]", "|": "\\", ":": ";", "\"": "'", "<": ",",
-  ">": ".", "?": "/",
+  "~": "`",
+  "!": "1",
+  "@": "2",
+  "#": "3",
+  $: "4",
+  "%": "5",
+  "^": "6",
+  "&": "7",
+  "*": "8",
+  "(": "9",
+  ")": "0",
+  _: "-",
+  "+": "=",
+  "{": "[",
+  "}": "]",
+  "|": "\\",
+  ":": ";",
+  '"': "'",
+  "<": ",",
+  ">": ".",
+  "?": "/",
 };
 
 /** 按住 Shift 时把上档字符还原为基础键；否则原样返回 */
@@ -277,10 +298,7 @@ export type ShortcutOverrides = Record<string, string | null>;
  * - overrides 中显式存在（含 null=禁用）→ 采用覆盖值
  * - 否则 → 命令默认绑定
  */
-export function resolveShortcut(
-  overrides: ShortcutOverrides,
-  commandId: string
-): string | null {
+export function resolveShortcut(overrides: ShortcutOverrides, commandId: string): string | null {
   if (Object.prototype.hasOwnProperty.call(overrides, commandId)) {
     return normalizeShortcut(overrides[commandId]);
   }
@@ -288,9 +306,7 @@ export function resolveShortcut(
 }
 
 /** 计算所有命令的有效绑定（id → 规范快捷键或 null） */
-export function effectiveShortcuts(
-  overrides: ShortcutOverrides
-): Record<string, string | null> {
+export function effectiveShortcuts(overrides: ShortcutOverrides): Record<string, string | null> {
   const result: Record<string, string | null> = {};
   for (const cmd of SHORTCUT_COMMANDS) {
     result[cmd.id] = resolveShortcut(overrides, cmd.id);
@@ -299,10 +315,7 @@ export function effectiveShortcuts(
 }
 
 /** 某命令当前绑定是否等于默认绑定 */
-export function isDefaultShortcut(
-  overrides: ShortcutOverrides,
-  commandId: string
-): boolean {
+export function isDefaultShortcut(overrides: ShortcutOverrides, commandId: string): boolean {
   const resolved = resolveShortcut(overrides, commandId);
   const def = commandById(commandId)?.defaultShortcut ?? null;
   return normalizeShortcut(resolved) === normalizeShortcut(def);
@@ -399,9 +412,7 @@ export function formatShortcutForDisplay(
  * 主修饰键统一映射为 "CmdOrCtrl"——Tauri 在 macOS 上渲染为 ⌘、其余平台渲染为
  * Ctrl，从而一份配置适配全平台。
  */
-export function toMenuAccelerator(
-  shortcut: string | null | undefined
-): string | null {
+export function toMenuAccelerator(shortcut: string | null | undefined): string | null {
   const normalized = normalizeShortcut(shortcut);
   if (!normalized) return null;
   // normalized 已是规范格式（主修饰键为 "Ctrl"），直接替换为 "CmdOrCtrl"

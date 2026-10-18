@@ -208,8 +208,9 @@ describe("编辑器预览双向滚动同步", () => {
         const midLine = Math.floor(view.state.doc.lines / 2);
         const midPos = view.state.doc.line(midLine).from;
         view.dispatch({
-          effects: (window as any).EditorView?.scrollIntoView?.(midPos, { y: "start" })
-            ?? view.state.scrollIntoView(midPos),
+          effects:
+            (window as any).EditorView?.scrollIntoView?.(midPos, { y: "start" }) ??
+            view.state.scrollIntoView(midPos),
         });
         done(null);
       } catch (e) {

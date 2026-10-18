@@ -38,10 +38,7 @@ describe("buildTabList", () => {
   });
 
   it("副标题取所在目录；未命名标签为 null", () => {
-    const tabs = [
-      tab({ id: "a", path: "/ws/docs/sub/a.md" }),
-      tab({ id: "u", path: null }),
-    ];
+    const tabs = [tab({ id: "a", path: "/ws/docs/sub/a.md" }), tab({ id: "u", path: null })];
     const list = buildTabList(tabs, { activeTabId: null, workspacePath: "/ws", titleOf });
     expect(list[0].subtitle).toBe("/ws/docs/sub");
     expect(list[1].subtitle).toBeNull();

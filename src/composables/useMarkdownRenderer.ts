@@ -74,12 +74,7 @@ const murasakiShikiTheme: ThemeRegistration = {
       settings: { foreground: "#2563eb" },
     },
     {
-      scope: [
-        "entity.name.class",
-        "entity.name.type",
-        "support.type",
-        "support.class",
-      ],
+      scope: ["entity.name.class", "entity.name.type", "support.type", "support.class"],
       settings: { foreground: "#60a5fa" },
     },
     {
@@ -93,9 +88,7 @@ const murasakiShikiTheme: ThemeRegistration = {
  * 解析 Shiki 主题参数：murasaki 主题返回自定义 theme object，其他主题返回主题名字符串。
  * 供 highlightCodeBlocks / wysiwygPlugin / useHtmlExport 共用，确保 murasaki 主题走品牌色。
  */
-export function resolveShikiThemeOption(
-  themeName: string
-): string | ThemeRegistration {
+export function resolveShikiThemeOption(themeName: string): string | ThemeRegistration {
   if (themeName === "murasaki") return murasakiShikiTheme;
   return themeName;
 }
@@ -111,9 +104,7 @@ function codeBlockPlugin(md: MarkdownIt) {
     const token = tokens[idx];
     const lang = token.info.trim();
     const code = token.content;
-    const lineAttr = token.map
-      ? ` data-source-line="${token.map[0] + 1}"`
-      : "";
+    const lineAttr = token.map ? ` data-source-line="${token.map[0] + 1}"` : "";
 
     if (lang === "mermaid") {
       return `<div class="mermaid"${lineAttr}>${md.utils.escapeHtml(code)}</div>`;
@@ -364,14 +355,9 @@ function katexEngine(expr: string, opts: { displayMode?: boolean }) {
  * - `options.theme` 显式传入时用它高亮（#434），省略时回落到当前预览主题；
  * - `options.isStale()` 在每次 await 之后自检，已过期就停止处理剩余代码块（#431）。
  */
-async function highlightCodeBlocks(
-  container: HTMLElement,
-  options: HighlightOptions = {}
-) {
+async function highlightCodeBlocks(container: HTMLElement, options: HighlightOptions = {}) {
   const { theme, isStale } = options;
-  const blocks = container.querySelectorAll<HTMLElement>(
-    'pre code[data-lang]'
-  );
+  const blocks = container.querySelectorAll<HTMLElement>("pre code[data-lang]");
   for (const block of Array.from(blocks)) {
     if (isStale?.()) return;
     const lang = block.getAttribute("data-lang") || "text";
@@ -427,8 +413,7 @@ export function useMarkdownRenderer(): UseMarkdownRenderer {
     // parse + renderer.render 等价于 md.render，但能拿到 token（front-matter 数据来源）
     const tokens = md.parse(source, env);
     const frontMatterToken = tokens.find((token) => token.type === "front_matter");
-    const frontMatter =
-      typeof frontMatterToken?.meta === "string" ? frontMatterToken.meta : "";
+    const frontMatter = typeof frontMatterToken?.meta === "string" ? frontMatterToken.meta : "";
     // T6.4 (#103)：净化 HTML 输出 —— markdown-it 配置 html:true 会原样透传内联 HTML，
     // 此处用 DOMPurify 清除 script/iframe/on*/javascript: 等 XSS 向量。
     // 覆盖 PreviewPane 预览 + useHtmlExport 导出（均调用 render()）。

@@ -22,10 +22,7 @@ import { toAppPath } from "./platform";
  * 耗时异常长时把总预算顺延等长 —— 挂起不占用轮询预算，也不会因一次挂起就把
  * 整个 session 判死（此前主探针无 catch，一次挂起 = beforeAll 失败 = 整文件 skip）。
  */
-export async function waitForPinia(
-  browser: Browser,
-  timeout = 30000
-): Promise<void> {
+export async function waitForPinia(browser: Browser, timeout = 30000): Promise<void> {
   const start = Date.now();
   let deadline = start + timeout;
   let lastSwitchAttempt = 0;
@@ -43,10 +40,12 @@ export async function waitForPinia(
         for (const handle of handles) {
           try {
             await browser.switchToWindow(handle);
-            const hasPinia = await browser.execute(() => {
-              // @ts-ignore
-              return !!(window as any).__pinia__;
-            }).catch(() => false);
+            const hasPinia = await browser
+              .execute(() => {
+                // @ts-ignore
+                return !!(window as any).__pinia__;
+              })
+              .catch(() => false);
             if (hasPinia) return;
           } catch {
             // 忽略：该 handle 可能已失效
@@ -79,14 +78,12 @@ export async function waitForPinia(
   const title = await browser.getTitle().catch(() => "<unknown>");
   const state = await browser.execute(() => document.readyState).catch(() => "<unknown>");
   const handles = await browser.getWindowHandles().catch(() => []);
-  const errorNote = lastProbeError
-    ? ` 最后一次探针报错：${String(lastProbeError)}。`
-    : "";
+  const errorNote = lastProbeError ? ` 最后一次探针报错：${String(lastProbeError)}。` : "";
   throw new Error(
     `waitForPinia 超时 (${Date.now() - start}ms，基础预算 ${timeout}ms)：__pinia__ 未暴露。` +
-    `${errorNote}` +
-    ` title="${title}", readyState="${state}", handles=${handles.length}.` +
-    ` 可能原因：上一次测试遗留 WebView2 窗口状态（如 settings 窗口）。`
+      `${errorNote}` +
+      ` title="${title}", readyState="${state}", handles=${handles.length}.` +
+      ` 可能原因：上一次测试遗留 WebView2 窗口状态（如 settings 窗口）。`
   );
 }
 
@@ -101,17 +98,13 @@ export async function waitForPinia(
  * 判据是 `App.vue` 在 `initialized.value = true` 处挂的 `window.__appReady__` ——
  * 它一定晚于上面那三处恢复。`createSession()` 已调用本函数，各 spec 不必自己等。
  */
-export async function waitForAppReady(
-  browser: Browser,
-  timeout = 30000
-): Promise<void> {
+export async function waitForAppReady(browser: Browser, timeout = 30000): Promise<void> {
   try {
-    await waitForInBrowser(
-      browser,
-      () => !!(window as any).__appReady__,
-      [],
-      { timeout, interval: 200, message: "应用初始化完成（window.__appReady__）" }
-    );
+    await waitForInBrowser(browser, () => !!(window as any).__appReady__, [], {
+      timeout,
+      interval: 200,
+      message: "应用初始化完成（window.__appReady__）",
+    });
   } catch (err) {
     throw new Error(
       `${String(err)}。可能原因：应用启动恢复（设置 / 工作区 / 标签）卡住，或 onMounted 提前抛错。`
@@ -180,10 +173,7 @@ export async function waitForPiniaInCurrentWindow(
 }
 
 /** 获取 store 实例（在浏览器上下文中执行） */
-export async function getStore<T = any>(
-  browser: Browser,
-  name: string
-): Promise<T> {
+export async function getStore<T = any>(browser: Browser, name: string): Promise<T> {
   return browser.execute((storeName: string) => {
     // @ts-ignore
     const pinia = window.__pinia__;
@@ -216,10 +206,7 @@ async function stopWatchingBestEffort(browser: Browser): Promise<void> {
 }
 
 /** 通过 workspace store 直接打开工作区（绕过原生对话框） */
-export async function openWorkspace(
-  browser: Browser,
-  path: string
-): Promise<void> {
+export async function openWorkspace(browser: Browser, path: string): Promise<void> {
   await stopWatchingBestEffort(browser);
   // 注意：browser.execute 在 Tauri WebView2 下不等待 async function 的 Promise
   // 改用 executeAsync，通过 done callback 显式等待异步操作完成
@@ -269,21 +256,18 @@ export async function closeAllTabs(browser: Browser): Promise<void> {
     const tabs = pinia._s.get("tabs");
     const ids = tabs.tabs.map((t: any) => t.id);
     // 逐个关闭：reduce 串联 Promise，确保前一个 doCloseTab 完成后再执行下一个
-    ids.reduce(
-      (p: Promise<unknown>, id: string) =>
-        p.then(() => Promise.resolve(tabs.doCloseTab(id))),
-      Promise.resolve()
-    )
+    ids
+      .reduce(
+        (p: Promise<unknown>, id: string) => p.then(() => Promise.resolve(tabs.doCloseTab(id))),
+        Promise.resolve()
+      )
       .then(() => done(null))
       .catch((err: unknown) => done(err ? String(err) : null));
   });
 }
 
 /** 通过 tabs store 打开文件到新 tab（绕过文件树点击） */
-export async function openFileInTab(
-  browser: Browser,
-  path: string
-): Promise<void> {
+export async function openFileInTab(browser: Browser, path: string): Promise<void> {
   const appPath = toAppPath(path);
 
   // 不能 await openFile：若草稿基线与磁盘 mtime 不一致（#425），它会阻塞在
@@ -291,7 +275,10 @@ export async function openFileInTab(
   // 途中遇到草稿冲突时按测试默认策略选择「加载磁盘版本」（unsaved 的中间按钮）。
   await browser.execute((filePath: string) => {
     // @ts-ignore
-    void window.__pinia__._s.get("tabs").openFile(filePath).catch(() => {});
+    void window.__pinia__._s
+      .get("tabs")
+      .openFile(filePath)
+      .catch(() => {});
   }, appPath);
 
   await browser.waitUntil(
@@ -301,7 +288,11 @@ export async function openFileInTab(
         // @ts-ignore
         const pinia = window.__pinia__;
         const tabs = pinia._s.get("tabs");
-        if (tabs.tabs.some((tab: { path: string | null }) => tab.path && norm(tab.path) === norm(filePath))) {
+        if (
+          tabs.tabs.some(
+            (tab: { path: string | null }) => tab.path && norm(tab.path) === norm(filePath)
+          )
+        ) {
           return true;
         }
         const dialog = pinia._s.get("dialog");
@@ -362,9 +353,9 @@ export async function getTabsState(
         path: t.path,
         isDirty: t.isDirty,
         title: t.title ?? (t.path ? t.path.split(/[\\/]/).pop() : "未命名"),
-        contentLength: (t.content ?? "").length
+        contentLength: (t.content ?? "").length,
       })),
-      activeTabId: tabs.activeTabId
+      activeTabId: tabs.activeTabId,
     };
   });
 }
@@ -380,10 +371,7 @@ export async function getActiveContent(browser: Browser): Promise<string> {
 }
 
 /** 设置当前激活 tab 的内容（用于断言保存行为） */
-export async function setActiveContent(
-  browser: Browser,
-  content: string
-): Promise<void> {
+export async function setActiveContent(browser: Browser, content: string): Promise<void> {
   await browser.execute((newContent: string) => {
     // @ts-ignore
     const pinia = window.__pinia__;
@@ -435,16 +423,18 @@ export async function resetPersistenceSettings(browser: Browser): Promise<void> 
     // @ts-ignore
     const pinia = window.__pinia__;
     const persistence = pinia._s.get("persistence");
-    Promise.resolve(persistence.updateSettings({
-      editorMode: "split",
-      sidebarView: "files",
-      // 侧栏折叠 / 显示隐藏文件也一并复位：目前没有 spec 依赖它们，但漏掉就等于
-      // 把「前序 spec 的遗留状态」留给后面的用例（#315）
-      sidebarCollapsed: false,
-      showHiddenFiles: false,
-      showLineNumbers: true,
-      softWrap: true,
-    }))
+    Promise.resolve(
+      persistence.updateSettings({
+        editorMode: "split",
+        sidebarView: "files",
+        // 侧栏折叠 / 显示隐藏文件也一并复位：目前没有 spec 依赖它们，但漏掉就等于
+        // 把「前序 spec 的遗留状态」留给后面的用例（#315）
+        sidebarCollapsed: false,
+        showHiddenFiles: false,
+        showLineNumbers: true,
+        softWrap: true,
+      })
+    )
       .then(() => done(null))
       .catch((err: unknown) => done(err ? String(err) : null));
   });
@@ -497,14 +487,28 @@ export async function dismissAllDialogs(browser: Browser): Promise<void> {
       for (const item of items) {
         try {
           switch (item.kind) {
-            case "alert": item.resolver(undefined); break;
-            case "confirm": item.resolver(false); break;
-            case "prompt": item.resolver(null); break;
-            case "conflict": item.resolver({ action: "cancel" }); break;
-            case "unsaved": item.resolver("cancel"); break;
-            default: item.resolver(undefined); break;
+            case "alert":
+              item.resolver(undefined);
+              break;
+            case "confirm":
+              item.resolver(false);
+              break;
+            case "prompt":
+              item.resolver(null);
+              break;
+            case "conflict":
+              item.resolver({ action: "cancel" });
+              break;
+            case "unsaved":
+              item.resolver("cancel");
+              break;
+            default:
+              item.resolver(undefined);
+              break;
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
       dialog.queue.length = 0;
     }
@@ -522,19 +526,18 @@ export async function dismissAllDialogs(browser: Browser): Promise<void> {
  * 通过 Tauri event API 触发 menu-event（模拟用户点击原生菜单）
  * 走真实代码路径：App.vue listen -> handleMenuEvent
  */
-export async function emitMenuEvent(
-  browser: Browser,
-  menuId: string
-): Promise<void> {
+export async function emitMenuEvent(browser: Browser, menuId: string): Promise<void> {
   await browser.executeAsync((id: string, done: (res: unknown) => void) => {
     // @ts-ignore
-    window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-      event: "menu-event",
-      payload: id
-    }).then(
-      () => done(null),
-      (err: unknown) => done(err ? String(err) : null)
-    );
+    window.__TAURI_INTERNALS__
+      .invoke("plugin:event|emit", {
+        event: "menu-event",
+        payload: id,
+      })
+      .then(
+        () => done(null),
+        (err: unknown) => done(err ? String(err) : null)
+      );
   }, menuId);
 }
 
@@ -592,7 +595,9 @@ export async function callStoreAction<T = any>(
   });
 
   // 启动调用（async wrapper 自身不会 reject，所以 execute 立即返回）
-  await browser.execute(
+  // webdriverio 的 execute 重载把回调参数推导成 HTMLElement[]（浏览器端 API 的形状），
+  // 这里实际上是「两个字符串 + 任意 action 参数」，只能对调用本身做类型断言。
+  await (browser.execute as any)(
     (sName: string, aName: string, ...rest: any[]) => {
       // @ts-ignore
       const promise = window.__callAction(sName, aName, ...rest);

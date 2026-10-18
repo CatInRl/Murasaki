@@ -33,13 +33,15 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // 先重置：emit navigate "editor" 确保初始无设置页残留
     await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "navigate",
-        payload: "editor",
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "navigate",
+          payload: "editor",
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     });
     await browser.pause(300);
 
@@ -85,20 +87,23 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // 2. emit settings://saved 触发主窗口 loadSettings（模拟设置窗口保存）
     await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "settings://saved",
-        payload: { settings: { editorMode: "wysiwyg" } },
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "settings://saved",
+          payload: { settings: { editorMode: "wysiwyg" } },
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     });
     await browser.pause(500);
 
     // 3. 验证 persistence.settings.editorMode === "wysiwyg"
-    const mode = await browser.execute(() =>
-      // @ts-ignore
-      window.__pinia__._s.get("persistence").settings.editorMode
+    const mode = await browser.execute(
+      () =>
+        // @ts-ignore
+        window.__pinia__._s.get("persistence").settings.editorMode
     );
     expect(mode).toBe("wysiwyg");
   });
@@ -107,13 +112,15 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // 关闭设置页（navigate to editor）
     await browser.executeAsync((done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "navigate",
-        payload: "editor",
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "navigate",
+          payload: "editor",
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     });
     await browser.pause(300);
 
@@ -122,9 +129,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     expect(await settingsShell.isExisting()).toBe(false);
 
     // 准备含 markdown 语法（标题 + 正文）的测试文件
-    wsPath = resetWorkspace([
-      { path: "wysiwyg-test.md", content: "# 大标题\n\n正文内容\n" },
-    ]);
+    wsPath = resetWorkspace([{ path: "wysiwyg-test.md", content: "# 大标题\n\n正文内容\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\wysiwyg-test.md`);
 
@@ -133,9 +138,10 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     await waitForPresent(browser, ".editor-pane", 10000);
 
     // 验证 editorBridge.editorMode === "wysiwyg"
-    const mode = await browser.execute(() =>
-      // @ts-ignore
-      window.__pinia__._s.get("editorBridge").editorMode
+    const mode = await browser.execute(
+      () =>
+        // @ts-ignore
+        window.__pinia__._s.get("editorBridge").editorMode
     );
     expect(mode).toBe("wysiwyg");
 

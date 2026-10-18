@@ -147,9 +147,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     await browser.pause(500);
 
     // 大纲面板应显示 EmptyState（OutlinePanel.vue 第 44-49 行）
-    const empty = await browser.$(
-      ".outline-pane .empty-state, [class*='outline'] .empty-state"
-    );
+    const empty = await browser.$(".outline-pane .empty-state, [class*='outline'] .empty-state");
     await waitForPresent(
       browser,
       ".outline-pane .empty-state, [class*='outline'] .empty-state",
@@ -266,14 +264,10 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     // 由于 useOutline 的 loading 是组件内部 ref，无法直接访问
     // 退而求其次：验证 OutlinePanel 的 Skeleton 组件能正确渲染（通过断言 .skeleton 类存在性）
     // —— 实际加载很快，难以稳定抓取；此用例作为弱断言，验证组件结构正确
-    const outlinePane = await browser.$(
-      ".outline-pane, [class*='outline']"
-    );
+    const outlinePane = await browser.$(".outline-pane, [class*='outline']");
     expect(await outlinePane.isExisting()).toBe(true);
     // 大纲项应存在（intro.md 有标题）
-    const items = await browser.$$(
-      ".outline-pane .outline-item, [class*='outline'] .outline-item"
-    );
+    const items = await browser.$$(".outline-pane .outline-item, [class*='outline'] .outline-item");
     expect(items.length).toBeGreaterThan(0);
   });
 

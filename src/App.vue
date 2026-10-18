@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { storeToRefs } from "pinia";
-import {
-  NConfigProvider,
-} from "naive-ui";
+import { NConfigProvider } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import EditorPane from "./components/EditorPane.vue";
@@ -86,30 +84,32 @@ const { t } = useI18n();
 // ===== 草稿冲突裁决（#425）=====
 // 草稿基线与磁盘 mtime 不一致时，让用户选择「保留草稿」还是「加载磁盘版本」，
 // 而不是静默丢弃草稿。取消 = 用磁盘内容打开，草稿文件保留。
-tabsStore.setDraftConflictResolver(async ({ path, diskContent, draftContent, diskMtime, draftSavedAt }) => {
-  const preview = (text: string): string => {
-    const line = text.split(/\r?\n/).find((item) => item.trim().length > 0) ?? "";
-    return line.length > 40 ? `${line.slice(0, 40)}…` : line;
-  };
-  const formatTime = (ms: number): string => (ms > 0 ? new Date(ms).toLocaleString() : "");
+tabsStore.setDraftConflictResolver(
+  async ({ path, diskContent, draftContent, diskMtime, draftSavedAt }) => {
+    const preview = (text: string): string => {
+      const line = text.split(/\r?\n/).find((item) => item.trim().length > 0) ?? "";
+      return line.length > 40 ? `${line.slice(0, 40)}…` : line;
+    };
+    const formatTime = (ms: number): string => (ms > 0 ? new Date(ms).toLocaleString() : "");
 
-  const choice = await dialog.unsavedChanges({
-    title: t("common.dialog.draftConflictTitle"),
-    message: t("common.dialog.draftConflictMessage", {
-      name: basename(path),
-      diskTime: formatTime(diskMtime),
-      diskPreview: preview(diskContent),
-      draftTime: formatTime(draftSavedAt),
-      draftPreview: preview(draftContent),
-    }),
-    saveText: t("common.dialog.draftConflictKeep"),
-    discardText: t("common.dialog.draftConflictLoadDisk"),
-    cancelText: t("common.dialog.draftConflictLater"),
-  });
-  if (choice === "save") return "keep-draft";
-  if (choice === "discard") return "load-disk";
-  return "cancel";
-});
+    const choice = await dialog.unsavedChanges({
+      title: t("common.dialog.draftConflictTitle"),
+      message: t("common.dialog.draftConflictMessage", {
+        name: basename(path),
+        diskTime: formatTime(diskMtime),
+        diskPreview: preview(diskContent),
+        draftTime: formatTime(draftSavedAt),
+        draftPreview: preview(draftContent),
+      }),
+      saveText: t("common.dialog.draftConflictKeep"),
+      discardText: t("common.dialog.draftConflictLoadDisk"),
+      cancelText: t("common.dialog.draftConflictLater"),
+    });
+    if (choice === "save") return "keep-draft";
+    if (choice === "discard") return "load-disk";
+    return "cancel";
+  }
+);
 
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
@@ -201,17 +201,42 @@ async function onSelectMode(mode: EditorMode): Promise<void> {
 // 切 tab 时更新 editor bridge 的文档路径
 // 用 flush: 'post' 确保在 SourceEditor.onMounted（registerView(view, null)）之后触发，
 // 否则首次打开 tab 时 EditorPane 挂载会重置 activeDocPath 为 null。
-watch(currentFilePath, (path) => {
-  editorBridge.updateDocPath(path);
-}, { flush: 'post' });
+watch(
+  currentFilePath,
+  (path) => {
+    editorBridge.updateDocPath(path);
+  },
+  { flush: "post" }
+);
 
 // ===== 文件操作 composable（磁盘 IO 类入口）=====
 const {
-  openFile, openFileViaDialog, openPathInNewWindow, saveCurrentFile, saveAsCurrentFile,
-  reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, onNewTab, onNewFile,
-  onOpenFolder, onOpenFile, onOpenRecent, notifyUnsupportedFiles, notifyIgnoredFolders,
+  openFile,
+  openFileViaDialog,
+  openPathInNewWindow,
+  saveCurrentFile,
+  saveAsCurrentFile,
+  reloadCurrentFile,
+  exportCurrentHtml,
+  exportCurrentPdf,
+  onNewTab,
+  onNewFile,
+  onOpenFolder,
+  onOpenFile,
+  onOpenRecent,
+  notifyUnsupportedFiles,
+  notifyIgnoredFolders,
   openWithDefaultApp,
-} = useFileActions({ tabsStore, workspace, fileOps, persistence, dialog, toast: toastStore, activeTab, currentTheme });
+} = useFileActions({
+  tabsStore,
+  workspace,
+  fileOps,
+  persistence,
+  dialog,
+  toast: toastStore,
+  activeTab,
+  currentTheme,
+});
 
 // ===== 拖放打开（原生 drag-drop，issue #92）=====
 // 单个目录 → 走「打开文件夹」同一路径（同目录已开则聚焦，否则新窗口）；文件 → 当前窗口逐个开标签。
@@ -239,15 +264,16 @@ const { copyRichText } = useCopyRichText({
 });
 
 // ===== 对比窗口 + 外部修改处理 composable（三选一对话框改走 dialog store）=====
-const {
-  compareState,
-  handleExternalChange,
-  onCompareSave, onCompareUseExternal, onCompareClose,
-} = useCompareWindow({ tabsStore, dialog });
+const { compareState, handleExternalChange, onCompareSave, onCompareUseExternal, onCompareClose } =
+  useCompareWindow({ tabsStore, dialog });
 
 // ===== Tab 关闭逻辑 composable（对话框改走 dialog store）=====
 const {
-  onCloseTabRequest, onCloseOthers, onCloseRight, onCloseLeft, onCloseAllTabs,
+  onCloseTabRequest,
+  onCloseOthers,
+  onCloseRight,
+  onCloseLeft,
+  onCloseAllTabs,
   saveBeforeClose,
 } = useTabClose({ tabsStore, dialog, workspace });
 
@@ -353,7 +379,10 @@ async function openSettings(): Promise<void> {
     await invoke("open_settings");
   } catch (err) {
     console.error("打开设置窗口失败:", err);
-    dialog.alert({ message: t("common.error.openSettingsFailed", { error: formatCommandError(err) }), variant: "error" });
+    dialog.alert({
+      message: t("common.error.openSettingsFailed", { error: formatCommandError(err) }),
+      variant: "error",
+    });
   }
 }
 
@@ -436,29 +465,39 @@ function exposeTestHooks(): void {
   // 注意：editorRef 是 Vue ref，EditorPane 用 v-else 渲染（无 tab 时不挂载）
   // 所以必须用动态 getter，否则注册时 editorRef.value 还是 null
   // 同时暴露 undo/redo：release 构建后浏览器内 dynamic import 路径不可用
-  // @ts-ignore
+  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __editorRef__
   window.__editorRef__ = {
     getView: () => editorRef.value?.getView() ?? null,
     scrollToLine: (line: number) => editorRef.value?.scrollToLine(line),
     focus: () => editorRef.value?.focus(),
     undo: () => {
       const view = editorRef.value?.getView();
-      if (view) { view.focus(); cmUndo(view); }
+      if (view) {
+        view.focus();
+        cmUndo(view);
+      }
     },
     redo: () => {
       const view = editorRef.value?.getView();
-      if (view) { view.focus(); cmRedo(view); }
+      if (view) {
+        view.focus();
+        cmRedo(view);
+      }
     },
   };
   // E2E test hooks：release 构建后 dynamic import 不可用，暴露纯函数/设置器供测试调用
-  // @ts-ignore
+  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __exportHtml__
   window.__exportHtml__ = exportHtml;
-  // @ts-ignore
-  window.__setTheme__ = (theme: string) => { currentTheme.value = theme; };
-  // @ts-ignore
-  window.__setSidebarView__ = (view: SidebarView) => { sidebarView.value = view; };
+  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __setTheme__
+  window.__setTheme__ = (theme: string) => {
+    currentTheme.value = theme;
+  };
+  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __setSidebarView__
+  window.__setSidebarView__ = (view: SidebarView) => {
+    sidebarView.value = view;
+  };
   // 暴露 settingsLogic 纯函数：设置窗口未打开时主窗口也能被 E2E 测试访问到
-  // @ts-ignore
+  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __settingsLogic__
   window.__settingsLogic__ = {
     fieldsForCategory,
     isDirty,
@@ -526,7 +565,7 @@ onMounted(async () => {
     },
     // E2E 就绪信号：必须晚于「恢复设置 / 工作区 / 标签」（#315）
     markAppReady: () => {
-      // @ts-ignore
+      // @ts-ignore: E2E 就绪信号，Window 类型未声明 __appReady__
       window.__appReady__ = true;
     },
     exposeTestHooks,
@@ -588,18 +627,13 @@ const imagePaste = useImagePaste({
  * 外部拖入图片 → 插入当前窗口编辑器（issue #288，由 useDragDrop 的原生拖放链路调用）。
  * `position` 是 Tauri 给的窗口物理像素落点，换算/回退光标都在 composable 内处理。
  */
-function onDropImages(
-  paths: string[],
-  position: { x: number; y: number } | null
-): Promise<void> {
+function onDropImages(paths: string[], position: { x: number; y: number } | null): Promise<void> {
   return imagePaste.insertDroppedImages(paths, position).then(() => undefined);
 }
 
 // ===== 编辑器导航/插入 composable =====
-const {
-  onJumpToLine, onDropImagePath,
-  onEditorContextAction, onTableInsertConfirm,
-} = useEditorNavigation({ editorRef, imagePaste, tableDialogVisible, dialog });
+const { onJumpToLine, onDropImagePath, onEditorContextAction, onTableInsertConfirm } =
+  useEditorNavigation({ editorRef, imagePaste, tableDialogVisible, dialog });
 
 // ===== 全屏切换 =====
 async function toggleFullscreen(): Promise<void> {
@@ -620,17 +654,34 @@ async function toggleFullscreen(): Promise<void> {
 // 快捷键系统：读取 settings.shortcuts 覆盖，提供全局 keydown 匹配
 const { matchGlobalKeydown } = useShortcuts();
 const { handleMenuEvent, onKeyDown } = useCommands({
-  onNewTab, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
-  reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, copyRichText,
+  onNewTab,
+  openFileViaDialog,
+  saveCurrentFile,
+  saveAsCurrentFile,
+  reloadCurrentFile,
+  exportCurrentHtml,
+  exportCurrentPdf,
+  copyRichText,
   onCloseTabRequest,
-  workspace, tabsStore, searchStore, fileOps, dialog,
-  editorRef, currentTheme, selectSidebarView, statusBarVisible,
-  tableDialogVisible, allTabsOpen,
-  openSettings, toggleFullscreen,
+  workspace,
+  tabsStore,
+  searchStore,
+  fileOps,
+  dialog,
+  editorRef,
+  currentTheme,
+  selectSidebarView,
+  statusBarVisible,
+  tableDialogVisible,
+  allTabsOpen,
+  openSettings,
+  toggleFullscreen,
   updater: { check: checkForUpdate },
   matchGlobalKeydown,
   setEditorMode: onSelectMode,
-  zoomIn, zoomOut, zoomReset,
+  zoomIn,
+  zoomOut,
+  zoomReset,
 });
 
 // ===== 拖拽/命令行打开文件或文件夹（issue #92 / #113）=====
@@ -723,12 +774,19 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   },
   initialized,
 });
-
 </script>
 
 <template>
-  <NConfigProvider :theme="naiveTheme" :theme-overrides="naiveThemeOverrides" :locale="null" :date-locale="null">
-    <div class="murasaki-shell" :class="{ 'has-sidebar': workspace.hasWorkspace || tabsStore.hasTabs }">
+  <NConfigProvider
+    :theme="naiveTheme"
+    :theme-overrides="naiveThemeOverrides"
+    :locale="null"
+    :date-locale="null"
+  >
+    <div
+      class="murasaki-shell"
+      :class="{ 'has-sidebar': workspace.hasWorkspace || tabsStore.hasTabs }"
+    >
       <!-- Sidebar: 文件树 / 大纲 -->
       <aside
         v-if="workspace.hasWorkspace || tabsStore.hasTabs"
@@ -746,8 +804,19 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :aria-label="$t('editor.sidebar.filesTabAria')"
             @click="expandSidebar('files')"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
+              />
             </svg>
           </button>
           <button
@@ -758,13 +827,22 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :aria-label="$t('editor.sidebar.outlineTabAria')"
             @click="expandSidebar('outline')"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="8" y1="6" x2="21" y2="6"/>
-              <line x1="8" y1="12" x2="21" y2="12"/>
-              <line x1="8" y1="18" x2="21" y2="18"/>
-              <line x1="3" y1="6" x2="3.01" y2="6"/>
-              <line x1="3" y1="12" x2="3.01" y2="12"/>
-              <line x1="3" y1="18" x2="3.01" y2="18"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
             </svg>
           </button>
           <div class="sidebar-rail-spacer"></div>
@@ -775,8 +853,17 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :aria-label="$t('editor.sidebar.expandSidebar')"
             @click="expandRail"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="9 18 15 12 9 6"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
         </div>
@@ -799,8 +886,17 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :aria-label="$t('editor.sidebar.collapseSidebar')"
             @click="collapseSidebar"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
           <!-- 右缘拖拽调宽把手 -->
@@ -895,13 +991,22 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
     <Teleport to="body">
       <div v-if="dropDragging" class="murasaki-drop-overlay" aria-hidden="true">
         <div class="murasaki-drop-overlay-card">
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            width="34"
+            height="34"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M12 3v12" />
             <path d="m7 10 5 5 5-5" />
             <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
           </svg>
-          <div class="murasaki-drop-overlay-title">{{ $t('common.drop.overlayTitle') }}</div>
-          <div class="murasaki-drop-overlay-hint">{{ $t('common.drop.overlayHint') }}</div>
+          <div class="murasaki-drop-overlay-title">{{ $t("common.drop.overlayTitle") }}</div>
+          <div class="murasaki-drop-overlay-hint">{{ $t("common.drop.overlayHint") }}</div>
         </div>
       </div>
     </Teleport>
@@ -1010,8 +1115,9 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
   padding: 0;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .murasaki-sidebar-collapse:hover {
   background: var(--murasaki-neutral-200);
@@ -1039,8 +1145,9 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
   padding: 0;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .sidebar-rail-btn:hover {
   background: var(--murasaki-neutral-200);

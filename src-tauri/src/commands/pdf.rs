@@ -10,8 +10,8 @@ use std::sync::mpsc;
 #[cfg(windows)]
 use std::time::Duration;
 
-use tauri::{AppHandle, WebviewUrl, WebviewWindowBuilder};
 use crate::errors::{CommandError, ErrorCode};
+use tauri::{AppHandle, WebviewUrl, WebviewWindowBuilder};
 
 /// 等待 `with_webview` 整体返回的超时（导航 + 打印都卡住时的最后兜底）
 #[cfg(windows)]
@@ -178,7 +178,7 @@ fn print_to_pdf_inner(
         Microsoft::Web::WebView2::Win32::*, NavigationCompletedEventHandler,
         PrintToPdfCompletedHandler,
     };
-    use windows::core::{HSTRING, Interface};
+    use windows::core::{Interface, HSTRING};
 
     let controller = pw.controller();
     let core = unsafe { controller.CoreWebView2() }
@@ -264,14 +264,16 @@ fn print_to_pdf_inner(
     unsafe { core7.PrintToPdf(&path_hstring, &settings, &pdf_handler) }
         .map_err(|e| CommandError::internal(format!("PrintToPdf: {e}")))?;
 
-    let (result, is_success) = wait_with_pump_timeout(&pdf_rx, PDF_PRINT_TIMEOUT).ok_or_else(|| {
-        CommandError::new(ErrorCode::Timeout).with_param("detail", "print timeout")
-    })?;
+    let (result, is_success) =
+        wait_with_pump_timeout(&pdf_rx, PDF_PRINT_TIMEOUT).ok_or_else(|| {
+            CommandError::new(ErrorCode::Timeout).with_param("detail", "print timeout")
+        })?;
 
     result.map_err(|e| CommandError::internal(format!("PrintToPdf completed with error: {e}")))?;
 
     if !is_success {
-        return Err(CommandError::internal("PrintToPdf reported failure").with_param("detail", "isSuccess=false"));
+        return Err(CommandError::internal("PrintToPdf reported failure")
+            .with_param("detail", "isSuccess=false"));
     }
 
     Ok(())

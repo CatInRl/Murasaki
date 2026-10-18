@@ -2,16 +2,40 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { EditorState, Compartment, Transaction, Extension } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab, selectAll } from "@codemirror/commands";
-import { indentOnInput, bracketMatching, foldGutter, foldKeymap, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import {
+  EditorView,
+  keymap,
+  lineNumbers,
+  highlightActiveLine,
+  drawSelection,
+} from "@codemirror/view";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  selectAll,
+} from "@codemirror/commands";
+import {
+  indentOnInput,
+  bracketMatching,
+  foldGutter,
+  foldKeymap,
+  HighlightStyle,
+  syntaxHighlighting,
+} from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { languageForFile } from "../editor/language";
 import { isMarkdownFile } from "../utils/fileKind";
 import { basename } from "../utils/path";
 import { searchKeymap, highlightSelectionMatches, openSearchPanel } from "@codemirror/search";
-import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import {
+  autocompletion,
+  completionKeymap,
+  closeBrackets,
+  closeBracketsKeymap,
+} from "@codemirror/autocomplete";
 import { tags } from "@lezer/highlight";
 import {
   Scissors,
@@ -48,21 +72,48 @@ import type { EditorMode } from "../types";
  */
 const murasakiHighlightStyle = HighlightStyle.define([
   // Headings: purple-700, bold
-  { tag: tags.heading1, color: "var(--murasaki-purple-700)", fontWeight: "700", fontSize: "1.25em" },
-  { tag: tags.heading2, color: "var(--murasaki-purple-700)", fontWeight: "700", fontSize: "1.15em" },
-  { tag: tags.heading3, color: "var(--murasaki-purple-600)", fontWeight: "600", fontSize: "1.05em" },
-  { tag: [tags.heading4, tags.heading5, tags.heading6], color: "var(--murasaki-purple-600)", fontWeight: "600" },
+  {
+    tag: tags.heading1,
+    color: "var(--murasaki-purple-700)",
+    fontWeight: "700",
+    fontSize: "1.25em",
+  },
+  {
+    tag: tags.heading2,
+    color: "var(--murasaki-purple-700)",
+    fontWeight: "700",
+    fontSize: "1.15em",
+  },
+  {
+    tag: tags.heading3,
+    color: "var(--murasaki-purple-600)",
+    fontWeight: "600",
+    fontSize: "1.05em",
+  },
+  {
+    tag: [tags.heading4, tags.heading5, tags.heading6],
+    color: "var(--murasaki-purple-600)",
+    fontWeight: "600",
+  },
   // ATX heading markers (#, ##): purple-400
   { tag: tags.heading, color: "var(--murasaki-purple-400)" },
   // Emphasis — 语义 token，随主题切换（颜色与预览 .markdown-body em/strong/del 一致）
   { tag: tags.strong, color: "var(--murasaki-ink)", fontWeight: "700" },
   { tag: tags.emphasis, color: "var(--murasaki-ink)", fontStyle: "italic" },
-  { tag: tags.strikethrough, color: "var(--murasaki-muted-foreground)", textDecoration: "line-through" },
+  {
+    tag: tags.strikethrough,
+    color: "var(--murasaki-muted-foreground)",
+    textDecoration: "line-through",
+  },
   // Links
   { tag: tags.link, color: "var(--murasaki-purple-700)", textDecoration: "underline" },
   { tag: tags.url, color: "var(--murasaki-state-info)" },
   // Inline code & code blocks
-  { tag: tags.monospace, color: "var(--murasaki-purple-800)", backgroundColor: "var(--murasaki-primary-soft)" },
+  {
+    tag: tags.monospace,
+    color: "var(--murasaki-purple-800)",
+    backgroundColor: "var(--murasaki-primary-soft)",
+  },
   // Lists: purple marker
   { tag: tags.list, color: "var(--murasaki-purple-600)" },
   // Quotes: purple-600 italic
@@ -332,10 +383,7 @@ function buildExtensions() {
     // isEnabled / isMarkdown 为实时谓词（读取 props 响应式值），开关/文件切换无需重建扩展
     fullwidthToMarkdownExtension({
       isEnabled: () => props.fullwidthToMarkdown,
-      isMarkdown: () =>
-        props.currentFilePath
-          ? isMarkdownFile(props.currentFilePath)
-          : true, // 未命名新文件默认按 markdown 处理（与 App.vue 约定一致）
+      isMarkdown: () => (props.currentFilePath ? isMarkdownFile(props.currentFilePath) : true), // 未命名新文件默认按 markdown 处理（与 App.vue 约定一致）
     }),
     foldGutter({ openText: "▾", closedText: "▸" }),
     murasakiTheme,
@@ -643,14 +691,11 @@ watch(
 
 // 字体设置变更（大小/行高/字体族）→ 重新应用 fontComp
 // 通过 Compartment.reconfigure 动态切换，不销毁编辑器实例
-watch(
-  [() => props.fontSize, () => props.lineHeight, () => props.fontFamily],
-  () => {
-    viewRef.value?.dispatch({
-      effects: fontComp.reconfigure(buildFontTheme()),
-    });
-  }
-);
+watch([() => props.fontSize, () => props.lineHeight, () => props.fontFamily], () => {
+  viewRef.value?.dispatch({
+    effects: fontComp.reconfigure(buildFontTheme()),
+  });
+});
 
 // 当前文件路径变更（切 tab / 重命名）→ 更新模块级状态并触发 WYSIWYG 重算 + 语言重配
 // ImageWidget 在 toDOM 时读取 currentFilePath 解析相对图片路径（ADR-0015）
@@ -675,16 +720,57 @@ function onContextMenu(e: MouseEvent): void {
 
 function buildEditorMenuItems(): MenuItem[] {
   return [
-    { label: t("common.cut"), icon: Scissors, shortcut: formatShortcutForDisplay("Ctrl+X") ?? "", action: () => runExecCommand("cut") },
-    { label: t("common.copy"), icon: Copy, shortcut: formatShortcutForDisplay("Ctrl+C") ?? "", action: () => runExecCommand("copy") },
-    { label: t("common.paste"), icon: ClipboardPaste, shortcut: formatShortcutForDisplay("Ctrl+V") ?? "", action: () => runExecCommand("paste") },
-    { label: t("editor.contextMenu.selectAll"), icon: TextSelect, shortcut: formatShortcutForDisplay("Ctrl+A") ?? "", action: () => runSelectAll() },
+    {
+      label: t("common.cut"),
+      icon: Scissors,
+      shortcut: formatShortcutForDisplay("Ctrl+X") ?? "",
+      action: () => runExecCommand("cut"),
+    },
+    {
+      label: t("common.copy"),
+      icon: Copy,
+      shortcut: formatShortcutForDisplay("Ctrl+C") ?? "",
+      action: () => runExecCommand("copy"),
+    },
+    {
+      label: t("common.paste"),
+      icon: ClipboardPaste,
+      shortcut: formatShortcutForDisplay("Ctrl+V") ?? "",
+      action: () => runExecCommand("paste"),
+    },
+    {
+      label: t("editor.contextMenu.selectAll"),
+      icon: TextSelect,
+      shortcut: formatShortcutForDisplay("Ctrl+A") ?? "",
+      action: () => runSelectAll(),
+    },
     { separator: true },
-    { label: t("editor.contextMenu.findReplace"), icon: Search, shortcut: formatShortcutForDisplay("Ctrl+F") ?? "", action: () => runFindReplace() },
-    { label: t("editor.toolbar.insertTable"), icon: Table, action: () => emit("context-action", "insert-table") },
-    { label: t("editor.contextMenu.link"), icon: LinkIcon, action: () => emit("context-action", "insert-link") },
-    { label: t("editor.contextMenu.image"), icon: ImageIcon, action: () => emit("context-action", "insert-image") },
-    { label: t("editor.contextMenu.pastePlainText"), icon: Clipboard, action: () => runPastePlainText() },
+    {
+      label: t("editor.contextMenu.findReplace"),
+      icon: Search,
+      shortcut: formatShortcutForDisplay("Ctrl+F") ?? "",
+      action: () => runFindReplace(),
+    },
+    {
+      label: t("editor.toolbar.insertTable"),
+      icon: Table,
+      action: () => emit("context-action", "insert-table"),
+    },
+    {
+      label: t("editor.contextMenu.link"),
+      icon: LinkIcon,
+      action: () => emit("context-action", "insert-link"),
+    },
+    {
+      label: t("editor.contextMenu.image"),
+      icon: ImageIcon,
+      action: () => emit("context-action", "insert-image"),
+    },
+    {
+      label: t("editor.contextMenu.pastePlainText"),
+      icon: Clipboard,
+      action: () => runPastePlainText(),
+    },
   ];
 }
 

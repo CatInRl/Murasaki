@@ -31,7 +31,10 @@ describe("resolveInternalMarkdownLink", () => {
 
   it("Windows 反斜杠路径", () => {
     expect(
-      resolveInternalMarkdownLink("sub\\b.md", { filePath: "C:\\ws\\docs\\a.md", workspacePath: null })
+      resolveInternalMarkdownLink("sub\\b.md", {
+        filePath: "C:\\ws\\docs\\a.md",
+        workspacePath: null,
+      })
     ).toBe("C:/ws/docs/sub/b.md");
   });
 

@@ -66,8 +66,13 @@ onMounted(async () => {
   draft.value = { ...persistence.settings };
   snapshot.value = { ...persistence.settings };
   // E2E test hook：release 构建后 dynamic import 不可用，暴露纯函数供测试调用
-  // @ts-ignore
-  window.__settingsLogic__ = { fieldsForCategory, isDirty, isCategoryDirty, restoreCategoryDefaults };
+  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __settingsLogic__
+  window.__settingsLogic__ = {
+    fieldsForCategory,
+    isDirty,
+    isCategoryDirty,
+    restoreCategoryDefaults,
+  };
 });
 
 function selectCategory(cat: SettingsCategory): void {
@@ -129,7 +134,7 @@ async function handleClose(): Promise<void> {
           @click="selectCategory('general')"
         >
           <Settings :size="16" />
-          <span>{{ $t('settings.categories.general') }}</span>
+          <span>{{ $t("settings.categories.general") }}</span>
         </button>
         <button
           type="button"
@@ -138,7 +143,7 @@ async function handleClose(): Promise<void> {
           @click="selectCategory('editor')"
         >
           <Type :size="16" />
-          <span>{{ $t('settings.categories.editor') }}</span>
+          <span>{{ $t("settings.categories.editor") }}</span>
         </button>
         <button
           type="button"
@@ -147,7 +152,7 @@ async function handleClose(): Promise<void> {
           @click="selectCategory('shortcuts')"
         >
           <Keyboard :size="16" />
-          <span>{{ $t('settings.categories.shortcuts') }}</span>
+          <span>{{ $t("settings.categories.shortcuts") }}</span>
         </button>
       </div>
     </nav>
@@ -155,18 +160,9 @@ async function handleClose(): Promise<void> {
     <!-- Content -->
     <div class="settings-content">
       <div class="settings-content-inner">
-        <GeneralPanel
-          v-if="activeCategory === 'general'"
-          v-model="draft"
-        />
-        <EditorPanel
-          v-else-if="activeCategory === 'editor'"
-          v-model="draft"
-        />
-        <ShortcutPanel
-          v-else-if="activeCategory === 'shortcuts'"
-          v-model="draft"
-        />
+        <GeneralPanel v-if="activeCategory === 'general'" v-model="draft" />
+        <EditorPanel v-else-if="activeCategory === 'editor'" v-model="draft" />
+        <ShortcutPanel v-else-if="activeCategory === 'shortcuts'" v-model="draft" />
       </div>
 
       <!-- Footer -->
@@ -177,7 +173,7 @@ async function handleClose(): Promise<void> {
           :disabled="!currentCategoryDirty"
           @click="handleRestoreDefault"
         >
-          {{ $t('settings.footer.restoreDefaults') }}
+          {{ $t("settings.footer.restoreDefaults") }}
         </button>
         <button
           class="secondary-button"
@@ -185,7 +181,7 @@ async function handleClose(): Promise<void> {
           style="margin-left: auto"
           @click="handleClose"
         >
-          {{ $t('settings.footer.close') }}
+          {{ $t("settings.footer.close") }}
         </button>
         <button
           class="primary-button"
@@ -193,7 +189,7 @@ async function handleClose(): Promise<void> {
           :disabled="saving || !dirty"
           @click="handleSave"
         >
-          {{ saving ? $t('settings.footer.saving') : $t('settings.footer.save') }}
+          {{ saving ? $t("settings.footer.saving") : $t("settings.footer.save") }}
         </button>
       </div>
     </div>

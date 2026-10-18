@@ -46,9 +46,7 @@ export function useScrollSync(opts: ScrollSyncOptions) {
    * querySelectorAll 默认按文档顺序，与行号递增一致。
    */
   function collectLineElements(container: HTMLElement): HTMLElement[] {
-    const list = Array.from(
-      container.querySelectorAll<HTMLElement>("[data-source-line]")
-    );
+    const list = Array.from(container.querySelectorAll<HTMLElement>("[data-source-line]"));
     return list;
   }
 

@@ -173,11 +173,14 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
       ws.selectedFilePath = null; // 先清空
     });
     await browser.pause(100);
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      const ws = window.__pinia__._s.get("workspace");
-      ws.selectedFilePath = path;
-    }, toAppPath(`${wsPath}\\intro.md`));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore
+        const ws = window.__pinia__._s.get("workspace");
+        ws.selectedFilePath = path;
+      },
+      toAppPath(`${wsPath}\\intro.md`)
+    );
     await browser.pause(300);
 
     // 应有 .is-selected 节点
@@ -195,11 +198,14 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
     await browser.pause(500);
 
     // 选中 intro.md
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      const ws = window.__pinia__._s.get("workspace");
-      ws.selectedFilePath = path;
-    }, toAppPath(`${wsPath}\\intro.md`));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore
+        const ws = window.__pinia__._s.get("workspace");
+        ws.selectedFilePath = path;
+      },
+      toAppPath(`${wsPath}\\intro.md`)
+    );
     await browser.pause(300);
 
     // 获取选中节点的计算样式
@@ -229,26 +235,33 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
     await browser.pause(300);
 
     // 选中 intro.md
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      const ws = window.__pinia__._s.get("workspace");
-      ws.selectedFilePath = path;
-    }, toAppPath(`${wsPath}\\intro.md`));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore
+        const ws = window.__pinia__._s.get("workspace");
+        ws.selectedFilePath = path;
+      },
+      toAppPath(`${wsPath}\\intro.md`)
+    );
     await browser.pause(300);
 
-    let selected = await browser.$(".file-tree .node-row.is-selected");
+    const selected = await browser.$(".file-tree .node-row.is-selected");
     expect(await selected.isExisting()).toBe(true);
 
     // 切换到 notes.md
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      const ws = window.__pinia__._s.get("workspace");
-      ws.selectedFilePath = path;
-    }, toAppPath(`${wsPath}\\notes.md`));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore
+        const ws = window.__pinia__._s.get("workspace");
+        ws.selectedFilePath = path;
+      },
+      toAppPath(`${wsPath}\\notes.md`)
+    );
     await browser.pause(300);
 
     // 应仍有且仅有一个 .is-selected（应为 notes.md）
-    const selectedCount = await browser.$$(".file-tree .node-row.is-selected").then((els) => els.length);
+    const selectedEls = await browser.$$(".file-tree .node-row.is-selected");
+    const selectedCount = selectedEls.length;
     expect(selectedCount).toBe(1);
   });
 

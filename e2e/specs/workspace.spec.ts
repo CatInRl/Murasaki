@@ -10,8 +10,20 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { isRendered, readText, textOfElement, waitForInBrowser, waitForPresent } from "../helpers/wait";
+import {
+  openWorkspace,
+  closeWorkspace,
+  closeAllTabs,
+  waitForPinia,
+  resetPersistenceSettings,
+} from "../helpers/store";
+import {
+  isRendered,
+  readText,
+  textOfElement,
+  waitForInBrowser,
+  waitForPresent,
+} from "../helpers/wait";
 import { waitForTreeSettled } from "../helpers/tree";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -102,9 +114,7 @@ describe("工作区 + 文件树", () => {
       (name: string) =>
         Array.from(document.querySelectorAll(".tab-bar-container .tab-title")).some((el) => {
           const rect = (el as HTMLElement).getBoundingClientRect();
-          return (
-            (el.textContent ?? "").trim() === name && rect.width > 0 && rect.height > 0
-          );
+          return (el.textContent ?? "").trim() === name && rect.width > 0 && rect.height > 0;
         }),
       ["intro.md"],
       { timeout: 15000, message: 'tab 栏出现已渲染的 "intro.md" 标签' }
@@ -121,10 +131,9 @@ describe("工作区 + 文件树", () => {
     await closeWorkspace(browser);
 
     // 侧栏消失
-    await browser.waitUntil(
-      async () => !(await browser.$(".file-tree").isExisting()),
-      { timeout: 5000 }
-    );
+    await browser.waitUntil(async () => !(await browser.$(".file-tree").isExisting()), {
+      timeout: 5000,
+    });
   });
 
   it("关闭工作区后重开同一目录：外部新建的文件仍会刷进文件树（#311）", async () => {

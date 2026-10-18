@@ -25,7 +25,7 @@ import {
   resetPersistenceSettings,
 } from "../helpers/store";
 import { textOfElement, waitForPresent } from "../helpers/wait";
-import { writeFileSync, rmSync, readFileSync } from "node:fs";
+import { writeFileSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
 let browser: Browser;
@@ -40,13 +40,15 @@ async function emitFileChangedEvent(
   await browser.executeAsync(
     (payload: { path: string; kind: string }, done: (res: unknown) => void) => {
       // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "file-changed",
-        payload,
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "file-changed",
+          payload,
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     },
     { path, kind }
   );
@@ -117,10 +119,10 @@ describe("外部修改检测", () => {
     }, path);
 
     // 等待自动重载完成
-    await browser.waitUntil(
-      async () => (await getActiveContent(browser)) === newContent,
-      { timeout: 5000, timeoutMsg: "自动重载未在 5s 内完成" }
-    );
+    await browser.waitUntil(async () => (await getActiveContent(browser)) === newContent, {
+      timeout: 5000,
+      timeoutMsg: "自动重载未在 5s 内完成",
+    });
 
     // isDirty 应为 false（重载后与磁盘一致）
     const isDirty = await browser.execute(() => {
@@ -208,10 +210,9 @@ describe("外部修改检测", () => {
     }
 
     // 等待内容更新为磁盘版本
-    await browser.waitUntil(
-      async () => (await getActiveContent(browser)) === externalContent,
-      { timeout: 5000 }
-    );
+    await browser.waitUntil(async () => (await getActiveContent(browser)) === externalContent, {
+      timeout: 5000,
+    });
 
     // isDirty 应为 false
     const isDirtyAfter = await browser.execute(() => {

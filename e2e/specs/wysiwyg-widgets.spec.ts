@@ -346,14 +346,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     const wsPath = resetWorkspace([
       {
         path: "list.md",
-        content: [
-          "- 项目一",
-          "- 项目二",
-          "- 项目三",
-          "",
-          "结尾段。",
-          "",
-        ].join("\n"),
+        content: ["- 项目一", "- 项目二", "- 项目三", "", "结尾段。", ""].join("\n"),
       },
     ]);
     await openWorkspace(browser, wsPath);
@@ -410,9 +403,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
   // ============ M17: Bold 立即渲染 ============
 
   it("Bold 光标在段内时 ** 标记 dim（.murasaki-wysiwyg-mark-dim）", async () => {
-    const wsPath = resetWorkspace([
-      { path: "bold.md", content: "**bold 文本**\n\n结尾段。\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "bold.md", content: "**bold 文本**\n\n结尾段。\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\bold.md`);
     await ensureSplitMode(browser);
@@ -427,9 +418,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
   });
 
   it("Bold 光标离开段时 ** 标记 hide（.murasaki-wysiwyg-mark-hide）", async () => {
-    const wsPath = resetWorkspace([
-      { path: "bold.md", content: "**bold 文本**\n\n结尾段。\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "bold.md", content: "**bold 文本**\n\n结尾段。\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\bold.md`);
     await ensureSplitMode(browser);
@@ -445,9 +434,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
   });
 
   it("Bold 光标从段内移到段外时 ** 标记从 dim 切换到 hide", async () => {
-    const wsPath = resetWorkspace([
-      { path: "bold.md", content: "**bold 文本**\n\n结尾段。\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "bold.md", content: "**bold 文本**\n\n结尾段。\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\bold.md`);
     await ensureSplitMode(browser);
@@ -455,23 +442,20 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 阶段 1：光标在段内 → dim
     await setCursor(browser, 5);
-    let dimCount = await browser.$$(
-      ".murasaki-wysiwyg-mark-dim"
-    ).then((els) => els.length);
-    let hideCount = await browser.$$(
-      ".murasaki-wysiwyg-mark-hide"
-    ).then((els) => els.length);
+    const dimEls = await browser.$$(".murasaki-wysiwyg-mark-dim");
+    let dimCount = dimEls.length;
     expect(dimCount).toBeGreaterThan(0);
 
     // 阶段 2：光标移到段外 → hide
     await setCursor(browser, 14);
-    dimCount = await browser.$$(".murasaki-wysiwyg-mark-dim").then((els) => els.length);
-    hideCount = await browser.$$(".murasaki-wysiwyg-mark-hide").then((els) => els.length);
+    const hideEls = await browser.$$(".murasaki-wysiwyg-mark-hide");
+    const hideCount = hideEls.length;
     expect(hideCount).toBeGreaterThan(0);
 
     // 阶段 3：光标回到段内 → 重新 dim
     await setCursor(browser, 5);
-    dimCount = await browser.$$(".murasaki-wysiwyg-mark-dim").then((els) => els.length);
+    const dimEls2 = await browser.$$(".murasaki-wysiwyg-mark-dim");
+    dimCount = dimEls2.length;
     expect(dimCount).toBeGreaterThan(0);
   });
 
@@ -517,7 +501,10 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     const info = await browser.execute(() => {
       const el = document.querySelector(".murasaki-wysiwyg-mermaid svg") as SVGSVGElement | null;
       if (!el) return null;
-      const vb = (el.getAttribute("viewBox") ?? "").trim().split(/[\s,]+/).map(Number);
+      const vb = (el.getAttribute("viewBox") ?? "")
+        .trim()
+        .split(/[\s,]+/)
+        .map(Number);
       const rect = el.getBoundingClientRect();
       const today = el.querySelector("g.today");
       const ok = vb.length === 4 && vb.every((n) => Number.isFinite(n));

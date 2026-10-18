@@ -68,15 +68,8 @@ export interface CommandsDeps {
 
   // dialog store 切片
   dialog: {
-    alert: (options: {
-      message: string;
-      variant?: AlertVariant;
-      title?: string;
-    }) => Promise<void>;
-    prompt: (options: {
-      message?: string;
-      placeholder?: string;
-    }) => Promise<string | null>;
+    alert: (options: { message: string; variant?: AlertVariant; title?: string }) => Promise<void>;
+    prompt: (options: { message?: string; placeholder?: string }) => Promise<string | null>;
   };
 
   // 响应式状态（commands 读写）
@@ -121,14 +114,32 @@ export function useCommands(deps: CommandsDeps) {
   const t = i18n.global.t.bind(i18n.global);
 
   const {
-    onNewTab, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
-    reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, copyRichText,
+    onNewTab,
+    openFileViaDialog,
+    saveCurrentFile,
+    saveAsCurrentFile,
+    reloadCurrentFile,
+    exportCurrentHtml,
+    exportCurrentPdf,
+    copyRichText,
     onCloseTabRequest,
-    workspace, tabsStore, searchStore, fileOps, dialog,
-    editorRef, currentTheme, selectSidebarView, statusBarVisible,
-    tableDialogVisible, allTabsOpen,
-    openSettings, toggleFullscreen, updater,
-    zoomIn, zoomOut, zoomReset,
+    workspace,
+    tabsStore,
+    searchStore,
+    fileOps,
+    dialog,
+    editorRef,
+    currentTheme,
+    selectSidebarView,
+    statusBarVisible,
+    tableDialogVisible,
+    allTabsOpen,
+    openSettings,
+    toggleFullscreen,
+    updater,
+    zoomIn,
+    zoomOut,
+    zoomReset,
     matchGlobalKeydown,
     setEditorMode,
   } = deps;

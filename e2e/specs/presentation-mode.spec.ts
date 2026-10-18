@@ -12,11 +12,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
-import {
-  resetWorkspace,
-  defaultFixtureFiles,
-  type FixtureFile,
-} from "../helpers/fixtures";
+import { resetWorkspace, defaultFixtureFiles, type FixtureFile } from "../helpers/fixtures";
 import {
   openWorkspace,
   closeWorkspace,
@@ -637,16 +633,17 @@ describe("演示模式", () => {
       async () => (await browser.$(".editor-pane.mode-source")).isExisting(),
       { timeout: 10000 }
     );
-    expect(await (await browser.$(".editor-pane.mode-presentation")).isExisting()).toBe(
-      false
-    );
+    expect(await (await browser.$(".editor-pane.mode-presentation")).isExisting()).toBe(false);
     // 且不写回 settings（保留 md 的最后一次选择）
-    await browser.waitUntil(async () => {
-      const mode = await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("persistence").settings.editorMode;
-      });
-      return mode === "presentation";
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        const mode = await browser.execute(() => {
+          // @ts-ignore
+          return window.__pinia__._s.get("persistence").settings.editorMode;
+        });
+        return mode === "presentation";
+      },
+      { timeout: 5000 }
+    );
   });
 });

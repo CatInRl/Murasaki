@@ -57,10 +57,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     });
     // 与 Rust 侧同构的结构化错误，调用方统一按 code 判断
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject({ code: "timeout", params: { path } }),
-        REFRESH_TIMEOUT_MS
-      )
+      setTimeout(() => reject({ code: "timeout", params: { path } }), REFRESH_TIMEOUT_MS)
     );
     return Promise.race([treePromise, timeoutPromise]);
   }

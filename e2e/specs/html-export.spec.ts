@@ -17,7 +17,6 @@ import {
   openWorkspace,
   closeWorkspace,
   closeAllTabs,
-  openFileInTab,
   waitForPinia,
   dismissAllDialogs,
   ensureSplitMode,
@@ -39,7 +38,13 @@ async function callExportHtml(
   filePath: string | null
 ): Promise<string> {
   const result = await browser.executeAsync(
-    (src: string, t: string, ws: string | null, fp: string | null, done: (res: unknown) => void) => {
+    (
+      src: string,
+      t: string,
+      ws: string | null,
+      fp: string | null,
+      done: (res: unknown) => void
+    ) => {
       const fn = (window as any).__exportHtml__;
       if (!fn) {
         done({ ok: false, error: "window.__exportHtml__ not exposed" });
@@ -153,7 +158,7 @@ describe("HTML 导出", () => {
     expect(html).toContain("data:image/png;base64,");
     expect(html).toContain(pngBase64);
     // 不应残留相对路径
-    expect(html).not.toContain('./test-image.png');
+    expect(html).not.toContain("./test-image.png");
   });
 
   it("超过分块阈值的大图仍能内联（#428）", async () => {
@@ -199,7 +204,8 @@ describe("HTML 导出", () => {
     const result = await browser.executeAsync(
       (path: string, content: string, done: (res: unknown) => void) => {
         // @ts-ignore
-        window.__TAURI_INTERNALS__.invoke("write_text_file", { path, content })
+        window.__TAURI_INTERNALS__
+          .invoke("write_text_file", { path, content })
           .then(() => done({ ok: true }))
           .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
       },
