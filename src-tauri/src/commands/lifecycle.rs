@@ -9,26 +9,61 @@
 //! 不再存在「主窗口」特殊语义（旧实现只认 `label == "main"`）。
 
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
+
+use super::windows::is_editor_window;
+
+/// 退出流程超时兜底：所有窗口都卡在落盘时，多久后强制退出。
+///
+/// 取得较长是为了不干扰「未保存改动」确认框 —— 用户可能花一两分钟决定；
+/// 真正的卡死（前端失联）最终仍会被兜底收掉。
+const EXIT_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// 退出流程状态：各窗口的 `CloseRequested → 落盘 → close_window` 只允许进入一次
 #[derive(Default)]
-pub struct ClosingState(Mutex<HashSet<String>>);
+pub struct ClosingState {
+    closing: Mutex<HashSet<String>>,
+    /// 看门狗代际：每次布防自增，旧线程醒来发现代际不符就直接退出
+    generation: AtomicU64,
+}
 
 impl ClosingState {
     /// 尝试为某窗口进入落盘流程；该窗口已在流程中返回 false
     pub fn begin(&self, label: &str) -> bool {
-        let mut set = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut set = self.closing.lock().unwrap_or_else(|e| e.into_inner());
         set.insert(label.to_string())
+    }
+
+    /// 开始一轮新的看门狗（旧线程会因代际不符而失效）
+    fn next_generation(&self) -> u64 {
+        self.generation.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    fn is_current_generation(&self, generation: u64) -> bool {
+        self.generation.load(Ordering::SeqCst) == generation
     }
 
     /// 让某窗口退出落盘流程（issue #377）：用户在退出确认里选「取消」后由
     /// 前端经 [`cancel_close`] 调用。不退出的话残留的 label 会让后续
     /// CloseRequested 在 [`intercept_close_request`] 里被吞掉，关闭按钮永久失效。
     pub fn cancel(&self, label: &str) {
-        let mut set = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        let mut set = self.closing.lock().unwrap_or_else(|e| e.into_inner());
         set.remove(label);
+    }
+
+    /// 这些窗口是否**全部**仍在落盘流程中。
+    ///
+    /// 超时兜底只在「一个都没退出、也没人取消」时触发；只要有一个窗口
+    /// 调过 `cancel_close`，就不能替用户做决定。
+    pub fn all_closing(&self, labels: &[String]) -> bool {
+        if labels.is_empty() {
+            return false;
+        }
+        let set = self.closing.lock().unwrap_or_else(|e| e.into_inner());
+        labels.iter().all(|label| set.contains(label))
     }
 }
 
@@ -43,11 +78,17 @@ impl ClosingState {
 /// 而裸 `listen` 的 `Any` target 会匹配一切 emit（含定向 emit_to），
 /// 任一环节退化都会让「关闭我」的通知落到全部窗口，导致所有窗口一起关掉。
 pub fn intercept_close_request(window: &tauri::Window) -> bool {
+    // PDF 导出的隐藏窗口没有前端：放行关闭（调用方改用 destroy 时不会走到这里）
+    if !is_editor_window(window.label()) {
+        return false;
+    }
     let state = window.app_handle().state::<ClosingState>();
     if !state.begin(window.label()) {
         return true;
     }
     let _ = window.emit_to(window.label(), "app-close-requested", ());
+    // 关闭最后一个窗口同样是「退出应用」，一样需要超时兜底
+    arm_exit_watchdog(window.app_handle().clone(), state.next_generation());
     true
 }
 
@@ -72,16 +113,54 @@ pub fn exit_app(app: AppHandle) {
 /// 「只关当前窗口」而丢失。
 #[tauri::command]
 pub fn quit_app(app: AppHandle) {
-    let windows = app.webview_windows();
+    // 只通知编辑器窗口：PDF 导出的隐藏 webview 没有前端监听，永远等不到它落盘
+    let windows: Vec<(String, tauri::WebviewWindow)> = app
+        .webview_windows()
+        .into_iter()
+        .filter(|(label, _)| is_editor_window(label))
+        .collect();
     if windows.is_empty() {
         app.exit(0);
         return;
     }
+
+    let generation = app.state::<ClosingState>().next_generation();
     for (label, window) in windows {
         app.state::<ClosingState>().begin(&label);
         // 逐窗口定向发送：用广播会让每个窗口收到 N 次（N = 窗口数）
         let _ = window.emit_to(label.as_str(), "app-close-requested", ());
     }
+
+    arm_exit_watchdog(app, generation);
+}
+
+/// 退出超时兜底：前端落盘卡住时强制退出，避免应用永久停在「正在退出」。
+///
+/// 只在这些窗口**全部**仍处于关闭流程时触发；用户取消退出后 `cancel_close`
+/// 会移除对应 label，兜底不会抢在用户前面退出。
+fn arm_exit_watchdog(app: AppHandle, generation: u64) {
+    std::thread::spawn(move || {
+        std::thread::sleep(EXIT_TIMEOUT);
+
+        let state = app.state::<ClosingState>();
+        // 期间又发生过新的关闭 / 退出请求：以新看门狗为准
+        if !state.is_current_generation(generation) {
+            return;
+        }
+        let remaining: Vec<String> = app
+            .webview_windows()
+            .keys()
+            .filter(|label| is_editor_window(label))
+            .cloned()
+            .collect();
+        if remaining.is_empty() {
+            return;
+        }
+        if !state.all_closing(&remaining) {
+            return;
+        }
+        app.exit(0);
+    });
 }
 
 #[cfg(test)]
@@ -119,6 +198,30 @@ mod tests {
         let state = ClosingState::default();
         state.cancel("win-1");
         assert!(state.begin("win-1"));
+    }
+
+    #[test]
+    fn all_closing_requires_every_window() {
+        let state = ClosingState::default();
+        state.begin("main");
+        assert!(!state.all_closing(&["main".to_string(), "win-1".to_string()]));
+        state.begin("win-1");
+        assert!(state.all_closing(&["main".to_string(), "win-1".to_string()]));
+    }
+
+    #[test]
+    fn all_closing_false_after_cancel() {
+        let state = ClosingState::default();
+        state.begin("main");
+        state.begin("win-1");
+        state.cancel("win-1");
+        assert!(!state.all_closing(&["main".to_string(), "win-1".to_string()]));
+    }
+
+    #[test]
+    fn all_closing_false_for_empty_list() {
+        let state = ClosingState::default();
+        assert!(!state.all_closing(&[]));
     }
 
     #[test]
