@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { getMarkdownRenderer, getFrontMatter, setCurrentFilePath } from "../composables/useMarkdownRenderer";
+import { getMarkdownRenderer } from "../composables/useMarkdownRenderer";
 import { renderFrontMatterCard } from "../composables/useFrontMatter";
 import { MARKDOWN_THEMES } from "../composables/useTheme";
 // 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
@@ -87,17 +87,20 @@ async function renderPlantUML(container: HTMLElement, isStale: () => boolean) {
 async function update(isStale: () => boolean): Promise<void> {
   const container = containerRef.value;
   if (!container || isStale()) return;
-  // ADR-0015：设置当前文件路径，供 image renderer 解析相对图片路径
-  setCurrentFilePath(props.currentFilePath);
-  // 同步渲染 HTML
-  const bodyHtml = renderer.render(props.source);
+  // #434：文件路径与 front-matter 都随本次渲染显式传入 / 返回，不再读写模块级单例
+  const { html: bodyHtml, frontMatter } = renderer.render(props.source, {
+    filePath: props.currentFilePath,
+  });
   // 渲染 front-matter 卡片（spec：YAML frontmatter 必须解析并渲染为样式化卡片）
   // 共享实现：PreviewPane 与 useHtmlExport 必须使用同一渲染函数
-  const fmCard = renderFrontMatterCard(getFrontMatter());
+  const fmCard = renderFrontMatterCard(frontMatter);
   if (isStale()) return;
   container.innerHTML = fmCard + bodyHtml;
-  // 异步高亮代码块
-  await renderer.highlight(container, isStale);
+  // 异步高亮代码块：主题显式传入（#434），过期即停（#431）
+  await renderer.highlight(container, {
+    theme: resolveShikiTheme(props.theme),
+    isStale,
+  });
   if (isStale()) return;
   // 异步渲染 Mermaid
   await renderMermaid(container, isStale);
