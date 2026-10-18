@@ -164,9 +164,9 @@ export const useTabsStore = defineStore("tabs", () => {
    * 关闭标签页
    * - 若有未保存修改，由调用方决定如何处理（保存/不保存/取消）
    *   - 选择"保存"：调用方先调 saveTab / saveTabAs，再调本方法
-   *   - 选择"不保存"：直接调本方法，会自动写草稿保留未保存内容
+   *   - 选择"不保存"：调 `doCloseTab(id, { keepDraft: false })`，不写草稿并清掉已有草稿
    *   - 选择"取消"：调用方不调本方法
-   * - 本方法只负责写草稿 + 从列表中移除 + 调整激活 tab
+   * - 本方法只负责写草稿（或清理）+ 从列表中移除 + 调整激活 tab
    */
   async function closeTab(tabId: string): Promise<{ needsConfirm: boolean; tab: Tab | null }> {
     const idx = tabs.value.findIndex((t) => t.id === tabId);
@@ -186,15 +186,24 @@ export const useTabsStore = defineStore("tabs", () => {
   /**
    * 真正执行关闭动作（写草稿 + 移除 + 调整激活）
    * 调用方处理完未保存确认后调用本方法
+   * @param options.keepDraft 用户明确「不保存」时传 false：不写草稿并清掉已有草稿
    */
-  async function doCloseTab(tabId: string): Promise<{ needsConfirm: boolean; tab: Tab | null }> {
+  async function doCloseTab(
+    tabId: string,
+    options: { keepDraft?: boolean } = {}
+  ): Promise<{ needsConfirm: boolean; tab: Tab | null }> {
     const idx = tabs.value.findIndex((t) => t.id === tabId);
     if (idx < 0) return { needsConfirm: false, tab: null };
 
     const tab = tabs.value[idx];
-    if (tab.isDirty && tab.path) {
-      // 写入草稿（保留未保存内容，供下次启动恢复）
-      await persistDraftQuietly(tab.path, tab.content, tab.lastMtime ?? 0);
+    if (tab.path) {
+      if (options.keepDraft === false || !tab.isDirty) {
+        // 明确丢弃，或内容已与磁盘一致：旧草稿都是过期兜底，删掉避免下次误恢复
+        await fileSystem.deleteDraft(tab.path);
+      } else {
+        // 写入草稿（保留未保存内容，供下次启动恢复）
+        await persistDraftQuietly(tab.path, tab.content, tab.lastMtime ?? 0);
+      }
     }
 
     tabs.value.splice(idx, 1);

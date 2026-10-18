@@ -18,8 +18,8 @@ export interface TabsStoreLike {
   activeTabId: string | null;
   /** 关闭 tab（无未保存修改路径，走 dirty 检查） */
   closeTab: (id: string) => Promise<unknown>;
-  /** 强制关闭 tab（跳过 dirty 检查，草稿自动写入） */
-  doCloseTab: (id: string) => Promise<unknown>;
+  /** 强制关闭 tab（跳过 dirty 检查；`keepDraft: false` = 用户明确不保存） */
+  doCloseTab: (id: string, options?: { keepDraft?: boolean }) => Promise<unknown>;
   saveTab: (id: string) => Promise<unknown>;
   saveTabAs: (id: string, path: string) => Promise<unknown>;
 }
@@ -115,8 +115,8 @@ export function useTabClose(deps: TabCloseDeps) {
       const ok = await saveBeforeClose(tabId, tab);
       if (!ok) return;
     }
-    // discard：跳过 dirty 检查直接关闭（草稿会自动写入）
-    await tabsStore.doCloseTab(tabId);
+    // discard：明确丢弃 → 不写草稿并清掉已有草稿；save 后已不脏，同样无需草稿
+    await tabsStore.doCloseTab(tabId, { keepDraft: choice !== "discard" });
   }
 
   // ===== 批量关闭（右键菜单触发）=====
@@ -134,6 +134,7 @@ export function useTabClose(deps: TabCloseDeps) {
     if (targets.length === 0) return;
 
     const dirty = targets.filter((tab) => tab.isDirty);
+    let keepDraft = true;
     if (dirty.length > 0) {
       const names = dirty
         .map((tab) => (tab.path ? basename(tab.path) : t("common.untitled")))
@@ -159,10 +160,11 @@ export function useTabClose(deps: TabCloseDeps) {
           if (!ok) return;
         }
       }
+      keepDraft = choice !== "discard";
     }
 
     for (const tab of targets) {
-      await tabsStore.doCloseTab(tab.id);
+      await tabsStore.doCloseTab(tab.id, { keepDraft });
     }
   }
 
