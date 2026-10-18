@@ -43,7 +43,7 @@ import { useShortcuts } from "./shortcuts/useShortcuts";
 import { toMenuAccelerators } from "./shortcuts/shortcutsLogic";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
 import { useModeMenuSync } from "./composables/useModeMenuSync";
-import { useExitFlush, type ExitFlushTab } from "./composables/useExitFlush";
+import { useExitFlush, type ExitFlushChoice, type ExitFlushTab } from "./composables/useExitFlush";
 import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
 import { setLocale } from "./i18n";
 import { mapSystemLocale } from "./utils/systemLocale";
@@ -79,6 +79,34 @@ const editorBridge = useEditorBridgeStore();
 const dialog = useDialogStore();
 const toastStore = useToastStore();
 const { t } = useI18n();
+
+// ===== 草稿冲突裁决（#425）=====
+// 草稿基线与磁盘 mtime 不一致时，让用户选择「保留草稿」还是「加载磁盘版本」，
+// 而不是静默丢弃草稿。取消 = 用磁盘内容打开，草稿文件保留。
+tabsStore.setDraftConflictResolver(async ({ path, diskContent, draftContent, diskMtime, draftSavedAt }) => {
+  const preview = (text: string): string => {
+    const line = text.split(/\r?\n/).find((item) => item.trim().length > 0) ?? "";
+    return line.length > 40 ? `${line.slice(0, 40)}…` : line;
+  };
+  const formatTime = (ms: number): string => (ms > 0 ? new Date(ms).toLocaleString() : "");
+
+  const choice = await dialog.unsavedChanges({
+    title: t("common.dialog.draftConflictTitle"),
+    message: t("common.dialog.draftConflictMessage", {
+      name: basename(path),
+      diskTime: formatTime(diskMtime),
+      diskPreview: preview(diskContent),
+      draftTime: formatTime(draftSavedAt),
+      draftPreview: preview(draftContent),
+    }),
+    saveText: t("common.dialog.draftConflictKeep"),
+    discardText: t("common.dialog.draftConflictLoadDisk"),
+    cancelText: t("common.dialog.draftConflictLater"),
+  });
+  if (choice === "save") return "keep-draft";
+  if (choice === "discard") return "load-disk";
+  return "cancel";
+});
 
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
@@ -387,17 +415,17 @@ let cleanupExitListener: (() => void) | null = null;
  * 退出前的未保存改动确认（issue #346 / ADR-0017 修订）。
  *
  * 把本窗口所有 dirty tab **一次性汇总**成一个三选一对话框（与批量关闭 tab 同款），
- * 返回 `false` = 取消退出：窗口不关、也不落盘。
+ * 返回 `cancel` = 取消退出：窗口不关、也不落盘。
  *
  * - 选「保存」：逐个写回（已命名走写盘、未命名走另存为），任一取消或失败即**中止退出**
- * - 选「不保存」：不回写文件；退出时的草稿兜底照旧（ADR-0017，保证崩溃/异常仍有得恢复）
+ * - 选「不保存」：不回写文件，也不留草稿（issue #426）
  */
-async function resolveUnsavedOnExit(dirty: readonly ExitFlushTab[]): Promise<boolean> {
+async function resolveUnsavedOnExit(dirty: readonly ExitFlushTab[]): Promise<ExitFlushChoice> {
   const names = dirty
     .map((tab) => (tab.path ? basename(tab.path) : t("common.untitled")))
     .join("、");
-  // 注意：这里的「不保存」不等于丢内容 —— 未命名 tab 的正文随 tabs.json 保留、下次启动会恢复，
-  // 所以不像「批量关闭 tab」那样需要额外警告（那条路径下 tab 真的被移除了）
+  // 已命名 tab 选择「不保存」= 真丢弃（不写文件、不留草稿）；
+  // 未命名 tab 没有磁盘可回退，正文只能随 tabs.json 保存，因此这里显式清空。
   const choice = await dialog.unsavedChanges({
     title: t("common.dialog.unsavedBeforeExitTitle"),
     message: t("common.dialog.unsavedBeforeExitMessage", { count: dirty.length, names }),
@@ -405,14 +433,19 @@ async function resolveUnsavedOnExit(dirty: readonly ExitFlushTab[]): Promise<boo
     discardText: t("common.closeWithoutSaving"),
     cancelText: t("common.cancel"),
   });
-  if (choice === "cancel") return false;
-  if (choice === "discard") return true;
+  if (choice === "cancel") return "cancel";
+  if (choice === "discard") {
+    for (const tab of dirty) {
+      if (!tab.path) tabsStore.updateContent(tab.id, "");
+    }
+    return "discard";
+  }
 
   for (const tab of dirty) {
     const ok = await saveBeforeClose(tab.id, tab);
-    if (!ok) return false;
+    if (!ok) return "cancel";
   }
-  return true;
+  return "save";
 }
 
 // 退出前：先问未保存改动（上面），再写草稿 + 刷新 tabs.json，最后真正关窗

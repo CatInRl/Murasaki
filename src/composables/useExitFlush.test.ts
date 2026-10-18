@@ -16,11 +16,15 @@ vi.mock("@tauri-apps/api/webviewWindow", () => ({
   getCurrentWebviewWindow: () => ({ destroy: vi.fn(async () => undefined) }),
 }));
 vi.mock("../services/fileSystem", () => ({
-  fileSystem: { saveDraft: vi.fn(async () => undefined) },
+  fileSystem: {
+    saveDraft: vi.fn(async () => undefined),
+    deleteDraft: vi.fn(async () => undefined),
+  },
 }));
 
 /** 接线层内部固定走 fileSystem.saveDraft（不取注入的 saveDraft），断言要用这个替身 */
 const saveDraftSpy = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+const deleteDraftSpy = fileSystem.deleteDraft as unknown as ReturnType<typeof vi.fn>;
 
 function tab(overrides: Partial<ExitFlushTab> = {}): ExitFlushTab {
   return {
@@ -104,7 +108,7 @@ describe("useExitFlush（退出确认 #346）", () => {
 
   it("无未保存改动：不询问，直接落盘", async () => {
     const { deps, persist } = makeDeps([tab({ isDirty: false })]);
-    const resolveUnsaved = vi.fn(async () => false);
+    const resolveUnsaved = vi.fn(async () => "cancel" as const);
     await useExitFlush(deps, { resolveUnsaved }).onExitRequested();
     expect(resolveUnsaved).not.toHaveBeenCalled();
     expect(persist).toHaveBeenCalledTimes(1);
@@ -119,7 +123,7 @@ describe("useExitFlush（退出确认 #346）", () => {
 
   it("选「继续退出」：把 dirty tab 交给询问方后照旧落盘", async () => {
     const { deps, persist } = makeDeps([tab()]);
-    const resolveUnsaved = vi.fn(async () => true);
+    const resolveUnsaved = vi.fn(async () => "save" as const);
     await useExitFlush(deps, { resolveUnsaved }).onExitRequested();
     expect(resolveUnsaved).toHaveBeenCalledWith([expect.objectContaining({ id: "t1" })]);
     expect(saveDraftSpy).toHaveBeenCalledTimes(1);
@@ -129,7 +133,7 @@ describe("useExitFlush（退出确认 #346）", () => {
   it("选「取消」：不落盘、不关窗，且下次仍能触发（否则窗口就再也关不掉了）", async () => {
     const warn = vi.spyOn(console, "error").mockImplementation(() => {});
     const { deps, persist } = makeDeps([tab()]);
-    const resolveUnsaved = vi.fn(async () => false);
+    const resolveUnsaved = vi.fn(async () => "cancel" as const);
     const { onExitRequested } = useExitFlush(deps, { resolveUnsaved });
 
     invokeSpy.mockClear();
@@ -143,6 +147,17 @@ describe("useExitFlush（退出确认 #346）", () => {
     await onExitRequested();
     expect(resolveUnsaved).toHaveBeenCalledTimes(2);
     warn.mockRestore();
+  });
+
+  it("选「不保存」：不写草稿、清掉已有草稿，但仍然刷新 tabs.json 并关窗（#426）", async () => {
+    const { deps, persist } = makeDeps([tab()]);
+    deleteDraftSpy.mockClear();
+    const resolveUnsaved = vi.fn(async () => "discard" as const);
+    await useExitFlush(deps, { resolveUnsaved }).onExitRequested();
+    expect(resolveUnsaved).toHaveBeenCalled();
+    expect(saveDraftSpy).not.toHaveBeenCalled();
+    expect(deleteDraftSpy).toHaveBeenCalledWith("C:/ws/a.md");
+    expect(persist).toHaveBeenCalledTimes(1);
   });
 
   it("确认过程抛错：按「取消退出」处理，同样要退出 Rust 拦截", async () => {

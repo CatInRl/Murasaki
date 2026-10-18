@@ -87,6 +87,11 @@
     "openLargeFileConfirm": "ファイル「{name}」はサイズが大きいため（{size} MB）、テキストとして開くと時間がかかる場合があります。開きますか？",
     "reloadDiscardConfirm": "再読み込みすると「{name}」の未保存の変更は破棄されます（下書きは保持されます）。続行しますか？",
     "reloadConfirmAction": "再読み込み",
+    "draftConflictTitle": "下書きとディスクの内容が一致しません",
+    "draftConflictMessage": "ファイル「{name}」は閉じた後に外部で変更されました。\n\nディスクの内容（{diskTime}）：{diskPreview}\n下書き（{draftTime}）：{draftPreview}",
+    "draftConflictKeep": "下書きを保持",
+    "draftConflictLoadDisk": "ディスクの内容を読み込む",
+    "draftConflictLater": "後で決める",
     "openFileFirst": "先にファイルを開いてください"
   },
   "error": {
