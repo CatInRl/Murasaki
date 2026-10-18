@@ -6,6 +6,7 @@ import { MARKDOWN_THEMES } from "../composables/useTheme";
 // 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
 import "../styles/markdown-content.css";
 import { renderMermaidDiagram, sanitizeMermaidSvg } from "../utils/mermaidTheme";
+import { createRenderGate } from "../composables/useRenderGate";
 
 interface Props {
   source: string;
@@ -48,19 +49,22 @@ function resolveShikiTheme(themeName: string): string {
 // 初始化 Shiki 主题（与 props.theme 同步，确保首次渲染就用对的主题）
 renderer.setShikiTheme(resolveShikiTheme(props.theme));
 
-async function renderMermaid(container: HTMLElement) {
+async function renderMermaid(container: HTMLElement, isStale: () => boolean) {
   const blocks = container.querySelectorAll<HTMLElement>(".mermaid");
   if (blocks.length === 0) return;
   // 初始化、token 派生的 themeVariables 与 gantt 宽度注入统一在
   // utils/mermaidTheme.ts（issue #295/#342），与 WYSIWYG 共用同一渲染入口。
   for (const block of Array.from(blocks)) {
+    if (isStale()) return;
     const code = block.textContent || "";
     const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
     try {
       const svg = await renderMermaidDiagram(block, id, code);
+      if (isStale()) return;
       block.innerHTML = svg;
       sanitizeMermaidSvg(block);
     } catch (err) {
+      if (isStale()) return;
       block.innerHTML = `<pre style="color:var(--murasaki-state-error)">${(err as Error).message}</pre>`;
     }
   }
@@ -69,18 +73,20 @@ async function renderMermaid(container: HTMLElement) {
 // ===== PlantUML（官方 TeaVM 纯浏览器产物，无需服务器。逻辑提取到 utils/plantuml.ts 供 WYSIWYG 复用）=====
 import { renderPlantUmlCode } from "../utils/plantuml";
 
-async function renderPlantUML(container: HTMLElement) {
+async function renderPlantUML(container: HTMLElement, isStale: () => boolean) {
   const blocks = container.querySelectorAll<HTMLElement>(".plantuml-block");
   if (blocks.length === 0) return;
   for (const block of Array.from(blocks)) {
+    if (isStale()) return;
     const code = block.textContent || "";
     await renderPlantUmlCode(code, block);
   }
 }
 
-async function update() {
+/** 一次完整渲染；`isStale()` 为 true 表示已有更新调度，放弃后续 DOM 操作（#431） */
+async function update(isStale: () => boolean): Promise<void> {
   const container = containerRef.value;
-  if (!container) return;
+  if (!container || isStale()) return;
   // ADR-0015：设置当前文件路径，供 image renderer 解析相对图片路径
   setCurrentFilePath(props.currentFilePath);
   // 同步渲染 HTML
@@ -88,20 +94,33 @@ async function update() {
   // 渲染 front-matter 卡片（spec：YAML frontmatter 必须解析并渲染为样式化卡片）
   // 共享实现：PreviewPane 与 useHtmlExport 必须使用同一渲染函数
   const fmCard = renderFrontMatterCard(getFrontMatter());
+  if (isStale()) return;
   container.innerHTML = fmCard + bodyHtml;
   // 异步高亮代码块
-  await renderer.highlight(container);
+  await renderer.highlight(container, isStale);
+  if (isStale()) return;
   // 异步渲染 Mermaid
-  await renderMermaid(container);
+  await renderMermaid(container, isStale);
+  if (isStale()) return;
   // 异步渲染 PlantUML
-  await renderPlantUML(container);
+  await renderPlantUML(container, isStale);
 }
+
+/**
+ * 预览重渲染入口（#431）：200ms 防抖 + 代际取消。
+ * 快速输入时只有最后一次变更真正渲染，旧渲染在每个 await 之后自检并放弃。
+ */
+const renderGate = createRenderGate({
+  debounceMs: 200,
+  immediateFirst: true,
+  run: update,
+});
 
 // 源码变更 → 重新渲染
 watch(
   () => props.source,
   () => {
-    void nextTick(update);
+    void nextTick(() => renderGate.schedule());
   },
   { immediate: true }
 );
@@ -110,7 +129,7 @@ watch(
 watch(
   () => props.currentFilePath,
   () => {
-    void nextTick(update);
+    void nextTick(() => renderGate.schedule());
   }
 );
 
@@ -119,11 +138,12 @@ watch(
   () => props.theme,
   (newTheme) => {
     renderer.setShikiTheme(resolveShikiTheme(newTheme));
-    void nextTick(update);
+    void nextTick(() => renderGate.schedule());
   }
 );
 
 onBeforeUnmount(() => {
+  renderGate.cancel();
   containerRef.value = null;
 });
 
