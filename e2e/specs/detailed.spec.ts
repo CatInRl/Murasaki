@@ -12,6 +12,7 @@ import {
   closeWorkspace,
   openFileInTab,
   getTabsState,
+  getActiveContent,
   ensureSplitMode,
   resetPersistenceSettings,
   dismissAllDialogs,
@@ -248,11 +249,11 @@ describe("1. 关闭确认对话框", () => {
     // tab 仍在
     await waitForTabCount(browser, 1);
 
-    // 模拟用户选「不保存」→ 调 doCloseTab
+    // 模拟用户选「不保存」→ 调 doCloseTab（keepDraft: false，不写草稿）
     await browser.executeAsync((done) => {
       // @ts-ignore
       const tabs = window.__pinia__._s.get("tabs");
-      Promise.resolve(tabs.doCloseTab(tabs.activeTabId))
+      Promise.resolve(tabs.doCloseTab(tabs.activeTabId, { keepDraft: false }))
         .then(() => done(null), (e: unknown) => done(String(e)));
     });
 
@@ -261,6 +262,12 @@ describe("1. 关闭确认对话框", () => {
     // 磁盘内容应未变
     const diskAfter = await readDiskFile(browser, `${WS1}\\intro.md`);
     expect(diskAfter).toBe(originalDisk);
+
+    // 重新打开：应回到磁盘内容，被丢弃的修改不会借草稿复活（#426）
+    await openFileInTab(browser, `${WS1}\\intro.md`);
+    await waitForTabCount(browser, 1);
+    const reopened = await getActiveContent(browser);
+    expect(reopened).not.toContain("改了内容");
   });
 
   it("1.3 有修改弹对话框：选择「保存」→ 磁盘写入新内容，tab 关闭", async () => {
