@@ -1,5 +1,6 @@
 pub mod assets;
 pub mod atomic_write;
+pub mod dialogs;
 pub mod drafts;
 pub mod files;
 pub mod launch;

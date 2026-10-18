@@ -22,6 +22,7 @@ pub async fn export_pdf(
 ) -> Result<(), CommandError> {
     #[cfg(windows)]
     {
+        crate::security::policy().ensure_write(&output_path)?;
         export_pdf_windows(&app, html, output_path).await
     }
     #[cfg(not(windows))]

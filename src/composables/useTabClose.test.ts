@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useTabClose, type TabCloseDeps } from "./useTabClose";
 
-vi.mock("@tauri-apps/plugin-dialog", () => ({
-  save: vi.fn(),
+// mock Rust 侧文件对话框命令（#437）
+vi.mock("../utils/fileDialog", () => ({
+  pickFile: vi.fn(),
+  pickSave: vi.fn(),
+  pickFolder: vi.fn(),
 }));
 
-import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { pickSave } from "../utils/fileDialog";
 
-const mockedSaveDialog = saveDialog as unknown as ReturnType<typeof vi.fn>;
+const mockedPickSave = pickSave as unknown as ReturnType<typeof vi.fn>;
 
 function makeTab(overrides: Partial<{
   id: string;
@@ -43,7 +46,7 @@ function makeDeps(overrides: Partial<TabCloseDeps> = {}): TabCloseDeps {
 }
 
 beforeEach(() => {
-  mockedSaveDialog.mockReset();
+  mockedPickSave.mockReset();
 });
 
 describe("useTabClose", () => {
@@ -130,7 +133,7 @@ describe("useTabClose", () => {
     });
 
     it("有未保存修改 + 用户选 save（无路径）→ saveDialog + saveTabAs", async () => {
-      mockedSaveDialog.mockResolvedValue("/new/path.md");
+      mockedPickSave.mockResolvedValue("/new/path.md");
       const deps = makeDeps({
         tabsStore: {
           tabs: [makeTab({ isDirty: true, path: null })],
@@ -147,7 +150,7 @@ describe("useTabClose", () => {
       });
       const { onCloseTabRequest } = useTabClose(deps);
       await onCloseTabRequest("tab1");
-      expect(mockedSaveDialog).toHaveBeenCalled();
+      expect(mockedPickSave).toHaveBeenCalled();
       expect(deps.tabsStore.saveTabAs).toHaveBeenCalledWith("tab1", "/new/path.md");
       expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("tab1", { keepDraft: true });
     });
@@ -273,13 +276,13 @@ describe("useTabClose", () => {
     });
 
     it("保存被取消（另存为对话框取消）→ 整批中止，不关闭任何标签", async () => {
-      mockedSaveDialog.mockResolvedValue(null);
+      mockedPickSave.mockResolvedValue(null);
       const deps = batchDeps(
         [makeTab({ id: "t1", path: null, isDirty: true })],
         { dialog: { unsavedChanges: vi.fn().mockResolvedValue("save"), alert: vi.fn() } as never }
       );
       await useTabClose(deps).onCloseAllTabs();
-      expect(mockedSaveDialog).toHaveBeenCalled();
+      expect(mockedPickSave).toHaveBeenCalled();
       expect(deps.tabsStore.doCloseTab).not.toHaveBeenCalled();
     });
   });

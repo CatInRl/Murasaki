@@ -104,9 +104,12 @@ pub fn classify_drop_paths(paths: Vec<String>) -> Vec<DropPathInfo> {
 #[tauri::command]
 pub fn take_pending_open_path(
     window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
     state: tauri::State<'_, PendingOpenState>,
 ) -> Option<serde_json::Value> {
     let path = state.take(window.label())?;
+    // 这个路径来自启动参数 / 文件关联 / 已授权的新建窗口请求（#437）
+    crate::security::grant_path(&app, std::path::Path::new(&path));
     Some(serde_json::json!({
         "path": path,
         "type": classify_path(std::path::Path::new(&path)),

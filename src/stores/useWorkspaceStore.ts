@@ -1,8 +1,8 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { TreeListing, TreeNode } from "../types";
+import { pickFolder } from "../utils/fileDialog";
 import { basename } from "../utils/path";
 import { i18n } from "../i18n";
 import {
@@ -95,11 +95,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
    * Rust 侧会聚焦那个窗口而不是重复开窗（避免同目录双 watcher 与文件操作冲突）。
    */
   async function openFolderDialog(): Promise<boolean> {
-    const selected = await openDialog({
-      directory: true,
-      multiple: false,
-      title: t("common.openFolderTitle"),
-    });
+    const selected = await pickFolder({ title: t("common.openFolderTitle") });
     if (typeof selected !== "string" || !selected) {
       return false;
     }

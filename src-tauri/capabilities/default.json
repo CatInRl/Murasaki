@@ -9,11 +9,9 @@
     "core:window:allow-destroy",
     "core:window:allow-is-fullscreen",
     "core:window:allow-set-fullscreen",
-    "dialog:default",
-    "fs:default",
     "store:default",
     "shell:default",
     "updater:default",
-    "process:default"
+    "process:allow-restart"
   ]
 }

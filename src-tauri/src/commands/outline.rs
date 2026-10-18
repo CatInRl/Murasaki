@@ -96,6 +96,7 @@ pub fn parse_outline_from_text(content: &str) -> Vec<OutlineItem> {
 /// 返回 OutlineItem 数组
 #[tauri::command]
 pub fn parse_outline(path: String) -> Result<Vec<OutlineItem>, CommandError> {
+    crate::security::policy().ensure_read(&path)?;
     let p = Path::new(&path);
     if !p.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &path));

@@ -18,22 +18,23 @@ vi.mock("../services/fileSystem", () => ({
   },
 }));
 
-// mock @tauri-apps/plugin-dialog
-vi.mock("@tauri-apps/plugin-dialog", () => ({
-  open: vi.fn(),
-  save: vi.fn(),
+// mock Rust 侧文件对话框命令（#437）
+vi.mock("../utils/fileDialog", () => ({
+  pickFile: vi.fn(),
+  pickSave: vi.fn(),
+  pickFolder: vi.fn(),
 }));
 
 import { exportHtml } from "./useHtmlExport";
 import { fileSystem } from "../services/fileSystem";
-import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { pickFile, pickSave } from "../utils/fileDialog";
 
 const mockedExportHtml = exportHtml as unknown as ReturnType<typeof vi.fn>;
 const mockedExportPdf = fileSystem.exportPdf as unknown as ReturnType<typeof vi.fn>;
 const mockedGetSize = fileSystem.getSize as unknown as ReturnType<typeof vi.fn>;
 const mockedExists = fileSystem.exists as unknown as ReturnType<typeof vi.fn>;
-const mockedOpenDialog = openDialog as unknown as ReturnType<typeof vi.fn>;
-const mockedSaveDialog = saveDialog as unknown as ReturnType<typeof vi.fn>;
+const mockedPickFile = pickFile as unknown as ReturnType<typeof vi.fn>;
+const mockedPickSave = pickSave as unknown as ReturnType<typeof vi.fn>;
 
 function makeTab(overrides: Partial<Tab> = {}): Tab {
   return {
@@ -91,20 +92,20 @@ function makeDeps(overrides: Partial<FileActionsDeps> = {}): FileActionsDeps {
 beforeEach(() => {
   mockedExportHtml.mockReset();
   mockedExportPdf.mockReset();
-  mockedOpenDialog.mockReset();
-  mockedSaveDialog.mockReset();
+  mockedPickFile.mockReset();
+  mockedPickSave.mockReset();
   mockedGetSize.mockReset().mockResolvedValue(0);
   mockedExists.mockReset().mockResolvedValue(false);
 });
 
 describe("useFileActions - openFileViaDialog", () => {
   it("过滤器覆盖 Markdown / 文本与代码 / 所有文件三类", async () => {
-    mockedOpenDialog.mockResolvedValue(null);
+    mockedPickFile.mockResolvedValue(null);
     const deps = makeDeps();
     const { openFileViaDialog } = useFileActions(deps);
     await openFileViaDialog();
 
-    const options = mockedOpenDialog.mock.calls[0][0];
+    const options = mockedPickFile.mock.calls[0][0];
     expect(options.title).toBe("打开文件");
     expect(options.filters.map((f: { name: string }) => f.name)).toEqual([
       "Markdown 文档",
@@ -121,7 +122,7 @@ describe("useFileActions - openFileViaDialog", () => {
   });
 
   it("选中非 Markdown 文件也能打开", async () => {
-    mockedOpenDialog.mockResolvedValue("/test/page.html");
+    mockedPickFile.mockResolvedValue("/test/page.html");
     const deps = makeDeps();
     const { openFileViaDialog } = useFileActions(deps);
     await openFileViaDialog();
@@ -300,7 +301,7 @@ describe("useFileActions - exportCurrentPdf", () => {
   it("成功 → saveDialog(PDF) + exportHtml + exportPdf + toast.success", async () => {
     const fullHtml = "<html><body><h1>Hi</h1></body></html>";
     mockedExportHtml.mockResolvedValue({ html: fullHtml, failedImages: [] });
-    mockedSaveDialog.mockResolvedValue("/test/file.pdf");
+    mockedPickSave.mockResolvedValue("/test/file.pdf");
     mockedExportPdf.mockResolvedValue(undefined);
 
     const deps = makeDeps();
@@ -308,7 +309,7 @@ describe("useFileActions - exportCurrentPdf", () => {
     await exportCurrentPdf();
 
     // saveDialog 用 PDF 过滤器
-    expect(mockedSaveDialog).toHaveBeenCalledWith(
+    expect(mockedPickSave).toHaveBeenCalledWith(
       expect.objectContaining({
         filters: [{ name: "PDF", extensions: ["pdf"] }],
         title: "导出 PDF",
@@ -328,7 +329,7 @@ describe("useFileActions - exportCurrentPdf", () => {
   });
 
   it("用户取消 saveDialog → 不调用 exportHtml/exportPdf，无 toast", async () => {
-    mockedSaveDialog.mockResolvedValue(null);
+    mockedPickSave.mockResolvedValue(null);
 
     const deps = makeDeps();
     const { exportCurrentPdf } = useFileActions(deps);
@@ -342,7 +343,7 @@ describe("useFileActions - exportCurrentPdf", () => {
 
   it("exportHtml 抛错 → toast.error，不调用 exportPdf", async () => {
     mockedExportHtml.mockRejectedValue(new Error("render fail"));
-    mockedSaveDialog.mockResolvedValue("/test/file.pdf");
+    mockedPickSave.mockResolvedValue("/test/file.pdf");
 
     const deps = makeDeps();
     const { exportCurrentPdf } = useFileActions(deps);
@@ -358,7 +359,7 @@ describe("useFileActions - exportCurrentPdf", () => {
   it("exportPdf 抛错 → toast.error", async () => {
     const fullHtml = "<html><body><h1>Hi</h1></body></html>";
     mockedExportHtml.mockResolvedValue({ html: fullHtml, failedImages: [] });
-    mockedSaveDialog.mockResolvedValue("/test/file.pdf");
+    mockedPickSave.mockResolvedValue("/test/file.pdf");
     mockedExportPdf.mockRejectedValue(new Error("PDF generation failed"));
 
     const deps = makeDeps();
@@ -373,7 +374,7 @@ describe("useFileActions - exportCurrentPdf", () => {
 
   it("无标题 tab（path=null）也能导出，默认名 untitled.pdf", async () => {
     mockedExportHtml.mockResolvedValue({ html: "<body>ok</body>", failedImages: [] });
-    mockedSaveDialog.mockResolvedValue("/test/untitled.pdf");
+    mockedPickSave.mockResolvedValue("/test/untitled.pdf");
     mockedExportPdf.mockResolvedValue(undefined);
 
     const deps = makeDeps({
@@ -382,7 +383,7 @@ describe("useFileActions - exportCurrentPdf", () => {
     const { exportCurrentPdf } = useFileActions(deps);
     await exportCurrentPdf();
 
-    expect(mockedSaveDialog).toHaveBeenCalledWith(
+    expect(mockedPickSave).toHaveBeenCalledWith(
       expect.objectContaining({
         defaultPath: "untitled.pdf",
       })
@@ -398,7 +399,7 @@ describe("useFileActions - exportCurrentPdf", () => {
 
   it("有路径的 tab 默认名用 basename 替换扩展名", async () => {
     mockedExportHtml.mockResolvedValue({ html: "<body>ok</body>", failedImages: [] });
-    mockedSaveDialog.mockResolvedValue("/test/my-doc.pdf");
+    mockedPickSave.mockResolvedValue("/test/my-doc.pdf");
     mockedExportPdf.mockResolvedValue(undefined);
 
     const deps = makeDeps({
@@ -407,7 +408,7 @@ describe("useFileActions - exportCurrentPdf", () => {
     const { exportCurrentPdf } = useFileActions(deps);
     await exportCurrentPdf();
 
-    expect(mockedSaveDialog).toHaveBeenCalledWith(
+    expect(mockedPickSave).toHaveBeenCalledWith(
       expect.objectContaining({
         defaultPath: "my-doc.pdf",
       })
@@ -420,7 +421,7 @@ describe("useFileActions - exportCurrentPdf", () => {
 describe("useFileActions - exportCurrentHtml 反馈（#384）", () => {
   it("导出成功 → toast.success 反馈", async () => {
     mockedExportHtml.mockResolvedValue({ html: "<html>ok</html>", failedImages: [] });
-    mockedSaveDialog.mockResolvedValue("/test/out.html");
+    mockedPickSave.mockResolvedValue("/test/out.html");
 
     const deps = makeDeps();
     const { exportCurrentHtml } = useFileActions(deps);
@@ -432,7 +433,7 @@ describe("useFileActions - exportCurrentHtml 反馈（#384）", () => {
 
   it("导出失败 → toast.error（与 PDF 反馈模型统一），不再 dialog.alert", async () => {
     mockedExportHtml.mockRejectedValue(new Error("render fail"));
-    mockedSaveDialog.mockResolvedValue("/test/out.html");
+    mockedPickSave.mockResolvedValue("/test/out.html");
 
     const deps = makeDeps();
     const { exportCurrentHtml } = useFileActions(deps);

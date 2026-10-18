@@ -214,6 +214,8 @@ pub fn cleanup_window_state(app: &AppHandle, label: &str) {
 ///
 /// 目录：命中已有窗口则聚焦并返回其 label；文件：新窗口打开该文件。
 pub fn open_path_in_new_window_impl(app: &AppHandle, path: &str) -> Result<String, CommandError> {
+    // 只允许打开已授权路径（对话框刚授权 / 最近列表的持久化授权）
+    crate::security::policy().ensure_read(path)?;
     if !std::path::Path::new(path).exists() {
         return Err(CommandError::path(ErrorCode::NotFound, path));
     }
