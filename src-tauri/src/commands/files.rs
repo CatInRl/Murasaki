@@ -104,9 +104,57 @@ fn is_markdown(name: &str) -> bool {
     lower.ends_with(".md") || lower.ends_with(".markdown") || lower.ends_with(".mdown") || lower.ends_with(".mkd")
 }
 
+/// 文件树递归深度上限（含根目录的第 0 层）：超过后不再向下展开子目录。
+pub const MAX_TREE_DEPTH: usize = 20;
+
+/// 文件树节点总数上限：超过后停止遍历并返回 `truncated = true`。
+///
+/// 20k 节点足够覆盖正常项目；再大的目录（含依赖、产物、网络盘）一次整棵树
+/// 返回既拖垮后端遍历，也让前端一次渲染卡死。
+pub const MAX_TREE_NODES: usize = 20_000;
+
+/// 文件树遍历配额：节点数与截断标记（#432）
+struct TreeBudget {
+    remaining: usize,
+    truncated: bool,
+}
+
+impl TreeBudget {
+    fn new(limit: usize) -> Self {
+        Self {
+            remaining: limit,
+            truncated: false,
+        }
+    }
+
+    /// 申请一个节点配额；耗尽时标记截断并返回 false
+    fn take(&mut self) -> bool {
+        if self.remaining == 0 {
+            self.truncated = true;
+            return false;
+        }
+        self.remaining -= 1;
+        true
+    }
+}
+
+/// `list_tree` 的返回：节点列表 + 是否因上限被截断（#432）
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TreeListing {
+    pub nodes: Vec<TreeNode>,
+    /// 因深度或节点数上限而省略了部分内容
+    pub truncated: bool,
+}
+
 /// 递归遍历目录生成文件树
 /// show_hidden: 是否显示全部（含 NOISE_NAMES 清单与 dotfile）；false 时按 spec 过滤噪音 + dotfile
-fn build_tree_inner(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<TreeNode>> {
+fn build_tree_inner(
+    dir: &Path,
+    show_hidden: bool,
+    depth: usize,
+    budget: &mut TreeBudget,
+) -> std::io::Result<Vec<TreeNode>> {
     let mut nodes: Vec<TreeNode> = Vec::new();
     let entries = fs::read_dir(dir)?;
 
@@ -124,7 +172,16 @@ fn build_tree_inner(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<TreeNo
             Err(_) => continue,
         };
         if metadata.is_dir() {
-            let children = build_tree_inner(&path, show_hidden).unwrap_or_default();
+            if !budget.take() {
+                break;
+            }
+            // 达到深度上限：保留目录节点但不再展开，并标记截断
+            let children = if depth + 1 >= MAX_TREE_DEPTH {
+                budget.truncated = true;
+                Vec::new()
+            } else {
+                build_tree_inner(&path, show_hidden, depth + 1, budget).unwrap_or_default()
+            };
             nodes.push(TreeNode {
                 name,
                 path: path.to_string_lossy().to_string(),
@@ -133,6 +190,9 @@ fn build_tree_inner(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<TreeNo
                 size: None,
             });
         } else {
+            if !budget.take() {
+                break;
+            }
             let size = entry.metadata().ok().map(|m| m.len());
             nodes.push(TreeNode {
                 name,
@@ -150,18 +210,29 @@ fn build_tree_inner(dir: &Path, show_hidden: bool) -> std::io::Result<Vec<TreeNo
 
 /// 列出指定目录的文件树（递归，一次返回完整结构）
 /// show_hidden: 可选，是否包含隐藏文件（默认 false）
+///
+/// #432：改为 `async` + `spawn_blocking`，避免递归遍历大目录时阻塞主线程；
+/// 超过深度 / 节点数上限时返回 `truncated = true`。
 #[tauri::command]
-pub fn list_tree(path: String, show_hidden: Option<bool>) -> Result<Vec<TreeNode>, String> {
-    let dir = Path::new(&path);
-    if !dir.exists() {
-        return Err(format!("路径不存在: {}", path));
-    }
-    if !dir.is_dir() {
-        return Err(format!("不是目录: {}", path));
-    }
-    let tree = build_tree_inner(dir, show_hidden.unwrap_or(false))
-        .map_err(|e| format!("读取目录失败: {}: {}", path, e))?;
-    Ok(tree)
+pub async fn list_tree(path: String, show_hidden: Option<bool>) -> Result<TreeListing, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = PathBuf::from(&path);
+        if !dir.exists() {
+            return Err(format!("路径不存在: {}", path));
+        }
+        if !dir.is_dir() {
+            return Err(format!("不是目录: {}", path));
+        }
+        let mut budget = TreeBudget::new(MAX_TREE_NODES);
+        let nodes = build_tree_inner(&dir, show_hidden.unwrap_or(false), 0, &mut budget)
+            .map_err(|e| format!("读取目录失败: {}: {}", path, e))?;
+        Ok(TreeListing {
+            nodes,
+            truncated: budget.truncated,
+        })
+    })
+    .await
+    .map_err(|e| format!("读取目录任务失败: {}", e))?
 }
 
 /// 创建文件（若已存在则报错）
@@ -287,22 +358,36 @@ pub fn copy_file(from: String, to: String) -> Result<TreeNode, String> {
 }
 
 /// 读取文件内容（文本）
+///
+/// #432：`async` + `spawn_blocking` —— 大文件或网络盘读取不再占用主线程。
 #[tauri::command]
-pub fn read_text_file(path: String) -> Result<String, String> {
-    fs::read_to_string(&path).map_err(|e| e.to_string())
+pub async fn read_text_file(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || fs::read_to_string(&path).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| format!("读取文件任务失败: {}", e))?
 }
 
 /// 读取文件内容（二进制，返回字节数组）
 /// 用于 HTML 导出时将图片转为 Base64
+///
+/// #432：`async` + `spawn_blocking`。
 #[tauri::command]
-pub fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
-    fs::read(&path).map_err(|e| e.to_string())
+pub async fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
+    tauri::async_runtime::spawn_blocking(move || fs::read(&path).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| format!("读取文件任务失败: {}", e))?
 }
 
 /// 写入文件内容（文本）
+///
+/// #432：`async` + `spawn_blocking` —— 原子替换含 fsync，大文件写盘不再阻塞主线程。
 #[tauri::command]
-pub fn write_text_file(path: String, content: String) -> Result<(), String> {
-    write_atomic(Path::new(&path), content.as_bytes()).map_err(|e| e.to_string())
+pub async fn write_text_file(path: String, content: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        write_atomic(Path::new(&path), content.as_bytes()).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("写入文件任务失败: {}", e))?
 }
 
 /// 检查路径是否存在
@@ -459,7 +544,7 @@ mod tests {
         let file = std::env::temp_dir().join("murasaki-408-not-a-dir");
         let _ = fs::remove_file(&file);
         fs::write(&file, b"x").unwrap();
-        let result = build_tree_inner(&file, false);
+        let result = build_tree_inner(&file, false, 0, &mut TreeBudget::new(MAX_TREE_NODES));
         let _ = fs::remove_file(&file);
         assert!(
             result.is_err(),
@@ -476,12 +561,52 @@ mod tests {
         fs::create_dir_all(dir.join(".git")).unwrap();
         fs::write(dir.join(".git").join("config"), "x").unwrap();
 
-        let hidden = build_tree_inner(&dir, true).unwrap();
+        let hidden = build_tree_inner(&dir, true, 0, &mut TreeBudget::new(MAX_TREE_NODES)).unwrap();
         assert_eq!(hidden.len(), 2);
 
-        let visible = build_tree_inner(&dir, false).unwrap();
+        let visible = build_tree_inner(&dir, false, 0, &mut TreeBudget::new(MAX_TREE_NODES)).unwrap();
         assert_eq!(visible.len(), 1);
         assert_eq!(visible[0].name, "a.md");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #432：节点数超过上限时停止遍历并标记截断
+    #[test]
+    fn build_tree_inner_truncates_when_node_budget_exhausted() {
+        let dir = std::env::temp_dir().join("murasaki-432-budget");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        for i in 0..10 {
+            fs::write(dir.join(format!("f{}.md", i)), "x").unwrap();
+        }
+
+        let mut budget = TreeBudget::new(3);
+        let nodes = build_tree_inner(&dir, false, 0, &mut budget).unwrap();
+
+        assert_eq!(nodes.len(), 3, "配额耗尽后必须停止追加节点");
+        assert!(budget.truncated, "配额耗尽必须标记 truncated");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #432：达到深度上限时保留目录节点但不再展开，并标记截断
+    #[test]
+    fn build_tree_inner_truncates_at_depth_limit() {
+        let dir = std::env::temp_dir().join("murasaki-432-depth");
+        let _ = fs::remove_dir_all(&dir);
+        let nested = dir.join("a").join("b");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(nested.join("deep.md"), "x").unwrap();
+
+        // depth = MAX_TREE_DEPTH - 1：下一层目录不再展开
+        let mut budget = TreeBudget::new(MAX_TREE_NODES);
+        let nodes = build_tree_inner(&dir, false, MAX_TREE_DEPTH - 1, &mut budget).unwrap();
+
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].node_type, "directory");
+        assert_eq!(nodes[0].children.as_ref().map(|c| c.len()), Some(0));
+        assert!(budget.truncated, "深度截断必须标记 truncated");
 
         let _ = fs::remove_dir_all(&dir);
     }

@@ -55,7 +55,9 @@
     "newFolderPlaceholder": "new-folder",
     "createFailed": "Failed to create: {error}",
     "refreshTimeout": "Refresh timed out",
-    "refreshTimeoutDesc": "The workspace may be too large or a network drive is slow"
+    "refreshTimeoutDesc": "The workspace may be too large or a network drive is slow",
+    "truncated": "File tree truncated",
+    "truncatedDesc": "The folder is too large or too deep; only the first 20,000 entries are shown"
   },
   "outline": {
     "title": "Outline",

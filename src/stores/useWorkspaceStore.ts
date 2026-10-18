@@ -14,6 +14,15 @@ let refreshPromise: Promise<void> | null = null;
 const REFRESH_TIMEOUT_MS = 30000;
 
 /**
+ * `list_tree` 的返回（#432）：节点列表 + 是否因深度 / 节点数上限被截断。
+ * 截断时前端仍展示已返回的部分，并提示用户。
+ */
+interface TreeListing {
+  nodes: TreeNode[];
+  truncated: boolean;
+}
+
+/**
  * 工作区 Store
  * - 管理当前工作区路径、文件树数据
  * - 提供打开文件夹、刷新文件树等操作
@@ -75,12 +84,17 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   async function openWorkspace(path: string): Promise<void> {
     loading.value = true;
     try {
-      const tree = await invoke<TreeNode[]>("list_tree", {
+      const listing = await invoke<TreeListing>("list_tree", {
         path,
         showHidden: persistence.settings.showHiddenFiles,
       });
       workspacePath.value = path;
-      fileTree.value = tree;
+      fileTree.value = listing.nodes;
+      if (listing.truncated) {
+        toast.warning(t("editor.fileTree.truncated"), {
+          description: t("editor.fileTree.truncatedDesc"),
+        });
+      }
       // 记录到最近打开（委托给 persistence store）
       await persistence.addRecent(path, "folder");
     } catch (err) {
@@ -104,15 +118,20 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     loading.value = true;
     refreshPromise = (async () => {
       try {
-        const treePromise = invoke<TreeNode[]>("list_tree", {
+        const treePromise = invoke<TreeListing>("list_tree", {
           path: workspacePath.value,
           showHidden: persistence.settings.showHiddenFiles,
         });
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("timeout")), REFRESH_TIMEOUT_MS)
         );
-        const tree = await Promise.race([treePromise, timeoutPromise]);
-        fileTree.value = tree;
+        const listing = await Promise.race([treePromise, timeoutPromise]);
+        fileTree.value = listing.nodes;
+        if (listing.truncated) {
+          toast.warning(t("editor.fileTree.truncated"), {
+            description: t("editor.fileTree.truncatedDesc"),
+          });
+        }
       } catch (err) {
         if (err instanceof Error && err.message === "timeout") {
           console.error(`刷新文件树超时（${REFRESH_TIMEOUT_MS / 1000}s）`);
