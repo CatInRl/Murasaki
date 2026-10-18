@@ -270,7 +270,21 @@ function retryLoad(): void {
             @blur="submitRootCreating"
           />
         </div>
+        <!-- 空文件夹：给出下一步动作，而不是一片空白 -->
+        <EmptyState
+          v-if="!fileOps.rootCreating && workspace.fileTree.length === 0"
+          :icon="FolderOpen"
+          :title="$t('editor.fileTree.emptyFolder')"
+          :description="$t('editor.fileTree.emptyFolderDesc')"
+          :action-text="$t('common.newFile')"
+          :action-icon="FilePlus"
+          @action="fileOps.beginRootCreate('file')"
+          :secondary-action-text="$t('editor.fileTree.openFolder')"
+          @secondary-action="onOpenWorkspace"
+        />
+        <!-- 空文件夹时不渲染空的无障碍树容器，避免读屏读到一棵空树 -->
         <div
+          v-if="workspace.fileTree.length > 0"
           class="tree-root"
           role="tree"
           :aria-label="$t('editor.fileTree.ariaLabel')"

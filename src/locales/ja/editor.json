@@ -51,6 +51,8 @@
     "noWorkspace": "ワークスペースが開かれていません",
     "noWorkspaceDesc": "フォルダーを開くと編集を開始できます",
     "openFolder": "フォルダーを開く",
+    "emptyFolder": "このフォルダーは空です",
+    "emptyFolderDesc": "ファイルを作成するか、別のフォルダーを開きます",
     "newFilePlaceholder": "新規ファイル名.md",
     "newFolderPlaceholder": "新規フォルダー名",
     "createFailed": "作成に失敗しました: {error}",
@@ -102,7 +104,11 @@
     "emptyNoResults": "一致する項目が見つかりませんでした",
     "emptyHint": "ファイル名や内容のキーワードをお試しください",
     "loadingScan": "内容をスキャン中…",
+    "searchFailed": "検索に失敗しました",
+    "noWorkspace": "ワークスペースを開くとファイル内容を検索できます",
+    "noWorkspaceHint": "開いているタブと最近のファイルは検索できます",
     "truncated": "内容の結果は切り詰められました。検索条件を絞り込んでください",
+    "searchCancelled": "検索はキャンセルされました。スキャン済みの部分的な結果のみ表示しています",
     "resultCount": "{count} 件の結果"
   },
   "toolbar": {
