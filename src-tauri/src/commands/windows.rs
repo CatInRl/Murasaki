@@ -203,6 +203,17 @@ pub fn create_editor_window(app: &AppHandle, path: Option<String>) -> Result<Str
     Ok(label)
 }
 
+/// PDF 导出隐藏窗口的 label 前缀（创建与识别共用同一来源）
+pub const PDF_EXPORT_LABEL_PREFIX: &str = "pdf-export-";
+
+/// 是否为编辑器窗口。
+///
+/// PDF 导出的隐藏 webview（`pdf-export-*`）没有前端、不参与「关最后一个窗口退出」，
+/// 也不应该接收退出事件 —— 否则导出期间关闭最后一个窗口，应用不会退出（#440）。
+pub fn is_editor_window(label: &str) -> bool {
+    !label.starts_with(PDF_EXPORT_LABEL_PREFIX)
+}
+
 /// 清理某窗口在各全局状态里的残留（窗口销毁时调用）。
 pub fn cleanup_window_state(app: &AppHandle, label: &str) {
     app.state::<WindowRegistry>().remove(label);
@@ -275,8 +286,11 @@ pub fn close_window(window: WebviewWindow, app: AppHandle) -> Result<(), Command
 /// 前端落盘失败时会直接 `destroy()` 绕过 `close_window`）。
 /// `WindowRegistry::begin_exit` 保证只退出一次。
 pub fn exit_if_no_other_windows(app: &AppHandle, closed_label: &str) {
-    let labels: Vec<String> = app.webview_windows().keys().cloned().collect();
-    let remaining = labels.iter().filter(|l| l.as_str() != closed_label).count();
+    let remaining = app
+        .webview_windows()
+        .keys()
+        .filter(|label| label.as_str() != closed_label && is_editor_window(label))
+        .count();
     if remaining > 0 {
         return;
     }
@@ -343,6 +357,14 @@ mod tests {
         let registry = WindowRegistry::default();
         assert!(registry.begin_exit());
         assert!(!registry.begin_exit());
+    }
+
+    #[test]
+    fn pdf_export_windows_are_not_editor_windows() {
+        assert!(is_editor_window("main"));
+        assert!(is_editor_window("win-1"));
+        assert!(is_editor_window("settings"));
+        assert!(!is_editor_window("pdf-export-1234"));
     }
 
     #[test]
