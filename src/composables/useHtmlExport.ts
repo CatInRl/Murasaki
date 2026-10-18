@@ -1,8 +1,5 @@
 import {
   getMarkdownRenderer,
-  getFrontMatter,
-  getCurrentFilePath,
-  setCurrentFilePath,
   resolveShikiThemeOption,
 } from "./useMarkdownRenderer";
 import { renderFrontMatterCard } from "./useFrontMatter";
@@ -248,22 +245,13 @@ export interface ExportHtmlResult {
 export async function exportHtml(options: ExportHtmlOptions): Promise<ExportHtmlResult> {
   const { source, theme, workspacePath, filePath } = options;
   const renderer = getMarkdownRenderer();
-  renderer.setShikiTheme(resolveShikiTheme(theme));
 
   // 1. 渲染 markdown 为 HTML
   //
-  // 图片 src 改写依赖渲染器的模块级 currentFilePath（由 PreviewPane / SourceEditor
-  // 在切文件时设置）。导出时必须临时指向「本次导出的文件」，否则相对图片会按别的
-  // 目录解析 —— 一旦 base 目录不对，回解出的绝对路径会指向错误文件，被静默内联成
-  // 错误图片（issue #258）。render 是同步的，set/restore 之间不会与预览交错。
-  const previousFilePath = getCurrentFilePath();
-  let bodyHtml: string;
-  try {
-    setCurrentFilePath(filePath);
-    bodyHtml = renderer.render(source);
-  } finally {
-    setCurrentFilePath(previousFilePath);
-  }
+  // 图片 src 的基准目录与 front-matter 都由本次调用显式传入 / 返回（#434）：
+  // 不再临时改写模块级 currentFilePath、也不再读写模块级 front-matter，
+  // 因此导出与预览并发时不会串用彼此的文档与主题。
+  const { html: bodyHtml, frontMatter } = renderer.render(source, { filePath });
 
   // 2. 高亮代码块
   const shikiTheme = resolveShikiThemeOption(resolveShikiTheme(theme));
@@ -273,7 +261,7 @@ export async function exportHtml(options: ExportHtmlOptions): Promise<ExportHtml
   const inlined = await inlineImages(highlighted, workspacePath, filePath);
 
   // 4. 添加 front-matter 卡片
-  const fmCard = renderFrontMatterCard(getFrontMatter());
+  const fmCard = renderFrontMatterCard(frontMatter);
   const finalBody = fmCard + inlined.html;
 
   // 5. 包装完整 HTML

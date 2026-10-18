@@ -8,18 +8,19 @@ name: Test
 #      起不来（webview 停在 title="localhost"），整套 e2e 会系统性失败；
 #   ② 跑之前不能有残留的 tauri-driver / msedgedriver 占用 4444 / 4445，否则 setup 会
 #      静默复用一个半死的 driver，所有 session 报 ECONNRESET。
-# 目前 e2e 只跑不拦（未加入 required status checks），避免拖慢每个 PR（见 #261）。
+# 五个 job（frontend / rust / e2e / e2e (linux) / e2e (macos)）均为 required status
+# checks，PR 必须全绿才能合入 main（见 AGENTS.md「过门禁」）。
 #
 # Linux e2e（e2e-linux job）用 tauri-driver + WebKitWebDriver（webkit2gtk-driver 包）
 # 驱动真实 WebKitGTK，经 Xvfb 无头运行；应用侧 E2E 判定来自 tauri-driver 注入的
 # TAURI_WEBVIEW_AUTOMATION 环境变量（见 src-tauri/src/lib.rs 的 is_e2e_mode）。
-# 首期不加入 required status checks，稳定后再提升（同 #261 的路径）。
+# 同为 required status check。
 #
 # macOS e2e（e2e-macos job）不用 tauri-driver —— 它不支持 WKWebView（safaridriver
 # 需 GUI 授权，CI 不可用）。改用应用内嵌的 WebDriver 服务端（tauri-plugin-wdio-webdriver，
 # 仅 debug 构建注册，见 lib.rs run()）：应用进程由 e2e/helpers/driver.ts 自行 spawn/kill，
 # session 生命周期 = 应用进程生命周期。因此被测二进制必须 `tauri build --debug` ——
-# release 二进制没注册插件，/status 永不就绪。首期同样只跑不拦（#368）。
+# release 二进制没注册插件，/status 永不就绪。同为 required status check。
 on:
   pull_request:
   push:

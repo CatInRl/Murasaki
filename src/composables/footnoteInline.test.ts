@@ -14,7 +14,7 @@ describe("脚注原位渲染 (T6.3 / #101)", () => {
   it("[^1]: 定义在原位渲染为脚注块（不在文末汇聚）", () => {
     const md = getMarkdownRenderer();
     const source = "Some text[^1]\n\n[^1]: This is a footnote\n\nMore text";
-    const html = md.render(source);
+    const html = md.render(source).html;
 
     // 脚注定义应在原位（在 "More text" 之前）
     const defPos = html.indexOf("footnote-def");
@@ -30,7 +30,7 @@ describe("脚注原位渲染 (T6.3 / #101)", () => {
   it("[^1] 引用链接指向原位定义的 id", () => {
     const md = getMarkdownRenderer();
     const source = "Text[^1]\n\n[^1]: footnote text";
-    const html = md.render(source);
+    const html = md.render(source).html;
 
     // 引用应有 href 指向定义 id
     expect(html).toMatch(/href="#fn-1"/);
@@ -49,7 +49,7 @@ describe("脚注原位渲染 (T6.3 / #101)", () => {
       "",
       "[^2]: Second footnote",
     ].join("\n");
-    const html = md.render(source);
+    const html = md.render(source).html;
 
     // 两个定义都存在
     const def1Pos = html.indexOf('id="fn-1"');
@@ -67,14 +67,14 @@ describe("脚注原位渲染 (T6.3 / #101)", () => {
   it("脚注引用使用 [n] 编号显示", () => {
     const md = getMarkdownRenderer();
     const source = "Text[^1]\n\n[^1]: footnote";
-    const html = md.render(source);
+    const html = md.render(source).html;
     expect(html).toContain("[1]");
   });
 
   it("同一脚注多次引用都指向同一定义 id", () => {
     const md = getMarkdownRenderer();
     const source = "First[^1] and again[^1]\n\n[^1]: footnote";
-    const html = md.render(source);
+    const html = md.render(source).html;
     // 两个引用都指向同一个定义
     const matches = html.match(/href="#fn-1"/g);
     expect(matches).toHaveLength(2);
@@ -83,28 +83,28 @@ describe("脚注原位渲染 (T6.3 / #101)", () => {
   it("脚注定义内容正常渲染（含 markdown 语法）", () => {
     const md = getMarkdownRenderer();
     const source = "Text[^1]\n\n[^1]: This is **bold** footnote";
-    const html = md.render(source);
+    const html = md.render(source).html;
     // 脚注定义内的 markdown 语法正常渲染
     expect(html).toContain("<strong>bold</strong>");
   });
 
   it("无脚注的文档不受影响", () => {
     const md = getMarkdownRenderer();
-    const html = md.render("Just a normal paragraph");
+    const html = md.render("Just a normal paragraph").html;
     expect(html).not.toContain("footnote");
   });
 
   it("脚注引用渲染为 <sup> 标签", () => {
     const md = getMarkdownRenderer();
     const source = "Text[^1]\n\n[^1]: footnote";
-    const html = md.render(source);
+    const html = md.render(source).html;
     expect(html).toContain('<sup class="footnote-ref">');
   });
 
   it("脚注定义渲染为带 class 的容器", () => {
     const md = getMarkdownRenderer();
     const source = "Text[^1]\n\n[^1]: footnote";
-    const html = md.render(source);
+    const html = md.render(source).html;
     expect(html).toContain('class="footnote-def"');
   });
 });
