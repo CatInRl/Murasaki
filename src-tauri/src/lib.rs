@@ -564,6 +564,7 @@ pub fn run() {
             lifecycle::cancel_close,
             windows::open_path_in_new_window,
             windows::set_window_workspace,
+            windows::set_window_title,
             windows::close_window,
             search::search_workspace,
             search::cancel_search,

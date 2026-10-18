@@ -1,6 +1,5 @@
 import type { Ref } from "vue";
 import type { EditorView } from "@codemirror/view";
-import { invoke } from "@tauri-apps/api/core";
 import { i18n } from "../i18n";
 import { getAppVersion } from "../utils/appVersion";
 import {
@@ -101,6 +100,15 @@ export interface CommandsDeps {
   openSettings: () => Promise<void>;
   toggleFullscreen: () => Promise<void>;
 
+  /**
+   * 设置页是否覆盖在主窗口上（#442）。
+   * 打开时全局快捷键与菜单命令不应作用到背后的文档，否则 Ctrl+S / Ctrl+Q 会
+   * 静默保存背后正文、丢弃设置草稿。
+   */
+  isSettingsVisible: () => boolean;
+  /** 退出应用（设置页打开时由调用方先完成设置页的未保存确认，#442） */
+  quitApp: () => Promise<void>;
+
   // 预览缩放（无预览区模式下自身 no-op，见 App.vue）
   zoomIn: () => Promise<void>;
   zoomOut: () => Promise<void>;
@@ -131,14 +139,29 @@ export function useCommands(deps: CommandsDeps) {
     zoomIn, zoomOut, zoomReset,
     matchGlobalKeydown,
     setEditorMode,
+    isSettingsVisible,
+    quitApp,
   } = deps;
+
+  /** 设置页打开时仍放行的命令：只涉及全局信息 / 应用生命周期，不碰背后的文档 */
+  const SETTINGS_ALLOWED_MENU_IDS = new Set(["settings", "about", "check-updates"]);
 
   /** 由原生菜单触发的命令分发 */
   async function handleMenuEvent(menuId: string): Promise<void> {
+    // 设置页覆盖在主窗口上时，快捷键 / 菜单不应作用到背后的文档（#442）
+    if (isSettingsVisible()) {
+      if (menuId === "quit") {
+        await quitApp();
+        return;
+      }
+      if (!SETTINGS_ALLOWED_MENU_IDS.has(menuId)) return;
+    }
     switch (menuId) {
       case "new-file":
         // 有工作区 → 落文件树根目录内联命名；无工作区 → 新建未命名 tab
         if (workspace.hasWorkspace) {
+          // 折叠态 / 大纲视图下输入框不可见 → 先把文件树露出来（#442）
+          selectSidebarView("files");
           fileOps.beginRootCreate("file");
         } else {
           onNewTab();
@@ -265,6 +288,8 @@ export function useCommands(deps: CommandsDeps) {
           dialog.alert({ message: t("editor.commands.needWorkspace"), variant: "warning" });
           break;
         }
+        // 折叠态 / 大纲视图下输入框不可见 → 先把文件树露出来（#442）
+        selectSidebarView("files");
         fileOps.beginRootCreate("directory");
         break;
       }
@@ -281,11 +306,8 @@ export function useCommands(deps: CommandsDeps) {
       case "quit": {
         // 「退出应用」= 通知所有窗口各自落盘后关闭，关掉最后一个窗口才退出
         // （spec #194 决策 ③）。只关本窗口应走标题栏关闭按钮。
-        try {
-          await invoke("quit_app");
-        } catch (err) {
-          console.error("退出失败:", err);
-        }
+        // 设置页打开时由 quitApp 先处理设置页的未保存确认（#442）
+        await quitApp();
         break;
       }
       case "docs": {
