@@ -218,6 +218,32 @@ describe("useSearchStore", () => {
       expect(store.results).toEqual([]);
       expect(store.truncated).toBe(false);
       expect(store.loading).toBe(false);
+      // #441：失败原因暴露给搜索条，而不是伪装成「无结果」
+      expect(store.error).toBe("boom");
+    });
+
+    it("成功搜索会清掉上一次的错误", async () => {
+      // cancel_search 与 search_workspace 走同一个 invoke mock，按命令区分
+      mockedInvoke.mockImplementation((cmd: string) =>
+        cmd === "cancel_search" ? Promise.resolve() : Promise.reject(new Error("boom"))
+      );
+      const store = useSearchStore();
+      store.setQuery("hello");
+      await store.search();
+      expect(store.error).toBe("boom");
+
+      mockedInvoke.mockImplementation((cmd: string) =>
+        cmd === "cancel_search"
+          ? Promise.resolve()
+          : Promise.resolve({
+              contentResults: [],
+              filenameResults: [],
+              truncated: false,
+              cancelled: false,
+            } as SearchResponse)
+      );
+      await store.search();
+      expect(store.error).toBeNull();
     });
 
     it("search 成功后 resultsQuery 记录产生结果的查询", async () => {

@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type EventTarget as TauriEventTarget, type UnlistenFn } from "@tauri-apps/api/event";
 import { currentWindowLabel } from "../utils/windowContext";
+import { formatCommandError } from "../utils/commandError";
 import type {
   SearchProgressEvent,
   SearchResponse,
@@ -78,6 +79,8 @@ export const useSearchStore = defineStore("search", () => {
   const matchedCount = ref(0);
   /** 是否因达到上限而被截断 */
   const truncated = ref(false);
+  /** 搜索失败的原因（IPC / 正则等）；null 表示没有错误 */
+  const error = ref<string | null>(null);
 
   // ===== 内部：事件监听器清理 =====
   let unlistenProgress: UnlistenFn | null = null;
@@ -108,6 +111,7 @@ export const useSearchStore = defineStore("search", () => {
     matchedFiles.value = 0;
     matchedCount.value = 0;
     truncated.value = false;
+    error.value = null;
   }
 
   // ===== Actions =====
@@ -175,6 +179,7 @@ export const useSearchStore = defineStore("search", () => {
     const workspace = useWorkspaceStore();
     const workspacePath = workspace.workspacePath;
     const currentQuery = query.value.trim();
+    error.value = null;
 
     // 无工作区或空查询：清空结果
     if (!workspacePath || !currentQuery) {
@@ -259,6 +264,7 @@ export const useSearchStore = defineStore("search", () => {
       console.error("内容搜索失败:", err);
       resetResults();
       truncated.value = false;
+      error.value = formatCommandError(err);
       return { contentResults: [], filenameResults: [], truncated: false, cancelled: false };
     } finally {
       loading.value = false;
@@ -288,6 +294,7 @@ export const useSearchStore = defineStore("search", () => {
     matchedFiles,
     matchedCount,
     truncated,
+    error,
     // actions
     setQuery,
     setOptions,

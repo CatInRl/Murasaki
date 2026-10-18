@@ -51,6 +51,8 @@
     "noWorkspace": "No workspace open",
     "noWorkspaceDesc": "Open a folder to start editing",
     "openFolder": "Open Folder",
+    "emptyFolder": "This folder is empty",
+    "emptyFolderDesc": "Create a file, or open another folder",
     "newFilePlaceholder": "new-file.md",
     "newFolderPlaceholder": "new-folder",
     "createFailed": "Failed to create: {error}",
@@ -102,6 +104,9 @@
     "emptyNoResults": "No matches found",
     "emptyHint": "Try a filename or content keyword",
     "loadingScan": "Scanning content…",
+    "searchFailed": "Search failed",
+    "noWorkspace": "Open a workspace to search file contents",
+    "noWorkspaceHint": "You can still search open tabs and recent files",
     "truncated": "Content results truncated. Refine your query.",
     "resultCount": "{count} results"
   },

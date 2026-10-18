@@ -12,6 +12,7 @@ import {
   Code2,
   FileText,
   Files,
+  FolderX,
   History,
   Loader2,
   Search,
@@ -128,13 +129,44 @@ const flatEntries = computed<SearchEntry[]>(() => {
 });
 
 const hasQuery = computed(() => searchStore.query.trim().length > 0);
+/** 有查询、但工作区未打开：内容搜索不可用，给出明确说明而不是「无结果」 */
+const showNoWorkspace = computed(
+  () =>
+    hasQuery.value &&
+    !workspace.hasWorkspace &&
+    !searchStore.loading &&
+    flatEntries.value.length === 0
+);
 const showEmpty = computed(
   () =>
     hasQuery.value &&
+    workspace.hasWorkspace &&
     !searchStore.loading &&
+    !searchStore.error &&
     flatEntries.value.length === 0 &&
     contentSource.value.length === 0
 );
+/** 扫描进度文案（总数为 0 时退回只显示命中数） */
+const progressText = computed(() => {
+  if (searchStore.totalFiles > 0) {
+    return t("editor.search.scanningProgress", {
+      scanned: searchStore.scannedFiles,
+      total: searchStore.totalFiles,
+      matched: searchStore.matchedCount,
+    });
+  }
+  return t("editor.search.scanning", { matched: searchStore.matchedCount });
+});
+
+/** 失败后重试当前查询 */
+function retrySearch(): void {
+  void searchStore.search();
+}
+
+/** 取消进行中的内容扫描 */
+function cancelContentSearch(): void {
+  void searchStore.cancelSearch();
+}
 
 // ===== 键盘导航 =====
 
@@ -462,8 +494,23 @@ watch(
 
       <!-- 结果区 -->
       <div class="gsb__results">
+        <!-- 出错：给出原因与重试，而不是伪装成「无结果」 -->
+        <div v-if="searchStore.error" class="gsb__empty gsb__error" role="alert">
+          <TriangleAlert :size="20" class="gsb__empty-icon" aria-hidden="true" />
+          <span>{{ t('editor.searchBar.searchFailed') }}</span>
+          <span class="gsb__empty__hint">{{ searchStore.error }}</span>
+          <button class="gsb__error__retry" type="button" @click="retrySearch">
+            {{ t('common.retry') }}
+          </button>
+        </div>
+        <!-- 未打开工作区 -->
+        <div v-else-if="showNoWorkspace" class="gsb__empty">
+          <FolderX :size="20" class="gsb__empty-icon" aria-hidden="true" />
+          <span>{{ t('editor.searchBar.noWorkspace') }}</span>
+          <span class="gsb__empty__hint">{{ t('editor.searchBar.noWorkspaceHint') }}</span>
+        </div>
         <!-- 空态 -->
-        <div v-if="showEmpty" class="gsb__empty">
+        <div v-else-if="showEmpty" class="gsb__empty">
           <SearchX :size="20" class="gsb__empty-icon" aria-hidden="true" />
           <span>{{ t('editor.searchBar.emptyNoResults') }}</span>
           <span class="gsb__empty__hint">{{ t('editor.searchBar.emptyHint') }}</span>
@@ -534,7 +581,10 @@ watch(
             aria-busy="true"
           >
             <span class="gsb__spinner" aria-hidden="true"></span>
-            <span>{{ t('editor.searchBar.loadingScan') }}</span>
+            <span>{{ progressText }}</span>
+            <button class="gsb__loading__cancel" type="button" @click="cancelContentSearch">
+              {{ t('editor.search.cancelSearch') }}
+            </button>
           </div>
         </template>
       </div>
@@ -923,6 +973,21 @@ watch(
   animation: gsb-spin 0.7s linear infinite;
 }
 @keyframes gsb-spin { to { transform: rotate(360deg); } }
+.gsb__error__retry,
+.gsb__loading__cancel {
+  margin-top: 4px;
+  padding: 4px 12px;
+  border: 1px solid var(--murasaki-border);
+  border-radius: var(--murasaki-radius-sm);
+  background: var(--murasaki-card);
+  color: var(--murasaki-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.gsb__error__retry:hover,
+.gsb__loading__cancel:hover {
+  background: var(--murasaki-purple-50);
+}
 
 /* —— 截断提示 —— */
 .gsb__truncate {
