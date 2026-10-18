@@ -8,6 +8,7 @@ import {
   extname,
   resolveRelative,
   relativePath,
+  relativeFromDir,
   canonicalPath,
   isSamePath,
   isPathUnder,
@@ -115,6 +116,37 @@ describe("utils/path", () => {
     });
     it("处理 ./ 当前目录", () => {
       expect(resolveRelative("C:/docs", "./file.md")).toBe("C:/docs/file.md");
+    });
+    it("已含盘符的绝对路径不加前导斜杠（#435）", () => {
+      // 旧预览实现会拼成 `/C:/ws/b.md`，Windows 上相对 .md 链接因此打不开
+      expect(resolveRelative("C:/ws/docs", "C:/ws/b.md")).toBe("C:/ws/b.md");
+    });
+    it("反斜杠基准与正斜杠相对路径混用", () => {
+      expect(resolveRelative("C:\\ws\\docs", "../b.md")).toBe("C:/ws/b.md");
+    });
+    it("越过盘符根时夹在盘符处（不丢盘符）", () => {
+      expect(resolveRelative("C:/ws", "../../b.md")).toBe("C:/b.md");
+    });
+    it("越过 Unix 根时夹在根处", () => {
+      expect(resolveRelative("/ws", "../../b.md")).toBe("/b.md");
+    });
+  });
+
+  describe("relativeFromDir", () => {
+    it("工作区根到直接子文件", () => {
+      expect(relativeFromDir("C:/ws", "C:/ws/a.md")).toBe("a.md");
+    });
+    it("工作区根带末尾分隔符", () => {
+      expect(relativeFromDir("C:/ws/", "C:/ws/sub/a.md")).toBe("sub/a.md");
+    });
+    it("文件在工作区外时逐级向上", () => {
+      expect(relativeFromDir("C:/ws/sub", "C:/ws/a.md")).toBe("../a.md");
+    });
+    it("目录与文件相同返回 .", () => {
+      expect(relativeFromDir("C:/ws", "C:/ws")).toBe(".");
+    });
+    it("Windows 反斜杠与大小写混用", () => {
+      expect(relativeFromDir("C:\\WS\\", "c:/ws/sub/A.md")).toBe("sub/A.md");
     });
   });
 

@@ -6,6 +6,11 @@ import { MARKDOWN_THEMES } from "../composables/useTheme";
 // 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
 import "../styles/markdown-content.css";
 import { renderMermaidDiagram, sanitizeMermaidSvg } from "../utils/mermaidTheme";
+import {
+  isAnchorLink,
+  resolveInternalMarkdownLink,
+} from "../utils/internalLink";
+import { isExternalUrl } from "../utils/url";
 import { createRenderGate } from "../utils/renderGate";
 
 interface Props {
@@ -156,60 +161,7 @@ onBeforeUnmount(() => {
 //  - 外部 URL（http/https/ftp 等）→ 系统浏览器打开
 //  - 锚点链接（#section）→ 滚动到对应标题
 //  - 其他类型（mailto、tel 等）→ 默认行为
-const MD_EXTENSIONS = ["md", "markdown", "mdown", "mkd"];
-
-function isExternalUrl(href: string): boolean {
-  return /^(https?:|ftp:|file:|mailto:|tel:)/i.test(href);
-}
-
-function isAnchorLink(href: string): boolean {
-  return href.startsWith("#");
-}
-
-/**
- * 解析相对 .md 链接为绝对路径
- *  - 若 currentFilePath 存在：以该文件所在目录为基准
- *  - 否则以 workspacePath 为基准
- *  - 若解析后是 .md 文件则返回绝对路径，否则返回 null
- */
-function resolveInternalMd(href: string): string | null {
-  if (isExternalUrl(href) || isAnchorLink(href)) return null;
-
-  // 去掉 URL fragment 和 query
-  const cleanHref = href.split("#")[0].split("?")[0];
-  if (!cleanHref) return null;
-
-  // 检查扩展名
-  const ext = cleanHref.split(".").pop()?.toLowerCase() ?? "";
-  if (!MD_EXTENSIONS.includes(ext)) return null;
-
-  // 解析为绝对路径
-  let basePath: string | null = null;
-  if (props.currentFilePath) {
-    // 以当前文件所在目录为基准
-    const norm = props.currentFilePath.replace(/\\/g, "/");
-    basePath = norm.split("/").slice(0, -1).join("/");
-  } else if (props.workspacePath) {
-    basePath = props.workspacePath.replace(/\\/g, "/").replace(/\/$/, "");
-  }
-  if (!basePath) return null;
-
-  // 处理相对路径（../, ./）
-  const baseParts = basePath.split("/").filter(Boolean);
-  const hrefParts = cleanHref.replace(/\\/g, "/").split("/").filter(Boolean);
-  for (const part of hrefParts) {
-    if (part === ".") continue;
-    if (part === "..") {
-      baseParts.pop();
-    } else {
-      baseParts.push(part);
-    }
-  }
-  // 重新加上盘符前缀（Windows）
-  const isAbsolute = /^([a-zA-Z]:)?\//.test(props.currentFilePath ?? props.workspacePath ?? "");
-  const absolutePath = isAbsolute ? "/" + baseParts.join("/") : baseParts.join("/");
-  return absolutePath;
-}
+// 分类与解析统一在 utils/internalLink（#435），组件只负责后续动作
 
 /**
  * 滚动预览到指定锚点（heading id）
@@ -258,7 +210,10 @@ async function handleLinkClick(e: MouseEvent): Promise<void> {
   }
 
   // 内部 .md 链接：在新 tab 中打开
-  const mdPath = resolveInternalMd(href);
+  const mdPath = resolveInternalMarkdownLink(href, {
+    filePath: props.currentFilePath,
+    workspacePath: props.workspacePath,
+  });
   if (mdPath) {
     e.preventDefault();
     emit("open-internal", mdPath);
