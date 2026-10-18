@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
 import { ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen, type EventTarget as TauriEventTarget, type UnlistenFn } from "@tauri-apps/api/event";
+import { currentWindowLabel } from "../utils/windowContext";
 import type {
   SearchProgressEvent,
   SearchResponse,
@@ -183,7 +184,7 @@ export const useSearchStore = defineStore("search", () => {
       resetResults();
       resetProgressState();
       cancelToken.value = null;
-      return { contentResults: [], filenameResults: [], truncated: false };
+      return { contentResults: [], filenameResults: [], truncated: false, cancelled: false };
     }
 
     // 中断旧搜索（fire-and-forget，避免阻塞新搜索启动）
@@ -196,6 +197,13 @@ export const useSearchStore = defineStore("search", () => {
     const token = generateCancelToken();
     cancelToken.value = token;
 
+    // 监听器只订阅本窗口：#439 后端用 emit_to(label) 定向发送，
+    // 默认 Any 目标会让所有窗口都收到正文数据
+    const target: TauriEventTarget = {
+      kind: "WebviewWindow",
+      label: currentWindowLabel(),
+    };
+
     // 设置监听器（过滤过期 token 的事件）
     try {
       unlistenProgress = await listen<SearchProgressEvent>(
@@ -207,7 +215,8 @@ export const useSearchStore = defineStore("search", () => {
           totalFiles.value = payload.totalFiles;
           matchedFiles.value = payload.matchedFiles;
           matchedCount.value = payload.matchedCount;
-        }
+        },
+        { target }
       );
       unlistenChunk = await listen<SearchResultChunkEvent>(
         "search-result-chunk",
@@ -218,7 +227,8 @@ export const useSearchStore = defineStore("search", () => {
             // 增量追加内容命中
             results.value = [...results.value, payload.result];
           }
-        }
+        },
+        { target }
       );
     } catch (err) {
       console.warn("注册搜索事件监听失败，退化为最终结果一致模式:", err);
@@ -249,7 +259,7 @@ export const useSearchStore = defineStore("search", () => {
       console.error("内容搜索失败:", err);
       resetResults();
       truncated.value = false;
-      return { contentResults: [], filenameResults: [], truncated: false };
+      return { contentResults: [], filenameResults: [], truncated: false, cancelled: false };
     } finally {
       loading.value = false;
       clearListeners();
