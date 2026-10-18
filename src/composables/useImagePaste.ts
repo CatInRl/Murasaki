@@ -105,16 +105,20 @@ export function mimeForImageExt(ext: string): string {
   return MIME_BY_EXT[ext.toLowerCase().replace(/^\./, "")] ?? "image/png";
 }
 
-/** 图片字节 → `data:<mime>;base64,...` */
-export function bytesToDataUri(bytes: Uint8Array, ext: string): string {
-  // 分块拼接，避免 String.fromCharCode 一次性展开大数组导致堆栈溢出
+/** 字节 → 标准 Base64（分块拼接，避免大图触发堆栈溢出） */
+export function bytesToBase64(bytes: Uint8Array): string {
   const CHUNK = 0x8000;
   let binary = "";
   for (let i = 0; i < bytes.length; i += CHUNK) {
     const end = Math.min(i + CHUNK, bytes.length);
     binary += String.fromCharCode(...bytes.subarray(i, end));
   }
-  return `data:${mimeForImageExt(ext)};base64,${btoa(binary)}`;
+  return btoa(binary);
+}
+
+/** 图片字节 → `data:<mime>;base64,...` */
+export function bytesToDataUri(bytes: Uint8Array, ext: string): string {
+  return `data:${mimeForImageExt(ext)};base64,${bytesToBase64(bytes)}`;
 }
 
 export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {

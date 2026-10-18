@@ -13,10 +13,11 @@ export interface CopyRichTextDeps {
   workspace: {
     workspacePath: string | null;
   };
-  /** toast 反馈（成功/失败提示） */
+  /** toast 反馈（成功/失败/提示） */
   toast: {
     success: (title: string) => void;
     error: (title: string) => void;
+    info: (title: string) => void;
   };
 }
 
@@ -63,7 +64,7 @@ export function useCopyRichText(deps: CopyRichTextDeps) {
     }
     const tab = activeTab.value;
     try {
-      const fullHtml = await exportHtml({
+      const { html: fullHtml, failedImages } = await exportHtml({
         source: tab.content,
         theme: currentTheme.value,
         workspacePath: workspace.workspacePath ?? null,
@@ -78,6 +79,9 @@ export function useCopyRichText(deps: CopyRichTextDeps) {
       });
       await navigator.clipboard.write([clipboardItem]);
       toast.success(t("common.copyRichTextSuccess"));
+      if (failedImages.length > 0) {
+        toast.info(t("common.exportImagesFailed", { count: failedImages.length }));
+      }
     } catch (err) {
       console.error("复制富文本失败:", err);
       toast.error(t("common.error.copyRichTextFailed", { error: err }));

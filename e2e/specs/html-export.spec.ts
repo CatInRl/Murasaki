@@ -47,7 +47,7 @@ async function callExportHtml(
       }
       try {
         fn({ source: src, theme: t, workspacePath: ws, filePath: fp })
-          .then((html: string) => done({ ok: true, html }))
+          .then((res: { html: string }) => done({ ok: true, html: res.html }))
           .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
       } catch (err: unknown) {
         done({ ok: false, error: err ? String(err) : null });
@@ -154,6 +154,20 @@ describe("HTML 导出", () => {
     expect(html).toContain(pngBase64);
     // 不应残留相对路径
     expect(html).not.toContain('./test-image.png');
+  });
+
+  it("超过分块阈值的大图仍能内联（#428）", async () => {
+    const bigPath = resolve(wsPath, "big-image.png");
+    // 200KB 伪 PNG：内容不重要，只验证编码不抛 RangeError 且确实内联
+    const bytes = Buffer.alloc(200 * 1024);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = i % 251;
+    writeFileSync(bigPath, bytes);
+
+    const source = "# 大图\n\n![大图](./big-image.png)\n";
+    const html = await callExportHtml(browser, source, "murasaki", wsPath, null);
+
+    expect(html).toContain("data:image/png;base64,");
+    expect(html).not.toContain('src="./big-image.png"');
   });
 
   it("导出包含 front-matter 卡片", async () => {

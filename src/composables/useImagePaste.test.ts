@@ -11,6 +11,7 @@ import {
   relativePath,
   resolveInsertMode,
   mimeForImageExt,
+  bytesToBase64,
   bytesToDataUri,
   useImagePaste,
 } from "./useImagePaste";
@@ -383,6 +384,21 @@ describe("useImagePaste utilities", () => {
       const payload = uri.slice("data:image/webp;base64,".length);
       const decoded = atob(payload);
       expect(decoded.length).toBe(size);
+      expect(decoded.charCodeAt(size - 1)).toBe(bytes[size - 1]);
+    });
+  });
+
+  describe("bytesToBase64", () => {
+    it("1MB 图片不触发 RangeError，且可无损还原", () => {
+      const size = 1024 * 1024;
+      const bytes = new Uint8Array(size);
+      for (let i = 0; i < size; i++) bytes[i] = i % 251;
+
+      const base64 = bytesToBase64(bytes);
+      const decoded = atob(base64);
+
+      expect(decoded.length).toBe(size);
+      expect(decoded.charCodeAt(0)).toBe(bytes[0]);
       expect(decoded.charCodeAt(size - 1)).toBe(bytes[size - 1]);
     });
   });
