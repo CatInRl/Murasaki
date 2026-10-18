@@ -381,7 +381,10 @@ export interface UseMarkdownRenderer {
   md: MarkdownIt;
   /** 同步渲染 HTML（代码块占位，Mermaid 占位） */
   render(source: string): string;
-  /** DOM 渲染后异步替换代码块高亮 */
+  /**
+   * DOM 渲染后异步替换代码块高亮。
+   * `isStale` 返回 true 时停止处理剩余代码块（预览已过期，#431）。
+   */
   highlight(container: HTMLElement, isStale?: () => boolean): Promise<void>;
   /** 当前使用的 Shiki 主题名 */
   getShikiTheme(): string;

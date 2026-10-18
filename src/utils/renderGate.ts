@@ -7,7 +7,8 @@
  * - 多个渲染并发，旧渲染仍在为已被覆盖的 DOM 做无用功。
  *
  * 该门提供两件事：
- * - **防抖**：窗口内的连续变更合并成一次渲染；
+ * - **防抖**：窗口内的连续变更合并成一次渲染（`schedule({ immediate: true })`
+ *   可跳过防抖，用于文件切换 / 主题切换这类需要立刻可见的变更）；
  * - **代际**：每次调度都让在途渲染立即过期，渲染任务通过 `isStale()` 在
  *   每个 await 之后自检，过期就放弃后续 DOM 操作。
  */
@@ -21,10 +22,18 @@ export interface RenderGateOptions {
   immediateFirst?: boolean;
 }
 
+export interface ScheduleOptions {
+  /** 跳过防抖，立即渲染（同时让在途渲染过期） */
+  immediate?: boolean;
+}
+
 export interface RenderGate {
   /** 调度一次渲染（窗口内多次调用合并为一次） */
-  schedule(): void;
-  /** 取消排队中的渲染，并让在途渲染过期（卸载时调用） */
+  schedule(options?: ScheduleOptions): void;
+  /**
+   * 取消排队中的渲染，并让在途渲染过期。
+   * 终态：调用后所有 schedule 都被忽略（组件卸载时使用）。
+   */
   cancel(): void;
 }
 
@@ -36,6 +45,7 @@ export function createRenderGate({
   let timer: ReturnType<typeof setTimeout> | null = null;
   let generation = 0;
   let started = false;
+  let cancelled = false;
 
   function clearTimer(): void {
     if (timer !== null) {
@@ -44,10 +54,11 @@ export function createRenderGate({
     }
   }
 
-  function schedule(): void {
+  function schedule({ immediate = false }: ScheduleOptions = {}): void {
+    if (cancelled) return;
     const current = ++generation;
-    const isStale = (): boolean => current !== generation;
-    const runNow = immediateFirst && !started;
+    const isStale = (): boolean => cancelled || current !== generation;
+    const runNow = immediate || (immediateFirst && !started);
     started = true;
 
     clearTimer();
@@ -62,6 +73,7 @@ export function createRenderGate({
   }
 
   function cancel(): void {
+    cancelled = true;
     // 递增代际：在途渲染在下一次自检时放弃
     generation++;
     clearTimer();

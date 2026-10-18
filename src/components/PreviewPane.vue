@@ -6,7 +6,7 @@ import { MARKDOWN_THEMES } from "../composables/useTheme";
 // 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
 import "../styles/markdown-content.css";
 import { renderMermaidDiagram, sanitizeMermaidSvg } from "../utils/mermaidTheme";
-import { createRenderGate } from "../composables/useRenderGate";
+import { createRenderGate } from "../utils/renderGate";
 
 interface Props {
   source: string;
@@ -79,7 +79,7 @@ async function renderPlantUML(container: HTMLElement, isStale: () => boolean) {
   for (const block of Array.from(blocks)) {
     if (isStale()) return;
     const code = block.textContent || "";
-    await renderPlantUmlCode(code, block);
+    await renderPlantUmlCode(code, block, "plantuml", isStale);
   }
 }
 
@@ -125,20 +125,20 @@ watch(
   { immediate: true }
 );
 
-// 当前文件路径变更 → 重新渲染（图片相对路径解析依赖此值）
+// 当前文件路径变更 → 立即重新渲染（切换标签时不能等防抖，否则会短暂显示上一篇内容）
 watch(
   () => props.currentFilePath,
   () => {
-    void nextTick(() => renderGate.schedule());
+    void nextTick(() => renderGate.schedule({ immediate: true }));
   }
 );
 
-// 主题变更 → 切换 Shiki 主题并重新渲染（代码块高亮跟随主题）
+// 主题变更 → 切换 Shiki 主题并立即重新渲染（代码块高亮跟随主题，需立刻可见）
 watch(
   () => props.theme,
   (newTheme) => {
     renderer.setShikiTheme(resolveShikiTheme(newTheme));
-    void nextTick(() => renderGate.schedule());
+    void nextTick(() => renderGate.schedule({ immediate: true }));
   }
 );
 

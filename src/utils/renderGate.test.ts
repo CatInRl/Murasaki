@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createRenderGate } from "./useRenderGate";
+import { createRenderGate } from "./renderGate";
 
 /**
  * #431：预览渲染节流门。
@@ -77,6 +77,18 @@ describe("createRenderGate", () => {
     expect(run).toHaveBeenCalledTimes(1); // 之后的调度走防抖
   });
 
+  it("immediate 调度跳过防抖并让在途渲染过期", async () => {
+    const run = vi.fn(async () => {});
+    const gate = createRenderGate({ debounceMs: 200, run });
+
+    gate.schedule();
+    gate.schedule({ immediate: true });
+
+    expect(run).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(run).toHaveBeenCalledTimes(1); // 防抖那个已被取消
+  });
+
   it("cancel 取消排队中的渲染并让在途渲染过期", async () => {
     let stale: boolean | null = null;
     let resolveFirst: (() => void) | undefined;
@@ -97,5 +109,16 @@ describe("createRenderGate", () => {
 
     expect(run).toHaveBeenCalledTimes(1); // 排队的那个没有执行
     expect(stale).toBe(true);
+  });
+
+  it("cancel 之后的新调度被忽略（组件已卸载）", async () => {
+    const run = vi.fn(async () => {});
+    const gate = createRenderGate({ debounceMs: 200, run });
+
+    gate.cancel();
+    gate.schedule();
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(run).not.toHaveBeenCalled();
   });
 });
