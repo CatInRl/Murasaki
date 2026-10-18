@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use lexical_sort::natural_lexical_cmp;
 use pinyin::ToPinyin;
 use super::atomic_write::write_atomic;
+use crate::errors::{CommandError, ErrorCode};
 
 /// 文件树节点：与前端 TreeNode 类型对齐
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -241,39 +242,39 @@ fn build_tree_inner(
 /// #432：改为 `async` + `spawn_blocking`，避免递归遍历大目录时阻塞主线程；
 /// 超过深度 / 节点数上限时返回 `truncated = true`。
 #[tauri::command]
-pub async fn list_tree(path: String, show_hidden: Option<bool>) -> Result<TreeListing, String> {
+pub async fn list_tree(path: String, show_hidden: Option<bool>) -> Result<TreeListing, CommandError> {
     tauri::async_runtime::spawn_blocking(move || {
         let dir = PathBuf::from(&path);
         if !dir.exists() {
-            return Err(format!("路径不存在: {}", path));
+            return Err(CommandError::path(ErrorCode::NotFound, &path));
         }
         if !dir.is_dir() {
-            return Err(format!("不是目录: {}", path));
+            return Err(CommandError::path(ErrorCode::NotADirectory, &path));
         }
         let mut budget = TreeBudget::new(MAX_TREE_NODES);
         let nodes = build_tree_inner(&dir, show_hidden.unwrap_or(false), 0, &mut budget)
-            .map_err(|e| format!("读取目录失败: {}: {}", path, e))?;
+            .map_err(|e| CommandError::io_at(&e, &path))?;
         Ok(TreeListing {
             nodes,
             truncated: budget.truncated,
         })
     })
     .await
-    .map_err(|e| format!("读取目录任务失败: {}", e))?
+    .map_err(|e| CommandError::internal(format!("list_tree join: {e}")))?
 }
 
 /// 创建文件（若已存在则报错）
 #[tauri::command]
-pub fn create_file(path: String) -> Result<TreeNode, String> {
+pub fn create_file(path: String) -> Result<TreeNode, CommandError> {
     let p = PathBuf::from(&path);
     if p.exists() {
-        return Err(format!("文件已存在: {}", path));
+        return Err(CommandError::path(ErrorCode::AlreadyExists, &path));
     }
     // 确保父目录存在
     if let Some(parent) = p.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        fs::create_dir_all(parent).map_err(|e| CommandError::io_at(&e, parent))?;
     }
-    fs::File::create(&p).map_err(|e| e.to_string())?;
+    fs::File::create(&p).map_err(|e| CommandError::io_at(&e, &path))?;
     let name = p
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -289,12 +290,12 @@ pub fn create_file(path: String) -> Result<TreeNode, String> {
 
 /// 创建目录（若已存在则报错）
 #[tauri::command]
-pub fn create_directory(path: String) -> Result<TreeNode, String> {
+pub fn create_directory(path: String) -> Result<TreeNode, CommandError> {
     let p = PathBuf::from(&path);
     if p.exists() {
-        return Err(format!("目录已存在: {}", path));
+        return Err(CommandError::path(ErrorCode::AlreadyExists, &path));
     }
-    fs::create_dir_all(&p).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&p).map_err(|e| CommandError::io_at(&e, &path))?;
     let name = p
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -310,30 +311,42 @@ pub fn create_directory(path: String) -> Result<TreeNode, String> {
 
 /// 删除文件或目录（走系统回收站）
 #[tauri::command]
-pub fn delete_path(path: String) -> Result<(), String> {
+pub fn delete_path(path: String) -> Result<(), CommandError> {
     let p = PathBuf::from(&path);
     if !p.exists() {
-        return Err(format!("路径不存在: {}", path));
+        return Err(CommandError::path(ErrorCode::NotFound, &path));
     }
-    trash::delete(&p).map_err(|e| e.to_string())
+    trash::delete(&p).map_err(|e| {
+        // Windows 下 `Error::Os` 的 code 是 Win32 错误码（5 = ERROR_ACCESS_DENIED）；
+        // `CouldNotAccess` 在路径存在性已检查过之后只剩权限问题。
+        let code = match &e {
+            trash::Error::Os { code: 5, .. } | trash::Error::CouldNotAccess { .. } => {
+                ErrorCode::PermissionDenied
+            }
+            _ => ErrorCode::Internal,
+        };
+        CommandError::path(code, &path).with_param("detail", format!("trash: {e}"))
+    })
 }
 
 /// 重命名/移动文件或目录
 #[tauri::command]
-pub fn rename_path(from: String, to: String) -> Result<TreeNode, String> {
+pub fn rename_path(from: String, to: String) -> Result<TreeNode, CommandError> {
     let src = PathBuf::from(&from);
     let dst = PathBuf::from(&to);
     if !src.exists() {
-        return Err(format!("源路径不存在: {}", from));
+        return Err(CommandError::path(ErrorCode::NotFound, &from));
     }
     if dst.exists() {
-        return Err(format!("目标已存在: {}", to));
+        return Err(CommandError::path(ErrorCode::AlreadyExists, &to));
     }
     // 确保目标父目录存在
     if let Some(parent) = dst.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        fs::create_dir_all(parent).map_err(|e| CommandError::io_at(&e, parent))?;
     }
-    fs::rename(&src, &dst).map_err(|e| e.to_string())?;
+    fs::rename(&src, &dst).map_err(|e| {
+        CommandError::io_at(&e, &from).with_param("to", to.clone())
+    })?;
     let name = dst
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -354,22 +367,24 @@ pub fn rename_path(from: String, to: String) -> Result<TreeNode, String> {
 
 /// 复制文件（仅文件，不复制目录）
 #[tauri::command]
-pub fn copy_file(from: String, to: String) -> Result<TreeNode, String> {
+pub fn copy_file(from: String, to: String) -> Result<TreeNode, CommandError> {
     let src = PathBuf::from(&from);
     let dst = PathBuf::from(&to);
     if !src.exists() {
-        return Err(format!("源文件不存在: {}", from));
+        return Err(CommandError::path(ErrorCode::NotFound, &from));
     }
     if dst.exists() {
-        return Err(format!("目标已存在: {}", to));
+        return Err(CommandError::path(ErrorCode::AlreadyExists, &to));
     }
     if src.is_dir() {
-        return Err("copy_file 仅支持文件，不支持目录".to_string());
+        return Err(CommandError::new(ErrorCode::Unsupported)
+            .with_param("operation", "copy_directory"));
     }
     if let Some(parent) = dst.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        fs::create_dir_all(parent).map_err(|e| CommandError::io_at(&e, parent))?;
     }
-    fs::copy(&src, &dst).map_err(|e| e.to_string())?;
+    fs::copy(&src, &dst)
+        .map_err(|e| CommandError::io_at(&e, &from).with_param("to", to.clone()))?;
     let name = dst
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -388,10 +403,12 @@ pub fn copy_file(from: String, to: String) -> Result<TreeNode, String> {
 ///
 /// #432：`async` + `spawn_blocking` —— 大文件或网络盘读取不再占用主线程。
 #[tauri::command]
-pub async fn read_text_file(path: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || fs::read_to_string(&path).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| format!("读取文件任务失败: {}", e))?
+pub async fn read_text_file(path: String) -> Result<String, CommandError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        fs::read_to_string(&path).map_err(|e| CommandError::io_at(&e, &path))
+    })
+    .await
+    .map_err(|e| CommandError::internal(format!("read_text_file join: {e}")))?
 }
 
 /// 读取文件内容（二进制，返回字节数组）
@@ -399,33 +416,36 @@ pub async fn read_text_file(path: String) -> Result<String, String> {
 ///
 /// #432：`async` + `spawn_blocking`。
 #[tauri::command]
-pub async fn read_binary_file(path: String) -> Result<Vec<u8>, String> {
-    tauri::async_runtime::spawn_blocking(move || fs::read(&path).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| format!("读取文件任务失败: {}", e))?
+pub async fn read_binary_file(path: String) -> Result<Vec<u8>, CommandError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        fs::read(&path).map_err(|e| CommandError::io_at(&e, &path))
+    })
+    .await
+    .map_err(|e| CommandError::internal(format!("read_binary_file join: {e}")))?
 }
 
 /// 写入文件内容（文本）
 ///
 /// #432：`async` + `spawn_blocking` —— 原子替换含 fsync，大文件写盘不再阻塞主线程。
 #[tauri::command]
-pub async fn write_text_file(path: String, content: String) -> Result<(), String> {
+pub async fn write_text_file(path: String, content: String) -> Result<(), CommandError> {
     tauri::async_runtime::spawn_blocking(move || {
-        write_atomic(Path::new(&path), content.as_bytes()).map_err(|e| e.to_string())
+        write_atomic(Path::new(&path), content.as_bytes())
+            .map_err(|e| CommandError::io_at(&e, &path))
     })
     .await
-    .map_err(|e| format!("写入文件任务失败: {}", e))?
+    .map_err(|e| CommandError::internal(format!("write_text_file join: {e}")))?
 }
 
 /// 检查路径是否存在
 #[tauri::command]
-pub fn path_exists(path: String) -> Result<bool, String> {
+pub fn path_exists(path: String) -> Result<bool, CommandError> {
     Ok(Path::new(&path).exists())
 }
 
 /// 获取路径类型："file" | "directory" | "none"
 #[tauri::command]
-pub fn path_type(path: String) -> Result<String, String> {
+pub fn path_type(path: String) -> Result<String, CommandError> {
     let p = Path::new(&path);
     if p.is_file() {
         Ok("file".to_string())
@@ -441,21 +461,21 @@ pub fn path_type(path: String) -> Result<String, String> {
 /// 前端用它决定「无后缀文件是否大到打开前先确认」（issue #308）—— 判断必须在
 /// 读取**之前**做，否则几百 MB 的文件已经把内容读进内存了。
 #[tauri::command]
-pub fn get_file_size(path: String) -> Result<u64, String> {
+pub fn get_file_size(path: String) -> Result<u64, CommandError> {
     let p = Path::new(&path);
     if !p.exists() {
-        return Err(format!("文件不存在: {}", path));
+        return Err(CommandError::path(ErrorCode::NotFound, &path));
     }
-    let metadata = fs::metadata(p).map_err(|e| e.to_string())?;
+    let metadata = fs::metadata(p).map_err(|e| CommandError::io_at(&e, &path))?;
     Ok(metadata.len())
 }
 
 /// 在系统资源管理器中显示文件（Windows: explorer.exe /select,）
 #[tauri::command]
-pub fn reveal_in_explorer(path: String) -> Result<(), String> {
+pub fn reveal_in_explorer(path: String) -> Result<(), CommandError> {
     let p = PathBuf::from(&path);
     if !p.exists() {
-        return Err(format!("路径不存在: {}", path));
+        return Err(CommandError::path(ErrorCode::NotFound, &path));
     }
     #[cfg(target_os = "windows")]
     {
@@ -463,14 +483,14 @@ pub fn reveal_in_explorer(path: String) -> Result<(), String> {
         std::process::Command::new("explorer.exe")
             .args(["/select,", &path])
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| CommandError::internal(format!("explorer: {e}")))?;
     }
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
             .args(["-R", &path])
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| CommandError::internal(format!("open -R: {e}")))?;
     }
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     {
@@ -479,7 +499,7 @@ pub fn reveal_in_explorer(path: String) -> Result<(), String> {
         std::process::Command::new("xdg-open")
             .arg(parent)
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| CommandError::internal(format!("xdg-open: {e}")))?;
     }
     Ok(())
 }
@@ -490,9 +510,9 @@ pub fn reveal_in_explorer(path: String) -> Result<(), String> {
 /// （http(s) / `tel:` / `mailto:`），要打开本地路径得把 `allow-open` 的 scope 放宽到 `**`，
 /// 为一个兜底入口扩大攻击面不划算。这里与 `reveal_in_explorer` 同形，用系统命令。
 #[tauri::command]
-pub fn open_with_default_app(path: String) -> Result<(), String> {
+pub fn open_with_default_app(path: String) -> Result<(), CommandError> {
     if !Path::new(&path).exists() {
-        return Err(format!("路径不存在: {}", path));
+        return Err(CommandError::path(ErrorCode::NotFound, &path));
     }
     #[cfg(target_os = "windows")]
     {
@@ -505,21 +525,21 @@ pub fn open_with_default_app(path: String) -> Result<(), String> {
         std::process::Command::new("explorer.exe")
             .arg(&path)
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| CommandError::internal(format!("explorer: {e}")))?;
     }
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
             .arg(&path)
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| CommandError::internal(format!("open: {e}")))?;
     }
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     {
         std::process::Command::new("xdg-open")
             .arg(&path)
             .spawn()
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| CommandError::internal(format!("xdg-open: {e}")))?;
     }
     Ok(())
 }
@@ -537,7 +557,7 @@ mod tests {
             "/definitely/not/here/murasaki-307.txt"
         };
         let err = open_with_default_app(missing.to_string()).unwrap_err();
-        assert!(err.contains("路径不存在"), "unexpected error: {err}");
+        assert_eq!(err.code, ErrorCode::NotFound, "unexpected error: {err}");
     }
 
     #[test]
@@ -563,7 +583,7 @@ mod tests {
             "/definitely/not/here/murasaki-308"
         };
         let err = get_file_size(missing.to_string()).unwrap_err();
-        assert!(err.contains("文件不存在"), "unexpected error: {err}");
+        assert_eq!(err.code, ErrorCode::NotFound, "unexpected error: {err}");
     }
 
     #[test]

@@ -115,8 +115,27 @@
     "openFileFailed": "ファイルを開けませんでした: {error}",
     "openWorkspaceFailed": "ワークスペースを開けませんでした: {error}",
     "reloadFailed": "再読み込みに失敗しました: {error}",
+    "watchFailed": "ワークスペースの変更を監視できません: {error}",
+    "restoreTabsFailed": "{count} 個のタブを復元できませんでした",
+    "withPath": "{message}：{path}",
+    "withDetail": "{message}（{detail}）",
+    "withPathDetail": "{message}：{path}（{detail}）",
     "exportHtmlFailed": "HTML のエクスポートに失敗しました: {error}",
-    "exportPdfFailed": "PDF のエクスポートに失敗しました: {error}"
+    "exportPdfFailed": "PDF のエクスポートに失敗しました: {error}",
+    "code": {
+      "not_found": "ファイルまたはフォルダが見つかりません",
+      "not_a_directory": "フォルダではありません",
+      "not_a_file": "ファイルではありません",
+      "already_exists": "既に存在します",
+      "permission_denied": "アクセス権がありません",
+      "outside_workspace": "パスはワークスペース内である必要があります",
+      "invalid_argument": "引数が不正です",
+      "unsupported": "この操作には対応していません",
+      "timeout": "操作がタイムアウトしました",
+      "internal": "内部エラー",
+      "io": "ファイルの読み書きに失敗しました",
+      "unknown": "不明なエラー"
+    }
   },
   "status": {
     "noFileOpen": "ファイルが開かれていません",

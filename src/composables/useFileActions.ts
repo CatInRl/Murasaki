@@ -9,6 +9,7 @@ import {
   isLargeExtensionlessFile,
 } from "../utils/fileKind";
 import { i18n } from "../i18n";
+import { formatCommandError } from "../utils/commandError";
 import type { Ref } from "vue";
 import type { Tab } from "../types";
 import type { ToastOptions } from "../stores/useToastStore";
@@ -94,7 +95,7 @@ export function useFileActions(deps: FileActionsDeps) {
       await fileOps.openWithDefaultApp(path);
     } catch (err) {
       dialog.alert({
-        message: t("common.error.openWithDefaultFailed", { error: err }),
+        message: t("common.error.openWithDefaultFailed", { error: formatCommandError(err) }),
         variant: "error",
       });
     }
@@ -141,7 +142,7 @@ export function useFileActions(deps: FileActionsDeps) {
       } else {
         // 文件在，但读不出来（无后缀二进制、非 UTF-8、权限…）：不再只弹一句
         // 「打开文件失败」就结束，给一个真实出口 —— 交给系统默认程序（#308/#149 T1）。
-        toast.error(t("common.error.openFileFailed", { error: err }), {
+        toast.error(t("common.error.openFileFailed", { error: formatCommandError(err) }), {
           description: basename(path),
           duration: 8000,
           action: openWithDefaultAction(path),
@@ -204,7 +205,7 @@ export function useFileActions(deps: FileActionsDeps) {
       await tabsStore.saveTab(activeTab.value.id);
     } catch (err) {
       console.error("保存失败:", err);
-      dialog.alert({ message: t("common.error.saveFailed", { error: err }), variant: "error" });
+      dialog.alert({ message: t("common.error.saveFailed", { error: formatCommandError(err) }), variant: "error" });
     }
   }
 
@@ -223,7 +224,7 @@ export function useFileActions(deps: FileActionsDeps) {
         await persistence.addRecent(selected, "file");
       } catch (err) {
         console.error("另存为失败:", err);
-        dialog.alert({ message: t("common.error.saveAsFailed", { error: err }), variant: "error" });
+        dialog.alert({ message: t("common.error.saveAsFailed", { error: formatCommandError(err) }), variant: "error" });
       }
     }
   }
@@ -247,7 +248,7 @@ export function useFileActions(deps: FileActionsDeps) {
       await tabsStore.reloadFromDisk(path);
     } catch (err) {
       console.error("重新加载失败:", err);
-      dialog.alert({ message: t("common.error.reloadFailed", { error: err }), variant: "error" });
+      dialog.alert({ message: t("common.error.reloadFailed", { error: formatCommandError(err) }), variant: "error" });
     }
   }
 
@@ -281,7 +282,7 @@ export function useFileActions(deps: FileActionsDeps) {
       }
     } catch (err) {
       console.error("导出 HTML 失败:", err);
-      toast.error(t("common.error.exportHtmlFailed", { error: err }));
+      toast.error(t("common.error.exportHtmlFailed", { error: formatCommandError(err) }));
     }
   }
 
@@ -314,7 +315,7 @@ export function useFileActions(deps: FileActionsDeps) {
       }
     } catch (err) {
       console.error("导出 PDF 失败:", err);
-      toast.error(t("common.error.exportPdfFailed", { error: err }));
+      toast.error(t("common.error.exportPdfFailed", { error: formatCommandError(err) }));
     }
   }
 
@@ -365,7 +366,7 @@ export function useFileActions(deps: FileActionsDeps) {
             await persistence.removeRecent(path);
           }
         } else {
-          dialog.alert({ message: t("common.error.openWorkspaceFailed", { error: err }), variant: "error" });
+          dialog.alert({ message: t("common.error.openWorkspaceFailed", { error: formatCommandError(err) }), variant: "error" });
         }
       }
     } else {

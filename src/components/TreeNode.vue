@@ -25,6 +25,7 @@ import { useToastStore } from "../stores/useToastStore";
 import type { MenuItem } from "../stores/useContextMenuStore";
 import { useFileTreeNav } from "../composables/useFileTreeNav";
 import { basename } from "../utils/path";
+import { formatCommandError } from "../utils/commandError";
 import type { TreeNode } from "../types";
 import {
   isMarkdownFile,
@@ -74,7 +75,7 @@ async function openWithDefaultApp(path: string): Promise<void> {
     await fileOps.openWithDefaultApp(path);
   } catch (err) {
     dialog.alert({
-      message: t("common.error.openWithDefaultFailed", { error: err }),
+      message: t("common.error.openWithDefaultFailed", { error: formatCommandError(err) }),
       variant: "error",
     });
   }
@@ -219,7 +220,7 @@ async function onDrop(e: DragEvent): Promise<void> {
     try {
       await fileOps.moveInto(internalPath, targetDir);
     } catch (err) {
-      dialog.alert({ message: t("common.error.moveFailed", { error: err }), variant: "error" });
+      dialog.alert({ message: t("common.error.moveFailed", { error: formatCommandError(err) }), variant: "error" });
     }
     return;
   }
@@ -233,7 +234,7 @@ async function onDrop(e: DragEvent): Promise<void> {
       try {
         await fileOps.copyInto(externalPath, targetDir);
       } catch (err) {
-        dialog.alert({ message: t("common.error.copyFailed", { error: err }), variant: "error" });
+        dialog.alert({ message: t("common.error.copyFailed", { error: formatCommandError(err) }), variant: "error" });
       }
     }
   }
@@ -345,7 +346,7 @@ function buildMenuItems(): MenuItem[] {
         try {
           await fileOps.paste(props.node.path);
         } catch (err) {
-          dialog.alert({ message: t("common.error.pasteFailed", { error: err }), variant: "error" });
+          dialog.alert({ message: t("common.error.pasteFailed", { error: formatCommandError(err) }), variant: "error" });
         }
       },
     });
@@ -359,7 +360,7 @@ function buildMenuItems(): MenuItem[] {
       try {
         await fileOps.copyAbsolutePath(props.node.path);
       } catch (err) {
-        dialog.alert({ message: t("common.error.copyPathFailed", { error: err }), variant: "error" });
+        dialog.alert({ message: t("common.error.copyPathFailed", { error: formatCommandError(err) }), variant: "error" });
       }
     },
   });
@@ -370,7 +371,7 @@ function buildMenuItems(): MenuItem[] {
       try {
         await fileOps.copyRelativePath(props.node.path);
       } catch (err) {
-        dialog.alert({ message: t("common.error.copyRelativePathFailed", { error: err }), variant: "error" });
+        dialog.alert({ message: t("common.error.copyRelativePathFailed", { error: formatCommandError(err) }), variant: "error" });
       }
     },
   });
@@ -385,7 +386,7 @@ function buildMenuItems(): MenuItem[] {
         try {
           await fileOps.deletePath(props.node.path);
         } catch (err) {
-          dialog.alert({ message: t("common.error.deleteFailed", { error: err }), variant: "error" });
+          dialog.alert({ message: t("common.error.deleteFailed", { error: formatCommandError(err) }), variant: "error" });
         }
       }
     },
@@ -397,7 +398,7 @@ function buildMenuItems(): MenuItem[] {
       try {
         await fileOps.revealInExplorer(props.node.path);
       } catch (err) {
-        dialog.alert({ message: t("common.error.revealFailed", { error: err }), variant: "error" });
+        dialog.alert({ message: t("common.error.revealFailed", { error: formatCommandError(err) }), variant: "error" });
       }
     },
   });
@@ -415,7 +416,7 @@ async function submitRename(): Promise<void> {
   try {
     await fileOps.renamePath(props.node.path, newName);
   } catch (err) {
-    dialog.alert({ message: t("common.error.renameFailed", { error: err }), variant: "error" });
+    dialog.alert({ message: t("common.error.renameFailed", { error: formatCommandError(err) }), variant: "error" });
   } finally {
     renaming.value = false;
   }
@@ -444,7 +445,7 @@ async function submitCreating(): Promise<void> {
       fileTreeNav.setExpanded(props.node.path, true);
     }
   } catch (err) {
-    dialog.alert({ message: t("common.error.createFailed", { error: err }), variant: "error" });
+    dialog.alert({ message: t("common.error.createFailed", { error: formatCommandError(err) }), variant: "error" });
   } finally {
     creating.value = false;
     creatingName.value = "";

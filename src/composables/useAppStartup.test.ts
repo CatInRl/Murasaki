@@ -165,6 +165,20 @@ describe("bootstrapApp", () => {
     expect(deps.openWorkspace).toHaveBeenCalledWith("C:/saved");
   });
 
+  it("恢复工作区失败不阻断后续启动（提示由 openWorkspace 给出，#436）", async () => {
+    const { deps, calls } = makeDeps({
+      settings: { reopenLastWorkspace: true, lastWorkspacePath: "C:/gone" },
+      failAt: "openWorkspace",
+    });
+
+    await bootstrapApp(deps);
+
+    expect(deps.openWorkspace).toHaveBeenCalledWith("C:/gone");
+    // 恢复失败不应阻断后续启动步骤
+    expect(calls).toContain("restoreTabs");
+    expect(calls).toContain("setupEventListeners");
+  });
+
   it("有外部入口的待打开路径：跳过会话恢复，监听就绪后才打开", async () => {
     const { deps, calls } = makeDeps({
       pending: { path: "C:/ws/a.md", type: "file" },

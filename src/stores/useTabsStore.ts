@@ -565,6 +565,8 @@ export const useTabsStore = defineStore("tabs", () => {
       // 每个 tab 激活都会让编辑器整体替换 EditorState（见 SourceEditor 的 tabId watch），
       // 逐个激活会表现为启动时把每个文件都切换一遍
       const orderedTabIds: string[] = []; // 按持久化顺序记录 tab id
+      /** 恢复失败的路径：结束后汇总提示，避免逐个弹窗刷屏 */
+      const failedPaths: string[] = [];
 
       for (const persisted of state.tabs) {
         if (persisted.path) {
@@ -578,6 +580,7 @@ export const useTabsStore = defineStore("tabs", () => {
             if (tab) orderedTabIds.push(tab.id);
           } catch (err) {
             console.warn(`恢复 tab 失败: ${persisted.path}`, err);
+            failedPaths.push(persisted.path);
             // 失败的 tab 不计入 orderedTabIds，后续重排时跳过
           }
         } else {
@@ -585,6 +588,22 @@ export const useTabsStore = defineStore("tabs", () => {
           const tab = newTab(persisted.content, { activate: false });
           orderedTabIds.push(tab.id);
         }
+      }
+
+      // 恢复失败的文件汇总提示一次：给出数量、前几个路径与重试入口（#436）
+      if (failedPaths.length > 0) {
+        useToastStore().warning(
+          i18n.global.t("common.error.restoreTabsFailed", { count: failedPaths.length }),
+          {
+            description: failedPaths.slice(0, 3).join("\n"),
+            action: {
+              label: i18n.global.t("common.retry"),
+              onClick: () => {
+                for (const path of failedPaths) void openFile(path).catch(() => {});
+              },
+            },
+          }
+        );
       }
 
       // 阶段 2：按持久化顺序重排 tabs 数组

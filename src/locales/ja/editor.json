@@ -56,6 +56,7 @@
     "createFailed": "作成に失敗しました: {error}",
     "refreshTimeout": "更新がタイムアウトしました",
     "refreshTimeoutDesc": "ワークスペースが大きすぎるか、ネットワークドライブの応答が遅い可能性があります",
+    "loadFailed": "ファイルツリーを読み込めません",
     "truncated": "ファイルツリーを省略しました",
     "truncatedDesc": "フォルダーが大きすぎるか階層が深すぎるため、一部の項目を省略しました"
   },
@@ -63,6 +64,7 @@
     "title": "アウトライン",
     "empty": "見出しなし",
     "emptyDesc": "このドキュメントにはまだ見出しの段落がありません",
+    "loadFailed": "ドキュメントのアウトラインを解析できません",
     "lineTooltip": "{line} 行目"
   },
   "search": {

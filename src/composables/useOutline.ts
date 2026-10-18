@@ -1,6 +1,7 @@
 import { ref, watch, type Ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { OutlineItem } from "../types";
+import { parseCommandError, type CommandErrorInfo } from "../utils/commandError";
 
 /**
  * 大纲 composable
@@ -15,7 +16,8 @@ export function useOutline(
   const isLiveEnabled = typeof enabled === "function" ? enabled : () => enabled.value;
   const outline = ref<OutlineItem[]>([]);
   const loading = ref(false);
-  const error = ref<string | null>(null);
+  /** 拉取失败（供大纲面板展示 ErrorState 与重试，#436） */
+  const error = ref<CommandErrorInfo | null>(null);
 
   async function fetchOutline(path: string): Promise<void> {
     loading.value = true;
@@ -24,11 +26,18 @@ export function useOutline(
       const items = await invoke<OutlineItem[]>("parse_outline", { path });
       outline.value = items;
     } catch (err) {
-      error.value = String(err);
+      error.value = parseCommandError(err);
       outline.value = [];
     } finally {
       loading.value = false;
     }
+  }
+
+  /** 重试当前文件的大纲解析 */
+  async function retry(): Promise<void> {
+    const path = filePath.value;
+    if (!path) return;
+    await fetchOutline(path);
   }
 
   // 监听文件路径变化，自动拉取磁盘权威大纲
@@ -39,6 +48,7 @@ export function useOutline(
         void fetchOutline(newPath);
       } else {
         outline.value = [];
+        error.value = null;
       }
     },
     { immediate: true }
@@ -62,6 +72,8 @@ export function useOutline(
         // 过期返回（期间又有新变更）直接丢弃，防回跳
         if (mySeq !== liveSeq) return;
         outline.value = items;
+        // 实时解析成功说明内容可用，清掉此前磁盘解析失败留下的 ErrorState
+        error.value = null;
       } catch {
         // 编辑态解析失败不打断编辑，保留当前大纲
       }
@@ -81,6 +93,7 @@ export function useOutline(
     outline,
     loading,
     error,
+    retry,
     updateLiveText,
   };
 }

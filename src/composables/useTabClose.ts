@@ -2,6 +2,7 @@ import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { basename } from "../utils/path";
 import { MARKDOWN_EXTENSIONS } from "../utils/fileKind";
 import { i18n } from "../i18n";
+import { formatCommandError } from "../utils/commandError";
 import type { AlertVariant } from "../stores/useDialogStore";
 
 // ===== 依赖类型切片 =====
@@ -68,7 +69,7 @@ export function useTabClose(deps: TabCloseDeps) {
         await tabsStore.saveTab(tabId);
         return true;
       } catch (err) {
-        await dialog.alert({ message: t("common.error.saveFailed", { error: err }), variant: "error" });
+        await dialog.alert({ message: t("common.error.saveFailed", { error: formatCommandError(err) }), variant: "error" });
         return false;
       }
     }
@@ -82,7 +83,7 @@ export function useTabClose(deps: TabCloseDeps) {
       await tabsStore.saveTabAs(tabId, selected);
       return true;
     } catch (err) {
-      await dialog.alert({ message: t("common.error.saveAsFailed", { error: err }), variant: "error" });
+      await dialog.alert({ message: t("common.error.saveAsFailed", { error: formatCommandError(err) }), variant: "error" });
       return false;
     }
   }

@@ -178,7 +178,7 @@ describe("useCopyRichText - copyRichText", () => {
     const deps = makeDeps();
     const { copyRichText } = useCopyRichText(deps);
     await copyRichText();
-    expect(deps.toast.error).toHaveBeenCalledWith("复制富文本失败: Error: render fail");
+    expect(deps.toast.error).toHaveBeenCalledWith("复制富文本失败: render fail");
     expect(mockWrite).not.toHaveBeenCalled();
     expect(deps.toast.success).not.toHaveBeenCalled();
   });
@@ -189,7 +189,7 @@ describe("useCopyRichText - copyRichText", () => {
     const deps = makeDeps();
     const { copyRichText } = useCopyRichText(deps);
     await copyRichText();
-    expect(deps.toast.error).toHaveBeenCalledWith("复制富文本失败: Error: clipboard denied");
+    expect(deps.toast.error).toHaveBeenCalledWith("复制富文本失败: clipboard denied");
     expect(deps.toast.success).not.toHaveBeenCalled();
   });
 

@@ -8,6 +8,7 @@
 
 use std::sync::mpsc;
 use tauri::{AppHandle, WebviewUrl, WebviewWindowBuilder};
+use crate::errors::{CommandError, ErrorCode};
 
 /// PDF 导出命令（Tauri command）。
 ///
@@ -18,7 +19,7 @@ pub async fn export_pdf(
     app: AppHandle,
     html: String,
     output_path: String,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     #[cfg(windows)]
     {
         export_pdf_windows(&app, html, output_path).await
@@ -26,7 +27,7 @@ pub async fn export_pdf(
     #[cfg(not(windows))]
     {
         let _ = (app, html, output_path);
-        Err("PDF 导出目前仅支持 Windows（macOS/Linux 降级路径留后续版本）".to_string())
+        Err(CommandError::new(ErrorCode::Unsupported).with_param("operation", "pdf_export"))
     }
 }
 
@@ -35,18 +36,18 @@ async fn export_pdf_windows(
     app: &AppHandle,
     html: String,
     output_path: String,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     // 创建隐藏 webview（唯一标签，避免冲突）
     let label = format!("pdf-export-{}", uuid::Uuid::new_v4());
     let webview = WebviewWindowBuilder::new(app, &label, WebviewUrl::default())
         .visible(false)
         .inner_size(800.0, 600.0)
         .build()
-        .map_err(|e| format!("创建隐藏 webview 失败: {}", e))?;
+        .map_err(|e| CommandError::internal(format!("create hidden webview: {e}")))?;
 
     // 通过 channel 接收 with_webview 闭包的结果
     // with_webview 将闭包派发到 UI 线程执行并阻塞当前线程直到完成
-    let (tx, rx) = mpsc::channel::<Result<(), String>>();
+    let (tx, rx) = mpsc::channel::<Result<(), CommandError>>();
     let html_clone = html.clone();
     let output_path_clone = output_path.clone();
 
@@ -57,10 +58,12 @@ async fn export_pdf_windows(
 
     if let Err(e) = dispatch_result {
         let _ = webview.close();
-        return Err(format!("with_webview 调度失败: {}", e));
+        return Err(CommandError::internal(format!("with_webview: {e}")));
     }
 
-    let result = rx.recv().map_err(|e| format!("接收导出结果失败: {}", e))?;
+    let result = rx
+        .recv()
+        .map_err(|e| CommandError::internal(format!("pdf result channel: {e}")))?;
 
     // 销毁隐藏 webview（无论成功或失败，避免内存泄漏）
     let _ = webview.close();
@@ -77,7 +80,7 @@ fn print_to_pdf_inner(
     pw: tauri::webview::PlatformWebview,
     html: &str,
     output_path: &str,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     use webview2_com::{
         Microsoft::Web::WebView2::Win32::*,
         wait_with_pump, NavigationCompletedEventHandler, PrintToPdfCompletedHandler,
@@ -86,12 +89,12 @@ fn print_to_pdf_inner(
 
     let controller = pw.controller();
     let core = unsafe { controller.CoreWebView2() }
-        .map_err(|e| format!("获取 CoreWebView2 失败: {}", e))?;
+        .map_err(|e| CommandError::internal(format!("CoreWebView2: {e}")))?;
 
     // 1. 注册 NavigationCompleted 事件处理器
     //    必须在 NavigateToString 之前注册，避免错过事件
     //    事件通过 Windows 消息循环派发，在 wait_with_pump 泵送时触发
-    let (nav_tx, nav_rx) = mpsc::channel::<Result<(), String>>();
+    let (nav_tx, nav_rx) = mpsc::channel::<Result<(), CommandError>>();
     let nav_handler = NavigationCompletedEventHandler::create(Box::new(
         move |_sender, args: Option<ICoreWebView2NavigationCompletedEventArgs>| {
             let success = match &args {
@@ -106,23 +109,24 @@ fn print_to_pdf_inner(
             if success {
                 let _ = nav_tx.send(Ok(()));
             } else {
-                let _ = nav_tx.send(Err("页面导航失败".to_string()));
+                let _ = nav_tx.send(Err(CommandError::internal("navigation failed")));
             }
             Ok(())
         },
     ));
     let mut nav_token: i64 = 0;
     unsafe { core.add_NavigationCompleted(&nav_handler, &mut nav_token) }
-        .map_err(|e| format!("注册 NavigationCompleted 失败: {}", e))?;
+        .map_err(|e| CommandError::internal(format!("add NavigationCompleted: {e}")))?;
 
     // 2. 加载 HTML（NavigateToString 接受原始 HTML 字串）
     let html_hstring = HSTRING::from(html);
     unsafe { core.NavigateToString(&html_hstring) }
-        .map_err(|e| format!("NavigateToString 失败: {}", e))?;
+        .map_err(|e| CommandError::internal(format!("NavigateToString: {e}")))?;
 
     // 3. 等待导航完成（wait_with_pump 泵送消息，UI 保持响应）
     let nav_result = wait_with_pump(nav_rx)
-        .map_err(|e| format!("等待导航完成超时: {:?}", e))?;
+        .map_err(|e| CommandError::new(ErrorCode::Timeout)
+            .with_param("detail", format!("navigation: {e:?}")))?;
     nav_result?;
 
     // 4. 创建打印设置（A4 + 1 英寸标准边距）
@@ -130,9 +134,9 @@ fn print_to_pdf_inner(
     let env = pw.environment();
     let env6: ICoreWebView2Environment6 = env
         .cast()
-        .map_err(|e| format!("获取 ICoreWebView2Environment6 失败: {}", e))?;
+        .map_err(|e| CommandError::internal(format!("ICoreWebView2Environment6: {e}")))?;
     let settings = unsafe { env6.CreatePrintSettings() }
-        .map_err(|e| format!("CreatePrintSettings 失败: {}", e))?;
+        .map_err(|e| CommandError::internal(format!("CreatePrintSettings: {e}")))?;
 
     // A4 尺寸：8.27 × 11.69 英寸
     // 标准边距：1 英寸（上下左右）
@@ -149,7 +153,7 @@ fn print_to_pdf_inner(
     // 5. 获取 ICoreWebView2_7 接口（PrintToPdf 所在接口）
     let core7: ICoreWebView2_7 = core
         .cast()
-        .map_err(|e| format!("获取 ICoreWebView2_7 失败: {}", e))?;
+        .map_err(|e| CommandError::internal(format!("ICoreWebView2_7: {e}")))?;
 
     // 6. 调用 PrintToPdf 并等待完成
     //    PrintToPdf 是异步操作，通过完成回调接收结果
@@ -163,15 +167,16 @@ fn print_to_pdf_inner(
 
     let path_hstring = HSTRING::from(output_path);
     unsafe { core7.PrintToPdf(&path_hstring, &settings, &pdf_handler) }
-        .map_err(|e| format!("PrintToPdf 调用失败: {}", e))?;
+        .map_err(|e| CommandError::internal(format!("PrintToPdf: {e}")))?;
 
     let (result, is_success) = wait_with_pump(pdf_rx)
-        .map_err(|e| format!("等待 PrintToPdf 完成超时: {:?}", e))?;
+        .map_err(|e| CommandError::new(ErrorCode::Timeout)
+            .with_param("detail", format!("print: {e:?}")))?;
 
-    result.map_err(|e| format!("PrintToPdf 完成但有错误: {}", e))?;
+    result.map_err(|e| CommandError::internal(format!("PrintToPdf completed with error: {e}")))?;
 
     if !is_success {
-        return Err("PrintToPdf 报告失败（isSuccess=false）".to_string());
+        return Err(CommandError::internal("PrintToPdf reported failure").with_param("detail", "isSuccess=false"));
     }
 
     Ok(())

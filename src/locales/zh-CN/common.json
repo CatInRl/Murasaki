@@ -115,8 +115,27 @@
     "openFileFailed": "打开文件失败: {error}",
     "openWorkspaceFailed": "打开工作区失败: {error}",
     "reloadFailed": "重新加载失败: {error}",
+    "watchFailed": "无法监听工作区变化: {error}",
+    "restoreTabsFailed": "有 {count} 个标签未能恢复",
+    "withPath": "{message}：{path}",
+    "withDetail": "{message}（{detail}）",
+    "withPathDetail": "{message}：{path}（{detail}）",
     "exportHtmlFailed": "导出 HTML 失败: {error}",
-    "exportPdfFailed": "导出 PDF 失败: {error}"
+    "exportPdfFailed": "导出 PDF 失败: {error}",
+    "code": {
+      "not_found": "找不到文件或目录",
+      "not_a_directory": "目标不是文件夹",
+      "not_a_file": "目标不是文件",
+      "already_exists": "目标已存在",
+      "permission_denied": "没有访问权限",
+      "outside_workspace": "路径必须在工作区内",
+      "invalid_argument": "参数不合法",
+      "unsupported": "当前不支持该操作",
+      "timeout": "操作超时",
+      "internal": "内部错误",
+      "io": "文件读写失败",
+      "unknown": "未知错误"
+    }
   },
   "status": {
     "noFileOpen": "未打开文件",

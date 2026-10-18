@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
+use crate::errors::{CommandError, ErrorCode};
 
 /// 大纲项：与前端 OutlineItem 类型对齐
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,22 +95,22 @@ pub fn parse_outline_from_text(content: &str) -> Vec<OutlineItem> {
 /// path: 文件绝对路径
 /// 返回 OutlineItem 数组
 #[tauri::command]
-pub fn parse_outline(path: String) -> Result<Vec<OutlineItem>, String> {
+pub fn parse_outline(path: String) -> Result<Vec<OutlineItem>, CommandError> {
     let p = Path::new(&path);
     if !p.exists() {
-        return Err(format!("文件不存在: {}", path));
+        return Err(CommandError::path(ErrorCode::NotFound, &path));
     }
     if !p.is_file() {
-        return Err(format!("不是文件: {}", path));
+        return Err(CommandError::path(ErrorCode::NotAFile, &path));
     }
 
     // 获取 mtime
-    let metadata = fs::metadata(&p).map_err(|e| e.to_string())?;
+    let metadata = fs::metadata(p).map_err(|e| CommandError::io_at(&e, &path))?;
     let mtime = metadata
         .modified()
-        .map_err(|e| e.to_string())?
+        .map_err(|e| CommandError::io_at(&e, &path))?
         .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
+        .map_err(|e| CommandError::internal(format!("clock: {e}")))?
         .as_millis();
 
     // 查缓存
@@ -124,7 +125,7 @@ pub fn parse_outline(path: String) -> Result<Vec<OutlineItem>, String> {
     }
 
     // 读文件并解析
-    let content = fs::read_to_string(&p).map_err(|e| e.to_string())?;
+    let content = fs::read_to_string(p).map_err(|e| CommandError::io_at(&e, &path))?;
     let outline = parse_outline_from_text(&content);
 
     // 写缓存
@@ -146,7 +147,7 @@ pub fn parse_outline_str(text: String) -> Vec<OutlineItem> {
 
 /// 清除指定文件的大纲缓存（文件被删除/重命名时调用）
 #[tauri::command]
-pub fn invalidate_outline_cache(path: String) -> Result<(), String> {
+pub fn invalidate_outline_cache(path: String) -> Result<(), CommandError> {
     let mut cache = get_cache();
     let cache = cache.as_mut().unwrap();
     cache.remove(&path);
@@ -155,7 +156,7 @@ pub fn invalidate_outline_cache(path: String) -> Result<(), String> {
 
 /// 清除全部大纲缓存
 #[tauri::command]
-pub fn clear_outline_cache() -> Result<(), String> {
+pub fn clear_outline_cache() -> Result<(), CommandError> {
     let mut cache = get_cache();
     let cache = cache.as_mut().unwrap();
     cache.clear();

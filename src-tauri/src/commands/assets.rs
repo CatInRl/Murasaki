@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use super::atomic_write::write_atomic;
 use super::sha1_hex;
+use crate::errors::{CommandError, ErrorCode};
 use serde::Serialize;
 
 /// 图片保存结果
@@ -77,7 +78,7 @@ fn normalize_ext(ext: &str) -> String {
 /// 注意：**不能**在判断前先 trim 掉前导分隔符 —— 那样 Windows 的 `/abs` 与 Unix 的
 /// `/abs` 都会被削成相对路径而放行，而 `PathBuf::join` 遇到带根前缀的路径会丢弃
 /// 工作区前缀，直接落到盘根。
-fn normalize_asset_dir(dir: Option<&str>) -> Result<String, String> {
+fn normalize_asset_dir(dir: Option<&str>) -> Result<String, CommandError> {
     let raw = dir.unwrap_or("").trim();
     if raw.is_empty() {
         return Ok("assets".to_string());
@@ -86,7 +87,10 @@ fn normalize_asset_dir(dir: Option<&str>) -> Result<String, String> {
     for comp in Path::new(raw).components() {
         match comp {
             std::path::Component::Normal(seg) => parts.push(seg.to_string_lossy().to_string()),
-            _ => return Err(format!("图片目录必须是工作区内的相对路径: {}", raw)),
+            _ => {
+                return Err(CommandError::new(ErrorCode::OutsideWorkspace)
+                    .with_param("path", raw.to_string()))
+            }
         }
     }
     if parts.is_empty() {
@@ -107,15 +111,15 @@ pub fn save_image_asset(
     bytes: Vec<u8>,
     ext: String,
     dir: Option<String>,
-) -> Result<SaveImageResult, String> {
+) -> Result<SaveImageResult, CommandError> {
     let ws = PathBuf::from(&workspace);
     if !ws.exists() {
-        return Err(format!("工作区不存在: {}", workspace));
+        return Err(CommandError::path(ErrorCode::NotFound, &workspace));
     }
     let rel_dir = normalize_asset_dir(dir.as_deref())?;
     let assets_dir = ws.join(&rel_dir);
     if !assets_dir.exists() {
-        fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&assets_dir).map_err(|e| CommandError::io_at(&e, &assets_dir))?;
     }
 
     let ext_norm = normalize_ext(&ext);
@@ -123,7 +127,7 @@ pub fn save_image_asset(
     let hash = short_hash(&bytes);
     let filename = format!("{}-{}.{}", timestamp, hash, ext_norm);
     let abs_path = assets_dir.join(&filename);
-    write_atomic(&abs_path, &bytes).map_err(|e| e.to_string())?;
+    write_atomic(&abs_path, &bytes).map_err(|e| CommandError::io_at(&e, &abs_path))?;
 
     let relative_path = format!("{}/{}", rel_dir, filename);
     Ok(SaveImageResult {
@@ -146,15 +150,15 @@ pub fn copy_image_to_workspace(
     source_path: String,
     workspace: String,
     dir: Option<String>,
-) -> Result<SaveImageResult, String> {
+) -> Result<SaveImageResult, CommandError> {
     let src = Path::new(&source_path);
     if !src.exists() {
-        return Err(format!("源文件不存在: {}", source_path));
+        return Err(CommandError::path(ErrorCode::NotFound, &source_path));
     }
     if !src.is_file() {
-        return Err(format!("源路径不是文件: {}", source_path));
+        return Err(CommandError::path(ErrorCode::NotAFile, &source_path));
     }
-    let bytes = fs::read(src).map_err(|e| e.to_string())?;
+    let bytes = fs::read(src).map_err(|e| CommandError::io_at(&e, &source_path))?;
     let ext = src
         .extension()
         .and_then(|e| e.to_str())
@@ -167,15 +171,15 @@ pub fn copy_image_to_workspace(
 ///
 /// 前端不直接读本地文件；MIME 由前端按扩展名推断（单一来源见 `mimeForImageExt`）。
 #[tauri::command]
-pub fn read_image_base64(source_path: String) -> Result<String, String> {
+pub fn read_image_base64(source_path: String) -> Result<String, CommandError> {
     let src = Path::new(&source_path);
     if !src.exists() {
-        return Err(format!("源文件不存在: {}", source_path));
+        return Err(CommandError::path(ErrorCode::NotFound, &source_path));
     }
     if !src.is_file() {
-        return Err(format!("源路径不是文件: {}", source_path));
+        return Err(CommandError::path(ErrorCode::NotAFile, &source_path));
     }
-    let bytes = fs::read(src).map_err(|e| e.to_string())?;
+    let bytes = fs::read(src).map_err(|e| CommandError::io_at(&e, &source_path))?;
     Ok(base64_encode(&bytes))
 }
 

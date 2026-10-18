@@ -115,8 +115,27 @@
     "openFileFailed": "Failed to open file: {error}",
     "openWorkspaceFailed": "Failed to open workspace: {error}",
     "reloadFailed": "Reload failed: {error}",
+    "watchFailed": "Unable to watch workspace changes: {error}",
+    "restoreTabsFailed": "{count} tab(s) could not be restored",
+    "withPath": "{message}: {path}",
+    "withDetail": "{message} ({detail})",
+    "withPathDetail": "{message}: {path} ({detail})",
     "exportHtmlFailed": "Export HTML failed: {error}",
-    "exportPdfFailed": "Export PDF failed: {error}"
+    "exportPdfFailed": "Export PDF failed: {error}",
+    "code": {
+      "not_found": "File or folder not found",
+      "not_a_directory": "Not a folder",
+      "not_a_file": "Not a file",
+      "already_exists": "Already exists",
+      "permission_denied": "Permission denied",
+      "outside_workspace": "Path must be inside the workspace",
+      "invalid_argument": "Invalid argument",
+      "unsupported": "This operation is not supported",
+      "timeout": "Operation timed out",
+      "internal": "Internal error",
+      "io": "File read/write failed",
+      "unknown": "Unknown error"
+    }
   },
   "status": {
     "noFileOpen": "No file open",

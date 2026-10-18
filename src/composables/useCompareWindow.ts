@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { basename } from "../utils/path";
 import { i18n } from "../i18n";
+import { formatCommandError } from "../utils/commandError";
 
 /** useTabsStore 的接口切片 */
 export interface TabsStoreLike {
@@ -113,7 +114,7 @@ export function useCompareWindow(deps: CompareWindowDeps) {
       await tabsStore.writeMergedContent(filePath, mergedContent);
     } catch (err) {
       console.error("保存合并结果失败:", err);
-      dialog.alert({ message: t("common.error.saveMergeFailed", { error: err }), variant: "error" });
+      dialog.alert({ message: t("common.error.saveMergeFailed", { error: formatCommandError(err) }), variant: "error" });
     }
     compareState.value = { ...compareState.value, visible: false };
   }

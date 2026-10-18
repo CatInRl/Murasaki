@@ -5,6 +5,12 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { TreeListing, TreeNode } from "../types";
 import { basename } from "../utils/path";
 import { i18n } from "../i18n";
+import {
+  parseCommandError,
+  formatCommandError,
+  showRetryToast,
+  type CommandErrorInfo,
+} from "../utils/commandError";
 import { usePersistenceStore } from "./usePersistenceStore";
 import { useToastStore } from "./useToastStore";
 
@@ -33,6 +39,8 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   const fileTree = ref<TreeNode[]>([]);
   /** 加载中标志 */
   const loading = ref(false);
+  /** 最近一次读取文件树的失败（供文件树空态展示 ErrorState 与重试，#436） */
+  const loadError = ref<CommandErrorInfo | null>(null);
   /** 当前选中的文件路径（用于高亮） */
   const selectedFilePath = ref<string | null>(null);
   /** 是否已就「文件树被截断」提示过（避免刷新/聚焦时反复弹窗，#432） */
@@ -47,8 +55,12 @@ export const useWorkspaceStore = defineStore("workspace", () => {
       path,
       showHidden: persistence.settings.showHiddenFiles,
     });
+    // 与 Rust 侧同构的结构化错误，调用方统一按 code 判断
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), REFRESH_TIMEOUT_MS)
+      setTimeout(
+        () => reject({ code: "timeout", params: { path } }),
+        REFRESH_TIMEOUT_MS
+      )
     );
     return Promise.race([treePromise, timeoutPromise]);
   }
@@ -56,6 +68,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   /** 应用一次文件树结果；截断时只提示一次，恢复正常后允许再次提示 */
   function applyListing(listing: TreeListing): void {
     fileTree.value = listing.nodes;
+    loadError.value = null;
     if (!listing.truncated) {
       truncatedNotified = false;
       return;
@@ -94,7 +107,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
       await invoke("open_path_in_new_window", { path: selected });
     } catch (err) {
       console.error("新窗口打开文件夹失败:", err);
-      toast.error(t("common.error.openWorkspaceFailed", { error: err }));
+      toast.error(t("common.error.openWorkspaceFailed", { error: formatCommandError(err) }));
       return false;
     }
     return true;
@@ -115,6 +128,11 @@ export const useWorkspaceStore = defineStore("workspace", () => {
       await persistence.addRecent(path, "folder");
     } catch (err) {
       console.error("打开工作区失败:", err);
+      loadError.value = parseCommandError(err);
+      showRetryToast(
+        t("common.error.openWorkspaceFailed", { error: formatCommandError(err) }),
+        () => void openWorkspace(path).catch(() => {})
+      );
       throw err;
     } finally {
       loading.value = false;
@@ -139,13 +157,18 @@ export const useWorkspaceStore = defineStore("workspace", () => {
         // 读取期间换了工作区：丢弃本次结果，避免把旧树写到新工作区
         if (workspacePath.value === path) applyListing(listing);
       } catch (err) {
-        if (err instanceof Error && err.message === "timeout") {
+        const info = parseCommandError(err);
+        loadError.value = info;
+        if (info.code === "timeout") {
           console.error(`刷新文件树超时（${REFRESH_TIMEOUT_MS / 1000}s）`);
           toast.warning(t("editor.fileTree.refreshTimeout"), {
             description: t("editor.fileTree.refreshTimeoutDesc"),
+            action: { label: t("common.retry"), onClick: () => void refreshTree() },
           });
         } else {
           console.error("刷新文件树失败:", err);
+          // 树已渲染时保留旧树，仅用 toast 告知失败并给出重试入口
+          showRetryToast(formatCommandError(err), () => void refreshTree());
         }
       } finally {
         loading.value = false;
@@ -162,6 +185,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     workspacePath.value = null;
     fileTree.value = [];
     selectedFilePath.value = null;
+    loadError.value = null;
     truncatedNotified = false;
   }
 
@@ -177,6 +201,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     workspacePath,
     fileTree,
     loading,
+    loadError,
     selectedFilePath,
     // getters
     hasWorkspace,

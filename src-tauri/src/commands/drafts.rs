@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use super::atomic_write::write_atomic;
 use super::sha1_hex;
+use crate::errors::{CommandError, ErrorCode};
 use serde::{Deserialize, Serialize};
 
 /// 草稿元数据（与前端 DraftMeta 对齐）
@@ -21,31 +22,31 @@ pub struct DraftMeta {
 
 /// 获取 Murasaki app data 目录：%APPDATA%\murasaki\
 /// 若不存在则创建。
-fn app_data_dir() -> Result<PathBuf, String> {
+fn app_data_dir() -> Result<PathBuf, CommandError> {
     // 优先使用 APPDATA 环境变量（Windows 标准）
     // 注意：开发环境启动脚本可能重定向 APPDATA 到工作区 .appdata/
     let base = dirs::data_dir()
         .or_else(|| std::env::var_os("APPDATA").map(PathBuf::from))
-        .ok_or_else(|| "无法确定 app data 目录".to_string())?;
+        .ok_or_else(|| CommandError::new(ErrorCode::Internal).with_param("detail", "app data dir"))?;
     let dir = base.join("murasaki");
     if !dir.exists() {
-        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&dir).map_err(|e| CommandError::io_at(&e, &dir))?;
     }
     Ok(dir)
 }
 
 /// 草稿目录：%APPDATA%\murasaki\drafts\
-fn drafts_dir() -> Result<PathBuf, String> {
+fn drafts_dir() -> Result<PathBuf, CommandError> {
     let dir = app_data_dir()?.join("drafts");
     if !dir.exists() {
-        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        fs::create_dir_all(&dir).map_err(|e| CommandError::io_at(&e, &dir))?;
     }
     Ok(dir)
 }
 
 /// 根据原文件路径计算草稿文件路径：drafts/<sha1(path)>
 /// SHA1 避免路径中的特殊字符问题，且固定长度
-fn draft_path_for(original_path: &str) -> Result<PathBuf, String> {
+fn draft_path_for(original_path: &str) -> Result<PathBuf, CommandError> {
     // 转为十六进制字符串（40 字符）
     let hash_str = sha1_hex(original_path.as_bytes());
     Ok(drafts_dir()?.join(hash_str))
@@ -53,7 +54,7 @@ fn draft_path_for(original_path: &str) -> Result<PathBuf, String> {
 
 /// 草稿 sidecar 元数据文件路径：drafts/<sha1(path)>.meta.json
 /// 用于持久化 known_mtime（保存草稿时文件的 mtime），启动恢复时检测外部修改
-fn draft_meta_path_for(original_path: &str) -> Result<PathBuf, String> {
+fn draft_meta_path_for(original_path: &str) -> Result<PathBuf, CommandError> {
     let draft_path = draft_path_for(original_path)?;
     Ok(PathBuf::from(format!("{}.meta.json", draft_path.to_string_lossy())))
 }
@@ -94,11 +95,11 @@ pub fn save_draft(
     path: String,
     content: String,
     known_mtime: u64,
-) -> Result<DraftMeta, String> {
+) -> Result<DraftMeta, CommandError> {
     let draft_path = draft_path_for(&path)?;
     // 正文与 known_mtime 写在同一个文件里，一次原子替换完成
     let payload = encode_draft(known_mtime, &content);
-    write_atomic(&draft_path, payload.as_bytes()).map_err(|e| e.to_string())?;
+    write_atomic(&draft_path, payload.as_bytes()).map_err(|e| CommandError::io_at(&e, &draft_path))?;
     // 旧格式遗留的 sidecar 不再需要；删除失败不影响草稿本身
     let meta_path = draft_meta_path_for(&path)?;
     if meta_path.exists() {
@@ -106,7 +107,7 @@ pub fn save_draft(
     }
     let saved_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
+        .map_err(|e| CommandError::internal(format!("clock: {e}")))?
         .as_millis() as u64;
     Ok(DraftMeta {
         path,
@@ -120,19 +121,19 @@ pub fn save_draft(
 /// path: 原文件绝对路径
 /// 返回 (content, draft_meta)
 #[tauri::command]
-pub fn read_draft(path: String) -> Result<(String, DraftMeta), String> {
+pub fn read_draft(path: String) -> Result<(String, DraftMeta), CommandError> {
     let draft_path = draft_path_for(&path)?;
     if !draft_path.exists() {
-        return Err(format!("草稿不存在: {}", path));
+        return Err(CommandError::path(ErrorCode::NotFound, &path));
     }
-    let raw = fs::read_to_string(&draft_path).map_err(|e| e.to_string())?;
+    let raw = fs::read_to_string(&draft_path).map_err(|e| CommandError::io_at(&e, &draft_path))?;
     // 读取草稿文件的 mtime 作为 saved_at
-    let metadata = fs::metadata(&draft_path).map_err(|e| e.to_string())?;
+    let metadata = fs::metadata(&draft_path).map_err(|e| CommandError::io_at(&e, &draft_path))?;
     let saved_at = metadata
         .modified()
-        .map_err(|e| e.to_string())?
+        .map_err(|e| CommandError::io_at(&e, &draft_path))?
         .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
+        .map_err(|e| CommandError::internal(format!("clock: {e}")))?
         .as_millis() as u64;
     // 新格式自带 known_mtime；旧格式回退到 sidecar，再没有就按 0 处理
     let (known_mtime, content) = match decode_draft(&raw) {
@@ -165,29 +166,29 @@ fn read_legacy_known_mtime(original_path: &str) -> u64 {
 
 /// 删除草稿（文件保存后调用）
 #[tauri::command]
-pub fn delete_draft(path: String) -> Result<(), String> {
+pub fn delete_draft(path: String) -> Result<(), CommandError> {
     let draft_path = draft_path_for(&path)?;
     if draft_path.exists() {
-        fs::remove_file(&draft_path).map_err(|e| e.to_string())?;
+        fs::remove_file(&draft_path).map_err(|e| CommandError::io_at(&e, &draft_path))?;
     }
     // 同时删除 sidecar 元数据
     let meta_path = draft_meta_path_for(&path)?;
     if meta_path.exists() {
-        fs::remove_file(&meta_path).map_err(|e| e.to_string())?;
+        fs::remove_file(&meta_path).map_err(|e| CommandError::io_at(&e, &meta_path))?;
     }
     Ok(())
 }
 
 /// 检查草稿是否存在
 #[tauri::command]
-pub fn draft_exists(path: String) -> Result<bool, String> {
+pub fn draft_exists(path: String) -> Result<bool, CommandError> {
     let draft_path = draft_path_for(&path)?;
     Ok(draft_path.exists())
 }
 
 /// 获取 app data 目录路径（前端可用于读取 settings.json 等）
 #[tauri::command]
-pub fn get_app_data_dir() -> Result<String, String> {
+pub fn get_app_data_dir() -> Result<String, CommandError> {
     let dir = app_data_dir()?;
     Ok(dir.to_string_lossy().to_string())
 }
@@ -195,17 +196,17 @@ pub fn get_app_data_dir() -> Result<String, String> {
 /// 获取文件的当前 mtime（毫秒级 Unix 时间戳）
 /// 若文件不存在返回错误
 #[tauri::command]
-pub fn get_file_mtime(path: String) -> Result<u64, String> {
+pub fn get_file_mtime(path: String) -> Result<u64, CommandError> {
     let p = Path::new(&path);
     if !p.exists() {
-        return Err(format!("文件不存在: {}", path));
+        return Err(CommandError::path(ErrorCode::NotFound, &path));
     }
-    let metadata = fs::metadata(p).map_err(|e| e.to_string())?;
+    let metadata = fs::metadata(p).map_err(|e| CommandError::io_at(&e, &path))?;
     let mtime = metadata
         .modified()
-        .map_err(|e| e.to_string())?
+        .map_err(|e| CommandError::io_at(&e, &path))?
         .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
+        .map_err(|e| CommandError::internal(format!("clock: {e}")))?
         .as_millis() as u64;
     Ok(mtime)
 }

@@ -19,7 +19,9 @@ import {
 } from "../utils/treeNavigation";
 import TreeNode from "./TreeNode.vue";
 import EmptyState from "./EmptyState.vue";
+import ErrorState from "./ErrorState.vue";
 import Skeleton from "./Skeleton.vue";
+import { formatCommandError } from "../utils/commandError";
 
 const workspace = useWorkspaceStore();
 const fileOps = useFileOpsStore();
@@ -134,7 +136,7 @@ function onEmptyContextMenu(e: MouseEvent): void {
         try {
           await fileOps.paste(root);
         } catch (err) {
-          dialog.alert({ message: t("common.error.pasteFailed", { error: err }), variant: "error" });
+          dialog.alert({ message: t("common.error.pasteFailed", { error: formatCommandError(err) }), variant: "error" });
         }
       },
     },
@@ -146,7 +148,7 @@ function onEmptyContextMenu(e: MouseEvent): void {
         try {
           await fileOps.revealInExplorer(root);
         } catch (err) {
-          dialog.alert({ message: t("common.error.revealFailed", { error: err }), variant: "error" });
+          dialog.alert({ message: t("common.error.revealFailed", { error: formatCommandError(err) }), variant: "error" });
         }
       },
     },
@@ -166,7 +168,7 @@ async function submitRootCreating(): Promise<void> {
       await fileOps.createDirectory(workspace.workspacePath, name);
     }
   } catch (err) {
-    dialog.alert({ message: t("common.error.createFailed", { error: err }), variant: "error" });
+    dialog.alert({ message: t("common.error.createFailed", { error: formatCommandError(err) }), variant: "error" });
   } finally {
     fileOps.endRootCreate();
     rootCreatingName.value = "";
@@ -181,6 +183,20 @@ function cancelRootCreating(): void {
 // ===== 空状态：打开工作区 =====
 async function onOpenWorkspace(): Promise<void> {
   await workspace.openFolderDialog();
+}
+
+/**
+ * 失败态重试：
+ * - 工作区已打开（刷新失败）→ 重新读树
+ * - 首次打开就失败（workspacePath 未赋值）→ 用它尝试过的路径重新打开
+ */
+function retryLoad(): void {
+  if (workspace.workspacePath) {
+    void workspace.refreshTree();
+    return;
+  }
+  const path = workspace.loadError?.params.path;
+  if (path) void workspace.openWorkspace(path).catch(() => {});
 }
 </script>
 
@@ -206,6 +222,14 @@ async function onOpenWorkspace(): Promise<void> {
       <Skeleton
         v-if="workspace.loading && workspace.fileTree.length === 0"
         :lines="4"
+      />
+      <!-- 先于 EmptyState 判断：首次打开失败时 workspacePath 尚未赋值，否则只剩「未打开工作区」 -->
+      <ErrorState
+        v-else-if="workspace.loadError && workspace.fileTree.length === 0"
+        :title="$t('editor.fileTree.loadFailed')"
+        :description="formatCommandError(workspace.loadError)"
+        :retry-text="$t('common.retry')"
+        @retry="retryLoad"
       />
       <EmptyState
         v-else-if="!workspace.hasWorkspace"
