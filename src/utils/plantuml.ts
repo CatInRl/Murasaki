@@ -101,18 +101,23 @@ function injectSkinparam(code: string): string {
  * @param code PlantUML 源码
  * @param target 渲染目标的元素（id 会被覆盖以定位）
  * @param idPrefix 生成的元素 id 前缀（保证多实例并发时 id 唯一）
+ * @param isStale 可选过期判定（#431）：引擎加载完成后若已过期则不再渲染，
+ *   避免为已被新内容覆盖的预览做无用功
  */
 export async function renderPlantUmlCode(
   code: string,
   target: HTMLElement,
-  idPrefix = "plantuml"
+  idPrefix = "plantuml",
+  isStale?: () => boolean
 ): Promise<void> {
   try {
     const plantuml = await ensurePlantUml();
+    if (isStale?.()) return;
     const id = `${idPrefix}-${Math.random().toString(36).slice(2, 10)}`;
     target.id = id;
     plantuml.render([injectSkinparam(code)], id, { dark: false });
   } catch (err) {
+    if (isStale?.()) return;
     target.innerHTML = `<pre style="color:var(--murasaki-state-error)">${(err as Error).message}</pre>`;
   }
 }

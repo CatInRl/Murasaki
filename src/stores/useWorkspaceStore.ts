@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import type { TreeNode } from "../types";
+import type { TreeListing, TreeNode } from "../types";
 import { i18n } from "../i18n";
 import { usePersistenceStore } from "./usePersistenceStore";
 import { useToastStore } from "./useToastStore";
@@ -34,6 +34,37 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   const loading = ref(false);
   /** 当前选中的文件路径（用于高亮） */
   const selectedFilePath = ref<string | null>(null);
+  /** 是否已就「文件树被截断」提示过（避免刷新/聚焦时反复弹窗，#432） */
+  let truncatedNotified = false;
+
+  /**
+   * 读取文件树（带超时兜底）。
+   * 后端已改为 `spawn_blocking`，不再阻塞主线程；超时只放弃等待，避免 loading 永久卡住。
+   */
+  async function listTree(path: string): Promise<TreeListing> {
+    const treePromise = invoke<TreeListing>("list_tree", {
+      path,
+      showHidden: persistence.settings.showHiddenFiles,
+    });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), REFRESH_TIMEOUT_MS)
+    );
+    return Promise.race([treePromise, timeoutPromise]);
+  }
+
+  /** 应用一次文件树结果；截断时只提示一次，恢复正常后允许再次提示 */
+  function applyListing(listing: TreeListing): void {
+    fileTree.value = listing.nodes;
+    if (!listing.truncated) {
+      truncatedNotified = false;
+      return;
+    }
+    if (truncatedNotified) return;
+    truncatedNotified = true;
+    toast.warning(t("editor.fileTree.truncated"), {
+      description: t("editor.fileTree.truncatedDesc"),
+    });
+  }
 
   // ===== Getters =====
   const hasWorkspace = computed(() => workspacePath.value !== null);
@@ -75,12 +106,11 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   async function openWorkspace(path: string): Promise<void> {
     loading.value = true;
     try {
-      const tree = await invoke<TreeNode[]>("list_tree", {
-        path,
-        showHidden: persistence.settings.showHiddenFiles,
-      });
+      const listing = await listTree(path);
       workspacePath.value = path;
-      fileTree.value = tree;
+      // 新打开的工作区重新允许提示一次
+      truncatedNotified = false;
+      applyListing(listing);
       // 记录到最近打开（委托给 persistence store）
       await persistence.addRecent(path, "folder");
     } catch (err) {
@@ -98,21 +128,16 @@ export const useWorkspaceStore = defineStore("workspace", () => {
    */
   async function refreshTree(): Promise<void> {
     if (!workspacePath.value) return;
+    const path = workspacePath.value;
     // 防重入：进行中直接返回同一个 Promise
     if (refreshPromise) return refreshPromise;
 
     loading.value = true;
     refreshPromise = (async () => {
       try {
-        const treePromise = invoke<TreeNode[]>("list_tree", {
-          path: workspacePath.value,
-          showHidden: persistence.settings.showHiddenFiles,
-        });
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), REFRESH_TIMEOUT_MS)
-        );
-        const tree = await Promise.race([treePromise, timeoutPromise]);
-        fileTree.value = tree;
+        const listing = await listTree(path);
+        // 读取期间换了工作区：丢弃本次结果，避免把旧树写到新工作区
+        if (workspacePath.value === path) applyListing(listing);
       } catch (err) {
         if (err instanceof Error && err.message === "timeout") {
           console.error(`刷新文件树超时（${REFRESH_TIMEOUT_MS / 1000}s）`);
@@ -137,6 +162,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     workspacePath.value = null;
     fileTree.value = [];
     selectedFilePath.value = null;
+    truncatedNotified = false;
   }
 
   /**

@@ -215,6 +215,14 @@ export interface RenderResult {
   frontMatter: string;
 }
 
+/** 代码块高亮的可选参数（#431 过期取消 + #434 显式主题）。 */
+export interface HighlightOptions {
+  /** Shiki 主题名；省略时回落到当前预览主题 */
+  theme?: string;
+  /** 返回 true 表示本次渲染已过期，停止处理剩余代码块 */
+  isStale?: () => boolean;
+}
+
 /**
  * WYSIWYG 专用：当前文件路径（模块级状态）。
  *
@@ -352,13 +360,20 @@ function katexEngine(expr: string, opts: { displayMode?: boolean }) {
 /**
  * 异步高亮 <pre><code data-lang="..."> 块。
  * 在 HTML 注入 DOM 后调用，把占位替换为 Shiki 高亮后的 HTML。
- * `theme` 显式传入时用它高亮（#434），省略时回落到当前预览主题。
+ *
+ * - `options.theme` 显式传入时用它高亮（#434），省略时回落到当前预览主题；
+ * - `options.isStale()` 在每次 await 之后自检，已过期就停止处理剩余代码块（#431）。
  */
-async function highlightCodeBlocks(container: HTMLElement, theme?: string) {
+async function highlightCodeBlocks(
+  container: HTMLElement,
+  options: HighlightOptions = {}
+) {
+  const { theme, isStale } = options;
   const blocks = container.querySelectorAll<HTMLElement>(
     'pre code[data-lang]'
   );
   for (const block of Array.from(blocks)) {
+    if (isStale?.()) return;
     const lang = block.getAttribute("data-lang") || "text";
     const code = block.textContent || "";
     try {
@@ -366,6 +381,7 @@ async function highlightCodeBlocks(container: HTMLElement, theme?: string) {
         lang,
         theme: resolveShikiThemeOption(theme ?? currentShikiThemeName),
       });
+      if (isStale?.()) return;
       const wrapper = document.createElement("div");
       wrapper.innerHTML = html;
       const replacement = wrapper.firstElementChild as HTMLElement | null;
@@ -386,9 +402,9 @@ export interface UseMarkdownRenderer {
   render(source: string, context?: RenderContext): RenderResult;
   /**
    * DOM 渲染后异步替换代码块高亮。
-   * `theme` 显式传入时用它高亮；省略时用当前预览主题。
+   * `options.theme` 显式指定主题；`options.isStale()` 返回 true 时停止处理剩余代码块。
    */
-  highlight(container: HTMLElement, theme?: string): Promise<void>;
+  highlight(container: HTMLElement, options?: HighlightOptions): Promise<void>;
   /** 当前使用的 Shiki 主题名 */
   getShikiTheme(): string;
   /** 切换 Shiki 主题（切换后需重新 highlight 才生效） */
@@ -421,8 +437,8 @@ export function useMarkdownRenderer(): UseMarkdownRenderer {
     return { html, frontMatter };
   }
 
-  async function highlight(container: HTMLElement, theme?: string) {
-    await highlightCodeBlocks(container, theme);
+  async function highlight(container: HTMLElement, options?: HighlightOptions) {
+    await highlightCodeBlocks(container, options);
   }
 
   function getShikiTheme(): string {

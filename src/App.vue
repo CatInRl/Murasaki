@@ -42,6 +42,8 @@ import { useCommands } from "./composables/useCommands";
 import { useShortcuts } from "./shortcuts/useShortcuts";
 import { toMenuAccelerators } from "./shortcuts/shortcutsLogic";
 import { useAppLifecycle } from "./composables/useAppLifecycle";
+import { useSidebarLayout } from "./composables/useSidebarLayout";
+import { bootstrapApp, type AppStartupHandle } from "./composables/useAppStartup";
 import { useModeMenuSync } from "./composables/useModeMenuSync";
 import { useExitFlush, type ExitFlushChoice, type ExitFlushTab } from "./composables/useExitFlush";
 import { useUpdater, type UpdateInfo } from "./composables/useUpdater";
@@ -62,7 +64,7 @@ import { undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import type { SidebarView, EditorMode } from "./types";
 import type { SearchEntry } from "./search/searchLogic";
 import { resolveSearchJumpLine } from "./search/searchLogic";
-import { READING_FONT_PRESETS } from "./types";
+import { applyReadingFontPreset } from "./utils/readingFont";
 import {
   PRESENTATION_ZOOM_DEFAULT,
   stepPresentationZoom,
@@ -254,19 +256,9 @@ const sidebarView = ref<SidebarView>("files");
 // ===== 「全部标签」面板展开状态（TabBar 受控，快捷键与按钮共用，issue #168）=====
 const allTabsOpen = ref(false);
 
-// ===== 侧栏宽度（可拖拽调整 + 折叠成细条，均持久化） =====
-const SIDEBAR_MIN_WIDTH = 140;
-const SIDEBAR_MAX_WIDTH = 600;
-const SIDEBAR_COLLAPSED_WIDTH = 36;
-const sidebarWidth = ref(260);
-const sidebarCollapsed = ref(false);
-/** 拖拽调宽进行中：关闭宽度过渡动画 + 禁用文本选择 */
-const sidebarDragging = ref(false);
-
-/** 侧栏实际宽度：折叠时固定细条宽度，否则用用户调整后的宽度 */
-const sidebarStyle = computed(() => ({
-  width: sidebarCollapsed.value ? `${SIDEBAR_COLLAPSED_WIDTH}px` : `${sidebarWidth.value}px`,
-}));
+// ===== 侧栏宽度（可拖拽调整 + 折叠成细条，均持久化）=====
+// 状态、拖拽与持久化集中在 useSidebarLayout（#433）；实例在 setup 阶段创建，
+// initialized 由启动流程在恢复完成后置位（之前不写回设置）。
 
 /** 大纲视图可用性（与 Sidebar 一致：仅 markdown 文件） */
 const canShowOutline = computed(() =>
@@ -275,8 +267,18 @@ const canShowOutline = computed(() =>
 
 /** 折叠状态下点击图标 → 展开侧栏并切换视图 */
 function expandSidebar(view: SidebarView): void {
-  sidebarCollapsed.value = false;
+  layout.expand();
   sidebarView.value = view;
+}
+
+/** 折叠细条上的「展开」按钮：只展开，不改视图 */
+function expandRail(): void {
+  layout.expand();
+}
+
+/** 展开态右上角的「收起」按钮 */
+function collapseSidebar(): void {
+  layout.collapse();
 }
 
 /**
@@ -292,33 +294,6 @@ function selectSidebarView(view: SidebarView): void {
     return;
   }
   expandSidebar(view);
-}
-
-/** 侧栏右缘拖拽调宽（pointer events，Drag 期间禁止过渡与文本选择） */
-function startResize(e: PointerEvent): void {
-  if (sidebarCollapsed.value) return;
-  e.preventDefault();
-  // 指针捕获：指针移入主区域（如 HTML 预览 iframe）时 pointermove/up 会被 iframe 吞掉，
-  // 导致缩小侧栏后无法拖回右侧。捕获后事件始终派发到本元素，拖拽双向可靠。
-  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  const startX = e.clientX;
-  const startWidth = sidebarWidth.value;
-  sidebarDragging.value = true;
-  document.body.style.userSelect = "none";
-  const onMove = (ev: PointerEvent) => {
-    const w = startWidth + ev.clientX - startX;
-    sidebarWidth.value = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(w)));
-  };
-  const onUp = () => {
-    sidebarDragging.value = false;
-    document.body.style.userSelect = "";
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-    window.removeEventListener("pointercancel", onUp);
-  };
-  window.addEventListener("pointermove", onMove);
-  window.addEventListener("pointerup", onUp);
-  window.addEventListener("pointercancel", onUp);
 }
 
 // ===== 状态栏 / 全屏 =====
@@ -406,10 +381,7 @@ function onUpdateCancel(): void {
 }
 
 // ===== 启动初始化 =====
-// 事件监听器 cleanup（由 setupEventListeners 在 onMounted 中赋值）
-let cleanupListeners: (() => void) | null = null;
-// 退出拦截监听 cleanup（Rust 拦截主窗口关闭 → 前端落盘 → exit_app，ADR-0017）
-let cleanupExitListener: (() => void) | null = null;
+// 启动顺序与各步清理见 useAppStartup（#433）
 
 /**
  * 退出前的未保存改动确认（issue #346 / ADR-0017 修订）。
@@ -453,157 +425,15 @@ const { onExitRequested } = useExitFlush(tabsStore, {
   resolveUnsaved: resolveUnsavedOnExit,
 });
 
-onMounted(async () => {
-  // 1. 加载持久化状态
-  await persistence.loadSettings();
-  await persistence.loadRecent();
+/** 启动编排句柄：onBeforeUnmount 时统一撤销监听与后台任务 */
+let startup: AppStartupHandle | null = null;
 
-  // 应用保存的主题
-  if (persistence.settings.markdownTheme) {
-    currentTheme.value = persistence.settings.markdownTheme;
-  }
-  // 应用阅读字体预设（--murasaki-font-reading）
-  document.documentElement.style.setProperty(
-    "--murasaki-font-reading",
-    READING_FONT_PRESETS[persistence.settings.editorFontPreset] ?? READING_FONT_PRESETS.d
-  );
-  // 应用保存的编辑模式（运行时切换，无需重启）
-  // 菜单勾选由 useModeMenuSync（watch effectiveEditorMode）随生效值自动推送
-  editorBridge.setEditorMode(persistence.settings.editorMode);
-  // 应用保存的界面语言（ADR-0013，前端 i18n + Rust 菜单）
-  // 首次启动（language 从未写入）时先探测系统语言作为默认并持久化（issue #141）；
-  // 已持久化语言的既有用户跳过探测，保持原设置。
-  let effectiveLanguage = persistence.settings.language;
-  if (persistence.languageEmpty) {
-    try {
-      const detected = await invoke<string>("detect_system_locale");
-      effectiveLanguage = mapSystemLocale(detected);
-      await persistence.updateSettings({ language: effectiveLanguage });
-    } catch (err) {
-      console.warn("探测系统语言失败，使用默认语言:", err);
-    }
-  }
-  setLocale(effectiveLanguage);
-  void invoke("reload_menu", { lang: effectiveLanguage }).catch((err: unknown) =>
-    console.warn("初始化菜单语言失败:", err)
-  );
-  // 同步已保存的快捷键覆盖到原生菜单（菜单项快捷键提示跟随用户自定义）
-  void invoke("update_shortcut_labels", {
-    overrides: toMenuAccelerators(persistence.settings.shortcuts ?? {}),
-  }).catch((err: unknown) =>
-    console.warn("初始化菜单快捷键失败:", err)
-  );
-  // 恢复侧栏视图
-  if (persistence.settings.sidebarView) {
-    sidebarView.value = persistence.settings.sidebarView;
-  }
-  // 恢复侧栏宽度与折叠状态（布局状态持久化）
-  if (persistence.settings.sidebarWidth) {
-    sidebarWidth.value = Math.min(
-      SIDEBAR_MAX_WIDTH,
-      Math.max(SIDEBAR_MIN_WIDTH, persistence.settings.sidebarWidth)
-    );
-  }
-  sidebarCollapsed.value = persistence.settings.sidebarCollapsed;
-
-  // 1.5 取走本窗口的待打开路径（多窗口，spec #194 决策 ④）
-  //     有路径 ⇒ 本窗口是被外部入口创建的干净会话（冷启动带参数 / 运行中双击文件 /
-  //     打开文件夹 / 新窗口），此时**不恢复**上次工作区与标签；
-  //     无路径 ⇒ 正常启动，恢复上次会话。
-  //     必须在恢复之前取：`take_pending_open_path` 是 take-and-clear（按窗口 label 分槽）。
-  let pendingOpen: { path: string; type: "file" | "folder" } | null = null;
-  try {
-    const pending = await invoke<{ path: string; type: "file" | "folder" } | null>(
-      "take_pending_open_path"
-    );
-    if (pending?.path) {
-      pendingOpen = { path: pending.path, type: pending.type === "folder" ? "folder" : "file" };
-      console.log("[Murasaki] 本窗口由外部入口创建，跳过上次会话恢复:", pendingOpen.path);
-    }
-  } catch (err) {
-    console.warn("[Murasaki] 读取启动参数路径失败:", err);
-  }
-
-  // 2. 恢复上次打开的工作区与 tabs（仅正常启动；issue #96）
-  if (!pendingOpen) {
-    if (persistence.settings.reopenLastWorkspace && persistence.settings.lastWorkspacePath) {
-      try {
-        console.log("[Murasaki] 恢复工作区:", persistence.settings.lastWorkspacePath);
-        await workspace.openWorkspace(persistence.settings.lastWorkspacePath);
-        console.log("[Murasaki] 恢复工作区成功, workspacePath:", workspace.workspacePath);
-      } catch (err) {
-        console.warn("[Murasaki] 恢复工作区失败:", err);
-      }
-    }
-    await tabsStore.restore();
-  }
-
-  // 3. 注册 5 个 tauri 事件监听器（menu-event / recent-open / single-instance / settings://saved / navigate）
-  cleanupListeners = await setupEventListeners();
-
-  // 3.5 退出拦截：窗口关闭被 Rust 拦下后，落盘完成才放行（ADR-0017）
-  //
-  // 必须用 `getCurrentWebviewWindow().listen` 而不是裸 `listen`：裸 listen 的
-  // target 是 `Any`，而 Tauri 的 `match_any_or_filter` 让 Any 监听器匹配**一切**
-  // emit（含 `emit_to(label)`）。多窗口下 Rust 定向发给我这个 label 的
-  // `app-close-requested` 会被所有窗口收到，导致关一个窗口→全部窗口一起落盘关闭。
-  cleanupExitListener = await getCurrentWebviewWindow().listen("app-close-requested", () => {
-    void onExitRequested();
-  });
-
-  // 4. 同步最近打开菜单到原生菜单
-  await syncRecentMenu();
-
-  // 5. 注册全局快捷键
-  window.addEventListener("keydown", onKeyDown);
-
-  // 6. 启动文件监听（外部修改检测）
-  fileWatcher.start();
-  // 兜底：窗口重新获得焦点时刷新文件树（覆盖冷启动期间 watcher 未就绪、
-  // 或 notify 事件丢失导致的结构变化漏刷）
-  window.addEventListener("focus", onWindowFocus);
-
-  // 7. 注册图片粘贴处理（监听编辑器宿主元素的 paste 事件）
-  imagePaste.setup();
-
-  // 7.5 注册原生拖放打开（Tauri drag-drop 事件，issue #92）
-  // 这是 IPC 边界：注册失败（权限/窗口未就绪）不应阻断 onMounted 后续接线，故自行吞掉并记录
-  try {
-    await setupDragDrop();
-  } catch (err) {
-    console.error("注册拖放监听失败:", err);
-  }
-
-  // 8. 注入冲突解决器给 fileOps store（供文件树右键菜单使用）
-  fileOps.setConflictResolver(askConflict);
-
-  initialized.value = true;
-  // E2E 就绪信号：走到这里说明「恢复上次设置 / 工作区 / 标签」（402 / 437 / 443 行）已全部落地。
-  // 测试侧必须等它置位再动手 —— 否则这些恢复可能晚于测试的清场落地，把刚重置的视图 / 标签
-  // 又覆盖回去（#315：表现为 `.file-tree` 永不出现、或欢迎页不在 DOM，CI 上约 10% 概率）。
-  // 判据放在 initialized 置位处（而不是下面那个「E2E test hooks」区块）：语义就是「初始化完成」，
-  // 与区块里那些与启动流程无关的测试辅助分开；两处之间没有 await，放哪对时序没有影响。
-  // @ts-ignore
-  window.__appReady__ = true;
-
-  // 9. 打开本窗口的待打开路径（多窗口，spec #194）
-  //    路径已在 1.5 处提前取走（take-and-clear，不能二次 take），此处只消费。
-  //    此时事件监听器已就绪、文件监听已启动，打开动作不会漏事件。
-  if (pendingOpen) {
-    void onOpenPath(pendingOpen.path, pendingOpen.type);
-  }
-
-  // 10. 启动时静默检查更新（可被设置关闭，ADR-0012）
-  //     silent=true：不弹 toast / 不弹对话框，仅填充 availableUpdate 状态
-  if (persistence.settings.checkUpdatesOnStartup) {
-    void checkForUpdate(true);
-  }
-
-  // E2E 测试辅助：暴露 editorRef + test hooks 到 window
+/** E2E 测试钩子（与启动流程无关，启动末尾暴露） */
+function exposeTestHooks(): void {
   // 桌面应用 WebView 内部仅应用代码可访问，无 XSS 风险
   // 测试通过 window.__editorRef__.getView() 直接调用 CodeMirror API
   // 注意：editorRef 是 Vue ref，EditorPane 用 v-else 渲染（无 tab 时不挂载）
-  // 所以必须用动态 getter，否则 onMounted 时 editorRef.value 还是 null
+  // 所以必须用动态 getter，否则注册时 editorRef.value 还是 null
   // 同时暴露 undo/redo：release 构建后浏览器内 dynamic import 路径不可用
   // @ts-ignore
   window.__editorRef__ = {
@@ -634,20 +464,78 @@ onMounted(async () => {
     isCategoryDirty,
     restoreCategoryDefaults,
   };
+}
+
+onMounted(async () => {
+  // 启动顺序见 useAppStartup：设置 → 待打开路径 → 恢复会话 → 监听 → 就绪
+  startup = await bootstrapApp({
+    initialized,
+    persistence: {
+      loadSettings: () => persistence.loadSettings(),
+      loadRecent: () => persistence.loadRecent(),
+      updateSettings: (patch) => persistence.updateSettings(patch),
+      // getter：loadSettings 会整体替换 settings 对象，必须在加载之后读取
+      getSettings: () => persistence.settings,
+      isLanguageEmpty: () => persistence.languageEmpty,
+    },
+    applyTheme: (theme) => {
+      currentTheme.value = theme;
+    },
+    applyReadingFont: (preset) => applyReadingFontPreset(preset),
+    applyEditorMode: (mode) => editorBridge.setEditorMode(mode),
+    sidebar: {
+      setView: (view) => {
+        sidebarView.value = view;
+      },
+      restore: (saved) => layout.restore(saved),
+    },
+    i18n: {
+      setLocale,
+      mapSystemLocale,
+      reloadMenu: (lang) => invoke("reload_menu", { lang }),
+      updateShortcutLabels: (overrides) =>
+        invoke("update_shortcut_labels", { overrides: toMenuAccelerators(overrides) }),
+    },
+    detectSystemLocale: () => invoke<string>("detect_system_locale"),
+    takePendingOpenPath: () =>
+      invoke<{ path: string; type: "file" | "folder" } | null>("take_pending_open_path"),
+    openWorkspace: (path) => workspace.openWorkspace(path),
+    restoreTabs: () => tabsStore.restore(),
+    setupEventListeners,
+    // 必须用窗口级 listen：裸 listen 的 target 是 Any，多窗口下会收到所有窗口的 emit（ADR-0017）
+    listenCloseRequested: (handler) =>
+      getCurrentWebviewWindow().listen("app-close-requested", () => handler()),
+    syncRecentMenu,
+    onKeyDown,
+    onWindowFocus,
+    startFileWatcher: () => fileWatcher.start(),
+    stopFileWatcher: () => fileWatcher.stop(),
+    setupImagePaste: () => imagePaste.setup(),
+    teardownImagePaste: () => imagePaste.teardown(),
+    setupDragDrop,
+    teardownDragDrop,
+    setConflictResolver: () => fileOps.setConflictResolver(askConflict),
+    clearConflictResolver: () => fileOps.setConflictResolver(null),
+    onExitRequested,
+    openPath: (path, type) => {
+      void onOpenPath(path, type);
+    },
+    checkForUpdates: (silent) => {
+      void checkForUpdate(silent);
+    },
+    // E2E 就绪信号：必须晚于「恢复设置 / 工作区 / 标签」（#315）
+    markAppReady: () => {
+      // @ts-ignore
+      window.__appReady__ = true;
+    },
+    exposeTestHooks,
+  });
 });
 
 onBeforeUnmount(() => {
-  // 清理 5 个 tauri 事件监听器
-  cleanupListeners?.();
-  cleanupListeners = null;
-  cleanupExitListener?.();
-  cleanupExitListener = null;
-  window.removeEventListener("keydown", onKeyDown);
-  window.removeEventListener("focus", onWindowFocus);
-  fileWatcher.stop();
-  imagePaste.teardown();
-  teardownDragDrop();
-  fileOps.setConflictResolver(null);
+  // 撤销启动时注册的事件监听、快捷键、文件监听、粘贴 / 拖放与冲突解决器
+  startup?.dispose();
+  startup = null;
 });
 
 // ===== 文件监听（外部修改检测） =====
@@ -814,13 +702,15 @@ const { initialized, setupEventListeners } = useAppLifecycle({
   onOpenRecent,
 });
 
-// ===== 侧栏布局状态持久化（gated：初始化完成后才落盘） =====
-watch(sidebarWidth, (v) => {
-  if (initialized.value) void persistence.updateSettings({ sidebarWidth: v });
+// ===== 侧栏布局（状态 / 拖拽 / 持久化，见 useSidebarLayout）=====
+const layout = useSidebarLayout({
+  initialized,
+  updateSettings: (patch) => persistence.updateSettings(patch),
 });
-watch(sidebarCollapsed, (v) => {
-  if (initialized.value) void persistence.updateSettings({ sidebarCollapsed: v });
-});
+const sidebarCollapsed = layout.collapsed;
+const sidebarDragging = layout.dragging;
+const sidebarStyle = layout.style;
+const startResize = layout.startResize;
 
 // ===== 最近打开菜单同步（debounce + in-flight 锁，watcher 自启动）=====
 const { recentEntries: recentEntriesRef } = storeToRefs(persistence);
@@ -882,7 +772,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             type="button"
             :title="$t('editor.sidebar.expandSidebar')"
             :aria-label="$t('editor.sidebar.expandSidebar')"
-            @click="sidebarCollapsed = false"
+            @click="expandRail"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="9 18 15 12 9 6"/>
@@ -906,7 +796,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             type="button"
             :title="$t('editor.sidebar.collapseSidebar')"
             :aria-label="$t('editor.sidebar.collapseSidebar')"
-            @click="sidebarCollapsed = true"
+            @click="collapseSidebar"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 18 9 12 15 6"/>
