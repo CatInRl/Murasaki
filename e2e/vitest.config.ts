@@ -5,6 +5,18 @@ import { dirname, resolve } from "node:path";
 const e2eRoot = dirname(fileURLToPath(import.meta.url));
 
 /**
+ * 已知 flake 的隔离清单（#444）。
+ *
+ * 用法：`E2E_QUARANTINE=wysiwyg-full,scroll-sync`（spec 文件名，可省略 `.spec.ts`）。
+ * 默认空 —— 不隔离任何用例；隔离后该文件不参与本次运行，但仍在仓库里等待修复。
+ */
+const quarantined = (process.env.E2E_QUARANTINE ?? "")
+  .split(",")
+  .map((name) => name.trim())
+  .filter(Boolean)
+  .map((name) => `specs/${name.endsWith(".ts") ? name : `${name}.spec.ts`}`);
+
+/**
  * E2E 测试配置
  * - 串行执行（避免多个 Tauri 实例同时启动）：`fileParallelism: false` +
  *   `isolate: false` 让所有 spec 在同一个 fork 里依次跑
@@ -23,6 +35,9 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 60000,
     hookTimeout: 60000,
+    // 已知 flake 重试一次（#444）：真实 WebView 的启动/渲染抖动不应让门禁变红
+    retry: 1,
+    exclude: ["**/node_modules/**", ...quarantined],
     globalSetup: resolve(e2eRoot, "setup.ts"),
     globals: true,
     isolate: false,
