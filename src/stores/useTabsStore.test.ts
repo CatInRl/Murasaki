@@ -211,4 +211,40 @@ describe("useTabsStore", () => {
       expect(warningSpy).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("重新加载前写草稿兜底（#424）", () => {
+    it("有未保存改动时先写草稿，再覆盖为磁盘内容", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const saveDraft = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+      const getMtime = fileSystem.getMtime as unknown as ReturnType<typeof vi.fn>;
+      saveDraft.mockClear();
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "本地未保存");
+      const baselineBeforeReload = tab.lastMtime;
+      const diskMtimeAfterChange = 1_700_000_999_000;
+      getMtime.mockResolvedValueOnce(diskMtimeAfterChange);
+
+      await store.reloadFromDisk("C:\\docs\\a.md");
+
+      // 刻意断言「重载前的基线」：草稿代表基于旧版本的本地内容，
+      // 磁盘外部变更时下次打开应走冲突裁决，而不是让丢弃的修改复活。
+      expect(saveDraft).toHaveBeenCalledWith("C:\\docs\\a.md", "本地未保存", baselineBeforeReload);
+      expect(tab.content).toBe("content of C:\\docs\\a.md");
+      expect(tab.lastMtime).toBe(diskMtimeAfterChange);
+      expect(tab.isDirty).toBe(false);
+    });
+
+    it("没有未保存改动时不写草稿", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const saveDraft = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+      saveDraft.mockClear();
+      const store = useTabsStore();
+      await store.openFile("C:\\docs\\a.md");
+
+      await store.reloadFromDisk("C:\\docs\\a.md");
+
+      expect(saveDraft).not.toHaveBeenCalled();
+    });
+  });
 });

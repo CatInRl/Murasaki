@@ -42,7 +42,7 @@ export interface FileActionsDeps {
   };
   dialog: {
     alert: (opts: { message: string; variant?: "info" | "warning" | "error"; title?: string }) => void;
-    confirm: (opts: { message: string; danger?: boolean }) => Promise<boolean>;
+    confirm: (opts: { message: string; danger?: boolean; confirmText?: string }) => Promise<boolean>;
   };
   /** toast 反馈（PDF 导出成功/失败、打开失败兜底提示、拖入打不开的文件提示） */
   toast: {
@@ -229,8 +229,20 @@ export function useFileActions(deps: FileActionsDeps) {
   }
 
   async function reloadCurrentFile(): Promise<void> {
-    const path = activeTab.value?.path;
-    if (!path) return;
+    const tab = activeTab.value;
+    const path = tab?.path;
+    if (!tab || !path) return;
+
+    // 重新加载会用磁盘内容覆盖本地修改，先让用户确认
+    if (tab.isDirty) {
+      const confirmed = await dialog.confirm({
+        message: t("common.dialog.reloadDiscardConfirm", { name: basename(path) }),
+        danger: true,
+        confirmText: t("common.dialog.reloadConfirmAction"),
+      });
+      if (!confirmed) return;
+    }
+
     try {
       await tabsStore.reloadFromDisk(path);
     } catch (err) {
