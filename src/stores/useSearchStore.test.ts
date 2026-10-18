@@ -132,7 +132,12 @@ describe("useSearchStore", () => {
 
       const resp = await store.search();
 
-      expect(resp).toEqual({ contentResults: [], filenameResults: [], truncated: false });
+      expect(resp).toEqual({
+        contentResults: [],
+        filenameResults: [],
+        truncated: false,
+        cancelled: false,
+      });
       expect(mockedInvoke).not.toHaveBeenCalledWith(
         "search_workspace",
         expect.anything()
@@ -145,7 +150,12 @@ describe("useSearchStore", () => {
 
       const resp = await store.search();
 
-      expect(resp).toEqual({ contentResults: [], filenameResults: [], truncated: false });
+      expect(resp).toEqual({
+        contentResults: [],
+        filenameResults: [],
+        truncated: false,
+        cancelled: false,
+      });
       expect(mockedInvoke).not.toHaveBeenCalledWith(
         "search_workspace",
         expect.anything()
@@ -164,6 +174,7 @@ describe("useSearchStore", () => {
         ],
         filenameResults: ["/test/workspace/b.md"],
         truncated: false,
+        cancelled: false,
       };
       mockedInvoke.mockResolvedValueOnce(fakeResponse);
 
@@ -198,7 +209,12 @@ describe("useSearchStore", () => {
 
       const resp = await store.search();
 
-      expect(resp).toEqual({ contentResults: [], filenameResults: [], truncated: false });
+      expect(resp).toEqual({
+        contentResults: [],
+        filenameResults: [],
+        truncated: false,
+        cancelled: false,
+      });
       expect(store.results).toEqual([]);
       expect(store.truncated).toBe(false);
       expect(store.loading).toBe(false);
@@ -209,6 +225,7 @@ describe("useSearchStore", () => {
         contentResults: [],
         filenameResults: [],
         truncated: false,
+        cancelled: false,
       } as SearchResponse);
       const store = useSearchStore();
       store.setQuery("  hello  ");
@@ -225,6 +242,7 @@ describe("useSearchStore", () => {
         contentResults: [],
         filenameResults: [],
         truncated: false,
+        cancelled: false,
       } as SearchResponse);
       store.setQuery("hello");
       await store.search();
@@ -266,8 +284,20 @@ describe("useSearchStore", () => {
 
       // 等待 listen 被调用（监听器就位）
       await vi.waitFor(() => {
-        expect(mockedListen).toHaveBeenCalledWith("search-progress", expect.any(Function));
-        expect(mockedListen).toHaveBeenCalledWith("search-result-chunk", expect.any(Function));
+        // #439：监听器显式绑定到当前窗口，只接收 emit_to(label) 的事件
+        const windowTarget = expect.objectContaining({
+          target: expect.objectContaining({ kind: "WebviewWindow", label: "main" }),
+        });
+        expect(mockedListen).toHaveBeenCalledWith(
+          "search-progress",
+          expect.any(Function),
+          windowTarget
+        );
+        expect(mockedListen).toHaveBeenCalledWith(
+          "search-result-chunk",
+          expect.any(Function),
+          windowTarget
+        );
       });
 
       // 手动触发事件
@@ -296,6 +326,7 @@ describe("useSearchStore", () => {
             contentResults: [],
             filenameResults: [],
             truncated: false,
+            cancelled: false,
           } as SearchResponse);
         }
         return Promise.resolve(undefined);
@@ -335,6 +366,7 @@ describe("useSearchStore", () => {
             contentResults: [],
             filenameResults: [],
             truncated: false,
+            cancelled: false,
           } as SearchResponse);
         }
         return Promise.resolve(undefined);
@@ -373,6 +405,7 @@ describe("useSearchStore", () => {
             contentResults: [],
             filenameResults: [],
             truncated: false,
+            cancelled: false,
           } as SearchResponse);
         }
         return Promise.resolve(undefined);
@@ -426,6 +459,7 @@ describe("useSearchStore", () => {
         ],
         filenameResults: ["/test/workspace/final-name.md"],
         truncated: true,
+        cancelled: false,
       };
 
       await startSearchAndEmit(
@@ -467,6 +501,7 @@ describe("useSearchStore", () => {
         contentResults: [],
         filenameResults: [],
         truncated: false,
+        cancelled: false,
       } as SearchResponse);
       await store.search();
 
@@ -491,6 +526,7 @@ describe("useSearchStore", () => {
         contentResults: [],
         filenameResults: [],
         truncated: false,
+        cancelled: false,
       } as SearchResponse);
       await store.search();
       const firstToken = store.cancelToken!;
@@ -503,6 +539,7 @@ describe("useSearchStore", () => {
         contentResults: [],
         filenameResults: [],
         truncated: false,
+        cancelled: false,
       } as SearchResponse);
 
       await store.search();
@@ -523,6 +560,7 @@ describe("useSearchStore", () => {
         contentResults: [],
         filenameResults: [],
         truncated: true,
+        cancelled: false,
       } as SearchResponse);
       const store = useSearchStore();
       store.setQuery("hello");

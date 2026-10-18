@@ -105,11 +105,13 @@ export interface SearchResult {
  * - contentResults: 内容匹配结果
  * - filenameResults: 文件名匹配结果（仅路径字符串）
  * - truncated: 是否因达到结果上限而被截断（前端用于提示「结果已截断，请细化查询」）
+ * - cancelled: 是否被用户取消（取消不提示「结果过多」）
  */
 export interface SearchResponse {
   contentResults: SearchResult[];
   filenameResults: string[];
   truncated: boolean;
+  cancelled: boolean;
 }
 
 /**

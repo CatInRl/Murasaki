@@ -1,11 +1,12 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use walkdir::WalkDir;
 use crate::errors::{CommandError, ErrorCode};
 
@@ -38,6 +39,8 @@ pub struct SearchResponse {
     pub filename_results: Vec<String>,
     /// 是否因达到结果上限而被截断
     pub truncated: bool,
+    /// 是否被用户取消（与 truncated 区分：取消不应提示「结果过多」）
+    pub cancelled: bool,
 }
 
 /// 搜索选项
@@ -79,11 +82,19 @@ pub struct SearchResultChunkEvent {
     pub filename_match: Option<String>,
 }
 
-/// 搜索状态：保存已请求取消的 cancel_token 集合
+/// 取消标记的存活时间：超时后自动清理，避免长期运行把集合撑大
+const CANCEL_TOKEN_TTL: Duration = Duration::from_secs(300);
+
+/// 搜索状态：保存已请求取消的 cancel_token（token → 登记时间）
 /// search_workspace 在扫描循环中检查此集合，命中则提前返回
 #[derive(Default)]
 pub struct SearchState {
-    pub cancel_tokens: Mutex<HashSet<String>>,
+    pub cancel_tokens: Mutex<HashMap<String, Instant>>,
+}
+
+/// 清掉超过 TTL 的取消标记（有界内存）
+fn purge_expired_tokens(tokens: &mut HashMap<String, Instant>, now: Instant) {
+    tokens.retain(|_, at| now.saturating_duration_since(*at) < CANCEL_TOKEN_TTL);
 }
 
 /// 构造搜索正则：根据选项把用户查询编译为 Regex
@@ -118,11 +129,25 @@ fn byte_to_utf16_offset(line: &str, byte: usize) -> u32 {
     line.get(..byte).map(|s| s.encode_utf16().count()).unwrap_or(0) as u32
 }
 
-/// 在单个文件内容中搜索匹配行
-fn search_in_content(content: &str, regex: &Regex) -> Vec<SearchMatch> {
+/// 文件内每扫描多少行检查一次取消（大文件也能及时中断）
+const CANCEL_CHECK_LINES: usize = 200;
+/// 单个文件参与内容搜索的大小上限（超过直接跳过，避免整读巨型文件）
+const MAX_SEARCH_FILE_BYTES: u64 = 2 * 1024 * 1024;
+
+/// 在单个文件内容中搜索匹配行。
+///
+/// 返回 `(命中列表, 是否被取消)`；取消后返回已扫到的部分结果。
+fn search_in_content(
+    content: &str,
+    regex: &Regex,
+    is_cancelled: &dyn Fn() -> bool,
+) -> (Vec<SearchMatch>, bool) {
     let lines: Vec<&str> = content.lines().collect();
     let mut matches = Vec::new();
     for (i, line) in lines.iter().enumerate() {
+        if i % CANCEL_CHECK_LINES == 0 && is_cancelled() {
+            return (matches, true);
+        }
         if regex.is_match(line) {
             let line_number = (i + 1) as u32;
             // 命中段：按当前正则（含大小写/全词选项）精确计算 UTF-16 码元偏移
@@ -150,7 +175,7 @@ fn search_in_content(content: &str, regex: &Regex) -> Vec<SearchMatch> {
             });
         }
     }
-    matches
+    (matches, false)
 }
 
 /// 判断是否为 Markdown 文件
@@ -177,6 +202,7 @@ const PROGRESS_EMIT_INTERVAL: u32 = 10;
 /// - 最终返回 SearchResponse 作为权威结果（前端可用以覆盖增量结果保证一致）
 #[tauri::command]
 pub async fn search_workspace(
+    window: WebviewWindow,
     app: AppHandle,
     workspace: String,
     query: String,
@@ -189,6 +215,7 @@ pub async fn search_workspace(
             content_results: Vec::new(),
             filename_results: Vec::new(),
             truncated: false,
+            cancelled: false,
         });
     }
     let opts = options.unwrap_or_default();
@@ -201,139 +228,92 @@ pub async fn search_workspace(
 
     let max_results = max_results.unwrap_or(DEFAULT_MAX_RESULTS).max(1);
     let token = cancel_token.unwrap_or_default();
+    let label = window.label().to_string();
+
+    // WalkDir / Regex / 文件读取都是同步且可能耗时：放到阻塞线程池，
+    // 否则会占住 tokio worker，让同一进程里的其它异步命令排队。
+    tauri::async_runtime::spawn_blocking(move || {
+        search_blocking(&app, &label, &workspace_path, &regex, token, max_results)
+    })
+    .await
+    .map_err(|e| CommandError::internal(format!("search join: {e}")))?
+}
+
+/// 是否属于搜索应跳过的噪音目录（与文件树共用同一份清单）
+fn is_ignored(root: &Path, path: &Path) -> bool {
+    let relative = path.strip_prefix(root).unwrap_or(path);
+    relative.components().any(|component| {
+        component
+            .as_os_str()
+            .to_str()
+            .is_some_and(crate::commands::files::is_noise)
+    })
+}
+
+/// 同步扫描实现（运行在阻塞线程池里）：只负责事件接线与取消标记清理。
+fn search_blocking(
+    app: &AppHandle,
+    label: &str,
+    workspace: &Path,
+    regex: &Regex,
+    token: String,
+    max_results: u32,
+) -> Result<SearchResponse, CommandError> {
     let has_token = !token.is_empty();
-
-    // 先收集所有 .md 文件路径，用于 total_files 进度
-    let md_files: Vec<PathBuf> = WalkDir::new(&workspace_path)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_file() && is_markdown(e.path()))
-        .map(|e| e.path().to_path_buf())
-        .collect();
-    let total_files = md_files.len() as u32;
-
-    let mut content_results: Vec<SearchResult> = Vec::new();
-    let mut filename_results: Vec<String> = Vec::new();
-    let mut seen_filenames: HashSet<String> = HashSet::new();
-    let mut matched_count: u32 = 0;
-    let mut truncated = false;
-
     let cancel_state = app.try_state::<SearchState>();
-    let is_cancelled = |t: &str| -> bool {
-        if t.is_empty() {
+
+    // 顺带清理过期的取消标记（有界内存）
+    if let Some(state) = cancel_state.as_deref() {
+        if let Ok(mut guard) = state.cancel_tokens.lock() {
+            purge_expired_tokens(&mut guard, Instant::now());
+        }
+    }
+
+    let is_cancelled = || -> bool {
+        if !has_token {
             return false;
         }
         cancel_state
             .as_deref()
             .and_then(|s| s.cancel_tokens.lock().ok())
-            .map(|guard| guard.contains(t))
+            .map(|guard| guard.contains_key(&token))
             .unwrap_or(false)
     };
 
-    for (idx, path) in md_files.iter().enumerate() {
-        // 检查取消
-        if has_token && is_cancelled(&token) {
-            truncated = true;
-            break;
-        }
-
-        // 文件名匹配
-        if filename_matches(path, &regex) {
-            let file_path = path.to_string_lossy().to_string();
-            if seen_filenames.insert(file_path.clone()) {
-                filename_results.push(file_path.clone());
-                // 增量推送文件名命中
-                if has_token {
-                    let _ = app.emit(
-                        "search-result-chunk",
-                        SearchResultChunkEvent {
-                            cancel_token: token.clone(),
-                            result: None,
-                            filename_match: Some(file_path.clone()),
-                        },
-                    );
-                }
-            }
-        }
-
-        // 内容匹配
-        let content = match fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(_) => {
-                // 即便读取失败也推送进度
-                if (idx as u32 + 1) % PROGRESS_EMIT_INTERVAL == 0 || idx + 1 == md_files.len() {
-                    if has_token {
-                        let _ = app.emit(
-                            "search-progress",
-                            SearchProgressEvent {
-                                scanned_files: (idx + 1) as u32,
-                                total_files,
-                                matched_files: content_results.len() as u32,
-                                matched_count,
-                                cancel_token: token.clone(),
-                            },
-                        );
-                    }
-                }
-                continue;
-            }
-        };
-        let matches = search_in_content(&content, &regex);
-        if !matches.is_empty() {
-            matched_count = matched_count.saturating_add(matches.len() as u32);
-            let result = SearchResult {
-                file_path: path.to_string_lossy().to_string(),
-                matches,
-            };
-            // 增量推送内容命中
+    let response = scan_workspace(
+        workspace,
+        regex,
+        max_results,
+        &is_cancelled,
+        |scanned, total, matched_files, matched_count| {
             if has_token {
-                let _ = app.emit(
-                    "search-result-chunk",
-                    SearchResultChunkEvent {
-                        cancel_token: token.clone(),
-                        result: Some(result.clone()),
-                        filename_match: None,
-                    },
-                );
-            }
-            content_results.push(result);
-
-            // 检查上限
-            if matched_count >= max_results {
-                truncated = true;
-                // 推送最终进度
-                if has_token {
-                    let _ = app.emit(
-                        "search-progress",
-                        SearchProgressEvent {
-                            scanned_files: (idx + 1) as u32,
-                            total_files,
-                            matched_files: content_results.len() as u32,
-                            matched_count,
-                            cancel_token: token.clone(),
-                        },
-                    );
-                }
-                break;
-            }
-        }
-
-        // 推送进度（每 PROGRESS_EMIT_INTERVAL 个文件一次 + 最后一次）
-        if (idx as u32 + 1) % PROGRESS_EMIT_INTERVAL == 0 || idx + 1 == md_files.len() {
-            if has_token {
-                let _ = app.emit(
+                let _ = app.emit_to(
+                    label,
                     "search-progress",
                     SearchProgressEvent {
-                        scanned_files: (idx + 1) as u32,
-                        total_files,
-                        matched_files: content_results.len() as u32,
+                        scanned_files: scanned,
+                        total_files: total,
+                        matched_files,
                         matched_count,
                         cancel_token: token.clone(),
                     },
                 );
             }
-        }
-    }
+        },
+        |result, filename_match| {
+            if has_token {
+                let _ = app.emit_to(
+                    label,
+                    "search-result-chunk",
+                    SearchResultChunkEvent {
+                        cancel_token: token.clone(),
+                        result,
+                        filename_match,
+                    },
+                );
+            }
+        },
+    );
 
     // 清理自身的 cancel_token（若已请求取消则保留标记由 cancel_search 自清理；这里仅消费未取消的）
     if has_token {
@@ -344,11 +324,149 @@ pub async fn search_workspace(
         }
     }
 
-    Ok(SearchResponse {
+    Ok(response)
+}
+
+/// 扫描实现：不依赖 Tauri 类型，单测与生产共用（避免测试复制一份会漂移的逻辑）。
+///
+/// - `on_progress(scanned, total, matched_files, matched_count)`
+/// - `on_chunk(result, filename_match)`：增量命中（内容结果 / 文件名）
+fn scan_workspace(
+    workspace: &Path,
+    regex: &Regex,
+    max_results: u32,
+    is_cancelled: &dyn Fn() -> bool,
+    mut on_progress: impl FnMut(u32, u32, u32, u32),
+    mut on_chunk: impl FnMut(Option<SearchResult>, Option<String>),
+) -> SearchResponse {
+    // 先收集所有 .md 文件路径，用于 total_files 进度；噪音目录直接剪枝
+    let mut md_files: Vec<PathBuf> = Vec::new();
+    let mut cancelled = false;
+    let mut truncated = false;
+    for entry in WalkDir::new(workspace)
+        .into_iter()
+        .filter_entry(|e| e.depth() == 0 || !is_ignored(workspace, e.path()))
+    {
+        if is_cancelled() {
+            cancelled = true;
+            break;
+        }
+        let Ok(entry) = entry else {
+            continue;
+        };
+        if entry.file_type().is_file() && is_markdown(entry.path()) {
+            md_files.push(entry.path().to_path_buf());
+        }
+    }
+    let total_files = md_files.len() as u32;
+
+    let mut content_results: Vec<SearchResult> = Vec::new();
+    let mut filename_results: Vec<String> = Vec::new();
+    let mut seen_filenames: HashSet<String> = HashSet::new();
+    let mut matched_count: u32 = 0;
+
+    for (idx, path) in md_files.iter().enumerate() {
+        let scanned = (idx + 1) as u32;
+        // 检查取消
+        if is_cancelled() {
+            cancelled = true;
+            break;
+        }
+
+        // 文件名匹配
+        if filename_matches(path, regex) {
+            let file_path = path.to_string_lossy().to_string();
+            if seen_filenames.insert(file_path.clone()) {
+                filename_results.push(file_path.clone());
+                on_chunk(None, Some(file_path));
+            }
+        }
+
+        // 跳过超大文件：整读几 MB 的正文会拖慢整次搜索
+        let too_large = fs::metadata(path)
+            .map(|meta| meta.len() > MAX_SEARCH_FILE_BYTES)
+            .unwrap_or(false);
+        if too_large {
+            if scanned % PROGRESS_EMIT_INTERVAL == 0 || idx + 1 == md_files.len() {
+                on_progress(
+                    scanned,
+                    total_files,
+                    content_results.len() as u32,
+                    matched_count,
+                );
+            }
+            continue;
+        }
+
+        // 内容匹配
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => {
+                // 即便读取失败也推送进度
+                if scanned % PROGRESS_EMIT_INTERVAL == 0 || idx + 1 == md_files.len() {
+                    on_progress(
+                        scanned,
+                        total_files,
+                        content_results.len() as u32,
+                        matched_count,
+                    );
+                }
+                continue;
+            }
+        };
+        let (matches, was_cancelled) = search_in_content(&content, regex, is_cancelled);
+        if was_cancelled {
+            cancelled = true;
+        }
+        if !matches.is_empty() {
+            matched_count = matched_count.saturating_add(matches.len() as u32);
+            let result = SearchResult {
+                file_path: path.to_string_lossy().to_string(),
+                matches,
+            };
+            on_chunk(Some(result.clone()), None);
+            content_results.push(result);
+
+            // 检查上限
+            if matched_count >= max_results {
+                truncated = true;
+                on_progress(
+                    scanned,
+                    total_files,
+                    content_results.len() as u32,
+                    matched_count,
+                );
+                break;
+            }
+        }
+
+        if was_cancelled {
+            on_progress(
+                scanned,
+                total_files,
+                content_results.len() as u32,
+                matched_count,
+            );
+            break;
+        }
+
+        // 推送进度（每 PROGRESS_EMIT_INTERVAL 个文件一次 + 最后一次）
+        if scanned % PROGRESS_EMIT_INTERVAL == 0 || idx + 1 == md_files.len() {
+            on_progress(
+                scanned,
+                total_files,
+                content_results.len() as u32,
+                matched_count,
+            );
+        }
+    }
+
+    SearchResponse {
         content_results,
         filename_results,
         truncated,
-    })
+        cancelled,
+    }
 }
 
 /// 请求取消指定 cancel_token 关联的搜索
@@ -359,11 +477,14 @@ pub fn cancel_search(app: AppHandle, cancel_token: String) -> Result<(), Command
         return Ok(());
     }
     let state = app.state::<SearchState>();
+    let now = Instant::now();
     let mut guard = state
         .cancel_tokens
         .lock()
         .map_err(|e| CommandError::internal(format!("search lock: {e}")))?;
-    guard.insert(cancel_token);
+    // 顺手清掉过期标记：token 集合不会随运行时长无限增长
+    purge_expired_tokens(&mut guard, now);
+    guard.insert(cancel_token, now);
     Ok(())
 }
 
@@ -401,35 +522,13 @@ mod tests {
         dir
     }
 
-    /// 同步执行 search_workspace（async）的辅助函数
+    /// 测试辅助：直接调用生产扫描实现（不依赖 AppHandle / 不 emit 事件）。
+    /// `_cancel_token` 保留只为不改动既有调用点；测试中取消恒为 false。
     fn run_search(
         workspace: String,
         query: String,
         options: Option<SearchOptions>,
-        cancel_token: Option<String>,
-        max_results: Option<u32>,
-    ) -> SearchResponse {
-        // tauri::async_runtime::block_on 在测试环境下可用
-        tauri::async_runtime::block_on(async {
-            // 测试中无 AppHandle，使用空 handle 不可行；
-            // 改为直接调用内部逻辑测试函数（不依赖 emit）
-            search_workspace_without_app(
-                &workspace,
-                &query,
-                options,
-                cancel_token.as_deref(),
-                max_results,
-            )
-            .await
-        })
-    }
-
-    /// 测试辅助：与 search_workspace 同逻辑但不依赖 AppHandle / 不 emit 事件
-    async fn search_workspace_without_app(
-        workspace: &str,
-        query: &str,
-        options: Option<SearchOptions>,
-        cancel_token: Option<&str>,
+        _cancel_token: Option<String>,
         max_results: Option<u32>,
     ) -> SearchResponse {
         if query.trim().is_empty() {
@@ -437,71 +536,21 @@ mod tests {
                 content_results: Vec::new(),
                 filename_results: Vec::new(),
                 truncated: false,
+                cancelled: false,
             };
         }
         let opts = options.unwrap_or_default();
-        let regex = build_search_regex(query, &opts).unwrap();
-        let workspace_path = PathBuf::from(workspace);
-        if !workspace_path.exists() {
-            return SearchResponse {
-                content_results: Vec::new(),
-                filename_results: Vec::new(),
-                truncated: false,
-            };
-        }
-
+        let regex = build_search_regex(&query, &opts).unwrap();
+        let workspace_path = PathBuf::from(&workspace);
         let max_results = max_results.unwrap_or(DEFAULT_MAX_RESULTS).max(1);
-        let token = cancel_token.unwrap_or("");
-        let has_token = !token.is_empty();
-        // 测试中 cancel 始终视为未触发（无全局 state）
-        let _ = token;
-
-        let md_files: Vec<PathBuf> = WalkDir::new(&workspace_path)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().is_file() && is_markdown(e.path()))
-            .map(|e| e.path().to_path_buf())
-            .collect();
-        let total_files = md_files.len() as u32;
-        let _ = total_files;
-
-        let mut content_results: Vec<SearchResult> = Vec::new();
-        let mut filename_results: Vec<String> = Vec::new();
-        let mut seen_filenames: HashSet<String> = HashSet::new();
-        let mut matched_count: u32 = 0;
-        let mut truncated = false;
-        let _ = has_token;
-
-        for path in &md_files {
-            if filename_matches(path, &regex) {
-                let file_path = path.to_string_lossy().to_string();
-                if seen_filenames.insert(file_path.clone()) {
-                    filename_results.push(file_path);
-                }
-            }
-            let content = match fs::read_to_string(path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-            let matches = search_in_content(&content, &regex);
-            if !matches.is_empty() {
-                matched_count = matched_count.saturating_add(matches.len() as u32);
-                content_results.push(SearchResult {
-                    file_path: path.to_string_lossy().to_string(),
-                    matches,
-                });
-                if matched_count >= max_results {
-                    truncated = true;
-                    break;
-                }
-            }
-        }
-
-        SearchResponse {
-            content_results,
-            filename_results,
-            truncated,
-        }
+        scan_workspace(
+            &workspace_path,
+            &regex,
+            max_results,
+            &|| false,
+            |_, _, _, _| {},
+            |_, _| {},
+        )
     }
 
     #[test]
@@ -775,5 +824,59 @@ mod tests {
         );
         assert!(!resp.truncated);
         assert_eq!(resp.content_results.len(), 3);
+    }
+
+    #[test]
+    fn search_in_content_cancels_between_lines() {
+        // 每 200 行检查一次取消：取消后返回已扫到的部分结果并标记 cancelled
+        let content = "hit\n".repeat(450);
+        let regex = Regex::new("hit").unwrap();
+        let calls = std::cell::Cell::new(0);
+        let is_cancelled = || {
+            let n = calls.get();
+            calls.set(n + 1);
+            n >= 1
+        };
+
+        let (matches, cancelled) = search_in_content(&content, &regex, &is_cancelled);
+
+        assert!(cancelled);
+        // 第一次检查（第 0 行）放行，第二次检查（第 200 行）命中取消
+        assert_eq!(matches.len(), 200);
+    }
+
+    #[test]
+    fn search_state_purges_expired_cancel_tokens() {
+        let start = Instant::now();
+        let mut tokens = HashMap::new();
+        // 用「把 now 往后推」构造过期，避免依赖机器已开机时长
+        tokens.insert("stale".to_string(), start);
+        tokens.insert(
+            "fresh".to_string(),
+            start + CANCEL_TOKEN_TTL + Duration::from_millis(500),
+        );
+
+        purge_expired_tokens(
+            &mut tokens,
+            start + CANCEL_TOKEN_TTL + Duration::from_secs(1),
+        );
+
+        assert!(!tokens.contains_key("stale"));
+        assert!(tokens.contains_key("fresh"));
+    }
+
+    #[test]
+    fn is_ignored_skips_noise_dirs_below_workspace() {
+        let root = Path::new("/ws");
+        assert!(is_ignored(root, Path::new("/ws/.git/objects/ab")));
+        assert!(is_ignored(root, Path::new("/ws/node_modules/pkg/a.md")));
+        assert!(!is_ignored(root, Path::new("/ws/docs/a.md")));
+    }
+
+    #[test]
+    fn is_ignored_does_not_reject_workspace_under_noise_named_dir() {
+        // 工作区本身在 node_modules 下：祖先目录名不应让搜索全空
+        let root = Path::new("/repo/node_modules/pkg");
+        assert!(!is_ignored(root, Path::new("/repo/node_modules/pkg/a.md")));
     }
 }
