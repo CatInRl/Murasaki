@@ -2,7 +2,9 @@
 
 ## 状态
 
-已接受
+**部分被取代**——框架选型（vue-i18n）仍有效；「仅中英双语」「Rust 翻译表双源维护」「不探测系统语言」三项已被 [ADR-0016](0016-multilang-single-source-and-locale-detection.md) 取代（现有 zh-CN / en / ja 三语，Rust 菜单文案构建时从 locale JSON 生成，首次启动探测系统语言）。
+
+> 阅读时请以 ADR-0016 为准；本文保留为 0.4.0 的决策背景。
 
 ## 背景
 
