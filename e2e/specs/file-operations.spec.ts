@@ -342,6 +342,42 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     );
   });
 
+  it("重命名已打开的文件：标签路径跟随，后续保存落到新路径（#427）", async () => {
+    const oldPath = resolve(wsPath, "notes.md");
+    expect(existsSync(oldPath)).toBe(true);
+    const oldFsPath = oldPath.replace(/\\/g, "/");
+
+    await callStoreAction(browser, "tabs", "openFile", oldFsPath);
+
+    await callStoreAction(browser, "fileOps", "renamePath", oldFsPath, "notes-renamed.md");
+
+    // 等过 watcher 的 300ms 合并窗口：改名不应再触发「文件已被外部删除」告警
+    await browser.pause(800);
+    expect(await browser.$(".dialog-overlay").isExisting()).toBe(false);
+
+    // 标签路径已跟随改名，而不是仍指向旧路径
+    const tabPath = await browser.execute(() => {
+      // @ts-ignore
+      return window.__pinia__._s.get("tabs").activeTab?.path;
+    });
+    expect(tabPath).toContain("notes-renamed.md");
+
+    // 重命名后继续编辑并保存
+    await callStoreAction(browser, "tabs", "updateActiveContent", "# 重命名后保存\n");
+
+    const tabId = await browser.execute(() => {
+      // @ts-ignore
+      return window.__pinia__._s.get("tabs").activeTab?.id;
+    });
+    await callStoreAction(browser, "tabs", "saveTab", tabId);
+
+    const newPath = resolve(wsPath, "notes-renamed.md");
+    await browser.waitUntil(
+      () => existsSync(newPath) && readFileSync(newPath, "utf-8").includes("重命名后保存"),
+      { timeout: 5000, interval: 100 }
+    );
+  });
+
   it("删除：fileOps.deletePath 移除文件并刷新文件树（走系统回收站）", async () => {
     const filePath = resolve(wsPath, "notes.md");
     expect(existsSync(filePath)).toBe(true);

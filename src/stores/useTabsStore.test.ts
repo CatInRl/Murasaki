@@ -13,6 +13,7 @@ vi.mock("../services/fileSystem", () => ({
     getMtime: vi.fn(async () => 1_700_000_000_000),
     draftExists: vi.fn(async () => false),
     saveDraft: vi.fn(async () => undefined),
+    deleteDraft: vi.fn(async () => undefined),
   },
 }));
 
@@ -209,6 +210,53 @@ describe("useTabsStore", () => {
       expect(tab.content).toBe("磁盘新内容");
       expect(tab.isDirty).toBe(false);
       expect(warningSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("应用内移动后同步标签路径（#427）", () => {
+    it("文件重命名同步单个标签", async () => {
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+
+      await store.syncPathsAfterMove("C:\\docs\\a.md", "C:\\docs\\b.md");
+      expect(tab.path).toBe("C:/docs/b.md");
+    });
+
+    it("脏标签的草稿迁到新路径键下", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const saveDraft = fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>;
+      const deleteDraft = fileSystem.deleteDraft as unknown as ReturnType<typeof vi.fn>;
+      saveDraft.mockClear();
+      deleteDraft.mockClear();
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "未保存的新内容");
+
+      await store.syncPathsAfterMove("C:\\docs\\a.md", "C:\\docs\\b.md");
+
+      // 新键用归一化后的路径；旧键仍用原始写法（草稿文件名是原串的 sha1）
+      expect(saveDraft).toHaveBeenCalledWith("C:/docs/b.md", "未保存的新内容", tab.lastMtime);
+      expect(deleteDraft).toHaveBeenCalledWith("C:\\docs\\a.md");
+    });
+
+    it("目录移动同步其下所有已打开标签", async () => {
+      const store = useTabsStore();
+      const first = await store.openFile("C:\\docs\\a.md");
+      const second = await store.openFile("C:\\docs\\sub\\b.md");
+
+      await store.syncPathsAfterMove("C:\\docs", "C:\\archive");
+
+      expect(first.path).toBe("C:/archive/a.md");
+      expect(second.path).toBe("C:/archive/sub/b.md");
+    });
+
+    it("不改动不在移动范围内的标签", async () => {
+      const store = useTabsStore();
+      const other = await store.openFile("C:\\other\\c.md");
+
+      await store.syncPathsAfterMove("C:\\docs", "C:\\archive");
+
+      expect(other.path).toBe("C:\\other\\c.md");
     });
   });
 

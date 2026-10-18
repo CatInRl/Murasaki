@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { useWorkspaceStore } from "./useWorkspaceStore";
+import { useTabsStore } from "./useTabsStore";
 import { fileSystem } from "../services/fileSystem";
 import type { TreeNode } from "../types";
 
@@ -160,6 +161,16 @@ export const useFileOpsStore = defineStore("fileOps", () => {
   }
 
   /**
+   * 物理移动并同步已打开标签的路径（#427）
+   * 目录被移动时，其下已打开文件的标签路径也会一起更新。
+   */
+  async function movePath(src: string, dst: string): Promise<TreeNode> {
+    const node = await fileSystem.renamePath(src, dst);
+    await useTabsStore().syncPathsAfterMove(src, dst);
+    return node;
+  }
+
+  /**
    * 重命名/移动：处理目标已存在冲突
    * - 若目标不存在：直接重命名
    * - 若目标存在：弹出冲突对话框（覆盖/重命名/取消）
@@ -191,7 +202,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     }
 
     try {
-      const node = await fileSystem.renamePath(oldPath, newPath);
+      const node = await movePath(oldPath, newPath);
       await workspace.refreshTree();
       return node;
     } catch (err) {
@@ -243,7 +254,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
         if (!conflict.newName) return;
         const newTarget = joinPath(targetDir, conflict.newName);
         if (mode === "cut") {
-          await fileSystem.renamePath(src, newTarget);
+          await movePath(src, newTarget);
         } else {
           await fileSystem.copyFile(src, newTarget);
         }
@@ -257,7 +268,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
 
     try {
       if (mode === "cut") {
-        await fileSystem.renamePath(src, targetPath);
+        await movePath(src, targetPath);
         clipboard.value = null;
       } else {
         await fileSystem.copyFile(src, targetPath);
@@ -371,7 +382,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
       if (conflict.action === "rename") {
         if (!conflict.newName) return;
         const newTarget = joinPath(targetDir, conflict.newName);
-        await fileSystem.renamePath(src, newTarget);
+        await movePath(src, newTarget);
         await workspace.refreshTree();
         return;
       }
@@ -380,7 +391,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     }
 
     try {
-      await fileSystem.renamePath(src, targetPath);
+      await movePath(src, targetPath);
       await workspace.refreshTree();
     } catch (err) {
       console.error("工作区内移动失败:", err);
