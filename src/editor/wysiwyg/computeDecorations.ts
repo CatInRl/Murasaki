@@ -35,12 +35,6 @@ const INLINE_MARK_TYPES = new Set([
 /** 无序列表标记首字符（- * +）。有序列表（1. a.）保持可见，不替换为 bullet。 */
 const UNORDERED_LIST_FIRST_CHAR = /^[-*+]/;
 
-/** 大文档阈值（行数），超过则启用视口增量计算。 */
-export const LARGE_DOC_LINE_THRESHOLD = 10000;
-
-/** 光标行为防抖间隔（ms）。 */
-export const DEBOUNCE_MS = 50;
-
 export type DecoKind = "hide" | "dim";
 
 /** 标记 decoration：对 [from,to] 应用 hide/dim 样式。 */
@@ -211,7 +205,12 @@ export interface ComputeInput {
   selectionHead: number;
   /** 解析后的 markdown 语法树。 */
   tree: Tree;
-  /** 可选视口；大文档时仅计算可见区域 ± buffer。 */
+  /**
+   * 重算窗口：只计算与该范围相交的节点（#430）。
+   *
+   * 纯光标跨行移动时传「旧光标行 ∪ 新光标行」，窗口外的装饰与光标无关，
+   * 由调用方沿用旧装饰，避免整篇文档遍历。省略则全量计算。
+   */
   viewport?: { from: number; to: number };
 }
 
@@ -357,19 +356,25 @@ interface MathRange {
  */
 function findMathRanges(
   doc: string,
-  codeRanges: Array<{ from: number; to: number }>
+  codeRanges: Array<{ from: number; to: number }>,
+  viewport?: { from: number; to: number }
 ): MathRange[] {
   const result: MathRange[] = [];
+  const scanTo = viewport ? Math.min(viewport.to, doc.length) : doc.length;
   const displayRe = /\$\$([\s\S]+?)\$\$/g;
   let m: RegExpExecArray | null;
+  if (viewport) displayRe.lastIndex = viewport.from;
   while ((m = displayRe.exec(doc)) !== null) {
+    if (m.index >= scanTo) break;
     const from = m.index;
     const to = m.index + m[0].length;
     if (inAnyCodeRange(from, to, codeRanges)) continue;
     result.push({ from, to, expr: m[1], displayMode: true });
   }
   const inlineRe = /\$([^\$\n]+?)\$/g;
+  if (viewport) inlineRe.lastIndex = viewport.from;
   while ((m = inlineRe.exec(doc)) !== null) {
+    if (m.index >= scanTo) break;
     const from = m.index;
     const to = m.index + m[0].length;
     if (inAnyCodeRange(from, to, codeRanges)) continue;
@@ -402,6 +407,9 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   let cursorCodeBlockRange: { from: number; to: number } | null = null;
 
   tree.iterate({
+    // 有重算窗口时只遍历与其相交的节点（#430）：纯光标移动不必走完整棵树
+    from: viewport?.from,
+    to: viewport?.to,
     enter(ref) {
       const { name, from, to } = ref;
 
@@ -641,7 +649,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   });
 
   // 数学公式：正则扫描（语法树不解析 $...$）
-  const mathRanges = findMathRanges(doc, codeRanges);
+  const mathRanges = findMathRanges(doc, codeRanges, viewport);
   for (const mr of mathRanges) {
     if (!inViewport(mr.from, mr.to, viewport)) continue;
     const inParagraph = mr.to >= cursorLine.from && mr.from <= cursorLine.to;
@@ -658,9 +666,13 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
 
   // Emoji shortcode：正则扫描 `:shortcode:` 并替换为 emoji widget
   // 跳过代码范围内的匹配（代码块/行内代码内的冒号不解析）
+  // 有重算窗口时只扫描窗口内（#430），不再每次光标移动都扫全篇
   const emojiRe = /:([a-z0-9_+-]+):/g;
+  const scanTo = viewport ? Math.min(viewport.to, doc.length) : doc.length;
+  if (viewport) emojiRe.lastIndex = viewport.from;
   let em: RegExpExecArray | null;
   while ((em = emojiRe.exec(doc)) !== null) {
+    if (em.index >= scanTo) break;
     const from = em.index;
     const to = em.index + em[0].length;
     const shortcode = em[1];
