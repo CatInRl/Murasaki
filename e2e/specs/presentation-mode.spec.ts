@@ -137,7 +137,7 @@ async function wheelZoomHtmlPreviewTo110(b: Browser): Promise<void> {
           if (!body) return { dispatched: false, reason: "no-body" };
           const view = fr?.contentWindow as (Window & typeof globalThis) | null;
           if (!view) return { dispatched: false, reason: "no-content-window" };
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const persistence = window.__pinia__?._s?.get("persistence");
           const zoomBefore = persistence?.settings?.presentationZoom;
           // 防过冲：zoom 已到位就不再派发（避免 waitUntil 重试把 zoom 越推越高）
@@ -206,7 +206,7 @@ async function wheelZoomHtmlPreviewTo110(b: Browser): Promise<void> {
 /** 当前持久化的演示缩放百分比 */
 async function getZoom(b: Browser): Promise<number> {
   return b.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     return window.__pinia__._s.get("persistence").settings.presentationZoom;
   });
 }
@@ -214,7 +214,7 @@ async function getZoom(b: Browser): Promise<number> {
 /** 重置演示缩放（persistence.presentationZoom 不在 resetPersistenceSettings 覆盖范围内） */
 async function resetZoom(b: Browser): Promise<void> {
   await b.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const persistence = window.__pinia__._s.get("persistence");
     Promise.resolve(persistence.updateSettings({ presentationZoom: 100 }))
       .then(() => done(null))
@@ -638,7 +638,7 @@ describe("演示模式", () => {
     await browser.waitUntil(
       async () => {
         const mode = await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           return window.__pinia__._s.get("persistence").settings.editorMode;
         });
         return mode === "presentation";

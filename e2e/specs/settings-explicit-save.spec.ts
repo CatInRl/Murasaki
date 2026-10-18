@@ -28,7 +28,7 @@ let wsPath: string;
 /** 切换到设置页（通过 navigate 事件） */
 async function navigateToSettings(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     window.__TAURI_INTERNALS__
       .invoke("plugin:event|emit", {
         event: "navigate",
@@ -45,7 +45,7 @@ async function navigateToSettings(browser: Browser): Promise<void> {
 /** 切换回编辑器视图 */
 async function navigateToEditor(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     window.__TAURI_INTERNALS__
       .invoke("plugin:event|emit", {
         event: "navigate",
@@ -125,7 +125,7 @@ describe("设置显式 Save 模型", () => {
 
     // 常规分类下有两个下拉：界面语言 + 图片插入方式（后者为本 issue 新增）
     const optionValues = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const all = Array.from(
         document.querySelectorAll(".settings-shell select")
       ) as HTMLSelectElement[];
@@ -165,7 +165,7 @@ describe("设置显式 Save 模型", () => {
 
     // 1. 启动 unsavedChanges（不阻塞会话）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const dialog = pinia._s.get("dialog");
       (window as any).__testResult = null;
@@ -205,7 +205,7 @@ describe("设置显式 Save 模型", () => {
     if (!clicked) {
       // 回退：通过 store 调用 unsavedDiscard
       await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const dialog = pinia._s.get("dialog");
         dialog.unsavedDiscard();
@@ -225,7 +225,7 @@ describe("设置显式 Save 模型", () => {
   it('dialog.unsavedChanges 选择 "保存" 返回 save', async () => {
     // 1. 启动 unsavedChanges（不阻塞会话）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const dialog = pinia._s.get("dialog");
       (window as any).__testResult = null;
@@ -255,7 +255,7 @@ describe("设置显式 Save 模型", () => {
     }
     if (!clicked) {
       await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const dialog = pinia._s.get("dialog");
         dialog.unsavedSave();
@@ -275,7 +275,7 @@ describe("设置显式 Save 模型", () => {
   it("dialog.unsavedChanges Escape 取消返回 cancel", async () => {
     // 1. 启动 unsavedChanges（不阻塞会话）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const dialog = pinia._s.get("dialog");
       (window as any).__testResult = null;

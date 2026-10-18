@@ -39,7 +39,7 @@ async function emitFileChangedEvent(
 ): Promise<void> {
   await browser.executeAsync(
     (payload: { path: string; kind: string }, done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__TAURI_INTERNALS__
         .invoke("plugin:event|emit", {
           event: "file-changed",
@@ -57,7 +57,7 @@ async function emitFileChangedEvent(
 /** 获取 active tab 的 hasExternalChange 状态 */
 async function getActiveExternalFlag(browser: Browser): Promise<boolean | null> {
   return browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const tabs = window.__pinia__._s.get("tabs");
     return tabs.activeTab?.hasExternalChange ?? null;
   });
@@ -111,7 +111,7 @@ describe("外部修改检测", () => {
     // E2E 环境下通过 plugin:event|emit 推送 'file-changed' 事件无法稳定到达前端监听器，
     // 因此绕过事件系统，直接调用 useFileWatcher 回调链路最终调用的 store 方法。
     await browser.executeAsync((filePath: string, done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.reloadFromDisk(filePath))
         .then(() => done(null))
@@ -126,7 +126,7 @@ describe("外部修改检测", () => {
 
     // isDirty 应为 false（重载后与磁盘一致）
     const isDirty = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.isDirty;
     });
@@ -147,7 +147,7 @@ describe("外部修改检测", () => {
     // 在前端修改内容，使 tab isDirty = true
     await setActiveContent(browser, "# 本地修改后的内容\n");
     const isDirtyBefore = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.isDirty;
     });
@@ -168,7 +168,7 @@ describe("外部修改检测", () => {
       await browser.pause(1500);
       // 通过 store 检查 externalChangeState.visible
       const visible = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         // App.vue 的 externalChangeState 不在 store 中，无法直接访问
         // 检查 DOM 中是否有对话框
         return !!document.querySelector(".external-change-dialog, [class*='external-change']");
@@ -216,7 +216,7 @@ describe("外部修改检测", () => {
 
     // isDirty 应为 false
     const isDirtyAfter = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.isDirty;
     });
@@ -285,7 +285,7 @@ describe("外部修改检测", () => {
 
     // isDirty 应为 true（仍保留本地未保存修改）
     const isDirty = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.isDirty;
     });

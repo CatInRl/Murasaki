@@ -43,7 +43,7 @@ async function openSettingsWindow(): Promise<void> {
   // JavaScript 事件循环有机会处理 invoke 的 IPC 消息发送。
   await browser.executeAsync((done: (res: unknown) => void) => {
     try {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__TAURI_INTERNALS__.invoke("open_settings");
     } catch {
       // 忽略
@@ -66,7 +66,7 @@ async function closeSettingsWindow(): Promise<void> {
     // 用 Tauri invoke 关闭窗口（fire-and-forget，不等 Promise）
     await browser.executeAsync((done: (res: unknown) => void) => {
       try {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__TAURI_INTERNALS__.invoke("plugin:window|close", {
           label: "settings",
         });
@@ -182,7 +182,7 @@ describe("设置窗口", () => {
     // 前序测试可能遗留 settingsVisible=true（旧测试断言多窗口会失败但仍渲染设置页）
     // 先重置：emit navigate 事件携带非 "settings" payload，触发 settingsVisible=false
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__TAURI_INTERNALS__
         .invoke("plugin:event|emit", {
           event: "navigate",
@@ -215,7 +215,7 @@ describe("设置窗口", () => {
 
     // 清理：隐藏设置页，避免影响后续 spec（session 内残留 settingsVisible）
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__TAURI_INTERNALS__
         .invoke("plugin:event|emit", {
           event: "navigate",

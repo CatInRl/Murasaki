@@ -255,7 +255,7 @@ describe("文件树键盘导航", () => {
 
     // 清理
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__pinia__._s.get("contextMenu").hide();
     });
   });

@@ -135,7 +135,7 @@ describe("状态栏", () => {
 
     // 修改内容使其变 dirty
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const tabs = pinia._s.get("tabs");
       if (tabs.activeTab) {

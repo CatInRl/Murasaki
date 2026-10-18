@@ -66,7 +66,7 @@ describe("Murasaki 启动 smoke 测试", () => {
           diag.cleanupMs = Date.now() - cleanupStartedAt;
 
           const snap = await browser.execute(() => {
-            // @ts-ignore
+            // @ts-ignore: E2E 运行时注入，类型不可静态推导
             const pinia = window.__pinia__;
             const tabsStore = pinia._s.get("tabs");
             const dialogStore = pinia._s.get("dialog");

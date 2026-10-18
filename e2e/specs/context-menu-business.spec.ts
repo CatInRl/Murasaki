@@ -52,7 +52,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
     await dismissAllDialogs(browser);
     // 清理残留菜单
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
       if (menu) menu.hide();
     });
@@ -67,7 +67,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
   it("TabBar 右键菜单渲染 8 项（5 关闭 + 分隔符 + 2 路径操作）", async () => {
     // 模拟 TabBar.onContextMenu 构造的菜单项
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
       menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
         { label: "关闭", shortcut: "Ctrl+W" },
@@ -109,7 +109,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
 
   it("TabBar '关闭' 项显示 Ctrl+W 快捷键提示", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
       menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
         { label: "关闭", shortcut: "Ctrl+W" },
@@ -123,7 +123,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
   it("TabBar 未保存的 tab '复制路径' 和 '在文件资源管理器中显示' 禁用", async () => {
     // 模拟 tab.path=null（未保存的新文件）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
       menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
         { label: "关闭", shortcut: "Ctrl+W" },
@@ -150,7 +150,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
   it("Editor 右键菜单渲染 10 项（4 编辑 + 分隔符 + 5 插入操作）", async () => {
     // 模拟 SourceEditor.buildEditorMenuItems 构造的菜单项
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
       menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
         { label: "剪切", shortcut: "Ctrl+X" },
@@ -196,7 +196,7 @@ describe("TabBar / Editor 右键菜单具体项", () => {
 
   it("Editor 右键菜单前 4 项显示对应快捷键", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
       menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
         { label: "剪切", shortcut: "Ctrl+X" },

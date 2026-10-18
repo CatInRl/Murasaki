@@ -213,7 +213,7 @@ describe("设计系统", () => {
     // 通过 store 选中节点（与 misc-visual 同一手法）
     await browser.execute(
       (path: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__pinia__._s.get("workspace").selectedFilePath = path;
       },
       toAppPath(`${wsPath}\\intro.md`)

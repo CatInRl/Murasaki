@@ -35,7 +35,7 @@ describe("对话框系统", () => {
     }
     // 确保队列清空
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const dialog = window.__pinia__._s.get("dialog");
       if (dialog && dialog.current) {
         dialog.cancelCurrent();
@@ -46,12 +46,12 @@ describe("对话框系统", () => {
   it("alert 对话框渲染并确认后消失", async () => {
     // 发起 alert（不 await，在浏览器内执行）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const dialog = window.__pinia__._s.get("dialog");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__alertResult = "pending";
       dialog.alert({ message: "测试提示", variant: "info" }).then(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__alertResult = "resolved";
       });
     });
@@ -62,7 +62,7 @@ describe("对话框系统", () => {
     await browser.waitUntil(
       async () => {
         return await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const cur = window.__pinia__._s.get("dialog").current;
           return cur !== null && cur.message === "测试提示";
         });
@@ -82,7 +82,7 @@ describe("对话框系统", () => {
     await browser.waitUntil(
       async () => {
         return await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           return window.__pinia__._s.get("dialog").current === null;
         });
       },
@@ -90,7 +90,7 @@ describe("对话框系统", () => {
     );
 
     const result = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__alertResult;
     });
     expect(result).toBe("resolved");
@@ -98,12 +98,12 @@ describe("对话框系统", () => {
 
   it("confirm 对话框确认返回 true", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const dialog = window.__pinia__._s.get("dialog");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__confirmResult = null;
       dialog.confirm({ message: "确认操作？" }).then((r: boolean) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__confirmResult = r;
       });
     });
@@ -118,7 +118,7 @@ describe("对话框系统", () => {
     await browser.waitUntil(
       async () => {
         return await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           return window.__pinia__._s.get("dialog").current === null;
         });
       },
@@ -126,7 +126,7 @@ describe("对话框系统", () => {
     );
 
     const result = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__confirmResult;
     });
     expect(result).toBe(true);
@@ -134,12 +134,12 @@ describe("对话框系统", () => {
 
   it("confirm 对话框取消返回 false", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const dialog = window.__pinia__._s.get("dialog");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__confirmResult2 = null;
       dialog.confirm({ message: "确认操作？" }).then((r: boolean) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__confirmResult2 = r;
       });
     });
@@ -154,7 +154,7 @@ describe("对话框系统", () => {
     await browser.waitUntil(
       async () => {
         return await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           return window.__pinia__._s.get("dialog").current === null;
         });
       },
@@ -162,7 +162,7 @@ describe("对话框系统", () => {
     );
 
     const result = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__confirmResult2;
     });
     expect(result).toBe(false);
@@ -170,12 +170,12 @@ describe("对话框系统", () => {
 
   it("prompt 对话框输入并确认返回输入值", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const dialog = window.__pinia__._s.get("dialog");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__promptResult = null;
       dialog.prompt({ message: "输入名称", defaultValue: "默认值" }).then((r: string | null) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__promptResult = r;
       });
     });
@@ -195,7 +195,7 @@ describe("对话框系统", () => {
     await confirmBtn.click();
 
     const result = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__promptResult;
     });
     expect(result).toBe("新名称");
@@ -203,12 +203,12 @@ describe("对话框系统", () => {
 
   it("prompt 对话框取消返回 null", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const dialog = window.__pinia__._s.get("dialog");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__promptResult2 = "still_pending";
       dialog.prompt({ message: "输入名称" }).then((r: string | null) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__promptResult2 = r;
       });
     });
@@ -222,7 +222,7 @@ describe("对话框系统", () => {
     await browser.waitUntil(
       async () => {
         return await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           return window.__pinia__._s.get("dialog").current === null;
         });
       },
@@ -230,7 +230,7 @@ describe("对话框系统", () => {
     );
 
     const result = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__promptResult2;
     });
     expect(result).toBe(null);
@@ -238,12 +238,12 @@ describe("对话框系统", () => {
 
   it("conflict 对话框覆盖返回 overwrite", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const dialog = window.__pinia__._s.get("dialog");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__conflictResult = null;
       dialog.conflict({ filename: "test.md" }).then((r: unknown) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__conflictResult = r;
       });
     });
@@ -258,7 +258,7 @@ describe("对话框系统", () => {
     await browser.waitUntil(
       async () => {
         return await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           return window.__pinia__._s.get("dialog").current === null;
         });
       },
@@ -266,7 +266,7 @@ describe("对话框系统", () => {
     );
 
     const result = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__conflictResult;
     });
     expect(result).toEqual({ action: "overwrite" });
@@ -275,12 +275,12 @@ describe("对话框系统", () => {
   it("unsaved 对话框三按钮返回 save/discard/cancel", async () => {
     // 测试 save
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const dialog = window.__pinia__._s.get("dialog");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__unsavedResult = null;
       dialog.unsavedChanges({ message: "未保存？" }).then((r: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__unsavedResult = r;
       });
     });
@@ -295,7 +295,7 @@ describe("对话框系统", () => {
     await browser.waitUntil(
       async () => {
         return await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           return window.__pinia__._s.get("dialog").current === null;
         });
       },
@@ -303,7 +303,7 @@ describe("对话框系统", () => {
     );
 
     const result = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__unsavedResult;
     });
     expect(result).toBe("save");
@@ -311,18 +311,18 @@ describe("对话框系统", () => {
 
   it("模态栈：第二个对话框等待第一个 resolve", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const dialog = window.__pinia__._s.get("dialog");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__d1 = "pending";
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__d2 = "pending";
       dialog.alert({ message: "第一个" }).then(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__d1 = "resolved";
       });
       dialog.alert({ message: "第二个" }).then(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__d2 = "resolved";
       });
     });
@@ -332,7 +332,7 @@ describe("对话框系统", () => {
     await browser.waitUntil(
       async () => {
         return await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const cur = window.__pinia__._s.get("dialog").current;
           return cur !== null && cur.message === "第一个";
         });
@@ -352,7 +352,7 @@ describe("对话框系统", () => {
     await browser.waitUntil(
       async () => {
         return await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const cur = window.__pinia__._s.get("dialog").current;
           return cur !== null && cur.message === "第二个";
         });
@@ -368,9 +368,9 @@ describe("对话框系统", () => {
     await browser.waitUntil(
       async () => {
         const r = await browser.execute(() => ({
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           d1: window.__d1,
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           d2: window.__d2,
         }));
         return r.d1 === "resolved" && r.d2 === "resolved";

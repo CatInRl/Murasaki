@@ -196,7 +196,7 @@ describe("多 Tab 管理", () => {
 
     // 通过 store 修改内容
     await browser.execute((content: string) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const tabs = pinia._s.get("tabs");
       if (tabs.activeTab) tabs.updateContent(tabs.activeTab.id, content);
@@ -222,7 +222,7 @@ describe("多 Tab 管理", () => {
 
     // 通过 CodeMirror view 在光标处插入文本（模拟真实输入）
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__editorRef__?.getView?.();
       if (!view) return done("no editor view");
       try {
@@ -238,7 +238,7 @@ describe("多 Tab 管理", () => {
     await browser.waitUntil(
       async () => {
         const isDirty = await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const tabs = window.__pinia__._s.get("tabs");
           return tabs.activeTab?.isDirty;
         });
@@ -249,7 +249,7 @@ describe("多 Tab 管理", () => {
 
     // 验证 dirty 标记存在
     let isDirty = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.isDirty;
     });
@@ -257,9 +257,9 @@ describe("多 Tab 管理", () => {
 
     // 触发 CodeMirror undo（通过 App.vue 暴露的 window.__editorRef__.undo）
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       if (!window.__editorRef__?.undo) return done("no undo");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       try {
         window.__editorRef__.undo();
         done(null);
@@ -272,7 +272,7 @@ describe("多 Tab 管理", () => {
     await browser.waitUntil(
       async () => {
         const isDirty = await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const tabs = window.__pinia__._s.get("tabs");
           return tabs.activeTab?.isDirty;
         });
@@ -283,7 +283,7 @@ describe("多 Tab 管理", () => {
 
     // 验证 dirty 标记消失
     isDirty = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.isDirty;
     });

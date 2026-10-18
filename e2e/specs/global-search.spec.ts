@@ -74,7 +74,7 @@ async function waitForSearchVisible(
   await browser.waitUntil(
     async () => {
       const v = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return window.__pinia__._s.get("search")?.visible ?? false;
       });
       return v === visible;
@@ -169,7 +169,7 @@ describe("统一搜索条主链路", () => {
     // 搜索条关闭 + 目标文件已在 tab 打开
     await waitForSearchVisible(browser, false);
     const tabsState = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return {
         count: tabs.tabs.length,

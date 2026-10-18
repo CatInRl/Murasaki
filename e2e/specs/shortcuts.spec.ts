@@ -88,7 +88,7 @@ async function setShortcutOverrides(
   shortcuts: Record<string, string | null>
 ): Promise<void> {
   await browser.executeAsync((sc: Record<string, string | null>, done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const persistence = pinia._s.get("persistence");
     Promise.resolve(persistence.updateSettings({ shortcuts: sc }))
@@ -101,7 +101,7 @@ async function setShortcutOverrides(
 /** 模拟设置窗口保存：emit settings://saved 事件（触发主窗口 loadSettings + update_shortcut_labels） */
 async function emitSettingsSaved(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     window.__TAURI_INTERNALS__
       .invoke("plugin:event|emit", {
         event: "settings://saved",
@@ -136,7 +136,7 @@ describe("快捷键", () => {
     // 不直接更新 App.vue 的 sidebarView ref（前序 spec 可能切到 outline，
     // 导致 .file-tree 不渲染）。通过 __setSidebarView__ 显式重置。
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("files");
     });
     wsPath = resetWorkspace(sidebarFixtures());
@@ -166,7 +166,7 @@ describe("快捷键", () => {
     // 等待两个 tab 都已注册
     await waitForStoreState(browser, async () => {
       const count = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return tabs.tabs.length;
       });
@@ -175,7 +175,7 @@ describe("快捷键", () => {
 
     let state: { count: number; activeId?: string | null; activeTitle?: string } =
       await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return { count: tabs.tabs.length, activeId: tabs.activeTabId };
       });
@@ -187,7 +187,7 @@ describe("快捷键", () => {
     // 应剩 1 个 tab（轮询等待，替代固定 pause）
     await waitForStoreState(browser, async () => {
       const count = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return tabs.tabs.length;
       });
@@ -195,7 +195,7 @@ describe("快捷键", () => {
     });
 
     state = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return {
         count: tabs.tabs.length,
@@ -214,7 +214,7 @@ describe("快捷键", () => {
     // 等待 notes.md 成为活跃 tab
     await waitForStoreState(browser, async () => {
       const active = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
       });
@@ -223,7 +223,7 @@ describe("快捷键", () => {
 
     // 当前活跃应为 notes.md（最后打开的）
     let active = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
     });
@@ -233,7 +233,7 @@ describe("快捷键", () => {
     await pressShortcut(browser, "Tab", { ctrl: true });
     await waitForStoreState(browser, async () => {
       const a = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
       });
@@ -241,7 +241,7 @@ describe("快捷键", () => {
     });
 
     active = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
     });
@@ -254,7 +254,7 @@ describe("快捷键", () => {
     // 等待 notes.md 成为活跃 tab
     await waitForStoreState(browser, async () => {
       const active = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
       });
@@ -266,7 +266,7 @@ describe("快捷键", () => {
     await pressShortcut(browser, "Tab", { ctrl: true, shift: true });
     await waitForStoreState(browser, async () => {
       const a = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
       });
@@ -274,7 +274,7 @@ describe("快捷键", () => {
     });
 
     const active = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
     });
@@ -291,7 +291,7 @@ describe("快捷键", () => {
     // 等待 reload.md 打开为活动 tab
     await waitForStoreState(browser, async () => {
       const title = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return tabs.activeTab ? tabs.getTabTitle(tabs.activeTab) : null;
       });
@@ -300,7 +300,7 @@ describe("快捷键", () => {
 
     // 修改内容（脏态）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       if (tabs.activeTab) {
         tabs.updateContent(tabs.activeTab.id, "# 修改后的内容\n");
@@ -309,7 +309,7 @@ describe("快捷键", () => {
     // 等待脏内容生效
     await waitForStoreState(browser, async () => {
       const content = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return tabs.activeTab?.content;
       });
@@ -324,7 +324,7 @@ describe("快捷键", () => {
     await waitForAbsent(browser, ".dialog-overlay", 5000);
 
     let content = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.content;
     });
@@ -338,7 +338,7 @@ describe("快捷键", () => {
 
     await waitForStoreState(browser, async () => {
       const c = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return tabs.activeTab?.content;
       });
@@ -346,7 +346,7 @@ describe("快捷键", () => {
     });
 
     content = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.content;
     });
@@ -397,7 +397,7 @@ describe("快捷键", () => {
     // 直接通过 __setSidebarView__ 设置 ref，避免 DOM 按钮点击不触发
     // Vue 的 @update:active-view 事件
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     // 等待切换到大纲视图生效（文件树消失）
@@ -477,7 +477,7 @@ describe("快捷键", () => {
     await browser.waitUntil(
       async () => {
         const kinds = await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const dialog = window.__pinia__._s.get("dialog");
           return ((dialog.queue ?? []) as { kind: string }[]).map((item) => item.kind);
         });
@@ -495,7 +495,7 @@ describe("快捷键", () => {
   it("Ctrl+Shift+F 打开统一搜索条", async () => {
     // 初始搜索条应不可见
     let searchVisible = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       return search.visible;
     });
@@ -506,7 +506,7 @@ describe("快捷键", () => {
     // 等待 search store visible 变为 true
     await waitForStoreState(browser, async () => {
       const visible = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const search = window.__pinia__._s.get("search");
         return search.visible;
       });
@@ -514,7 +514,7 @@ describe("快捷键", () => {
     });
 
     searchVisible = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       return search.visible;
     });
@@ -534,7 +534,7 @@ describe("快捷键", () => {
     // 这里直接调窗口插件命令断言「可调用」；不依赖 OS 是否真的进入全屏（CI 上不稳定），
     // 调用后立刻还原，避免影响后续用例。
     const err = await browser.executeAsync((done: (e: string | null) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const internals = window.__TAURI_INTERNALS__;
       const md = internals?.metadata ?? {};
       const label = md.currentWindow?.label ?? md.currentWebview?.label ?? "main";
@@ -580,7 +580,7 @@ describe("快捷键", () => {
 
     // 2. 验证内存中的快捷键覆盖已生效
     const stored = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__pinia__._s.get("persistence").settings.shortcuts;
     });
     expect(stored?.["toggle-statusbar"]).toBe("Alt+Shift+T");
@@ -610,7 +610,7 @@ describe("快捷键", () => {
   it("update_shortcut_labels 命令调用无错误（原生菜单快捷键提示同步）", async () => {
     // 直接调用 Rust 命令（重建后的 release 二进制），验证覆盖表能同步到原生菜单
     const err = await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__TAURI_INTERNALS__
         .invoke("update_shortcut_labels", {
           overrides: { "toggle-statusbar": "Alt+Shift+T", "close-tab": null },

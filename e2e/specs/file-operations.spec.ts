@@ -49,7 +49,7 @@ async function openTreeNodeContextMenu(b: Browser, nodeName: string): Promise<vo
   const attempts = 3;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const dispatched = await b.execute((name: string) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
       menu.hide();
       const evt = new MouseEvent("contextmenu", {
@@ -198,7 +198,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     await browser.keys(["Escape"]);
     await waitForAbsent(browser, ".murasaki-context-menu", 5000);
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       if (toast) toast.dismissAll();
     });
@@ -376,7 +376,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
 
     // 标签路径已跟随改名，而不是仍指向旧路径
     const tabPath = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__pinia__._s.get("tabs").activeTab?.path;
     });
     expect(tabPath).toContain("notes-renamed.md");
@@ -385,7 +385,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     await callStoreAction(browser, "tabs", "updateActiveContent", "# 重命名后保存\n");
 
     const tabId = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__pinia__._s.get("tabs").activeTab?.id;
     });
     await callStoreAction(browser, "tabs", "saveTab", tabId);
@@ -422,7 +422,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // 剪切 intro.md（同步操作，无需等待）
     await browser.execute(
       (path: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const fileOps = pinia._s.get("fileOps");
         fileOps.cut(path);
@@ -461,7 +461,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // 复制 notes.md（同步操作，无需等待）
     await browser.execute(
       (path: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const fileOps = pinia._s.get("fileOps");
         fileOps.copy(path);
@@ -486,7 +486,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // 模拟将 intro.md 重命名为 notes.md（已存在）
     // 需要注入冲突 resolver：因为 setConflictResolver 由 App.vue 注入，E2E 中需要重新注入
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const fileOps = pinia._s.get("fileOps");
       const dialog = pinia._s.get("dialog");
@@ -510,7 +510,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     //    改用同步 execute 启动异步操作，结果暂存到 window.__testResult。
     await browser.execute(
       (old: string, newName: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const fileOps = pinia._s.get("fileOps");
         (window as any).__testResult = null;
@@ -537,7 +537,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     } else {
       // 回退：通过 store 直接 cancelCurrent
       await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const dialog = pinia._s.get("dialog");
         dialog.cancelCurrent();
@@ -561,7 +561,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
 
   it("重命名到已存在文件名：选择覆盖则源文件替换目标", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const fileOps = pinia._s.get("fileOps");
       const dialog = pinia._s.get("dialog");
@@ -585,7 +585,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     //    改用同步 execute 启动异步操作，结果暂存到 window.__testResult。
     await browser.execute(
       (old: string, newName: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const fileOps = pinia._s.get("fileOps");
         (window as any).__testResult = null;
@@ -612,7 +612,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     } else {
       // 回退：通过 store 直接 conflictOverwrite
       await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const dialog = pinia._s.get("dialog");
         dialog.conflictOverwrite();
@@ -685,7 +685,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     if (browser) {
       try {
         await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const pinia = window.__pinia__;
           const fileOps = pinia?._s?.get("fileOps");
           if (fileOps) fileOps.setConflictResolver(null);

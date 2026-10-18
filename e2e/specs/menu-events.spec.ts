@@ -120,7 +120,7 @@ describe("菜单事件链", () => {
       await browser.waitUntil(
         async () => {
           const hasWs = await browser.execute(() => {
-            // @ts-ignore
+            // @ts-ignore: E2E 运行时注入，类型不可静态推导
             return window.__pinia__._s.get("workspace").hasWorkspace;
           });
           return hasWs === false;
@@ -136,7 +136,7 @@ describe("菜单事件链", () => {
       // 通过 store 检查 searchStore.visible
       await emitMenuEvent(browser, "find-in-files");
       const visible = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const search = pinia._s.get("search");
         return search?.visible ?? false;
@@ -169,7 +169,7 @@ describe("菜单事件链", () => {
         await browser.switchToWindow(settingsHandle);
         await browser.executeAsync((done: (res: unknown) => void) => {
           try {
-            // @ts-ignore
+            // @ts-ignore: E2E 运行时注入，类型不可静态推导
             window.__TAURI_INTERNALS__.invoke("plugin:window|close", { label: "settings" });
           } catch {
             /* ignore */

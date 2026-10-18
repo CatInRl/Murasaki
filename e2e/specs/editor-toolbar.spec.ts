@@ -68,7 +68,7 @@ describe("编辑器工具栏", () => {
 
     // 将光标设置到 position 2（"正"之后）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       const view = editorBridge.editorView;
       if (view) {
@@ -88,7 +88,7 @@ describe("编辑器工具栏", () => {
 
     // 验证编辑器内容包含 **
     const content = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.content ?? "";
     });
@@ -101,7 +101,7 @@ describe("编辑器工具栏", () => {
     await openFileInTab(browser, `${wsPath}\\italic.md`);
 
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       const view = editorBridge.editorView;
       if (view) {
@@ -119,7 +119,7 @@ describe("编辑器工具栏", () => {
     await browser.pause(300);
 
     const content = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.content ?? "";
     });
@@ -134,7 +134,7 @@ describe("编辑器工具栏", () => {
 
     // 将光标设置到行首
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       const view = editorBridge.editorView;
       if (view) {
@@ -153,7 +153,7 @@ describe("编辑器工具栏", () => {
     await browser.pause(300);
 
     const content = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.content ?? "";
     });
@@ -166,7 +166,7 @@ describe("编辑器工具栏", () => {
     await openFileInTab(browser, `${wsPath}\\list.md`);
 
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       const view = editorBridge.editorView;
       if (view) {
@@ -184,7 +184,7 @@ describe("编辑器工具栏", () => {
     await browser.pause(300);
 
     const content = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.content ?? "";
     });

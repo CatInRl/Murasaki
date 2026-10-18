@@ -69,13 +69,13 @@ describe("跨文件搜索结果跳转", () => {
   it("搜索关键词返回匹配文件结果", async () => {
     // 先打开统一搜索条（挂载会 clear 旧查询），再设置关键词
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
     await browser.pause(200);
     const result = await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setOptions({ regex: false, caseSensitive: false, wholeWord: false });
@@ -111,7 +111,7 @@ describe("跨文件搜索结果跳转", () => {
     // 打开统一搜索条，并等它挂载完成 —— GSB onMounted 会 clear()（清空 query/results），
     // 挂载完成前写入查询会被清掉（WebKit 上脚本推进可能快于渲染进程完成挂载）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
@@ -122,7 +122,7 @@ describe("跨文件搜索结果跳转", () => {
     // store 驱动则每轮 CI 都稳定；await 落定后 results 已被权威覆盖、chunk 监听已清理，
     // 列表不再重渲染，点击也就没有「落在被替换节点上」的竞态
     const result = await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setOptions({ regex: false, caseSensitive: false, wholeWord: false });
@@ -150,7 +150,7 @@ describe("跨文件搜索结果跳转", () => {
       while (Date.now() < deadline) {
         await browser.pause(300);
         const s = await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const tabs = window.__pinia__._s.get("tabs");
           return {
             count: tabs.tabs.length as number,
@@ -172,7 +172,7 @@ describe("跨文件搜索结果跳转", () => {
   it("统一搜索条可见性切换", async () => {
     // 通过 store 打开统一搜索条
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
@@ -185,7 +185,7 @@ describe("跨文件搜索结果跳转", () => {
 
     // 关闭
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = false;
     });
@@ -196,13 +196,13 @@ describe("跨文件搜索结果跳转", () => {
 
   it("正则表达式搜索", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
     await browser.pause(200);
     const result = await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setOptions({ regex: true, caseSensitive: false, wholeWord: false });
@@ -224,7 +224,7 @@ describe("跨文件搜索结果跳转", () => {
   it("文件名搜索", async () => {
     // 打开统一搜索条并等挂载完成（同点击用例：先等挂载再写 query，避开 onMounted clear()）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
@@ -233,7 +233,7 @@ describe("跨文件搜索结果跳转", () => {
     // 文件名分组是纯前端 computed（filesSource 对 query 模糊匹配，无需 Rust），
     // 经 store 写入 query 即渲染；同样绕开 WebKit 上不确定的 setValue → @input 链路
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.setQuery("file-b");
     });

@@ -65,7 +65,7 @@ async function waitForTabCount(expected: number, message: string): Promise<void>
   await waitForInBrowser(
     browser,
     (want: number) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__pinia__._s.get("tabs").tabs.length === want;
     },
     [expected],
@@ -183,7 +183,7 @@ async function waitForActivePathEndingWith(suffix: string, message: string): Pro
   await waitForInBrowser(
     browser,
     (want: string) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       const active = tabs.tabs.find((t: { id: string }) => t.id === tabs.activeTabId);
       return !!active && String(active.path ?? "").endsWith(want);

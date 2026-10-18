@@ -181,7 +181,7 @@ describe("工作区 + 文件树", () => {
     const loadingStopped = await waitForInBrowser(
       browser,
       () => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const ws = window.__pinia__._s.get("workspace");
         return ws.loading === false;
       },

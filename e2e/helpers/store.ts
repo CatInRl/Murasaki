@@ -42,7 +42,7 @@ export async function waitForPinia(browser: Browser, timeout = 30000): Promise<v
             await browser.switchToWindow(handle);
             const hasPinia = await browser
               .execute(() => {
-                // @ts-ignore
+                // @ts-ignore: E2E 运行时注入，类型不可静态推导
                 return !!(window as any).__pinia__;
               })
               .catch(() => false);
@@ -63,7 +63,7 @@ export async function waitForPinia(browser: Browser, timeout = 30000): Promise<v
     const probeStart = Date.now();
     try {
       const ready = await appProbe(browser, () => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return !!(window as any).__pinia__;
       });
       lastProbeError = undefined;
@@ -129,7 +129,7 @@ export async function waitForPiniaInCurrentWindow(
     const probeStart = Date.now();
     const ready = await browser
       .execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return !!(window as any).__pinia__;
       })
       .catch(() => false);
@@ -145,7 +145,7 @@ export async function waitForPiniaInCurrentWindow(
   let detail = `title="${title}"`;
   const diag = await browser
     .execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const buf = (window as any).__murasakiConsoleBuffer__;
       return {
         readyState: document.readyState,
@@ -175,7 +175,7 @@ export async function waitForPiniaInCurrentWindow(
 /** 获取 store 实例（在浏览器上下文中执行） */
 export async function getStore<T = any>(browser: Browser, name: string): Promise<T> {
   return browser.execute((storeName: string) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     if (!pinia) throw new Error("Pinia not exposed on window.__pinia__");
     const store = pinia._s.get(storeName);
@@ -191,7 +191,7 @@ async function stopWatchingBestEffort(browser: Browser): Promise<void> {
   try {
     await browser.executeAsync((done: (res: unknown) => void) => {
       try {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__TAURI_INTERNALS__.invoke("stop_watching").then(
           () => done(null),
           () => done(null)
@@ -211,7 +211,7 @@ export async function openWorkspace(browser: Browser, path: string): Promise<voi
   // 注意：browser.execute 在 Tauri WebView2 下不等待 async function 的 Promise
   // 改用 executeAsync，通过 done callback 显式等待异步操作完成
   const res = await browser.executeAsync((wsPath: string, done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const workspace = pinia._s.get("workspace");
     // 消音防 session 污染（机制详见 callStoreAction 注释）
@@ -235,7 +235,7 @@ export async function openWorkspace(browser: Browser, path: string): Promise<voi
 /** 关闭工作区 */
 export async function closeWorkspace(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const workspace = pinia._s.get("workspace");
     Promise.resolve(workspace.closeWorkspace())
@@ -251,7 +251,7 @@ export async function closeWorkspace(browser: Browser): Promise<void> {
  *  期间数组被其他 close 修改，splice(idx) 删错元素） */
 export async function closeAllTabs(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const tabs = pinia._s.get("tabs");
     const ids = tabs.tabs.map((t: any) => t.id);
@@ -274,7 +274,7 @@ export async function openFileInTab(browser: Browser, path: string): Promise<voi
   // 冲突对话框的 Promise 上，executeAsync 等到脚本超时。这里改为「发起 + 轮询」，
   // 途中遇到草稿冲突时按测试默认策略选择「加载磁盘版本」（unsaved 的中间按钮）。
   await browser.execute((filePath: string) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     void window.__pinia__._s
       .get("tabs")
       .openFile(filePath)
@@ -285,7 +285,7 @@ export async function openFileInTab(browser: Browser, path: string): Promise<voi
     async () =>
       await browser.execute((filePath: string) => {
         const norm = (value: string) => value.replace(/\\/g, "/").toLowerCase();
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const tabs = pinia._s.get("tabs");
         if (
@@ -321,7 +321,7 @@ export async function openFileInTab(browser: Browser, path: string): Promise<voi
  */
 export async function clearPersistedTabs(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const tabs = window.__pinia__?._s?.get("tabs");
     if (!tabs) return done(null);
     tabs.clearAll();
@@ -344,7 +344,7 @@ export async function getTabsState(
   browser: Browser
 ): Promise<{ tabs: TabSnapshot[]; activeTabId: string | null }> {
   return browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const tabs = pinia._s.get("tabs");
     return {
@@ -363,7 +363,7 @@ export async function getTabsState(
 /** 获取当前激活 tab 的内容（用于断言编辑器内容） */
 export async function getActiveContent(browser: Browser): Promise<string> {
   return browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const tabs = pinia._s.get("tabs");
     return tabs.activeTab?.content ?? "";
@@ -373,7 +373,7 @@ export async function getActiveContent(browser: Browser): Promise<string> {
 /** 设置当前激活 tab 的内容（用于断言保存行为） */
 export async function setActiveContent(browser: Browser, content: string): Promise<void> {
   await browser.execute((newContent: string) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const tabs = pinia._s.get("tabs");
     if (tabs.activeTab) {
@@ -385,7 +385,7 @@ export async function setActiveContent(browser: Browser, content: string): Promi
 /** 获取当前主题 */
 export async function getCurrentTheme(browser: Browser): Promise<string> {
   return browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const persistence = pinia._s.get("persistence");
     return persistence?.settings?.markdownTheme ?? null;
@@ -401,7 +401,7 @@ export async function getCurrentTheme(browser: Browser): Promise<string> {
  */
 export async function ensureSplitMode(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const persistence = pinia._s.get("persistence");
     Promise.resolve(persistence.updateSettings({ editorMode: "split" }))
@@ -420,7 +420,7 @@ export async function ensureSplitMode(browser: Browser): Promise<void> {
  */
 export async function resetPersistenceSettings(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const persistence = pinia._s.get("persistence");
     Promise.resolve(
@@ -443,7 +443,7 @@ export async function resetPersistenceSettings(browser: Browser): Promise<void> 
   // 应用就绪（`createSession` 里的 `waitForAppReady`）保证钩子已经挂上；缺了就是时序出了问题 → 直接报错，
   // 不要静默跳过（那会退化成本函数看似成功、后续却等不到 `.file-tree`）。
   await browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const setSidebarView = (window as any).__setSidebarView__;
     if (typeof setSidebarView !== "function") {
       throw new Error(
@@ -458,7 +458,7 @@ export async function resetPersistenceSettings(browser: Browser): Promise<void> 
   await waitForInBrowser(
     browser,
     () => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const p = window.__pinia__?._s?.get("persistence");
       return p?.settings?.sidebarView === "files";
     },
@@ -478,7 +478,7 @@ export async function resetPersistenceSettings(browser: Browser): Promise<void> 
  */
 export async function dismissAllDialogs(browser: Browser): Promise<void> {
   await browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     const dialog = pinia._s.get("dialog");
     if (dialog && dialog.queue) {
@@ -528,7 +528,7 @@ export async function dismissAllDialogs(browser: Browser): Promise<void> {
  */
 export async function emitMenuEvent(browser: Browser, menuId: string): Promise<void> {
   await browser.executeAsync((id: string, done: (res: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     window.__TAURI_INTERNALS__
       .invoke("plugin:event|emit", {
         event: "menu-event",
@@ -571,14 +571,14 @@ export async function callStoreAction<T = any>(
   // 注入永不 reject 的 wrapper 到 window，避免 async function throw 触发
   // CDP Runtime.exceptionThrown 事件（tauri-driver 会缓存并在每次 execute 中重复报告）
   await browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     window.__callAction = async (
       sName: string,
       aName: string,
       ...rest: any[]
     ): Promise<{ ok: boolean; data?: any; error?: string }> => {
       try {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const store = pinia._s.get(sName);
         if (!store || typeof store[aName] !== "function") {
@@ -599,12 +599,12 @@ export async function callStoreAction<T = any>(
   // 这里实际上是「两个字符串 + 任意 action 参数」，只能对调用本身做类型断言。
   await (browser.execute as any)(
     (sName: string, aName: string, ...rest: any[]) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const promise = window.__callAction(sName, aName, ...rest);
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__testResult = null;
       promise.then((r: any) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__testResult = r;
       });
       // 不需要 .catch()，wrapper 永不 reject
@@ -618,7 +618,7 @@ export async function callStoreAction<T = any>(
   const wrapped: any = await browser.waitUntil(
     async () => {
       const r = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return (window as any).__testResult;
       });
       if (r === null || r === undefined) return false;

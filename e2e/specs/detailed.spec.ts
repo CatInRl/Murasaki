@@ -103,7 +103,7 @@ beforeEach(async () => {
   // 关闭所有 tab（通过 clearAll）
   try {
     await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.clearAll()).then(
         () => done(null),
@@ -129,7 +129,7 @@ beforeEach(async () => {
 async function setTabContent(browser: Browser, tabId: string, content: string): Promise<void> {
   await browser.executeAsync(
     (id: string, c: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.updateContent(id, c);
       done(null);
@@ -142,7 +142,7 @@ async function setTabContent(browser: Browser, tabId: string, content: string): 
 /** 通过 CodeMirror view 在光标处插入文本（模拟真实输入） */
 async function cmInsertText(browser: Browser, text: string): Promise<void> {
   await browser.executeAsync((t: string, done) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const view = window.__editorRef__?.getView?.();
     if (!view) return done("no view");
     try {
@@ -158,7 +158,7 @@ async function cmInsertText(browser: Browser, text: string): Promise<void> {
 /** 触发 CodeMirror undo（通过 App.vue 暴露的接口） */
 async function cmUndo(browser: Browser): Promise<void> {
   await browser.executeAsync((done) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     if (!window.__editorRef__?.undo) return done("no undo");
     try {
       window.__editorRef__.undo();
@@ -172,7 +172,7 @@ async function cmUndo(browser: Browser): Promise<void> {
 /** 触发 CodeMirror redo（通过 App.vue 暴露的接口） */
 async function cmRedo(browser: Browser): Promise<void> {
   await browser.executeAsync((done) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     if (!window.__editorRef__?.redo) return done("no redo");
     try {
       window.__editorRef__.redo();
@@ -186,7 +186,7 @@ async function cmRedo(browser: Browser): Promise<void> {
 /** 读取 CodeMirror 当前文档内容（注意：从 view 读取，不是从 store 读取） */
 async function cmGetDoc(browser: Browser): Promise<string> {
   return browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const view = window.__editorRef__?.getView?.();
     if (!view) return null;
     return view.state.doc.toString();
@@ -196,7 +196,7 @@ async function cmGetDoc(browser: Browser): Promise<string> {
 /** 读取磁盘文件内容（通过 Tauri read_text_file 命令） */
 async function readDiskFile(browser: Browser, path: string): Promise<string> {
   return browser.executeAsync((p: string, done) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     window.__TAURI_INTERNALS__.invoke("read_text_file", { path: p }).then(
       (c: string) => done(c),
       (e: unknown) => done("ERR:" + String(e))
@@ -227,7 +227,7 @@ describe("1. 关闭确认对话框", () => {
 
     // 通过 store 调 closeTab（无 dirty 时直接关闭）
     const result = (await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.closeTab(tabs.activeTabId)).then(
         (r: any) => done({ needsConfirm: r.needsConfirm, hasTab: !!r.tab }),
@@ -254,7 +254,7 @@ describe("1. 关闭确认对话框", () => {
 
     // closeTab 应返回 needsConfirm: true（不直接关闭）
     const r1 = (await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.closeTab(tabs.activeTabId)).then(
         (r: any) => done({ needsConfirm: r.needsConfirm }),
@@ -267,7 +267,7 @@ describe("1. 关闭确认对话框", () => {
 
     // 模拟用户选「不保存」→ 调 doCloseTab（keepDraft: false，不写草稿）
     await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.doCloseTab(tabs.activeTabId, { keepDraft: false })).then(
         () => done(null),
@@ -300,7 +300,7 @@ describe("1. 关闭确认对话框", () => {
 
     // 模拟「保存」分支：先 saveTab 再 doCloseTab
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.saveTab(id))
         .then(() => tabs.doCloseTab(id))
@@ -326,7 +326,7 @@ describe("1. 关闭确认对话框", () => {
 
     // closeTab 返回 needsConfirm，调用方「取消」分支不调 doCloseTab
     const r = (await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.closeTab(tabs.activeTabId)).then(
         (r: any) => done({ needsConfirm: r.needsConfirm }),
@@ -344,7 +344,7 @@ describe("1. 关闭确认对话框", () => {
   it("1.5 关闭未命名 tab（无路径）：调 doCloseTab 不写草稿，直接关闭", async () => {
     // 新建未命名 tab
     await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       try {
         tabs.newTab();
@@ -363,7 +363,7 @@ describe("1. 关闭确认对话框", () => {
 
     // doCloseTab 应成功（无 path 不写草稿，但仍关闭）
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.doCloseTab(id)).then(
         () => done(null),
@@ -491,7 +491,7 @@ describe("3. 多 Tab 切换时撤销栈独立性", () => {
 
     // 切回 Tab A
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -506,7 +506,7 @@ describe("3. 多 Tab 切换时撤销栈独立性", () => {
 
     // 切到 Tab B
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -520,7 +520,7 @@ describe("3. 多 Tab 切换时撤销栈独立性", () => {
 
     // 切回 Tab A
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -543,7 +543,7 @@ describe("3. 多 Tab 切换时撤销栈独立性", () => {
 
     // 切到 Tab A 并输入、undo
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -565,13 +565,13 @@ describe("3. 多 Tab 切换时撤销栈独立性", () => {
 
     // 切到 Tab B 再切回 Tab A
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
     }, tabB.id);
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -594,7 +594,7 @@ describe("3. 多 Tab 切换时撤销栈独立性", () => {
 
     // 在 Tab B 输入
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -608,7 +608,7 @@ describe("3. 多 Tab 切换时撤销栈独立性", () => {
 
     // 关闭 Tab A（无 dirty，直接关）
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.closeTab(id)).then(
         () => done(null),
@@ -646,7 +646,7 @@ describe("4. 多 Tab 关闭/切换/新建场景", () => {
 
     // 关闭当前（math.md，idx=2）
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.closeTab(id)).then(
         () => done(null),
@@ -671,7 +671,7 @@ describe("4. 多 Tab 关闭/切换/新建场景", () => {
 
     // 关闭 Tab 0（非激活）
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.closeTab(id)).then(
         () => done(null),
@@ -694,7 +694,7 @@ describe("4. 多 Tab 关闭/切换/新建场景", () => {
     const lastId = state.tabs[2].id;
 
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.closeTab(id)).then(
         () => done(null),
@@ -712,7 +712,7 @@ describe("4. 多 Tab 关闭/切换/新建场景", () => {
 
     const state = await getTabsState(browser);
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.closeTab(id)).then(
         () => done(null),
@@ -740,7 +740,7 @@ describe("4. 多 Tab 关闭/切换/新建场景", () => {
 
     // 切到 A
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -796,7 +796,7 @@ describe("5. 交叉场景", () => {
 
     // 关闭 tab
     const result = (await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.closeTab(tabs.activeTabId)).then(
         (r: any) => done({ needsConfirm: r.needsConfirm }),
@@ -808,7 +808,7 @@ describe("5. 交叉场景", () => {
     if (result.needsConfirm) {
       // 若仍 dirty，需调 doCloseTab
       await browser.executeAsync((done) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         Promise.resolve(tabs.doCloseTab(tabs.activeTabId)).then(
           () => done(null),
@@ -829,7 +829,7 @@ describe("5. 交叉场景", () => {
 
     // 在 A 输入（dirty）
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -842,7 +842,7 @@ describe("5. 交叉场景", () => {
 
     // 切到 B
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -850,7 +850,7 @@ describe("5. 交叉场景", () => {
 
     // 此时 activeTab 是 B，要关 A 需指定 id
     const r = (await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.closeTab(id)).then(
         (r: any) => done({ needsConfirm: r.needsConfirm }),
@@ -861,7 +861,7 @@ describe("5. 交叉场景", () => {
 
     // 模拟「不保存」：调 doCloseTab
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.doCloseTab(id)).then(
         () => done(null),
@@ -890,7 +890,7 @@ describe("5. 交叉场景", () => {
 
     // A 输入
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -903,7 +903,7 @@ describe("5. 交叉场景", () => {
 
     // B 输入
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -916,7 +916,7 @@ describe("5. 交叉场景", () => {
 
     // 切回 A，undo 应只撤销 INPUT-A
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -926,7 +926,7 @@ describe("5. 交叉场景", () => {
 
     // 切到 B，undo 应只撤销 INPUT-B
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -948,7 +948,7 @@ describe("5. 交叉场景", () => {
 
     // 在 B 输入
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -957,7 +957,7 @@ describe("5. 交叉场景", () => {
 
     // 模拟「保存」分支：saveTab(B) + doCloseTab(B)
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.saveTab(id))
         .then(() => tabs.doCloseTab(id))
@@ -986,7 +986,7 @@ describe("5. 交叉场景", () => {
 
     // 在 A 输入并保留 undo 栈
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -1000,7 +1000,7 @@ describe("5. 交叉场景", () => {
 
     // 切到 B，输入
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);
@@ -1012,7 +1012,7 @@ describe("5. 交叉场景", () => {
 
     // 回到 A：内容应是 stage1A（保留输入）
     await browser.executeAsync((id: string, done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.switchTo(id);
       done(null);

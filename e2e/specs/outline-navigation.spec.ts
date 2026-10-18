@@ -88,7 +88,7 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 通过 sidebarView ref 切换到 outline 视图
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     await browser.pause(300);
@@ -105,7 +105,7 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 切换到大纲视图
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     await browser.pause(500);
@@ -130,7 +130,7 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 切换到大纲视图
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     await browser.pause(500);
@@ -170,14 +170,14 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 先切换到大纲
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     await browser.pause(300);
 
     // 再切换回文件树
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("files");
     });
     await browser.pause(300);
@@ -194,7 +194,7 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 切换到大纲视图
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     await browser.pause(300);

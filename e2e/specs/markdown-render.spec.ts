@@ -338,7 +338,7 @@ beforeEach(async () => {
   // 清空所有 tab
   try {
     await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       Promise.resolve(tabs.clearAll()).then(
         () => done(null),
@@ -554,7 +554,7 @@ describe("4. Mermaid 图表", () => {
     );
     // 替换为错误内容
     await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.updateContent(tabs.activeTabId, "```mermaid\nthis is not valid mermaid syntax\n```");
       done(null);
@@ -695,7 +695,7 @@ describe("6. 任务列表", () => {
     await openAndWait(browser, "render/tasklist.md");
     // 通过 store 模拟点击（避免动画/事件冒泡问题）
     const beforeContent = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.content ?? "";
     });
@@ -704,7 +704,7 @@ describe("6. 任务列表", () => {
     // 模拟 PreviewPane emit task-toggle：找未完成项的 li 并改源
     // 这里直接通过更新 store 验证渲染重绘
     await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       const newContent = tabs.activeTab.content.replace("- [ ] 未完成项", "- [x] 未完成项");
       tabs.updateContent(tabs.activeTabId, newContent);

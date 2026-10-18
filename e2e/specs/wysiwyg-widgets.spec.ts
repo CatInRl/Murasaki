@@ -36,7 +36,7 @@ let browser: Browser;
 /** 切换到 wysiwyg 模式 */
 async function setWysiwygMode(browser: Browser): Promise<void> {
   await browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const editorBridge = window.__pinia__._s.get("editorBridge");
     editorBridge.setEditorMode("wysiwyg");
   });
@@ -46,7 +46,7 @@ async function setWysiwygMode(browser: Browser): Promise<void> {
 /** 把光标移到指定位置，触发 decoration 重算（debounce 50ms） */
 async function setCursor(browser: Browser, pos: number): Promise<void> {
   await browser.execute((p: number) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const editorBridge = window.__pinia__._s.get("editorBridge");
     const view = editorBridge.editorView;
     if (view) {
@@ -115,7 +115,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 文档："# 代码块测试\n\n正文段。\n\n```ts\nconst x: string = \"hello\";\n```\n\n结尾段。\n"
     // 简化：把光标放到文档末尾
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__pinia__._s.get("editorBridge").editorView;
       if (view) {
         const end = view.state.doc.length;
@@ -160,7 +160,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 光标移到文档末尾
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__pinia__._s.get("editorBridge").editorView;
       if (view) {
         const end = view.state.doc.length;
@@ -202,7 +202,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 光标移到文档末尾
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__pinia__._s.get("editorBridge").editorView;
       if (view) {
         const end = view.state.doc.length;
@@ -244,7 +244,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 光标移到文档末尾
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__pinia__._s.get("editorBridge").editorView;
       if (view) {
         const end = view.state.doc.length;
@@ -287,7 +287,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 光标移到文档末尾
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__pinia__._s.get("editorBridge").editorView;
       if (view) {
         const end = view.state.doc.length;
@@ -327,7 +327,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 光标移到文档末尾
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__pinia__._s.get("editorBridge").editorView;
       if (view) {
         const end = view.state.doc.length;
@@ -356,7 +356,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 光标移到文档末尾
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__pinia__._s.get("editorBridge").editorView;
       if (view) {
         const end = view.state.doc.length;
@@ -385,7 +385,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
 
     // 光标移到文档末尾
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__pinia__._s.get("editorBridge").editorView;
       if (view) {
         const end = view.state.doc.length;
@@ -486,7 +486,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     await setWysiwygMode(browser);
     // 光标移到结尾段，让 mermaid 围栏以 widget 形式渲染
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__pinia__._s.get("editorBridge").editorView;
       if (view) {
         const end = view.state.doc.length;

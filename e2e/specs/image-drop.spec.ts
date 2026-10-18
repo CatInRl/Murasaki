@@ -42,7 +42,7 @@ let wsPath: string;
 /** 设置图片插入方式 + 默认图片目录（保证用例不受前序 spec 残留设置影响） */
 async function setImageSettings(b: Browser, mode: "file" | "base64"): Promise<void> {
   await b.executeAsync((m: string, done: (r: unknown) => void) => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const persistence = window.__pinia__._s.get("persistence");
     Promise.resolve(
       persistence.updateSettings({ imageInsertMode: m, defaultImageDir: "assets/images" })
@@ -82,7 +82,7 @@ async function dropImagePaths(
 /** 读 CodeMirror 当前文档内容（从 view 读，不是从 store 读） */
 async function editorDoc(b: Browser): Promise<string> {
   return b.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const view = window.__editorRef__?.getView?.();
     return view ? view.state.doc.toString() : "";
   });
@@ -155,7 +155,7 @@ describe("外部拖入图片（Tauri 原生 drag-drop，issue #288）", () => {
     await waitForInBrowser(
       browser,
       () => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const view = window.__editorRef__?.getView?.();
         const doc = view ? view.state.doc.toString() : "";
         return /!\[\]\(assets\/images\/[^)]+\.png\)/.test(doc);
@@ -186,7 +186,7 @@ describe("外部拖入图片（Tauri 原生 drag-drop，issue #288）", () => {
     await waitForInBrowser(
       browser,
       () => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const view = window.__editorRef__?.getView?.();
         const doc = view ? view.state.doc.toString() : "";
         return /!\[\]\(data:image\/png;base64,/.test(doc);
@@ -215,7 +215,7 @@ describe("外部拖入图片（Tauri 原生 drag-drop，issue #288）", () => {
       await waitForInBrowser(
         browser,
         () => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const view = window.__editorRef__?.getView?.();
           const doc = view ? view.state.doc.toString() : "";
           return doc.includes("data:image/png;base64,");
@@ -247,7 +247,7 @@ describe("外部拖入图片（Tauri 原生 drag-drop，issue #288）", () => {
     await waitForInBrowser(
       browser,
       () => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const view = window.__editorRef__?.getView?.();
         const doc = view ? view.state.doc.toString() : "";
         return doc.includes("base64,AQ==") && doc.includes("base64,Ag==");

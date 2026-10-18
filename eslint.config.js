@@ -9,7 +9,7 @@
 // - no-console：本项目大量 console.warn/error 是刻意的诊断输出
 // - 多词组件名：Skeleton.vue 等基础组件有意用单词名
 // - no-undef：TypeScript 自己会报未定义标识符，ESLint 重复检查只会误伤 DOM 类型别名
-// - e2e 允许 @ts-ignore：测试要通过 window.__pinia__ 等运行时钩子访问内部状态
+// - e2e 的 @ts-ignore 也要求写说明（运行时钩子无法静态推导，见下）
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import vue from "eslint-plugin-vue";
@@ -102,7 +102,6 @@ export default tseslint.config(
     files: ["**/*.test.ts", "e2e/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/ban-ts-comment": "off",
       // 测试里 rethrow 只是附加诊断信息（原始错误文案已拼进 message）；
       // 且项目 tsconfig lib 为 ES2021，Error 的 cause 选项需要 ES2022
       "preserve-caught-error": "off",

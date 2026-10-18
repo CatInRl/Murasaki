@@ -203,7 +203,7 @@ describe("HTML 导出", () => {
     const outPath = resolve(wsPath, "exported.html");
     const result = await browser.executeAsync(
       (path: string, content: string, done: (res: unknown) => void) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__TAURI_INTERNALS__
           .invoke("write_text_file", { path, content })
           .then(() => done({ ok: true }))

@@ -465,7 +465,6 @@ function exposeTestHooks(): void {
   // 注意：editorRef 是 Vue ref，EditorPane 用 v-else 渲染（无 tab 时不挂载）
   // 所以必须用动态 getter，否则注册时 editorRef.value 还是 null
   // 同时暴露 undo/redo：release 构建后浏览器内 dynamic import 路径不可用
-  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __editorRef__
   window.__editorRef__ = {
     getView: () => editorRef.value?.getView() ?? null,
     scrollToLine: (line: number) => editorRef.value?.scrollToLine(line),
@@ -486,18 +485,14 @@ function exposeTestHooks(): void {
     },
   };
   // E2E test hooks：release 构建后 dynamic import 不可用，暴露纯函数/设置器供测试调用
-  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __exportHtml__
   window.__exportHtml__ = exportHtml;
-  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __setTheme__
   window.__setTheme__ = (theme: string) => {
     currentTheme.value = theme;
   };
-  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __setSidebarView__
   window.__setSidebarView__ = (view: SidebarView) => {
     sidebarView.value = view;
   };
   // 暴露 settingsLogic 纯函数：设置窗口未打开时主窗口也能被 E2E 测试访问到
-  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __settingsLogic__
   window.__settingsLogic__ = {
     fieldsForCategory,
     isDirty,
@@ -565,7 +560,6 @@ onMounted(async () => {
     },
     // E2E 就绪信号：必须晚于「恢复设置 / 工作区 / 标签」（#315）
     markAppReady: () => {
-      // @ts-ignore: E2E 就绪信号，Window 类型未声明 __appReady__
       window.__appReady__ = true;
     },
     exposeTestHooks,

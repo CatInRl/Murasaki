@@ -27,6 +27,8 @@ declare global {
     __murasakiConsoleBuffer__?: any;
     /** HTML 导出钩子 */
     __exportHtml__?: any;
+    /** 切换 markdown 主题（`App.vue` 暴露） */
+    __setTheme__?: any;
     // 右键菜单 / 对话框 / toast 用例在页面上下文里使用的临时状态
     __menuAction?: any;
     __actionCalled?: any;

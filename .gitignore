@@ -19,6 +19,7 @@ e2e/.workspace/
 e2e/.workspace-*/
 
 # E2E debug artifacts
+e2e/**/*.js
 e2e/.diag-source.html
 e2e/.test-log.txt
 e2e/search-diag.txt

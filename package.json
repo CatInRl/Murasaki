@@ -21,7 +21,7 @@
     "test:e2e:check": "node e2e/scripts/check-env.mjs",
     "test:e2e": "npm run test:e2e:check && vitest run --config e2e/vitest.config.ts",
     "test:e2e:watch": "vitest --config e2e/vitest.config.ts",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

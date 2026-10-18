@@ -108,11 +108,11 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 诊断：直接调用 Tauri search_workspace 命令
     const diagInvoke = await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const workspace = pinia._s.get("workspace");
       const wsPath = workspace.workspacePath;
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__TAURI_INTERNALS__
         .invoke("search_workspace", {
           workspace: wsPath,
@@ -128,13 +128,13 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 打开统一搜索条（挂载会 clear 旧查询），再通过 store 触发内容搜索
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
     await browser.pause(200);
     const searchResult = await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setOptions({ regex: false, caseSensitive: false, wholeWord: false });
@@ -172,13 +172,13 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 打开统一搜索条，再触发搜索
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
     await browser.pause(200);
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setQuery("特殊关键词");
@@ -204,7 +204,7 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 打开统一搜索条，输入文件名（前端模糊匹配）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
@@ -233,7 +233,7 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 通过 store 打开统一搜索条
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
@@ -246,7 +246,7 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 关闭统一搜索条
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = false;
     });

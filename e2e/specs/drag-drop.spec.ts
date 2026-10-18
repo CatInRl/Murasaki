@@ -86,7 +86,7 @@ async function tabPaths(): Promise<(string | null)[]> {
 /** 当前窗口的工作区路径 */
 async function workspacePath(): Promise<string | null> {
   return browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     return pinia._s.get("workspace")?.workspacePath ?? null;
   });
@@ -169,7 +169,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await emitDragEvent(browser, "tauri://drag-leave", {}).catch(() => {});
     // 清空吐司：拖入打不开的文件会弹提示，上一个用例的提示不该影响下一条的断言
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       if (toast) toast.dismissAll();
     });
@@ -184,7 +184,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     const opened = await waitForInBrowser(
       browser,
       (p: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return (tabs.tabs ?? []).some((t: { path: string | null }) => t.path === p);
       },
@@ -220,7 +220,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     const ok = await waitForInBrowser(
       browser,
       (p: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return window.__pinia__._s.get("workspace")?.workspacePath === p;
       },
       [wsPath],
@@ -279,7 +279,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await waitForInBrowser(
       browser,
       (want: number) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return (window.__pinia__._s.get("tabs")?.tabs ?? []).length === want;
       },
       [files.length],
@@ -305,7 +305,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await waitForInBrowser(
       browser,
       (want: number) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return (window.__pinia__._s.get("tabs")?.tabs ?? []).length === want;
       },
       [1],
@@ -384,7 +384,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await waitForInBrowser(
       browser,
       (p: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return (tabs.tabs ?? []).some((t: { path: string | null }) => t.path === p);
       },

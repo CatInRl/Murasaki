@@ -50,7 +50,7 @@ async function activeIndex(b: Browser): Promise<number> {
 /** 展示一个含分隔线 + 禁用项的菜单，并把某个按钮设为「触发元素」 */
 async function showTestMenu(b: Browser): Promise<void> {
   await b.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     window.__menuAction = null;
     const trigger = document.querySelector(".status-mode-chip") as HTMLElement | null;
     trigger?.focus();
@@ -59,14 +59,14 @@ async function showTestMenu(b: Browser): Promise<void> {
     menu.show(new MouseEvent("contextmenu", { clientX: 120, clientY: 120 }), [
       {
         label: "第一项",
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         action: () => ((window as any).__menuAction = "first"),
       },
       { separator: true },
       { label: "禁用项", disabled: true },
       {
         label: "第三项",
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         action: () => ((window as any).__menuAction = "third"),
       },
     ]);
@@ -88,7 +88,7 @@ describe("右键菜单键盘导航", () => {
   beforeEach(async () => {
     await dismissAllDialogs(browser);
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__pinia__._s.get("contextMenu").hide();
     });
     await browser.pause(150);
@@ -125,7 +125,7 @@ describe("右键菜单键盘导航", () => {
     expect(await activeIndex(browser)).toBe(0);
 
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__pinia__._s.get("contextMenu").hide();
     });
   });
@@ -138,7 +138,7 @@ describe("右键菜单键盘导航", () => {
     await waitForAbsent(browser, ".murasaki-context-menu", 5000);
 
     const action = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return (window as any).__menuAction;
     });
     expect(action).toBe("third");

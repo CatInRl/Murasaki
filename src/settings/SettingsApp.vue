@@ -66,7 +66,6 @@ onMounted(async () => {
   draft.value = { ...persistence.settings };
   snapshot.value = { ...persistence.settings };
   // E2E test hook：release 构建后 dynamic import 不可用，暴露纯函数供测试调用
-  // @ts-ignore: E2E 测试钩子，Window 类型未声明 __settingsLogic__
   window.__settingsLogic__ = {
     fieldsForCategory,
     isDirty,
