@@ -357,5 +357,43 @@ describe("useTabsStore", () => {
         vi.useRealTimers();
       }
     });
+
+    it("clearAll 取消已排队的合并写，不会把空数组写进 tabs.json", async () => {
+      vi.useFakeTimers();
+      try {
+        const store = useTabsStore();
+        store.newTab("a");
+        store.schedulePersist();
+
+        store.clearAll();
+        await vi.advanceTimersByTimeAsync(2000);
+
+        expect(saveTabsSpy).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("落盘串行执行：前一次没写完时，后一次排队等待", async () => {
+      const store = useTabsStore();
+      store.newTab("a");
+
+      let release: (() => void) | undefined;
+      saveTabsSpy.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          })
+      );
+
+      const first = store.persist();
+      const second = store.persist();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(saveTabsSpy).toHaveBeenCalledTimes(1);
+
+      release?.();
+      await Promise.all([first, second]);
+      expect(saveTabsSpy).toHaveBeenCalledTimes(2);
+    });
   });
 });
