@@ -82,6 +82,25 @@
     "scanning": "Scanning… found {matched} matches",
     "resultSummary": "{files} files / {matches} matches"
   },
+  "searchPanel": {
+    "find": "Find",
+    "replace": "Replace",
+    "next": "next",
+    "previous": "previous",
+    "all": "all",
+    "matchCase": "match case",
+    "regexp": "regexp",
+    "byWord": "by word",
+    "replaceOne": "replace",
+    "replaceAll": "replace all",
+    "close": "close",
+    "currentMatch": "current match",
+    "onLine": "on line",
+    "replacedMatches": "replaced $ matches",
+    "replacedMatchOnLine": "replaced match on line $",
+    "goToLine": "Go to line",
+    "go": "go"
+  },
   "searchBar": {
     "placeholder": "Search files, tabs, content…",
     "aria": "Global Search",

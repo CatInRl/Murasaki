@@ -264,7 +264,7 @@ const hostRef = ref<HTMLDivElement | null>(null);
 const viewRef = shallowRef<EditorView | null>(null);
 
 const contextMenu = useContextMenuStore();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 // 标记正在进行外部值同步（避免 dispatch 触发 update:modelValue 污染 dirty 状态）
 let isApplyingExternalValue = false;
@@ -286,6 +286,8 @@ const fontComp = new Compartment();
 const languageComp = new Compartment();
 // 快捷键覆盖：settings.shortcuts 变化时重建编辑器快捷键 keymap（shortcutComp）
 const shortcutComp = new Compartment();
+// CodeMirror 内建查找/替换面板文案（#442）：默认英文，随界面语言重建
+const searchPhrasesComp = new Compartment();
 // 快捷键覆盖表（响应式：设置保存后自动更新）
 const { overrides } = useShortcuts();
 
@@ -293,6 +295,32 @@ const { overrides } = useShortcuts();
 // 未命名新文件默认按 markdown 处理（与 App.vue 约定一致）；实时读 props，切换文件无需重建扩展。
 function isMarkdownDoc(): boolean {
   return props.currentFilePath ? isMarkdownFile(props.currentFilePath) : true;
+}
+
+/**
+ * CodeMirror 内建查找/替换面板的短语（#442）。
+ * key 是 @codemirror/search 内部 `state.phrase(...)` 的原文，不能改写。
+ */
+function buildSearchPhrases(): Record<string, string> {
+  return {
+    Find: t("editor.searchPanel.find"),
+    Replace: t("editor.searchPanel.replace"),
+    next: t("editor.searchPanel.next"),
+    previous: t("editor.searchPanel.previous"),
+    all: t("editor.searchPanel.all"),
+    "match case": t("editor.searchPanel.matchCase"),
+    regexp: t("editor.searchPanel.regexp"),
+    "by word": t("editor.searchPanel.byWord"),
+    replace: t("editor.searchPanel.replaceOne"),
+    "replace all": t("editor.searchPanel.replaceAll"),
+    close: t("editor.searchPanel.close"),
+    "current match": t("editor.searchPanel.currentMatch"),
+    "on line": t("editor.searchPanel.onLine"),
+    "replaced $ matches": t("editor.searchPanel.replacedMatches"),
+    "replaced match on line $": t("editor.searchPanel.replacedMatchOnLine"),
+    "Go to line": t("editor.searchPanel.goToLine"),
+    go: t("editor.searchPanel.go"),
+  };
 }
 
 function buildExtensions() {
@@ -319,6 +347,8 @@ function buildExtensions() {
     // 快捷键扩展（高优先级，避免被 defaultKeymap 拦截；含 Enter 引用块换行处理）
     // 由设置中的快捷键覆盖动态生成，settings://saved 后通过 shortcutComp 重建
     shortcutComp.of(buildEditorShortcutExtension(overrides.value, { isMarkdown: isMarkdownDoc })),
+    // 查找/替换面板文案（#442）
+    searchPhrasesComp.of(EditorState.phrases.of(buildSearchPhrases())),
     // 语言高亮：markdown 走 GFM，其他文本/代码文件走解析出的 CodeMirror 语言
     languageComp.of(buildLanguageExtension()),
     lineNumbersComp.of(props.showLineNumbers ? lineNumbers() : []),
@@ -541,7 +571,7 @@ watch(
           isApplyingExternalValue = false;
         }
       }
-      // 确保 wysiwygComp + fontComp + shortcutComp 与当前配置一致（issue #115）
+      // 确保 wysiwygComp + fontComp + shortcutComp + searchPhrasesComp 与当前配置一致（issue #115）
       // cached state 可能在不同配置下缓存，setState 恢复后需重新应用当前配置
       view.dispatch({
         effects: [
@@ -550,6 +580,7 @@ watch(
           shortcutComp.reconfigure(
             buildEditorShortcutExtension(overrides.value, { isMarkdown: isMarkdownDoc })
           ),
+          searchPhrasesComp.reconfigure(EditorState.phrases.of(buildSearchPhrases())),
         ],
       });
     } else {
@@ -640,6 +671,13 @@ watch(
     });
   }
 );
+
+// 界面语言切换 → 重建查找/替换面板短语（#442）
+watch(locale, () => {
+  viewRef.value?.dispatch({
+    effects: searchPhrasesComp.reconfigure(EditorState.phrases.of(buildSearchPhrases())),
+  });
+});
 
 // 字体设置变更（大小/行高/字体族）→ 重新应用 fontComp
 // 通过 Compartment.reconfigure 动态切换，不销毁编辑器实例
