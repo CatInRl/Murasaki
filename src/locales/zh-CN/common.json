@@ -87,6 +87,11 @@
     "openLargeFileConfirm": "文件 \"{name}\" 体积较大（{size} MB），按文本打开可能较慢。仍要打开吗？",
     "reloadDiscardConfirm": "重新加载会丢弃 \"{name}\" 中尚未保存的修改（会先保留一份草稿）。是否继续？",
     "reloadConfirmAction": "重新加载",
+    "draftConflictTitle": "草稿与磁盘版本不一致",
+    "draftConflictMessage": "文件 \"{name}\" 在关闭后被外部修改。\n\n磁盘版本（{diskTime}）：{diskPreview}\n草稿版本（{draftTime}）：{draftPreview}",
+    "draftConflictKeep": "保留草稿",
+    "draftConflictLoadDisk": "加载磁盘版本",
+    "draftConflictLater": "稍后处理",
     "openFileFirst": "请先打开一个文件"
   },
   "error": {
