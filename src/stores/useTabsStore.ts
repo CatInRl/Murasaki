@@ -269,10 +269,17 @@ export const useTabsStore = defineStore("tabs", () => {
 
   /**
    * 从磁盘重新加载 tab 内容（覆盖本地修改，外部修改未弹窗时使用）
+   * 有未保存改动时先写草稿兜底，避免重载把本地内容彻底抹掉
    */
   async function reloadFromDisk(filePath: string): Promise<void> {
     const tab = getTabByPath(filePath);
     if (!tab) return;
+    if (tab.isDirty && tab.path) {
+      // knownMtime 取「重载前的磁盘基线」：草稿代表基于旧版本的本地内容。
+      // 磁盘被外部改过时，下次打开会因基线不一致而走冲突裁决（#425），
+      // 而不是把用户明确丢弃的修改当成最新内容直接复活。
+      await persistDraftQuietly(tab.path, tab.content, tab.lastMtime ?? 0);
+    }
     const content = await fileSystem.readText(filePath);
     const mtime = await fileSystem.getMtime(filePath);
     tab.content = content;

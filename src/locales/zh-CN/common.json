@@ -84,6 +84,8 @@
     "fileNotFoundRemove": "文件 \"{name}\" 不存在或已被移动。\n\n是否从\"最近打开\"列表中移除？",
     "folderNotFoundRemove": "文件夹 \"{name}\" 不存在或已被移动。\n\n是否从\"最近打开\"列表中移除？",
     "openLargeFileConfirm": "文件 \"{name}\" 体积较大（{size} MB），按文本打开可能较慢。仍要打开吗？",
+    "reloadDiscardConfirm": "重新加载会丢弃 \"{name}\" 中尚未保存的修改（会先保留一份草稿）。是否继续？",
+    "reloadConfirmAction": "重新加载",
     "openFileFirst": "请先打开一个文件"
   },
   "error": {

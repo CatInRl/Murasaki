@@ -84,6 +84,8 @@
     "fileNotFoundRemove": "ファイル「{name}」が見つからないか、移動されました。\n\n「最近開いたファイル」リストから削除しますか？",
     "folderNotFoundRemove": "フォルダー「{name}」が見つからないか、移動されました。\n\n「最近開いたフォルダー」リストから削除しますか？",
     "openLargeFileConfirm": "ファイル「{name}」はサイズが大きいため（{size} MB）、テキストとして開くと時間がかかる場合があります。開きますか？",
+    "reloadDiscardConfirm": "再読み込みすると「{name}」の未保存の変更は破棄されます（下書きは保持されます）。続行しますか？",
+    "reloadConfirmAction": "再読み込み",
     "openFileFirst": "先にファイルを開いてください"
   },
   "error": {
