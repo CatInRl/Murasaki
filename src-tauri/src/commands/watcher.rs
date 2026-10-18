@@ -72,6 +72,7 @@ pub fn start_watching(
     app: AppHandle,
     path: String,
 ) -> Result<(), CommandError> {
+    crate::security::policy().ensure(&path)?;
     let watch_path = PathBuf::from(&path);
     if !watch_path.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &path));

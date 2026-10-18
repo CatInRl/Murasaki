@@ -1,4 +1,4 @@
-import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { pickSave } from "../utils/fileDialog";
 import { basename } from "../utils/path";
 import { MARKDOWN_EXTENSIONS } from "../utils/fileKind";
 import { i18n } from "../i18n";
@@ -73,7 +73,7 @@ export function useTabClose(deps: TabCloseDeps) {
         return false;
       }
     }
-    const selected = await saveDialog({
+    const selected = await pickSave({
       filters: [{ name: t("common.fileFilter.markdown"), extensions: MARKDOWN_EXTENSIONS }],
       title: t("common.saveAs"),
       defaultPath: workspace.workspacePath ?? undefined,

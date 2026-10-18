@@ -112,6 +112,7 @@ pub fn save_image_asset(
     ext: String,
     dir: Option<String>,
 ) -> Result<SaveImageResult, CommandError> {
+    crate::security::policy().ensure(&workspace)?;
     let ws = PathBuf::from(&workspace);
     if !ws.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &workspace));
@@ -151,6 +152,7 @@ pub fn copy_image_to_workspace(
     workspace: String,
     dir: Option<String>,
 ) -> Result<SaveImageResult, CommandError> {
+    crate::security::policy().ensure(&source_path)?;
     let src = Path::new(&source_path);
     if !src.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &source_path));
@@ -172,6 +174,7 @@ pub fn copy_image_to_workspace(
 /// 前端不直接读本地文件；MIME 由前端按扩展名推断（单一来源见 `mimeForImageExt`）。
 #[tauri::command]
 pub fn read_image_base64(source_path: String) -> Result<String, CommandError> {
+    crate::security::policy().ensure(&source_path)?;
     let src = Path::new(&source_path);
     if !src.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &source_path));
@@ -244,6 +247,7 @@ mod tests {
     #[test]
     fn test_save_image_asset_creates_assets_dir() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         let ws = dir.path().to_string_lossy().to_string();
         let bytes = b"\x89PNG\r\n\x1a\nfakepngbytes";
         let result = save_image_asset(ws.clone(), bytes.to_vec(), "png".to_string(), None).unwrap();
@@ -262,6 +266,7 @@ mod tests {
     #[test]
     fn test_save_image_asset_filename_format() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         let ws = dir.path().to_string_lossy().to_string();
         let bytes = b"test";
         let result = save_image_asset(ws, bytes.to_vec(), "jpg".to_string(), None).unwrap();
@@ -281,6 +286,7 @@ mod tests {
     #[test]
     fn test_copy_image_to_workspace() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         // 创建源图片
         let src_path = dir.path().join("source.png");
         fs::write(&src_path, b"\x89PNG\r\n\x1a\nfake").unwrap();
@@ -306,6 +312,7 @@ mod tests {
     #[test]
     fn test_copy_image_to_workspace_custom_dir() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         let src_path = dir.path().join("photo.jpg");
         fs::write(&src_path, b"jpegbytes").unwrap();
         let ws_dir = dir.path().join("workspace");
@@ -326,6 +333,7 @@ mod tests {
     #[test]
     fn test_copy_image_to_workspace_missing_source() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         let ws = dir.path().to_string_lossy().to_string();
         let result = copy_image_to_workspace(
             dir.path()
@@ -341,6 +349,7 @@ mod tests {
     #[test]
     fn test_copy_image_to_workspace_rejects_folder_source() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         // 源是一个目录
         let src_dir = dir.path().join("folder.png");
         fs::create_dir(&src_dir).unwrap();
@@ -357,6 +366,7 @@ mod tests {
     #[test]
     fn test_copy_image_to_workspace_rejects_escaping_dir() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         let src_path = dir.path().join("source.png");
         fs::write(&src_path, b"x").unwrap();
         let ws_dir = dir.path().join("workspace");
@@ -384,6 +394,7 @@ mod tests {
     #[test]
     fn test_read_image_base64_roundtrip_prefix() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         let src_path = dir.path().join("pic.png");
         fs::write(&src_path, b"foo").unwrap();
         let b64 = read_image_base64(src_path.to_string_lossy().to_string()).unwrap();
@@ -393,6 +404,7 @@ mod tests {
     #[test]
     fn test_read_image_base64_missing_source() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         let result = read_image_base64(
             dir.path()
                 .join("nope.png")
@@ -445,6 +457,7 @@ mod tests {
     #[test]
     fn test_save_image_asset_custom_dir() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         let ws = dir.path().to_string_lossy().to_string();
         let bytes = b"\x89PNG\r\n\x1a\nfakepngbytes";
         let result =
@@ -461,6 +474,7 @@ mod tests {
     #[test]
     fn test_save_image_asset_rejects_escaping_dir() {
         let dir = TempDir::new().unwrap();
+        crate::security::policy().allow_root(dir.path());
         let ws = dir.path().to_string_lossy().to_string();
         let result =
             save_image_asset(ws, vec![1, 2, 3], "png".to_string(), Some("../outside".into()));

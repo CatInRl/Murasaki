@@ -1,5 +1,5 @@
-import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
+import { pickFile, pickSave } from "../utils/fileDialog";
 import { basename, extname } from "../utils/path";
 import { exportHtml } from "./useHtmlExport";
 import { fileSystem } from "../services/fileSystem";
@@ -181,8 +181,7 @@ export function useFileActions(deps: FileActionsDeps) {
   }
 
   async function openFileViaDialog(): Promise<void> {
-    const selected = await openDialog({
-      multiple: false,
+    const selected = await pickFile({
       filters: [
         { name: t("common.fileFilter.markdown"), extensions: MARKDOWN_EXTENSIONS },
         { name: t("common.fileFilter.textCode"), extensions: EDITABLE_TEXT_EXTENSIONS },
@@ -211,9 +210,7 @@ export function useFileActions(deps: FileActionsDeps) {
 
   async function saveAsCurrentFile(): Promise<void> {
     if (!activeTab.value) return;
-    const selected = await openDialog({
-      directory: false,
-      save: true,
+    const selected = await pickSave({
       filters: [{ name: t("common.fileFilter.markdown"), extensions: MARKDOWN_EXTENSIONS }],
       title: t("common.saveAs"),
       defaultPath: workspace.workspacePath ?? undefined,
@@ -261,7 +258,7 @@ export function useFileActions(deps: FileActionsDeps) {
     const defaultName = tab.path
       ? basename(tab.path).replace(/\.md$/i, "") + ".html"
       : "untitled.html";
-    const selected = await saveDialog({
+    const selected = await pickSave({
       defaultPath: defaultName,
       filters: [{ name: "HTML", extensions: ["html"] }],
       title: t("common.exportHtmlTitle"),
@@ -295,7 +292,7 @@ export function useFileActions(deps: FileActionsDeps) {
     const defaultName = tab.path
       ? basename(tab.path).replace(/\.md$/i, "") + ".pdf"
       : "untitled.pdf";
-    const selected = await saveDialog({
+    const selected = await pickSave({
       defaultPath: defaultName,
       filters: [{ name: "PDF", extensions: ["pdf"] }],
       title: t("common.exportPdfTitle"),

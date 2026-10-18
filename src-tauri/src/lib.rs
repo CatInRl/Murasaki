@@ -1,9 +1,11 @@
 pub mod commands;
 pub mod errors;
 pub mod i18n;
+pub mod security;
 
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
 use commands::assets;
+use commands::dialogs;
 use commands::drafts;
 use commands::files;
 use commands::launch::{self, PendingOpenState};
@@ -493,7 +495,6 @@ pub fn run() {
 
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -510,6 +511,8 @@ pub fn run() {
             // argv[0] 是 exe 路径，argv[1] 可能是用户拖入、命令行传入、或双击 .md 传入的路径
             if let Some(arg) = argv.get(1) {
                 if !arg.starts_with("--") && !arg.is_empty() {
+                    // 来自操作系统的用户手势 → 先授权，再交给统一入口（#437）
+                    security::grant_path(app, std::path::Path::new(arg));
                     match windows::open_path_in_new_window_impl(app, arg) {
                         Ok(_) => return,
                         Err(e) => eprintln!("[murasaki] 新窗口打开路径失败: {}", e),
@@ -589,8 +592,28 @@ pub fn run() {
             settings::open_settings,
             locale::detect_system_locale,
             pdf::export_pdf,
+            dialogs::pick_file,
+            dialogs::pick_save,
+            dialogs::pick_folder,
         ])
         .setup(|app| {
+            // 路径访问策略（#437）：APPDATA + 上次会话用到的路径；E2E 额外放行夹具目录
+            security::seed_from_persistence();
+            security::seed_e2e_roots();
+            if let Some(base) = dirs::data_dir() {
+                let _ = app.asset_protocol_scope().allow_directory(&base, true);
+            }
+            if crate::is_e2e_mode() {
+                if let Ok(cwd) = std::env::current_dir() {
+                    let _ = app
+                        .asset_protocol_scope()
+                        .allow_directory(cwd.join("e2e").join(".workspace"), true);
+                }
+                let _ = app
+                    .asset_protocol_scope()
+                    .allow_directory(std::env::temp_dir(), true);
+            }
+
             // 手动创建主窗口（tauri.conf.json 中 windows 数组为空）
             // 这样可以根据命令行参数动态注入 WebView2 additional_browser_args
             // 以支持 tauri-driver E2E 测试
@@ -655,6 +678,13 @@ pub fn run() {
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 if lifecycle::intercept_close_request(window) {
                     api.prevent_close();
+                }
+            }
+            // 系统拖放：用户把文件/文件夹拖到窗口上 → 当场授权（#437）
+            tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
+                let app = window.app_handle();
+                for path in paths {
+                    security::grant_path(app, &path);
                 }
             }
             // 焦点切换：把该窗口的主题/显示模式/侧栏视图勾选重放到共享菜单栏
