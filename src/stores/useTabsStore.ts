@@ -13,10 +13,35 @@ import { i18n } from "../i18n";
  * - 草稿恢复：关闭有未保存修改的 tab 时写入草稿
  * - 启动恢复：从 tabs.json 读取上次状态，结合草稿恢复内容
  */
+export type DraftConflictChoice = "keep-draft" | "load-disk" | "cancel";
+
+export interface DraftConflictInfo {
+  path: string;
+  diskContent: string;
+  draftContent: string;
+  /** 磁盘版本的最后修改时间（毫秒） */
+  diskMtime: number;
+  /** 草稿保存时间（毫秒） */
+  draftSavedAt: number;
+}
+
+/**
+ * 草稿与磁盘 mtime 不一致时的裁决入口（#425）。
+ * 由 App.vue 注入弹窗实现；未注入时不替用户做决定：加载磁盘内容并保留草稿文件。
+ */
+type DraftConflictResolver = (info: DraftConflictInfo) => Promise<DraftConflictChoice>;
+
 export const useTabsStore = defineStore("tabs", () => {
   const toast = useToastStore();
   /** 文案翻译（用户可见文本必须走 i18n，禁止硬编码） */
   const t = i18n.global.t.bind(i18n.global);
+
+  let draftConflictResolver: DraftConflictResolver | null = null;
+
+  /** 注入草稿冲突裁决器（App.vue 在启动时调用） */
+  function setDraftConflictResolver(resolver: DraftConflictResolver | null): void {
+    draftConflictResolver = resolver;
+  }
 
   // ===== State =====
   /** 标签页列表 */
@@ -78,8 +103,8 @@ export const useTabsStore = defineStore("tabs", () => {
    *
    * 草稿恢复与 mtime 冲突检测（ADR 0001）：
    *   - 若有草稿且草稿的 knownMtime == 文件当前 mtime → 用草稿内容（用户上次未保存）
-   *   - 若有草稿但 knownMtime != 文件当前 mtime → 磁盘在外部被改过，丢弃草稿，使用磁盘内容
-   *     （草稿已过期，强行使用会让用户失去外部更新的内容）
+   *   - 若有草稿但 knownMtime != 文件当前 mtime → 磁盘在外部被改过，交由用户裁决（#425）：
+   *     保留草稿 / 加载磁盘版本 / 稍后处理（用磁盘内容打开，草稿文件保留）
    */
   async function openFile(path: string, options: { activate?: boolean } = {}): Promise<Tab> {
     const activate = options.activate ?? true;
@@ -104,14 +129,31 @@ export const useTabsStore = defineStore("tabs", () => {
         // 注意：read_draft 返回 (String, DraftMeta)，DraftMeta 是对象 {path, draftPath, knownMtime, savedAt}
         // 不是数字，必须从对象中取 knownMtime 字段
         const [draftContent, draftMeta] = await fileSystem.readDraft(path);
-        // 仅当草稿基于的 mtime 与当前文件 mtime 一致时才采用草稿内容
-        // 否则磁盘已被外部修改，草稿过期，回退到磁盘内容
+        // 仅当草稿基于的 mtime 与当前文件 mtime 一致时才自动采用草稿
+        // 否则磁盘已被外部修改：交给用户裁决，而不是静默丢弃（#425）
         if (draftMeta.knownMtime === mtime) {
           finalContent = draftContent;
           isDirty = true;
         } else {
-          // 草稿过期，清理掉
-          await fileSystem.deleteDraft(path);
+          const choice: DraftConflictChoice = draftConflictResolver
+            ? await draftConflictResolver({
+                path,
+                diskContent: content,
+                draftContent,
+                diskMtime: mtime,
+                draftSavedAt: draftMeta.savedAt,
+              })
+            : // 没有裁决器（如单测）时不替用户做决定：保留草稿文件
+              "cancel";
+
+          if (choice === "keep-draft") {
+            finalContent = draftContent;
+            isDirty = true;
+          } else if (choice === "load-disk") {
+            // 只有用户明确选择磁盘版才删除草稿
+            await fileSystem.deleteDraft(path);
+          }
+          // cancel：使用磁盘内容，草稿文件保留，下次打开仍可裁决
         }
       }
 
@@ -164,9 +206,9 @@ export const useTabsStore = defineStore("tabs", () => {
    * 关闭标签页
    * - 若有未保存修改，由调用方决定如何处理（保存/不保存/取消）
    *   - 选择"保存"：调用方先调 saveTab / saveTabAs，再调本方法
-   *   - 选择"不保存"：直接调本方法，会自动写草稿保留未保存内容
+   *   - 选择"不保存"：调 `doCloseTab(id, { keepDraft: false })`，不写草稿并清掉已有草稿
    *   - 选择"取消"：调用方不调本方法
-   * - 本方法只负责写草稿 + 从列表中移除 + 调整激活 tab
+   * - 本方法只负责写草稿（或清理）+ 从列表中移除 + 调整激活 tab
    */
   async function closeTab(tabId: string): Promise<{ needsConfirm: boolean; tab: Tab | null }> {
     const idx = tabs.value.findIndex((t) => t.id === tabId);
@@ -186,15 +228,24 @@ export const useTabsStore = defineStore("tabs", () => {
   /**
    * 真正执行关闭动作（写草稿 + 移除 + 调整激活）
    * 调用方处理完未保存确认后调用本方法
+   * @param options.keepDraft 用户明确「不保存」时传 false：不写草稿并清掉已有草稿
    */
-  async function doCloseTab(tabId: string): Promise<{ needsConfirm: boolean; tab: Tab | null }> {
+  async function doCloseTab(
+    tabId: string,
+    options: { keepDraft?: boolean } = {}
+  ): Promise<{ needsConfirm: boolean; tab: Tab | null }> {
     const idx = tabs.value.findIndex((t) => t.id === tabId);
     if (idx < 0) return { needsConfirm: false, tab: null };
 
     const tab = tabs.value[idx];
-    if (tab.isDirty && tab.path) {
-      // 写入草稿（保留未保存内容，供下次启动恢复）
-      await persistDraftQuietly(tab.path, tab.content, tab.lastMtime ?? 0);
+    if (tab.path) {
+      if (options.keepDraft === false || !tab.isDirty) {
+        // 明确丢弃，或内容已与磁盘一致：旧草稿都是过期兜底，删掉避免下次误恢复
+        await fileSystem.deleteDraft(tab.path);
+      } else {
+        // 写入草稿（保留未保存内容，供下次启动恢复）
+        await persistDraftQuietly(tab.path, tab.content, tab.lastMtime ?? 0);
+      }
     }
 
     tabs.value.splice(idx, 1);
@@ -609,6 +660,7 @@ export const useTabsStore = defineStore("tabs", () => {
     clearAll,
     // 外部修改相关
     getTabByPath,
+    setDraftConflictResolver,
     syncPathsAfterMove,
     applyExternalResolution,
     markExternalChange,

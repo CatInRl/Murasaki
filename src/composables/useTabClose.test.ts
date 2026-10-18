@@ -105,7 +105,7 @@ describe("useTabClose", () => {
       const { onCloseTabRequest } = useTabClose(deps);
       await onCloseTabRequest("tab1");
       expect(deps.tabsStore.saveTab).toHaveBeenCalledWith("tab1");
-      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("tab1");
+      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("tab1", { keepDraft: true });
     });
 
     it("有未保存修改 + 用户选 discard → doCloseTab（不保存）", async () => {
@@ -126,7 +126,7 @@ describe("useTabClose", () => {
       const { onCloseTabRequest } = useTabClose(deps);
       await onCloseTabRequest("tab1");
       expect(deps.tabsStore.saveTab).not.toHaveBeenCalled();
-      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("tab1");
+      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("tab1", { keepDraft: false });
     });
 
     it("有未保存修改 + 用户选 save（无路径）→ saveDialog + saveTabAs", async () => {
@@ -149,7 +149,7 @@ describe("useTabClose", () => {
       await onCloseTabRequest("tab1");
       expect(mockedSaveDialog).toHaveBeenCalled();
       expect(deps.tabsStore.saveTabAs).toHaveBeenCalledWith("tab1", "/new/path.md");
-      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("tab1");
+      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("tab1", { keepDraft: true });
     });
   });
 
@@ -189,9 +189,9 @@ describe("useTabClose", () => {
       });
       const { onCloseOthers } = useTabClose(deps);
       await onCloseOthers("t2");
-      expect(doCloseTab).toHaveBeenCalledWith("t1");
-      expect(doCloseTab).toHaveBeenCalledWith("t3");
-      expect(doCloseTab).not.toHaveBeenCalledWith("t2");
+      expect(doCloseTab).toHaveBeenCalledWith("t1", { keepDraft: true });
+      expect(doCloseTab).toHaveBeenCalledWith("t3", { keepDraft: true });
+      expect(doCloseTab).not.toHaveBeenCalledWith("t2", { keepDraft: true });
     });
 
     it("onCloseAllTabs 关闭所有 tab", async () => {
@@ -208,8 +208,8 @@ describe("useTabClose", () => {
       });
       const { onCloseAllTabs } = useTabClose(deps);
       await onCloseAllTabs();
-      expect(doCloseTab).toHaveBeenCalledWith("t1");
-      expect(doCloseTab).toHaveBeenCalledWith("t2");
+      expect(doCloseTab).toHaveBeenCalledWith("t1", { keepDraft: true });
+      expect(doCloseTab).toHaveBeenCalledWith("t2", { keepDraft: true });
     });
 
     it("无未保存改动 → 静默关闭，不弹确认框", async () => {
@@ -237,8 +237,8 @@ describe("useTabClose", () => {
       );
       await useTabClose(deps).onCloseAllTabs();
       expect(deps.tabsStore.saveTab).not.toHaveBeenCalled();
-      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("t1");
-      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("t2");
+      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("t1", { keepDraft: false });
+      expect(deps.tabsStore.doCloseTab).toHaveBeenCalledWith("t2", { keepDraft: false });
     });
 
     it("选「全部保存并关闭」→ 逐个保存后关闭", async () => {
