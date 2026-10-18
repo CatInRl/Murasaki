@@ -438,10 +438,33 @@ export const useTabsStore = defineStore("tabs", () => {
     tab.hasExternalChange = false;
   }
 
+  /** 合并写窗口：高频输入时最多每 1.5s 落一次盘（#429） */
+  const PERSIST_DEBOUNCE_MS = 1500;
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
   /**
-   * 持久化当前 tabs 状态（用于启动恢复）
+   * 排一次合并落盘（#429）。
+   *
+   * 定时器已在等待时不重置 —— 连续输入期间也保证最多 1.5s 落一次盘，
+   * 不会因为「一直有改动」而无限延后（避免纯 trailing debounce 饿死）。
+   */
+  function schedulePersist(): void {
+    if (persistTimer !== null) return;
+    persistTimer = setTimeout(() => {
+      persistTimer = null;
+      void persist();
+    }, PERSIST_DEBOUNCE_MS);
+  }
+
+  /**
+   * 持久化当前 tabs 状态（用于启动恢复）。
+   * 会先取消已排队的合并写：本次调用写的就是最新状态，再写一次纯属浪费。
    */
   async function persist(): Promise<void> {
+    if (persistTimer !== null) {
+      clearTimeout(persistTimer);
+      persistTimer = null;
+    }
     const persistence = usePersistenceStore();
     const toSave: PersistedTab[] = tabs.value.map((t) => ({
       path: t.path,
@@ -565,6 +588,7 @@ export const useTabsStore = defineStore("tabs", () => {
     updateActiveContent,
     saveTab,
     saveTabAs,
+    schedulePersist,
     persist,
     restore,
     clearAll,
