@@ -3,7 +3,8 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { invoke } from "@tauri-apps/api/core";
 import { setLocale } from "../i18n";
-import { READING_FONT_PRESETS, type ReadingFontPreset, type AppLocale } from "../types";
+import type { ReadingFontPreset, AppLocale } from "../types";
+import { applyReadingFontPreset } from "../utils/readingFont";
 import { toMenuAccelerators } from "../shortcuts/shortcutsLogic";
 import { isMainWindow } from "../utils/windowContext";
 
@@ -72,14 +73,6 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
   } = deps;
 
   const initialized = ref(false);
-
-  // 点亮 --murasaki-font-reading 变量：预览/WYSIWYG 统一使用当前阅读字体预设
-  function applyReadingFontPreset(preset: ReadingFontPreset): void {
-    document.documentElement.style.setProperty(
-      "--murasaki-font-reading",
-      READING_FONT_PRESETS[preset] ?? READING_FONT_PRESETS.d
-    );
-  }
 
   // ===== 5 个 watcher =====
 

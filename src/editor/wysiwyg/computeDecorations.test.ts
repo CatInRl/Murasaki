@@ -36,16 +36,16 @@ function compute(
   });
 }
 
-function computeWithViewport(
+function computeWithWindow(
   doc: string,
   head: number,
-  viewport: { from: number; to: number }
+  recomputeWindow: { from: number; to: number }
 ): ComputedDeco[] {
   const input: ComputeInput = {
     doc,
     selectionHead: head,
     tree: treeOf(doc),
-    viewport,
+    recomputeWindow,
   };
   return computeDecorations(input);
 }
@@ -305,7 +305,7 @@ describe("computeDecorations — 视口裁剪", () => {
   it("视口外的标记被跳过，只返回视口内的", () => {
     const doc = "**a**\n\n**b**";
     // **a** 在 [0,5)，**b** 在 [7,12)；视口只覆盖前半
-    const d = computeWithViewport(doc, 9, { from: 0, to: 5 });
+    const d = computeWithWindow(doc, 9, { from: 0, to: 5 });
     const ms = marks(d).filter((m) => m.markType === "EmphasisMark");
     // 视口 [0,5] 只含第一组强调标记，第二组被裁掉
     expect(ms.length).toBeGreaterThanOrEqual(1);
@@ -556,7 +556,7 @@ describe("computeDecorations — T7.2 视口裁剪", () => {
   it("视口外的代码块 widget 被跳过", () => {
     const doc = "```js\na\n```\n\n```ts\nb\n```";
     // 第一个代码块 [0,11)，第二个 [13,24)；视口只覆盖后半
-    const d = computeWithViewport(doc, 0, { from: 13, to: 24 });
+    const d = computeWithWindow(doc, 0, { from: 13, to: 24 });
     const cb = blockWidgets(d).filter((w) => w.widget === "codeBlock");
     expect(cb).toHaveLength(1);
     expect(cb[0].from).toBeGreaterThanOrEqual(13);

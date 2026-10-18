@@ -31,6 +31,8 @@ import {
   BlockWidgetDeco,
 } from "./computeDecorations";
 import { findEmojiShortcodesInRange } from "./emojiReplacement";
+import { planDecorationUpdate } from "./decorationUpdatePlan";
+import { mergeWindowDecorations } from "./decorationMerge";
 import { sanitizeInlineHtml } from "./htmlSanitizer";
 import { parseTable } from "./tableReflow";
 import { TableEditor } from "./tableEditor";
@@ -814,11 +816,13 @@ export const recomputeWysiwygEffect = StateEffect.define<void>();
  * 解析完成时 wysiwygSyntaxWatcher 会 dispatch recomputeWysiwygEffect 触发重算。
  * 因此本函数只读取当前已解析的语法树（可能不完整），不主动推进解析。
  *
- * 注意：StateField 无法访问 view.viewport，因此不做视口增量计算。
- * 大文档（>10000 行）场景下性能可接受（CM6 RangeSet 增量构建），
- * 如需优化可再引入 ViewPlugin 监听 viewport 并 dispatch effect。
+ * `recomputeWindow` 为可选的重算窗口（#430）：传入时只计算与窗口相交的节点，
+ * 窗口外的装饰由 mergeWindowDecorations 沿用旧值。
  */
-function computeDecorationsForState(state: EditorState): DecorationSet {
+function computeDecorationsForState(
+  state: EditorState,
+  recomputeWindow?: { from: number; to: number }
+): DecorationSet {
   // 选区范围（锚点↔头）。空选区（光标）→ null，不叠加选中高亮。
   const sel = state.selection.main;
   const selection = sel.empty
@@ -831,8 +835,7 @@ function computeDecorationsForState(state: EditorState): DecorationSet {
     doc: state.doc.toString(),
     selectionHead: state.selection.main.head,
     tree: syntaxTree(state),
-    // StateField 不访问 viewport —— 全量计算（大文档性能可接受）
-    viewport: undefined,
+    recomputeWindow,
   });
   return toDecorationSet(decos, nextMermaidId, selection);
 }
@@ -843,27 +846,30 @@ function computeDecorationsForState(state: EditorState): DecorationSet {
  * 通过 `EditorView.decorations.from(f)` 提供装饰，不受 ViewPlugin 的
  * "不能跨换行块级替换" 限制，因此可以渲染代码块/表格/Mermaid 等多行 widget。
  *
- * 重算时机：
- * - docChanged / selectionSet → 立即重算（光标移动改变段范围，标记 hide/dim 切换）
- * - recomputeWysiwygEffect → 重算（语法树异步解析完成）
- * - 其他 → 映射现有装饰到新位置（保持 widget 实例，避免重渲染）
+ * 重算时机（#430）：
+ * - 文档改动 / 语法树异步解析完成 → 全量重算
+ * - 纯光标同行走动 → 装饰不变，仅映射位置
+ * - 纯光标跨行走动 → 只重算光标所在段落 / 块级节点的窗口
+ * - 选区非空 → 全量重算（块级 widget 的选中叠加会变）
  */
 export const wysiwygField = StateField.define<DecorationSet>({
   create(state) {
     return computeDecorationsForState(state);
   },
   update(decos, tr) {
-    // docChanged 或 selection 变化 → 重算（光标移动改变段范围，标记 hide/dim 切换）
-    // 注意：Transaction 没有 selectionSet 布尔属性（那是 ViewUpdate 的），
-    // 用 tr.selection !== undefined 检测事务是否包含选区变化。
-    if (tr.docChanged || tr.selection !== undefined) {
+    const plan = planDecorationUpdate({
+      docChanged: tr.docChanged,
+      recomputeRequested: tr.effects.some((e) => e.is(recomputeWysiwygEffect)),
+      prev: tr.startState,
+      next: tr.state,
+    });
+    if (plan.kind === "full") {
       return computeDecorationsForState(tr.state);
     }
-    // 显式重算 effect（语法树异步完成等）
-    if (tr.effects.some((e) => e.is(recomputeWysiwygEffect))) {
-      return computeDecorationsForState(tr.state);
+    if (plan.kind === "window") {
+      return mergeWindowDecorations(decos, computeDecorationsForState(tr.state, plan), plan);
     }
-    // 其他事务：映射装饰到新位置（不重算，保持 widget 实例稳定）
+    // 其他事务：映射装饰到新位置（保持 widget 实例稳定）
     return decos.map(tr.changes);
   },
   provide: (f) => EditorView.decorations.from(f),

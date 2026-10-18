@@ -55,7 +55,9 @@
     "newFolderPlaceholder": "新文件夹名",
     "createFailed": "新建失败: {error}",
     "refreshTimeout": "刷新超时",
-    "refreshTimeoutDesc": "可能是工作区过大或网络盘响应慢"
+    "refreshTimeoutDesc": "可能是工作区过大或网络盘响应慢",
+    "truncated": "文件树已截断",
+    "truncatedDesc": "目录过大或层级过深，部分内容已省略"
   },
   "outline": {
     "title": "大纲",
