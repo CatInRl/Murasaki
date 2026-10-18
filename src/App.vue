@@ -65,6 +65,7 @@ import type { SidebarView, EditorMode } from "./types";
 import type { SearchEntry } from "./search/searchLogic";
 import { resolveSearchJumpLine } from "./search/searchLogic";
 import { applyReadingFontPreset } from "./utils/readingFont";
+import { formatCommandError } from "./utils/commandError";
 import {
   PRESENTATION_ZOOM_DEFAULT,
   stepPresentationZoom,
@@ -352,7 +353,7 @@ async function openSettings(): Promise<void> {
     await invoke("open_settings");
   } catch (err) {
     console.error("打开设置窗口失败:", err);
-    dialog.alert({ message: t("common.error.openSettingsFailed", { error: err }), variant: "error" });
+    dialog.alert({ message: t("common.error.openSettingsFailed", { error: formatCommandError(err) }), variant: "error" });
   }
 }
 
@@ -501,6 +502,18 @@ onMounted(async () => {
       invoke<{ path: string; type: "file" | "folder" } | null>("take_pending_open_path"),
     openWorkspace: (path) => workspace.openWorkspace(path),
     restoreTabs: () => tabsStore.restore(),
+    notifyRestoreFailure: (path, err) => {
+      // 恢复失败不再只是 console.warn：给出原因与重试入口（#436）
+      toastStore.error(
+        t("common.error.openWorkspaceFailed", { error: formatCommandError(err) }),
+        {
+          action: {
+            label: t("common.retry"),
+            onClick: () => void workspace.openWorkspace(path).catch(() => {}),
+          },
+        }
+      );
+    },
     setupEventListeners,
     // 必须用窗口级 listen：裸 listen 的 target 是 Any，多窗口下会收到所有窗口的 emit（ADR-0017）
     listenCloseRequested: (handler) =>

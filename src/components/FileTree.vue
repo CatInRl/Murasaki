@@ -19,7 +19,9 @@ import {
 } from "../utils/treeNavigation";
 import TreeNode from "./TreeNode.vue";
 import EmptyState from "./EmptyState.vue";
+import ErrorState from "./ErrorState.vue";
 import Skeleton from "./Skeleton.vue";
+import { formatCommandError } from "../utils/commandError";
 
 const workspace = useWorkspaceStore();
 const fileOps = useFileOpsStore();
@@ -134,7 +136,7 @@ function onEmptyContextMenu(e: MouseEvent): void {
         try {
           await fileOps.paste(root);
         } catch (err) {
-          dialog.alert({ message: t("common.error.pasteFailed", { error: err }), variant: "error" });
+          dialog.alert({ message: t("common.error.pasteFailed", { error: formatCommandError(err) }), variant: "error" });
         }
       },
     },
@@ -146,7 +148,7 @@ function onEmptyContextMenu(e: MouseEvent): void {
         try {
           await fileOps.revealInExplorer(root);
         } catch (err) {
-          dialog.alert({ message: t("common.error.revealFailed", { error: err }), variant: "error" });
+          dialog.alert({ message: t("common.error.revealFailed", { error: formatCommandError(err) }), variant: "error" });
         }
       },
     },
@@ -166,7 +168,7 @@ async function submitRootCreating(): Promise<void> {
       await fileOps.createDirectory(workspace.workspacePath, name);
     }
   } catch (err) {
-    dialog.alert({ message: t("common.error.createFailed", { error: err }), variant: "error" });
+    dialog.alert({ message: t("common.error.createFailed", { error: formatCommandError(err) }), variant: "error" });
   } finally {
     fileOps.endRootCreate();
     rootCreatingName.value = "";
@@ -215,6 +217,13 @@ async function onOpenWorkspace(): Promise<void> {
         :action-text="$t('editor.fileTree.openFolder')"
         :action-icon="FolderOpen"
         @action="onOpenWorkspace"
+      />
+      <ErrorState
+        v-else-if="workspace.loadError && workspace.fileTree.length === 0"
+        :title="$t('editor.fileTree.loadFailed')"
+        :description="formatCommandError(workspace.loadError)"
+        :retry-text="$t('common.retry')"
+        @retry="workspace.refreshTree()"
       />
       <div v-else class="tree-content">
         <!-- 根目录新建输入框 -->

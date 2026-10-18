@@ -4,7 +4,9 @@ import { List } from "lucide-vue-next";
 import { NScrollbar } from "naive-ui";
 import type { OutlineItem } from "../types";
 import { usePersistenceStore } from "../stores/usePersistenceStore";
+import { formatCommandError, type CommandErrorInfo } from "../utils/commandError";
 import EmptyState from "./EmptyState.vue";
+import ErrorState from "./ErrorState.vue";
 import Skeleton from "./Skeleton.vue";
 
 interface Props {
@@ -12,14 +14,18 @@ interface Props {
   items: OutlineItem[];
   /** 加载中 */
   loading?: boolean;
+  /** 拉取失败（展示 ErrorState 与重试） */
+  error?: CommandErrorInfo | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
+  error: null,
 });
 
 const emit = defineEmits<{
   (e: "jump-to-line", line: number): void;
+  (e: "retry"): void;
 }>();
 
 const persistence = usePersistenceStore();
@@ -47,6 +53,13 @@ function normLevel(level: number): number {
 
     <NScrollbar class="outline-scroll">
       <Skeleton v-if="loading" :lines="4" />
+      <ErrorState
+        v-else-if="error"
+        :title="$t('editor.outline.loadFailed')"
+        :description="formatCommandError(error)"
+        :retry-text="$t('common.retry')"
+        @retry="emit('retry')"
+      />
       <EmptyState
         v-else-if="items.length === 0"
         :icon="List"

@@ -1,5 +1,6 @@
 import { exportHtml } from "./useHtmlExport";
 import { i18n } from "../i18n";
+import { formatCommandError } from "../utils/commandError";
 import type { Ref } from "vue";
 import type { Tab } from "../types";
 
@@ -84,7 +85,7 @@ export function useCopyRichText(deps: CopyRichTextDeps) {
       }
     } catch (err) {
       console.error("复制富文本失败:", err);
-      toast.error(t("common.error.copyRichTextFailed", { error: err }));
+      toast.error(t("common.error.copyRichTextFailed", { error: formatCommandError(err) }));
     }
   }
 

@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { NModal, NButton, NSpace, NText, NSpin } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
 import { basename, extname } from "../utils/path";
+import { formatCommandError } from "../utils/commandError";
 import { useDialogStore } from "../stores/useDialogStore";
 
 interface Props {
@@ -54,7 +55,7 @@ async function loadImage(path: string): Promise<void> {
       const text = await invoke<string>("read_text_file", { path });
       dataUrl.value = `data:image/svg+xml;utf8,${encodeURIComponent(text)}`;
     } catch (err) {
-      errorMsg.value = t("editor.imagePreview.readFailed", { error: err });
+      errorMsg.value = t("editor.imagePreview.readFailed", { error: formatCommandError(err) });
     } finally {
       loading.value = false;
     }
@@ -78,7 +79,7 @@ async function loadImage(path: string): Promise<void> {
     const base64 = btoa(binary);
     dataUrl.value = `data:${mimeOf(path)};base64,${base64}`;
   } catch (err) {
-    errorMsg.value = t("editor.imagePreview.readFailed", { error: err });
+    errorMsg.value = t("editor.imagePreview.readFailed", { error: formatCommandError(err) });
   } finally {
     loading.value = false;
   }
@@ -128,7 +129,7 @@ async function revealInExplorer(): Promise<void> {
   try {
     await invoke("reveal_in_explorer", { path: props.path });
   } catch (err) {
-    dialog.alert({ message: t("common.error.revealFailed", { error: err }), variant: "error" });
+    dialog.alert({ message: t("common.error.revealFailed", { error: formatCommandError(err) }), variant: "error" });
   }
 }
 </script>

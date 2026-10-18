@@ -56,6 +56,7 @@
     "createFailed": "Failed to create: {error}",
     "refreshTimeout": "Refresh timed out",
     "refreshTimeoutDesc": "The workspace may be too large or a network drive is slow",
+    "loadFailed": "Unable to load the file tree",
     "truncated": "File tree truncated",
     "truncatedDesc": "The folder is too large or too deep; some entries were omitted"
   },
@@ -63,6 +64,7 @@
     "title": "Outline",
     "empty": "No headings",
     "emptyDesc": "This document has no heading sections yet",
+    "loadFailed": "Unable to parse the document outline",
     "lineTooltip": "Line {line}"
   },
   "search": {

@@ -7,6 +7,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
+use crate::errors::{CommandError, ErrorCode};
 
 /// 搜索匹配项
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,7 +87,7 @@ pub struct SearchState {
 }
 
 /// 构造搜索正则：根据选项把用户查询编译为 Regex
-fn build_search_regex(query: &str, options: &SearchOptions) -> Result<Regex, String> {
+fn build_search_regex(query: &str, options: &SearchOptions) -> Result<Regex, CommandError> {
     let pattern = if options.regex {
         query.to_string()
     } else {
@@ -99,7 +100,8 @@ fn build_search_regex(query: &str, options: &SearchOptions) -> Result<Regex, Str
         pattern
     };
     let flags = if options.case_sensitive { "" } else { "(?i)" };
-    Regex::new(&format!("{}{}", flags, pattern)).map_err(|e| e.to_string())
+    Regex::new(&format!("{}{}", flags, pattern))
+        .map_err(|e| CommandError::new(ErrorCode::InvalidArgument).with_param("detail", e.to_string()))
 }
 
 /// 检查文件名是否匹配查询
@@ -181,7 +183,7 @@ pub async fn search_workspace(
     options: Option<SearchOptions>,
     cancel_token: Option<String>,
     max_results: Option<u32>,
-) -> Result<SearchResponse, String> {
+) -> Result<SearchResponse, CommandError> {
     if query.trim().is_empty() {
         return Ok(SearchResponse {
             content_results: Vec::new(),
@@ -193,7 +195,7 @@ pub async fn search_workspace(
     let regex = build_search_regex(&query, &opts)?;
     let workspace_path = PathBuf::from(&workspace);
     if !workspace_path.exists() {
-        return Err(format!("工作区不存在: {}", workspace));
+        return Err(CommandError::path(ErrorCode::NotFound, &workspace));
     }
 
     let max_results = max_results.unwrap_or(DEFAULT_MAX_RESULTS).max(1);
@@ -351,12 +353,15 @@ pub async fn search_workspace(
 /// 请求取消指定 cancel_token 关联的搜索
 /// 前端在新搜索前或用户手动取消时调用
 #[tauri::command]
-pub fn cancel_search(app: AppHandle, cancel_token: String) -> Result<(), String> {
+pub fn cancel_search(app: AppHandle, cancel_token: String) -> Result<(), CommandError> {
     if cancel_token.is_empty() {
         return Ok(());
     }
     let state = app.state::<SearchState>();
-    let mut guard = state.cancel_tokens.lock().map_err(|e| e.to_string())?;
+    let mut guard = state
+        .cancel_tokens
+        .lock()
+        .map_err(|e| CommandError::internal(format!("search lock: {e}")))?;
     guard.insert(cancel_token);
     Ok(())
 }

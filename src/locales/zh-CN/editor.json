@@ -56,6 +56,7 @@
     "createFailed": "新建失败: {error}",
     "refreshTimeout": "刷新超时",
     "refreshTimeoutDesc": "可能是工作区过大或网络盘响应慢",
+    "loadFailed": "无法读取文件树",
     "truncated": "文件树已截断",
     "truncatedDesc": "目录过大或层级过深，部分内容已省略"
   },
@@ -63,6 +64,7 @@
     "title": "大纲",
     "empty": "无标题",
     "emptyDesc": "本文档暂无标题段落",
+    "loadFailed": "无法解析文档大纲",
     "lineTooltip": "第 {line} 行"
   },
   "search": {

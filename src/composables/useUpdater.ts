@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { check as checkForUpdate, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { i18n } from "../i18n";
+import { formatCommandError } from "../utils/commandError";
 
 /**
  * 可序列化的更新信息（从 plugin 的 Update 对象提取，供 UI 使用）。
@@ -94,7 +95,7 @@ export function useUpdater(deps: UpdaterDeps) {
       return null;
     } catch (err) {
       if (!silent) {
-        toast.error(t("editor.update.checkFailed", { error: err }));
+        toast.error(t("editor.update.checkFailed", { error: formatCommandError(err) }));
       }
       return null;
     } finally {
@@ -146,7 +147,7 @@ export function useUpdater(deps: UpdaterDeps) {
       await relaunch();
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error(t("editor.update.downloadFailed", { error: err }));
+      toast.error(t("editor.update.downloadFailed", { error: formatCommandError(err) }));
     } finally {
       downloading.value = false;
     }
@@ -157,7 +158,7 @@ export function useUpdater(deps: UpdaterDeps) {
     try {
       await relaunch();
     } catch (err) {
-      toast.error(t("editor.update.restartFailed", { error: err }));
+      toast.error(t("editor.update.restartFailed", { error: formatCommandError(err) }));
     }
   }
 

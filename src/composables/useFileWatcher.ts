@@ -4,6 +4,9 @@ import { type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useTabsStore } from "../stores/useTabsStore";
+import { useToastStore } from "../stores/useToastStore";
+import { i18n } from "../i18n";
+import { formatCommandError } from "../utils/commandError";
 import { canonicalPath, isPathUnder, isSamePath } from "../utils/path";
 
 /** 外部变更事件的合并窗口（毫秒）：同一爆发期的多个事件合并为一次处理 */
@@ -174,6 +177,14 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcher {
       registeredPath = wsPath;
     } catch (err) {
       console.error("启动文件监听失败:", err);
+      // 监听失败意味着外部修改/文件树自动刷新失效，必须让用户看见（#436）
+      const toast = useToastStore();
+      toast.error(
+        i18n.global.t("common.error.watchFailed", { error: formatCommandError(err) }),
+        {
+          action: { label: i18n.global.t("common.retry"), onClick: () => void start() },
+        }
+      );
     }
   }
 

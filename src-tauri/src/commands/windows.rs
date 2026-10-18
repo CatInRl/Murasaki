@@ -14,6 +14,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 use super::launch::{classify_path, PendingOpenState};
+use crate::errors::{CommandError, ErrorCode};
 
 /// 窗口 ↔ 工作区注册表。
 ///
@@ -128,7 +129,7 @@ pub fn window_title_for_workspace(path: Option<&str>) -> String {
 ///
 /// 无论文件还是目录，路径都会写入 pending 槽，由前端拉取后统一走 `onOpenPath`
 /// 处理（文件 → 开 tab；目录 → 设工作区），单一机制便于维护。
-pub fn create_editor_window(app: &AppHandle, path: Option<String>) -> Result<String, String> {
+pub fn create_editor_window(app: &AppHandle, path: Option<String>) -> Result<String, CommandError> {
     let registry = app.state::<WindowRegistry>();
 
     // 目录且已有窗口打开 → 聚焦，不重复开窗（避免同目录双 watcher 与文件操作冲突）
@@ -175,7 +176,7 @@ pub fn create_editor_window(app: &AppHandle, path: Option<String>) -> Result<Str
 
     let window = builder
         .build()
-        .map_err(|e| format!("创建窗口失败: {}", e))?;
+        .map_err(|e| CommandError::internal(format!("create window: {e}")))?;
 
     // 显式置前（issue #414）。
     //
@@ -212,9 +213,9 @@ pub fn cleanup_window_state(app: &AppHandle, label: &str) {
 /// 前端调用：在**新窗口**中打开路径（「打开文件夹」入口）。
 ///
 /// 目录：命中已有窗口则聚焦并返回其 label；文件：新窗口打开该文件。
-pub fn open_path_in_new_window_impl(app: &AppHandle, path: &str) -> Result<String, String> {
+pub fn open_path_in_new_window_impl(app: &AppHandle, path: &str) -> Result<String, CommandError> {
     if !std::path::Path::new(path).exists() {
-        return Err(format!("路径不存在: {}", path));
+        return Err(CommandError::path(ErrorCode::NotFound, path));
     }
     create_editor_window(app, Some(path.to_string()))
 }
@@ -227,7 +228,7 @@ pub fn open_path_in_new_window_impl(app: &AppHandle, path: &str) -> Result<Strin
 /// WebView2 环境，实测直接卡死（命令永不返回、窗口也建不出来）。
 /// 改成 `async` 后命令在 tokio 工作线程上运行，建窗消息正常投递给主线程事件循环。
 #[tauri::command]
-pub async fn open_path_in_new_window(app: AppHandle, path: String) -> Result<String, String> {
+pub async fn open_path_in_new_window(app: AppHandle, path: String) -> Result<String, CommandError> {
     open_path_in_new_window_impl(&app, &path)
 }
 
@@ -246,10 +247,12 @@ pub fn set_window_workspace(window: WebviewWindow, app: AppHandle, path: Option<
 /// 关闭后若已无其它编辑器窗口，则退出应用 —— 实现「关最后一个窗口才退出」
 /// （Windows / macOS 行为一致，不依赖「主窗口」特殊语义）。
 #[tauri::command]
-pub fn close_window(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+pub fn close_window(window: WebviewWindow, app: AppHandle) -> Result<(), CommandError> {
     let label = window.label().to_string();
     cleanup_window_state(&app, &label);
-    window.destroy().map_err(|e| e.to_string())?;
+    window
+        .destroy()
+        .map_err(|e| CommandError::internal(format!("destroy window: {e}")))?;
     // 数剩余窗口时排除自己：destroy 之后 `webview_windows()` 的回收时机不确定
     exit_if_no_other_windows(&app, &label);
     Ok(())

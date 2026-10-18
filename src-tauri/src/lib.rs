@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod errors;
 pub mod i18n;
 
 use tauri::{Emitter, Manager, WebviewWindowBuilder};

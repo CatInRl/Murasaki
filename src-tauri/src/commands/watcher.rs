@@ -5,6 +5,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use notify::event::ModifyKind;
 use notify::{Watcher, RecursiveMode, EventKind, RecommendedWatcher};
+use crate::errors::{CommandError, ErrorCode};
 
 /// 某窗口的监听器实例与它监听的路径
 struct WatcherEntry {
@@ -70,16 +71,19 @@ pub fn start_watching(
     window: WebviewWindow,
     app: AppHandle,
     path: String,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
     let watch_path = PathBuf::from(&path);
     if !watch_path.exists() {
-        return Err(format!("路径不存在: {}", path));
+        return Err(CommandError::path(ErrorCode::NotFound, &path));
     }
 
     let state = app.state::<WatcherState>();
     let label = window.label().to_string();
     {
-        let map = state.watchers.lock().map_err(|e| e.to_string())?;
+        let map = state
+            .watchers
+            .lock()
+            .map_err(|e| CommandError::internal(format!("watcher lock: {e}")))?;
         if let Some(entry) = map.get(&label) {
             if entry.path == path {
                 // 已在监听该路径：直接返回成功
@@ -113,7 +117,10 @@ pub fn start_watching(
         }
     }) {
         Ok(w) => w,
-        Err(e) => return Err(format!("创建监听器失败: {}", e)),
+        Err(e) => {
+            return Err(CommandError::internal(format!("create watcher: {e}"))
+                .with_param("path", path.clone()))
+        }
     };
 
     // 添加监听路径（递归）
@@ -123,11 +130,14 @@ pub fn start_watching(
         RecursiveMode::NonRecursive
     };
     if let Err(e) = watcher.watch(&watch_path, mode) {
-        return Err(format!("添加监听路径失败: {}", e));
+        return Err(CommandError::internal(format!("watch: {e}")).with_param("path", path.clone()));
     }
 
     // 保存本窗口的 watcher（顶掉该窗口的旧实例，不影响其它窗口）
-    let mut map = state.watchers.lock().map_err(|e| e.to_string())?;
+    let mut map = state
+        .watchers
+        .lock()
+        .map_err(|e| CommandError::internal(format!("watcher lock: {e}")))?;
     map.insert(label, WatcherEntry { watcher, path });
 
     Ok(())
@@ -135,14 +145,14 @@ pub fn start_watching(
 
 /// 停止本窗口的文件监听
 #[tauri::command]
-pub fn stop_watching(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+pub fn stop_watching(window: WebviewWindow, app: AppHandle) -> Result<(), CommandError> {
     app.state::<WatcherState>().remove_window(window.label());
     Ok(())
 }
 
 /// 停止本窗口的全部监听（与 [`stop_watching`] 等价，保留给旧调用方）
 #[tauri::command]
-pub fn stop_all_watching(window: WebviewWindow, app: AppHandle) -> Result<(), String> {
+pub fn stop_all_watching(window: WebviewWindow, app: AppHandle) -> Result<(), CommandError> {
     app.state::<WatcherState>().remove_window(window.label());
     Ok(())
 }

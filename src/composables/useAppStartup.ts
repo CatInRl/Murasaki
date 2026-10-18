@@ -59,6 +59,8 @@ export interface AppStartupDeps {
   takePendingOpenPath(): Promise<{ path: string; type?: string } | null>;
   openWorkspace(path: string): Promise<unknown>;
   restoreTabs(): Promise<unknown>;
+  /** 恢复上次工作区失败时的用户可见提示（含重试入口）#436 */
+  notifyRestoreFailure(path: string, error: unknown): void;
   setupEventListeners(): Promise<() => void>;
   listenCloseRequested(handler: () => void): Promise<() => void>;
   syncRecentMenu(): Promise<unknown>;
@@ -186,6 +188,7 @@ async function runStartup(
         console.log("[Murasaki] 恢复工作区成功");
       } catch (err) {
         console.warn("[Murasaki] 恢复工作区失败:", err);
+        deps.notifyRestoreFailure(settings.lastWorkspacePath, err);
       }
     }
     await deps.restoreTabs();

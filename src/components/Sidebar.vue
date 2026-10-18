@@ -46,11 +46,12 @@ const liveOutlineEnabled = computed(
   () => effectiveView(props.activeView) === "outline"
 );
 const currentContentRef = toRef(props, "currentContent");
-const { outline: outlineItems, loading: outlineLoading } = useOutline(
-  filePathRef,
-  currentContentRef,
-  liveOutlineEnabled
-);
+const {
+  outline: outlineItems,
+  loading: outlineLoading,
+  error: outlineError,
+  retry: retryOutline,
+} = useOutline(filePathRef, currentContentRef, liveOutlineEnabled);
 /** 有效活动视图：非 md 文件始终强制文件树 */
 function effectiveView(view: SidebarView): SidebarView {
   return view === "outline" && !isCurrentMarkdown.value ? "files" : view;
@@ -110,6 +111,8 @@ function effectiveView(view: SidebarView): SidebarView {
           key="outline"
           :items="outlineItems"
           :loading="outlineLoading"
+          :error="outlineError"
+          @retry="retryOutline"
           @jump-to-line="(line) => emit('jump-to-line', line)"
         />
       </transition>
