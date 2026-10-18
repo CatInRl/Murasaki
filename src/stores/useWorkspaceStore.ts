@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { TreeNode } from "../types";
+import { basename } from "../utils/path";
 import { i18n } from "../i18n";
 import { usePersistenceStore } from "./usePersistenceStore";
 import { useToastStore } from "./useToastStore";
@@ -39,8 +40,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   const hasWorkspace = computed(() => workspacePath.value !== null);
   const workspaceName = computed(() => {
     if (!workspacePath.value) return "";
-    const parts = workspacePath.value.replace(/\\/g, "/").split("/").filter(Boolean);
-    return parts[parts.length - 1] ?? workspacePath.value;
+    return basename(workspacePath.value) || workspacePath.value;
   });
 
   // ===== Actions =====

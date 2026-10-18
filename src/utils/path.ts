@@ -176,6 +176,32 @@ export function isTabOutOfWorkspace(
 }
 
 /**
+ * 计算从 fromDir 目录到 to 的相对路径（fromDir 视为目录，不剥最后一段）
+ *
+ * 与 `relativePath` 的区别：那个把 from 当文件（先取父目录），这个把 from 当目录。
+ *
+ * 例如：relativeFromDir("C:/docs", "C:/docs/a.md") → "a.md"
+ *      relativeFromDir("C:/docs/", "C:/docs/sub/a.md") → "sub/a.md"
+ *      relativeFromDir("C:/docs", "C:/docs") → "."
+ */
+export function relativeFromDir(fromDir: string, to: string): string {
+  const fromParts = normalizePath(stripTrailingSep(fromDir)).split("/").filter(Boolean);
+  const toParts = normalizePath(to).split("/").filter(Boolean);
+  let i = 0;
+  while (
+    i < fromParts.length &&
+    i < toParts.length &&
+    fromParts[i].toLowerCase() === toParts[i].toLowerCase()
+  ) {
+    i++;
+  }
+  const ups: string[] = [];
+  for (let k = 0; k < fromParts.length - i; k++) ups.push("..");
+  const parts = [...ups, ...toParts.slice(i)];
+  return parts.length === 0 ? "." : parts.join("/");
+}
+
+/**
  * 计算从 fromFile 所在目录到 toPath 的相对路径
  * `from` 被视为文件路径，先取其目录作为基准
  *

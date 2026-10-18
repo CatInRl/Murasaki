@@ -14,7 +14,7 @@ import {
 } from "lucide-vue-next";
 import { useWorkspaceStore } from "../stores/useWorkspaceStore";
 import { useTabsStore } from "../stores/useTabsStore";
-import { basename, dirname } from "../utils/path";
+import { basename, dirname, isPathUnder, normalizePath, stripTrailingSep } from "../utils/path";
 import { zoomAppliesTo } from "../utils/presentationZoom";
 import type { EditorMode } from "../types";
 
@@ -58,12 +58,9 @@ const displayPath = computed<string>(() => {
   if (!props.filePath) return t("common.status.noFileOpen");
   const root = workspace.workspacePath;
   if (!root) return props.filePath;
-  const normRoot = root.replace(/\\/g, "/").replace(/\/$/, "");
-  const normPath = props.filePath.replace(/\\/g, "/");
-  if (normPath.startsWith(normRoot + "/")) {
-    return normPath.slice(normRoot.length + 1);
-  }
-  return props.filePath;
+  // 路径口径统一走 utils/path（#435）：分隔符归一、目录边界、大小写口径与文件树一致
+  if (!isPathUnder(root, props.filePath)) return props.filePath;
+  return normalizePath(props.filePath).slice(stripTrailingSep(normalizePath(root)).length).replace(/^\//, "");
 });
 
 const fileName = computed(() =>

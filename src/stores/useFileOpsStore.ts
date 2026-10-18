@@ -4,6 +4,14 @@ import { useWorkspaceStore } from "./useWorkspaceStore";
 import { useTabsStore } from "./useTabsStore";
 import { fileSystem } from "../services/fileSystem";
 import type { TreeNode } from "../types";
+import {
+  basename,
+  dirname,
+  isPathUnder,
+  isSamePath,
+  joinPaths,
+  relativeFromDir,
+} from "../utils/path";
 
 /**
  * 文件操作 Store
@@ -84,36 +92,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     return conflictResolver(targetPath, operation, sourcePath);
   }
 
-  /** 规范化路径分隔符为 / */
-  function normalize(path: string): string {
-    return path.replace(/\\/g, "/");
-  }
-
-  /** 从路径中提取父目录（保留绝对路径的前导 /） */
-  function parentDir(path: string): string {
-    const normalized = normalize(path);
-    const isAbsolute = normalized.startsWith("/");
-    const parts = normalized.split("/").filter(Boolean);
-    parts.pop();
-    if (parts.length === 0) {
-      return isAbsolute ? "/" : ".";
-    }
-    const joined = parts.join("/");
-    return isAbsolute ? "/" + joined : joined;
-  }
-
-  /** 从路径中提取文件名 */
-  function basename(path: string): string {
-    const parts = normalize(path).split("/").filter(Boolean);
-    return parts[parts.length - 1] ?? path;
-  }
-
-  /** 拼接路径（统一使用 / 分隔符，Rust PathBuf 在 Windows 上可正确解析） */
-  function joinPath(dir: string, name: string): string {
-    const d = dir.replace(/[\\/]+$/, "");
-    const n = name.replace(/^[\\/]+/, "");
-    return d + "/" + n;
-  }
+  // 路径工具统一走 utils/path（#435）：分隔符、盘符、大小写口径只有一份实现
 
   /**
    * 新建文件
@@ -121,7 +100,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
    * @param name 文件名
    */
   async function createFile(dirPath: string, name: string): Promise<TreeNode | null> {
-    const fullPath = joinPath(dirPath, name);
+    const fullPath = joinPaths(dirPath, name);
     try {
       const node = await fileSystem.createFile(fullPath);
       await workspace.refreshTree();
@@ -136,7 +115,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
    * 新建文件夹
    */
   async function createDirectory(dirPath: string, name: string): Promise<TreeNode | null> {
-    const fullPath = joinPath(dirPath, name);
+    const fullPath = joinPaths(dirPath, name);
     try {
       const node = await fileSystem.createDirectory(fullPath);
       await workspace.refreshTree();
@@ -182,11 +161,11 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     oldPath: string,
     newName: string
   ): Promise<TreeNode | null> {
-    const dir = parentDir(oldPath);
-    const newPath = joinPath(dir, newName);
+    const dir = dirname(oldPath);
+    const newPath = joinPaths(dir, newName);
 
     // 同名：无需操作
-    if (normalize(oldPath) === normalize(newPath)) {
+    if (isSamePath(oldPath, newPath)) {
       return null;
     }
 
@@ -235,9 +214,9 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     if (!clipboard.value) return;
     const { path: src, mode } = clipboard.value;
     const name = basename(src);
-    const targetPath = joinPath(targetDir, name);
+    const targetPath = joinPaths(targetDir, name);
 
-    if (normalize(src) === normalize(targetPath)) {
+    if (isSamePath(src, targetPath)) {
       // 同路径无需操作
       clipboard.value = null;
       return;
@@ -252,7 +231,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
       if (conflict.action === "cancel") return;
       if (conflict.action === "rename") {
         if (!conflict.newName) return;
-        const newTarget = joinPath(targetDir, conflict.newName);
+        const newTarget = joinPaths(targetDir, conflict.newName);
         if (mode === "cut") {
           await movePath(src, newTarget);
         } else {
@@ -328,7 +307,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
         await navigator.clipboard.writeText(path);
         return;
       }
-      const rel = relativePath(root, path);
+      const rel = relativeFromDir(root, path);
       await navigator.clipboard.writeText(rel);
     } catch (err) {
       console.error("复制相对路径失败:", err);
@@ -336,24 +315,6 @@ export const useFileOpsStore = defineStore("fileOps", () => {
     }
   }
 
-  /**
-   * 计算从 from 到 to 的相对路径（不依赖 path 模块，纯字符串处理）
-   * 输入路径会被规范化为 / 分隔符
-   */
-  function relativePath(from: string, to: string): string {
-    const normFrom = normalize(from).replace(/[\\/]+$/, "").split("/").filter(Boolean);
-    const normTo = normalize(to).split("/").filter(Boolean);
-    let i = 0;
-    while (i < normFrom.length && i < normTo.length && normFrom[i] === normTo[i]) {
-      i++;
-    }
-    const upCount = normFrom.length - i;
-    const downParts = normTo.slice(i);
-    const parts: string[] = [];
-    for (let k = 0; k < upCount; k++) parts.push("..");
-    for (const p of downParts) parts.push(p);
-    return parts.length === 0 ? "." : parts.join("/");
-  }
 
   /**
    * 工作区内移动（拖拽=移动语义）
@@ -362,16 +323,15 @@ export const useFileOpsStore = defineStore("fileOps", () => {
    */
   async function moveInto(src: string, targetDir: string): Promise<void> {
     const name = basename(src);
-    const targetPath = joinPath(targetDir, name);
+    const targetPath = joinPaths(targetDir, name);
 
-    if (normalize(src) === normalize(targetPath)) return;
+    if (isSamePath(src, targetPath)) return;
 
     // 禁止目录覆盖
     const srcType = await fileSystem.pathType(src);
     if (srcType === "directory") {
       // 检查目标是否是源目录的子目录（会导致递归移动）
-      const targetIsInsideSource = normalize(targetPath).startsWith(normalize(src) + "/");
-      if (targetIsInsideSource) {
+      if (isPathUnder(src, targetPath)) {
         throw new Error("无法将目录移动到其自身子目录内");
       }
     }
@@ -381,7 +341,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
       if (conflict.action === "cancel") return;
       if (conflict.action === "rename") {
         if (!conflict.newName) return;
-        const newTarget = joinPath(targetDir, conflict.newName);
+        const newTarget = joinPaths(targetDir, conflict.newName);
         await movePath(src, newTarget);
         await workspace.refreshTree();
         return;
@@ -406,14 +366,14 @@ export const useFileOpsStore = defineStore("fileOps", () => {
    */
   async function copyInto(src: string, targetDir: string): Promise<void> {
     const name = basename(src);
-    const targetPath = joinPath(targetDir, name);
+    const targetPath = joinPaths(targetDir, name);
 
     const conflict = await checkAndResolveConflict(targetPath, "copy", src);
     if (conflict) {
       if (conflict.action === "cancel") return;
       if (conflict.action === "rename") {
         if (!conflict.newName) return;
-        const newTarget = joinPath(targetDir, conflict.newName);
+        const newTarget = joinPaths(targetDir, conflict.newName);
         await fileSystem.copyFile(src, newTarget);
         await workspace.refreshTree();
         return;
