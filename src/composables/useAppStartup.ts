@@ -57,10 +57,9 @@ export interface AppStartupDeps {
   };
   detectSystemLocale(): Promise<string>;
   takePendingOpenPath(): Promise<{ path: string; type?: string } | null>;
+  /** 恢复工作区（失败提示与重试入口由 openWorkspace 自己给出，#436） */
   openWorkspace(path: string): Promise<unknown>;
   restoreTabs(): Promise<unknown>;
-  /** 恢复上次工作区失败时的用户可见提示（含重试入口）#436 */
-  notifyRestoreFailure(path: string, error: unknown): void;
   setupEventListeners(): Promise<() => void>;
   listenCloseRequested(handler: () => void): Promise<() => void>;
   syncRecentMenu(): Promise<unknown>;
@@ -187,8 +186,8 @@ async function runStartup(
         await deps.openWorkspace(settings.lastWorkspacePath);
         console.log("[Murasaki] 恢复工作区成功");
       } catch (err) {
+        // openWorkspace 已弹出带重试的提示，这里只记录日志，避免重复打扰
         console.warn("[Murasaki] 恢复工作区失败:", err);
-        deps.notifyRestoreFailure(settings.lastWorkspacePath, err);
       }
     }
     await deps.restoreTabs();

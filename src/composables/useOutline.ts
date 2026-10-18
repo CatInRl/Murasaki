@@ -48,6 +48,7 @@ export function useOutline(
         void fetchOutline(newPath);
       } else {
         outline.value = [];
+        error.value = null;
       }
     },
     { immediate: true }
@@ -71,6 +72,8 @@ export function useOutline(
         // 过期返回（期间又有新变更）直接丢弃，防回跳
         if (mySeq !== liveSeq) return;
         outline.value = items;
+        // 实时解析成功说明内容可用，清掉此前磁盘解析失败留下的 ErrorState
+        error.value = null;
       } catch {
         // 编辑态解析失败不打断编辑，保留当前大纲
       }

@@ -116,6 +116,10 @@
     "openWorkspaceFailed": "打开工作区失败: {error}",
     "reloadFailed": "重新加载失败: {error}",
     "watchFailed": "无法监听工作区变化: {error}",
+    "restoreTabsFailed": "有 {count} 个标签未能恢复",
+    "withPath": "{message}：{path}",
+    "withDetail": "{message}（{detail}）",
+    "withPathDetail": "{message}：{path}（{detail}）",
     "exportHtmlFailed": "导出 HTML 失败: {error}",
     "exportPdfFailed": "导出 PDF 失败: {error}",
     "code": {

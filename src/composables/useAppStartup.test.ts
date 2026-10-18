@@ -82,7 +82,6 @@ function makeDeps(
     }),
     openWorkspace: record("openWorkspace"),
     restoreTabs: record("restoreTabs"),
-    notifyRestoreFailure: vi.fn((path: string) => calls.push(`notifyRestoreFailure:${path}`)),
     setupEventListeners: vi.fn(async () => {
       calls.push("setupEventListeners");
       return () => calls.push("disposeListeners");
@@ -166,7 +165,7 @@ describe("bootstrapApp", () => {
     expect(deps.openWorkspace).toHaveBeenCalledWith("C:/saved");
   });
 
-  it("恢复工作区失败时给出用户可见提示（#436）", async () => {
+  it("恢复工作区失败不阻断后续启动（提示由 openWorkspace 给出，#436）", async () => {
     const { deps, calls } = makeDeps({
       settings: { reopenLastWorkspace: true, lastWorkspacePath: "C:/gone" },
       failAt: "openWorkspace",
@@ -174,7 +173,7 @@ describe("bootstrapApp", () => {
 
     await bootstrapApp(deps);
 
-    expect(calls).toContain("notifyRestoreFailure:C:/gone");
+    expect(deps.openWorkspace).toHaveBeenCalledWith("C:/gone");
     // 恢复失败不应阻断后续启动步骤
     expect(calls).toContain("restoreTabs");
     expect(calls).toContain("setupEventListeners");

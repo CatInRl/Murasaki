@@ -70,15 +70,7 @@ impl CommandError {
 
     /// 从 `std::io::Error` 映射，并附上出错路径。
     pub fn io_at(err: &io::Error, path: impl AsRef<Path>) -> Self {
-        let code = match err.kind() {
-            io::ErrorKind::NotFound => ErrorCode::NotFound,
-            io::ErrorKind::PermissionDenied => ErrorCode::PermissionDenied,
-            io::ErrorKind::AlreadyExists => ErrorCode::AlreadyExists,
-            io::ErrorKind::InvalidInput => ErrorCode::InvalidArgument,
-            io::ErrorKind::TimedOut => ErrorCode::Timeout,
-            _ => ErrorCode::Io,
-        };
-        Self::path(code, path).with_param("detail", err.to_string())
+        Self::path(io_code(err), path).with_param("detail", err.to_string())
     }
 
     /// 内部错误：第三方库 / 任务调度失败，`detail` 保留原始错误文案。
@@ -87,17 +79,21 @@ impl CommandError {
     }
 }
 
+/// `std::io::ErrorKind` → 错误码的唯一映射（`io_at` 与 `From` 共用）
+fn io_code(err: &io::Error) -> ErrorCode {
+    match err.kind() {
+        io::ErrorKind::NotFound => ErrorCode::NotFound,
+        io::ErrorKind::PermissionDenied => ErrorCode::PermissionDenied,
+        io::ErrorKind::AlreadyExists => ErrorCode::AlreadyExists,
+        io::ErrorKind::InvalidInput => ErrorCode::InvalidArgument,
+        io::ErrorKind::TimedOut => ErrorCode::Timeout,
+        _ => ErrorCode::Io,
+    }
+}
+
 impl From<io::Error> for CommandError {
     fn from(err: io::Error) -> Self {
-        let code = match err.kind() {
-            io::ErrorKind::NotFound => ErrorCode::NotFound,
-            io::ErrorKind::PermissionDenied => ErrorCode::PermissionDenied,
-            io::ErrorKind::AlreadyExists => ErrorCode::AlreadyExists,
-            io::ErrorKind::InvalidInput => ErrorCode::InvalidArgument,
-            io::ErrorKind::TimedOut => ErrorCode::Timeout,
-            _ => ErrorCode::Io,
-        };
-        Self::new(code).with_param("detail", err.to_string())
+        Self::new(io_code(&err)).with_param("detail", err.to_string())
     }
 }
 

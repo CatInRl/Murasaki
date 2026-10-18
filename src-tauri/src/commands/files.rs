@@ -316,7 +316,17 @@ pub fn delete_path(path: String) -> Result<(), CommandError> {
     if !p.exists() {
         return Err(CommandError::path(ErrorCode::NotFound, &path));
     }
-    trash::delete(&p).map_err(|e| CommandError::internal(format!("trash: {e}")))
+    trash::delete(&p).map_err(|e| {
+        // Windows 下 `Error::Os` 的 code 是 Win32 错误码（5 = ERROR_ACCESS_DENIED）；
+        // `CouldNotAccess` 在路径存在性已检查过之后只剩权限问题。
+        let code = match &e {
+            trash::Error::Os { code: 5, .. } | trash::Error::CouldNotAccess { .. } => {
+                ErrorCode::PermissionDenied
+            }
+            _ => ErrorCode::Internal,
+        };
+        CommandError::path(code, &path).with_param("detail", format!("trash: {e}"))
+    })
 }
 
 /// 重命名/移动文件或目录

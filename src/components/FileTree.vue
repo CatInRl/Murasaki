@@ -184,6 +184,20 @@ function cancelRootCreating(): void {
 async function onOpenWorkspace(): Promise<void> {
   await workspace.openFolderDialog();
 }
+
+/**
+ * 失败态重试：
+ * - 工作区已打开（刷新失败）→ 重新读树
+ * - 首次打开就失败（workspacePath 未赋值）→ 用它尝试过的路径重新打开
+ */
+function retryLoad(): void {
+  if (workspace.workspacePath) {
+    void workspace.refreshTree();
+    return;
+  }
+  const path = workspace.loadError?.params.path;
+  if (path) void workspace.openWorkspace(path).catch(() => {});
+}
 </script>
 
 <template>
@@ -209,6 +223,14 @@ async function onOpenWorkspace(): Promise<void> {
         v-if="workspace.loading && workspace.fileTree.length === 0"
         :lines="4"
       />
+      <!-- 先于 EmptyState 判断：首次打开失败时 workspacePath 尚未赋值，否则只剩「未打开工作区」 -->
+      <ErrorState
+        v-else-if="workspace.loadError && workspace.fileTree.length === 0"
+        :title="$t('editor.fileTree.loadFailed')"
+        :description="formatCommandError(workspace.loadError)"
+        :retry-text="$t('common.retry')"
+        @retry="retryLoad"
+      />
       <EmptyState
         v-else-if="!workspace.hasWorkspace"
         :icon="FolderOpen"
@@ -217,13 +239,6 @@ async function onOpenWorkspace(): Promise<void> {
         :action-text="$t('editor.fileTree.openFolder')"
         :action-icon="FolderOpen"
         @action="onOpenWorkspace"
-      />
-      <ErrorState
-        v-else-if="workspace.loadError && workspace.fileTree.length === 0"
-        :title="$t('editor.fileTree.loadFailed')"
-        :description="formatCommandError(workspace.loadError)"
-        :retry-text="$t('common.retry')"
-        @retry="workspace.refreshTree()"
       />
       <div v-else class="tree-content">
         <!-- 根目录新建输入框 -->

@@ -49,6 +49,12 @@ describe("utils/commandError", () => {
     ).toBe("文件读写失败：C:/ws/a.md（Access is denied）");
   });
 
+  it("internal 的细节不展示给用户", () => {
+    expect(
+      formatCommandError({ code: "internal", params: { detail: "menu: boom" } })
+    ).toBe("内部错误");
+  });
+
   it("未知 code 回退到 unknown 文案", () => {
     expect(formatCommandError({ code: "future_code" })).toBe("未知错误");
   });

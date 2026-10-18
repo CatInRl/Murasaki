@@ -502,18 +502,6 @@ onMounted(async () => {
       invoke<{ path: string; type: "file" | "folder" } | null>("take_pending_open_path"),
     openWorkspace: (path) => workspace.openWorkspace(path),
     restoreTabs: () => tabsStore.restore(),
-    notifyRestoreFailure: (path, err) => {
-      // 恢复失败不再只是 console.warn：给出原因与重试入口（#436）
-      toastStore.error(
-        t("common.error.openWorkspaceFailed", { error: formatCommandError(err) }),
-        {
-          action: {
-            label: t("common.retry"),
-            onClick: () => void workspace.openWorkspace(path).catch(() => {}),
-          },
-        }
-      );
-    },
     setupEventListeners,
     // 必须用窗口级 listen：裸 listen 的 target 是 Any，多窗口下会收到所有窗口的 emit（ADR-0017）
     listenCloseRequested: (handler) =>

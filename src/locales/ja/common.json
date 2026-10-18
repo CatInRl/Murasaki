@@ -116,6 +116,10 @@
     "openWorkspaceFailed": "ワークスペースを開けませんでした: {error}",
     "reloadFailed": "再読み込みに失敗しました: {error}",
     "watchFailed": "ワークスペースの変更を監視できません: {error}",
+    "restoreTabsFailed": "{count} 個のタブを復元できませんでした",
+    "withPath": "{message}：{path}",
+    "withDetail": "{message}（{detail}）",
+    "withPathDetail": "{message}：{path}（{detail}）",
     "exportHtmlFailed": "HTML のエクスポートに失敗しました: {error}",
     "exportPdfFailed": "PDF のエクスポートに失敗しました: {error}",
     "code": {

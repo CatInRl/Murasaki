@@ -7,6 +7,16 @@ use tauri::menu::{
 use crate::i18n;
 use crate::errors::CommandError;
 
+/// 菜单操作失败：内部错误 + 原始细节（细节只进日志 / 参数，不直接展示给用户）
+fn menu_error(err: impl std::fmt::Display) -> CommandError {
+    CommandError::internal(format!("menu: {err}"))
+}
+
+/// 菜单尚未初始化（启动早期或已被系统回收）
+fn menu_unavailable() -> CommandError {
+    CommandError::internal("menu not initialized")
+}
+
 /// 最近打开菜单状态
 /// - folders/files: 前端推送的最近路径列表
 /// - id_to_path: 菜单项 ID → 完整路径的反查映射（每次重建菜单时刷新）
@@ -127,7 +137,7 @@ pub fn sidebar_menu_id(view: &str) -> &'static str {
 pub fn apply_checked_for_window(app: &AppHandle, label: &str) -> Result<(), CommandError> {
     let state = app.state::<RecentMenuState>();
     let ui = state.ui_of(label);
-    let menu = app.menu().ok_or_else(|| CommandError::internal("menu not initialized"))?;
+    let menu = app.menu().ok_or_else(menu_unavailable)?;
     set_checked_by_ids(
         &menu,
         &[
@@ -155,19 +165,19 @@ pub fn apply_checked_for_window(app: &AppHandle, label: &str) -> Result<(), Comm
 /// 在 setup 与 update_recent_menu 时共用，保证菜单结构一致
 pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, Box<dyn std::error::Error>> {
     let state = app.state::<RecentMenuState>();
-    let folders = state.folders.lock().map_err(|e| CommandError::internal(format!("menu: {e}")))?.clone();
-    let files = state.files.lock().map_err(|e| CommandError::internal(format!("menu: {e}")))?.clone();
+    let folders = state.folders.lock().map_err(menu_error)?.clone();
+    let files = state.files.lock().map_err(menu_error)?.clone();
     let lang = state
         .current_language
         .lock()
-        .map_err(|e| CommandError::internal(format!("menu: {e}")))?
+        .map_err(menu_error)?
         .clone();
     // 按 menu.json 的实际点号 key 查询当前语言文案
     let mt = |key: &str| i18n::menu_text(&lang, key);
     let overrides = state
         .shortcut_overrides
         .lock()
-        .map_err(|e| CommandError::internal(format!("menu: {e}")))?
+        .map_err(menu_error)?
         .clone();
     // 解析菜单项的实际快捷键提示：
     // - 无覆盖 → 使用默认 accelerator
@@ -400,7 +410,7 @@ fn build_recent_submenu(
         builder = builder.item(&placeholder);
     } else {
         // 重建 id_to_path 中本 prefix 的映射
-        let mut map = id_to_path.lock().map_err(|e| CommandError::internal(format!("menu: {e}")))?;
+        let mut map = id_to_path.lock().map_err(menu_error)?;
         // 清除同前缀旧条目
         let prefix_with_colon = format!("{}:", prefix);
         map.retain(|k, _| !k.starts_with(&prefix_with_colon));
@@ -445,13 +455,13 @@ pub fn update_recent_menu(
 
     {
         // 先获取两把锁再修改，避免锁中毒时 folders 已更新但 files 未更新
-        let mut f = state.folders.lock().map_err(|e| CommandError::internal(format!("menu: {e}")))?;
-        let mut fi = state.files.lock().map_err(|e| CommandError::internal(format!("menu: {e}")))?;
+        let mut f = state.folders.lock().map_err(menu_error)?;
+        let mut fi = state.files.lock().map_err(menu_error)?;
         *f = folders;
         *fi = files;
     }
-    let menu = build_app_menu(&app).map_err(|e| CommandError::internal(format!("menu: {e}")))?;
-    app.set_menu(menu).map_err(|e| CommandError::internal(format!("menu: {e}")))?;
+    let menu = build_app_menu(&app).map_err(menu_error)?;
+    app.set_menu(menu).map_err(menu_error)?;
     Ok(())
 }
 
@@ -468,7 +478,7 @@ fn set_checked_by_ids(
         active_id: &str,
     ) -> Result<(), CommandError> {
         if let Some(submenu) = item.as_submenu() {
-            for sub in submenu.items().map_err(|e| CommandError::internal(format!("menu: {e}")))? {
+            for sub in submenu.items().map_err(menu_error)? {
                 walk(&sub, ids, active_id)?;
             }
         } else {
@@ -477,14 +487,14 @@ fn set_checked_by_ids(
                 if let Some(check_item) = item.as_check_menuitem() {
                     check_item
                         .set_checked(id == active_id)
-                        .map_err(|e| CommandError::internal(format!("menu: {e}")))?;
+                        .map_err(menu_error)?;
                 }
             }
         }
         Ok(())
     }
 
-    for item in menu.items().map_err(|e| CommandError::internal(format!("menu: {e}")))? {
+    for item in menu.items().map_err(menu_error)? {
         walk(&item, ids, active_id)?;
     }
     Ok(())
@@ -519,7 +529,7 @@ pub fn set_theme_checked(
         "theme-night",
         "theme-academic",
     ];
-    let menu = app.menu().ok_or_else(|| CommandError::internal("menu not initialized"))?;
+    let menu = app.menu().ok_or_else(menu_unavailable)?;
     set_checked_by_ids(&menu, &theme_ids, &theme_id)
 }
 
@@ -545,7 +555,7 @@ pub fn set_mode_checked(
     }
 
     let mode_ids = ["mode-source", "mode-split", "mode-wysiwyg", "mode-presentation"];
-    let menu = app.menu().ok_or_else(|| CommandError::internal("menu not initialized"))?;
+    let menu = app.menu().ok_or_else(menu_unavailable)?;
     set_checked_by_ids(&menu, &mode_ids, &mode_id)
 }
 
@@ -565,7 +575,7 @@ pub fn set_sidebar_view_checked(
     }
 
     let view_ids = ["toggle-sidebar", "toggle-outline"];
-    let menu = app.menu().ok_or_else(|| CommandError::internal("menu not initialized"))?;
+    let menu = app.menu().ok_or_else(menu_unavailable)?;
     // view_id 是视图名（files / outline），而勾选 API 要的是菜单项 ID —— 必须转换，
     // 否则 id == active_id 永不相等，两项勾选会被一起清空（issue #340）。
     set_checked_by_ids(&menu, &view_ids, sidebar_menu_id(&view_id))
@@ -580,11 +590,11 @@ pub fn reload_menu(
     lang: String,
 ) -> Result<(), CommandError> {
     {
-        let mut current = state.current_language.lock().map_err(|e| CommandError::internal(format!("menu: {e}")))?;
+        let mut current = state.current_language.lock().map_err(menu_error)?;
         *current = lang;
     }
-    let menu = build_app_menu(&app).map_err(|e| CommandError::internal(format!("menu: {e}")))?;
-    app.set_menu(menu).map_err(|e| CommandError::internal(format!("menu: {e}")))?;
+    let menu = build_app_menu(&app).map_err(menu_error)?;
+    app.set_menu(menu).map_err(menu_error)?;
     Ok(())
 }
 
@@ -602,11 +612,11 @@ pub fn update_shortcut_labels(
         let mut current = state
             .shortcut_overrides
             .lock()
-            .map_err(|e| CommandError::internal(format!("menu: {e}")))?;
+            .map_err(menu_error)?;
         *current = overrides;
     }
-    let menu = build_app_menu(&app).map_err(|e| CommandError::internal(format!("menu: {e}")))?;
-    app.set_menu(menu).map_err(|e| CommandError::internal(format!("menu: {e}")))?;
+    let menu = build_app_menu(&app).map_err(menu_error)?;
+    app.set_menu(menu).map_err(menu_error)?;
     Ok(())
 }
 

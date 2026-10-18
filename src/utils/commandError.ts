@@ -5,30 +5,14 @@
  * 前端按 code 走 i18n，不再匹配中文字符串。旧命令或非结构化异常退化为 `unknown`。
  */
 import { i18n } from "../i18n";
+import { useToastStore } from "../stores/useToastStore";
 
 export interface CommandErrorInfo {
   /** 错误码（snake_case），未知时为 `unknown` */
   code: string;
-  /** 上下文参数（path / detail / to 等） */
+  /** 上下文参数（path / detail 等） */
   params: Record<string, string>;
 }
-
-/** 与 Rust `ErrorCode` 一一对应；新增错误码时同步这里与三套 locale */
-const KNOWN_CODES = [
-  "not_found",
-  "not_a_directory",
-  "not_a_file",
-  "already_exists",
-  "permission_denied",
-  "outside_workspace",
-  "invalid_argument",
-  "unsupported",
-  "timeout",
-  "internal",
-  "io",
-] as const;
-
-const KNOWN = new Set<string>(KNOWN_CODES);
 
 /** 把 invoke 的拒绝值解析为结构化错误（非结构化 → unknown + detail） */
 export function parseCommandError(err: unknown): CommandErrorInfo {
@@ -51,10 +35,18 @@ export function parseCommandError(err: unknown): CommandErrorInfo {
 }
 
 /**
+ * 可展示 detail 的错误码：io 的系统原文与非法参数的原因对用户有用。
+ * `internal` 的细节是给排查用的（任务名 / 第三方库原文），直接展示只会变成噪音。
+ */
+function showsDetail(code: string): boolean {
+  return code === "io" || code === "invalid_argument";
+}
+
+/**
  * 渲染用户可读文案：
  * - 类目文案来自 `common.error.code.*`
- * - 有 `path` 时追加「：<路径>」
- * - `io` / `internal` 有 `detail` 时追加括号说明（系统原文，不翻译）
+ * - 路径 / 细节的拼接也走 locale（`withPath` / `withDetail` / `withPathDetail`），
+ *   不在代码里硬编码中文标点
  * - 非结构化错误直接展示原始信息
  */
 export function formatCommandError(err: unknown): string {
@@ -64,11 +56,31 @@ export function formatCommandError(err: unknown): string {
   if (code === "unknown") {
     return params.detail || i18n.global.t("common.error.code.unknown");
   }
-  const key = `common.error.code.${KNOWN.has(code) ? code : "unknown"}`;
-  let text = i18n.global.t(key);
-  if (params.path) text += `：${params.path}`;
-  if (params.detail && (code === "io" || code === "internal")) {
-    text += `（${params.detail}）`;
+  const key = `common.error.code.${code}`;
+  const message = i18n.global.te(key)
+    ? i18n.global.t(key)
+    : i18n.global.t("common.error.code.unknown");
+  const detail = showsDetail(code) ? params.detail : undefined;
+
+  if (params.path && detail) {
+    return i18n.global.t("common.error.withPathDetail", {
+      message,
+      path: params.path,
+      detail,
+    });
   }
-  return text;
+  if (params.path) {
+    return i18n.global.t("common.error.withPath", { message, path: params.path });
+  }
+  if (detail) {
+    return i18n.global.t("common.error.withDetail", { message, detail });
+  }
+  return message;
+}
+
+/** 错误提示 + 「重试」动作（文件树 / 监听 / 恢复等失败路径共用一段交互） */
+export function showRetryToast(message: string, retry: () => void): void {
+  useToastStore().error(message, {
+    action: { label: i18n.global.t("common.retry"), onClick: retry },
+  });
 }
