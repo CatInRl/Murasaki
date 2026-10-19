@@ -11,6 +11,16 @@ name: Test
 # 五个 job（frontend / rust / e2e / e2e (linux) / e2e (macos)）均为 required status
 # checks，PR 必须全绿才能合入 main（见 AGENTS.md「过门禁」）。
 #
+# E2E 分片（#444）：三平台各自再切成 4 份并行跑，由 CI 传 `E2E_SHARD=<序号>/<总数>`
+# 给 `e2e/vitest.config.ts`，分组表就在那里（`SHARD_GROUPS`）。
+# 动机是 Linux 上每个 spec 的 WebKitGTK session 启动约 30s × 41 文件，串行要 37–40 分钟。
+# **不用 Vitest 内置的 `--shard`**：它按文件数均分、不看每文件用例数，实测会让
+# wysiwyg-full（79 条、约 170s）与零散小文件混在一起，最重的一片仍决定总时长。
+# **改动分片数会改变 required status checks 的 job 名**（`e2e (2/4)` 这类格式），
+# 必须同步更新分支保护的 required_status_checks，否则 main 会卡在「等一个不存在的 job」。
+# 新增 spec 文件时也要加进 `SHARD_GROUPS` —— 漏加会让它在 CI 上永远不跑，
+# `e2e/vitest.config.ts` 里有自检会直接报错。
+#
 # Linux e2e（e2e-linux job）用 tauri-driver + WebKitWebDriver（webkit2gtk-driver 包）
 # 驱动真实 WebKitGTK，经 Xvfb 无头运行；应用侧 E2E 判定来自 tauri-driver 注入的
 # TAURI_WEBVIEW_AUTOMATION 环境变量（见 src-tauri/src/lib.rs 的 is_e2e_mode）。
@@ -107,9 +117,14 @@ jobs:
         run: npm run test:rust
 
   e2e:
-    name: e2e
+    # 分片名会显示为 `e2e (1/4)`…`e2e (4/4)`，均为 required status check（见文件头注释）
+    name: e2e (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: windows-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -155,6 +170,10 @@ jobs:
         env:
           TMP: ${{ runner.temp }}
           TEMP: ${{ runner.temp }}
+          # 分片选择在 e2e/vitest.config.ts 的 SHARD_GROUPS 里（按权重均衡；
+          # 不用 Vitest 内置 --shard —— 它只按文件数均分，会让 wysiwyg-full 的 79 条
+          # 全落进同一片，等于没分）
+          E2E_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
 
       # 失败时留诊断日志：应用侧在 E2E 模式会写 <TEMP>\murasaki-devtools.log
       # （Windows 更新通道 / DevToolsActivePort 写入等排查线索）
@@ -162,14 +181,18 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-logs
+          name: e2e-logs-shard${{ matrix.shard }}
           path: ${{ runner.temp }}/murasaki-devtools.log
           if-no-files-found: ignore
 
   e2e-linux:
-    name: e2e (linux)
+    name: e2e (linux) (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -225,20 +248,25 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
           WEBKIT_DISABLE_DMABUF_RENDERER: "1"
+          E2E_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
 
       # 失败时留诊断日志（与 Windows job 同名文件，artifact 名必须不同）
       - name: 上传失败诊断日志
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-logs-linux
+          name: e2e-logs-linux-shard${{ matrix.shard }}
           path: ${{ runner.temp }}/murasaki-devtools.log
           if-no-files-found: ignore
 
   e2e-macos:
-    name: e2e (macos)
+    name: e2e (macos) (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: macos-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -275,12 +303,13 @@ jobs:
         run: npm run test:e2e
         env:
           TMPDIR: ${{ runner.temp }}
+          E2E_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
 
       # 失败时留诊断日志（artifact 名必须与前两个 e2e job 不同）
       - name: 上传失败诊断日志
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-logs-macos
+          name: e2e-logs-macos-shard${{ matrix.shard }}
           path: ${{ runner.temp }}/murasaki-devtools.log
           if-no-files-found: ignore

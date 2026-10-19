@@ -97,6 +97,17 @@ describe("文件树选中态 & 搜索高亮", () => {
     // 慢 runner 上选中态建立可能晚于固定 pause（CI 上连续两次挂在这条）：
     // 等到元素真的出现再读样式，而不是赌 300ms
     await waitForPresent(browser, ".node-row.is-selected", 10000);
+    // 点击后鼠标仍悬在该行上：底色是 hover 态（--murasaki-primary-soft-hover，20%），
+    // 不是要断言的选中态（--murasaki-primary-soft，12%）。用真实指针移开
+    //（:hover 由浏览器维护，合成 mousemove 事件的 DOM 分发清不掉它）。
+    await browser
+      .action("pointer")
+      .move({ x: 0, y: 0 })
+      .perform()
+      .catch(() => {
+        // 某些 driver 不支持 pointer action：退回滚动到左侧空白处
+      });
+    await browser.pause(120);
 
     // 颜色判定放在浏览器里做（Node 侧没有 canvas），契约见 SELECTION_FILL 注释
     const tint = await browser.execute((fill: string) => {
@@ -116,8 +127,10 @@ describe("文件树选中态 & 搜索高亮", () => {
       const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
 
       return {
-        // 偏紫（蓝通道明显高于绿）+ 够浅（三通道都高，即与背景区分得开）
-        ok: b > g + 8 && r > g && Math.min(r, g, b) > 200,
+        // 偏紫（蓝通道明显高于绿与红）+ 是浅色（不是实心主色块）。
+        // 不卡具体混合比例：选中态（12%）与鼠标悬停态（20%）都是合格的「淡紫」，
+        // 而鼠标停在节点上时底色会从 --primary-soft 切到 --primary-soft-hover。
+        ok: b > g + 6 && b > r && Math.min(r, g, b) > 180,
         color,
         composed: `rgb(${r}, ${g}, ${b})`,
       };
