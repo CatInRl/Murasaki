@@ -432,4 +432,55 @@ describe("持久化恢复", () => {
     expect(restored.content).toBe("# 未保存的新内容\n");
     expect(restored.isDirty).toBe(true);
   });
+
+  // ===== 光标与滚动跨重启（#450 / ADR-0022 Q13）=====
+  // 过去 Tab.cursor / Tab.scroll 只在创建时初始化、运行时不更新，
+  // tabs.json 里存的永远是 {line:1,ch:0} / {x:0,y:0}，恢复等于没恢复。
+
+  it("光标与滚动位置写入 tabs.json，并在 restore 后带回会话", async () => {
+    const introPath = resolve(wsPath, "intro.md").replace(/\\/g, "/");
+    await openFileInTab(browser, introPath);
+    await browser.pause(300);
+
+    // 模拟编辑器上报：真实场景由 SourceEditor 的 cursor-change 事件写入
+    await browser.execute(() => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      const tabs = window.__pinia__._s.get("tabs");
+      const id = tabs.activeTabId;
+      tabs.updateCursor(id, { line: 9, ch: 6 });
+      tabs.updateScroll(id, { x: 0, y: 512 });
+    });
+
+    // 持久化 → 清空 → 恢复（与本文件其它用例同一套「模拟重启」手法）
+    await browser.executeAsync((done: (res: unknown) => void) => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      const tabs = window.__pinia__._s.get("tabs");
+      Promise.resolve(tabs.persist())
+        .then(() => done(null))
+        .catch((err: unknown) => done(err ? String(err) : null));
+    });
+    await browser.execute(() => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__pinia__._s.get("tabs").clearAll();
+    });
+    await browser.pause(200);
+    await browser.executeAsync((done: (res: unknown) => void) => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      const tabs = window.__pinia__._s.get("tabs");
+      Promise.resolve(tabs.restore())
+        .then(() => done(null))
+        .catch((err: unknown) => done(err ? String(err) : null));
+    });
+
+    const restored = await browser.execute(() => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      const tabs = window.__pinia__._s.get("tabs");
+      const tab = tabs.tabs.find((t: any) => t.path?.endsWith("intro.md"));
+      return tab ? { cursor: tab.cursor, scroll: tab.scroll } : null;
+    });
+
+    expect(restored).not.toBeNull();
+    expect(restored!.cursor).toEqual({ line: 9, ch: 6 });
+    expect(restored!.scroll).toEqual({ x: 0, y: 512 });
+  });
 });
