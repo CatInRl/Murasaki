@@ -109,12 +109,17 @@ murasaki/
 1. **先有 issue**：任何改动都要有 issue 跟踪（见下「Issue 跟踪约定」），禁止无 issue 开工。
 2. **切分支**：从最新 `main` 切出 `<type>/<issue>-<slug>`，例如 `fix/198-multi-window-deadlock`、`docs/205-dev-workflow`。`<type>` 取 Conventional Commits 类型（feat / fix / docs / refactor / test / chore）。分支名必须带 issue 号，所以**先有 issue 才有分支**。**不要在 main 上直接提交**。
 3. **开 PR**：推送分支后开 PR，标题格式 `<type>(<scope>): <描述> (#<issue>)`，描述按 [.github/pull_request_template.md](.github/pull_request_template.md) 模板填写（dependabot 等机器人开的 PR 不受此标题格式约束）。
-4. **过门禁**：[.github/workflows/test.yml](.github/workflows/test.yml) 中 `frontend`、`rust`、`e2e` 三个 job 必须全绿——
+4. **过门禁**：[.github/workflows/test.yml](.github/workflows/test.yml) 中 `frontend`、`rust` 与 **12 个 e2e 分片 job** 必须全绿——
    - `frontend`（ubuntu-24.04）：`npm test` + `npm run build`
    - `rust`（windows-latest）：`npm run build` + `npm run test:rust`（`tauri.conf.json` 的 `frontendDist` 指向 `../dist`，需先产出 dist）
-   - `e2e`（windows-latest）：tauri-driver + msedgedriver 驱动**真实 WebView2**，跑 `npx tauri build --no-bundle` + `npm run test:e2e`
+   - `e2e (n/4)` / `e2e (linux) (n/4)` / `e2e (macos) (n/4)`（n=1..4）：三平台各自切 4 片并行（#444）。Windows 用 tauri-driver + msedgedriver 驱动**真实 WebView2**，Linux 用 WebKitWebDriver + Xvfb，macOS 用应用内嵌的 WebDriver 服务端；均跑 `npx tauri build --no-bundle` + `npm run test:e2e`
 
-   `e2e` 于 **2026-09-26 提升为必过项**（此前只跑不拦，见 #261；提升的依据是修掉三类 flake 后连续 4 次跑绿：应用就绪未等 #266、元素等待不重试 #268、只等容器不等节点 #270。提升后它的第一次运行就拦下第四类 flake —— 右键菜单被滚动收起，见 #273）。代价是每个 PR 多等约 15–23 分钟；若某次确认是环境抖动而非回归，可 `gh run rerun <run-id> --failed` 重试，确需临时降级时改分支保护的 required status checks（`gh api repos/CatInRl/Murasaki/branches/main/protection/required_status_checks -X PATCH ...`）。
+   `e2e` 于 **2026-09-26 提升为必过项**（此前只跑不拦，见 #261；提升的依据是修掉三类 flake 后连续 4 次跑绿：应用就绪未等 #266、元素等待不重试 #268、只等容器不等节点 #270。提升后它的第一次运行就拦下第四类 flake —— 右键菜单被滚动收起，见 #273）。**2026-10-19 起分片**（#444）：瓶颈是每个 spec 启动一次真实 WebView（Linux ≈30s × 41 文件 ≈ 20 分钟），4 片后 Linux 从 **39 分钟降到约 12 分钟**、Windows/macOS 约 7 分钟。CI 分钟总数不变，只是并行度提高。若某次确认是环境抖动而非回归，可 `gh run rerun <run-id> --failed` 重试，确需临时降级时改分支保护的 required status checks（`gh api repos/CatInRl/Murasaki/branches/main/protection/required_status_checks -X PATCH ...`）。
+
+   **e2e 分片怎么改**：分组表在 `e2e/vitest.config.ts` 的 `SHARD_GROUPS`，CI 传 `E2E_SHARD=<序号>/<总数>` 选片；本地不设该变量时跑全集。两条硬约束：
+   - **新增 spec 文件必须加进 `SHARD_GROUPS`**，否则它在 CI 上**永远不跑且没有任何提示**（配置里有自检会直接报错，别把它当噪音删掉）。
+   - **改分片数必须同步改分支保护的 required checks**：job 名是 `e2e (2/4)` 这种格式，数字变了旧名就永远 pending。过渡期可以先把「旧名 + 新名」都放进保护（只增不减），等分片 PR 合入后再把旧名删掉；反过来（直接只留新名）会让**任何基于旧 workflow 的在途 PR 全部卡死**。
+   - 不要用 Vitest 内置 `--shard`：它按文件数均分、不看每文件用例数，实测让 wysiwyg-full（79 条）与一堆小文件混在一起，最重的一片仍决定总时长。
 
    **e2e 的坑（都踩过，别再踩）**：
    - 被测二进制必须走 Tauri CLI（`npm run tauri:build` 或 `npx tauri build --no-bundle`）。裸 `cargo build --release` 产出的二进制**前端起不来**（webview 停在 `title="localhost"`），整套 e2e 会系统性失败、极易误判成代码回归。
@@ -170,7 +175,7 @@ gh api -X PUT repos/CatInRl/Murasaki/branches/main/protection -F "required_statu
 
 - **发布流程**：开 `chore(release)` PR 更新三处版本号（package.json / src-tauri/Cargo.toml / src-tauri/tauri.conf.json），并把 `## [Unreleased]` 段落切成 `## [X.Y.Z] - YYYY-MM-DD` → CI 绿后合入 main → 在 main 打 `vX.Y.Z` tag → 推送 tag 触发 `release.yml` → 关闭 milestone → 同步更新本文件变更记录部分
   - 打 tag 前可本地自检版本一致性：`TAG=vX.Y.Z node scripts/check-release-ready.mjs`
-  - `release.yml` 会先校验「tag 与三处版本号一致」并等该提交的 frontend / rust / e2e / e2e (linux) / e2e (macos) 全绿；任何一项不满足都会拒绝发布
+  - `release.yml` 会先校验「tag 与三处版本号一致」并等该提交的 frontend / rust 与 12 个 e2e 分片 job（`e2e (n/4)` / `e2e (linux) (n/4)` / `e2e (macos) (n/4)`，见「过门禁」）全绿；任何一项不满足都会拒绝发布
   - Release 先以**草稿**创建，四个平台产物与 `latest.json` 齐全后才自动转正；中途失败时保持草稿，便于排查后重跑
 - **Release 必须包含 CHANGELOG 内容**：`release.yml` 会用 `awk` 从 `CHANGELOG.md` 提取 `## [VERSION]` 段落，拼接到 Release Notes（安装说明 + 变更记录）。因此打 tag 前必须先在 CHANGELOG.md 写好对应版本条目，否则 Release Notes 的"变更记录"章节为空
 - **重新发布同版本**：删除旧 release（`gh release delete vX.Y.Z --yes --cleanup-tag`）→ 删除本地 tag（`git tag -d vX.Y.Z`）→ 提交修复代码并推送 → 重新打 tag 并推送触发构建
