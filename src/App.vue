@@ -223,17 +223,6 @@ async function onSelectMode(mode: EditorMode): Promise<void> {
   await persistence.updateSettings({ editorMode: mode });
 }
 
-// 切 tab 时更新 editor bridge 的文档路径
-// 用 flush: 'post' 确保在 SourceEditor.onMounted（registerView(view, null)）之后触发，
-// 否则首次打开 tab 时 EditorPane 挂载会重置 activeDocPath 为 null。
-watch(
-  currentFilePath,
-  (path) => {
-    editorBridge.updateDocPath(path);
-  },
-  { flush: "post" }
-);
-
 // ===== 文件操作 composable（磁盘 IO 类入口）=====
 const {
   openFile,
@@ -368,6 +357,10 @@ const wordCount = computed(() => countWords(activeContent.value));
 function onCursorChange(payload: { line: number; ch: number }) {
   cursorLine.value = payload.line;
   cursorCol.value = payload.ch;
+  // 同时记进 tab / 会话，供跨重启恢复（ADR-0022 Q13）。
+  // 过去光标位置从不更新，tabs.json 里存的永远是初始的 {line:1,ch:0}。
+  const id = tabsStore.activeTabId;
+  if (id) tabsStore.updateCursor(id, payload);
 }
 
 // ===== 冲突对话框（改走 dialog store，不再使用 ConflictDialog 组件）=====

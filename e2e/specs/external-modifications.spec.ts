@@ -4,7 +4,7 @@
  * 验证：
  * - H4: 文件被外部修改且 tab 无未保存修改 → 自动重载
  * - H5: 文件被外部修改且 tab 有未保存修改 → 弹三选一对话框（加载磁盘版本 / 保留本地 / 对比）
- * - H6: 文件被外部删除 → tab 标记 hasExternalChange + alert 提示
+ * - H6: 文件被外部删除 → 弹 alert 提示
  *
  * 通过 Tauri event 'file-changed' 模拟 Rust notify 推送，
  * 走完整代码路径：file-changed → useFileWatcher → handleExternalChange → 弹窗 / 重载。
@@ -52,15 +52,6 @@ async function emitFileChangedEvent(
     },
     { path, kind }
   );
-}
-
-/** 获取 active tab 的 hasExternalChange 状态 */
-async function getActiveExternalFlag(browser: Browser): Promise<boolean | null> {
-  return browser.execute(() => {
-    // @ts-ignore: E2E 运行时注入，类型不可静态推导
-    const tabs = window.__pinia__._s.get("tabs");
-    return tabs.activeTab?.hasExternalChange ?? null;
-  });
 }
 
 describe("外部修改检测", () => {
@@ -132,8 +123,8 @@ describe("外部修改检测", () => {
     });
     expect(isDirty).toBe(false);
 
-    // hasExternalChange 应为 false（已重载）
-    expect(await getActiveExternalFlag(browser)).toBe(false);
+    // 编辑器读到的内容也应已经是磁盘新内容（不只是 store 里的副本）
+    expect(await getActiveContent(browser)).toBe(newContent);
   });
 
   // ===== H5: 有本地修改时弹三选一对话框 =====
@@ -290,47 +281,24 @@ describe("外部修改检测", () => {
       return tabs.activeTab?.isDirty;
     });
     expect(isDirty).toBe(true);
-
-    // hasExternalChange 应为 true（用户选择保留本地，外部修改标记保留）
-    expect(await getActiveExternalFlag(browser)).toBe(true);
   });
 
   // ===== H6: 文件被外部删除 =====
 
-  it("文件被外部删除 → tab 标记 hasExternalChange + 弹 alert 提示", async () => {
+  it("文件被外部删除 → 弹出提示，内容不会被清空", async () => {
     const filePath = resolve(wsPath, "intro.md");
     const path = filePath.replace(/\\/g, "/");
     await openFileInTab(browser, path);
     await browser.pause(300);
+    const before = await getActiveContent(browser);
 
-    // 删除文件
     rmSync(filePath, { force: true });
-
-    // 触发 file-changed 事件（Rust notify 也会推送删除事件）
     await emitFileChangedEvent(browser, path, "remove");
 
-    // 等待 alert 对话框出现
-    await browser.pause(1500);
-
-    // 检查 tab hasExternalChange
-    const hasExternal = await getActiveExternalFlag(browser);
-    // 注意：如果事件链路未正确触发，hasExternal 可能为 false
-    // 此处只验证状态机的正确性（如果触发了，标记必须正确）
-    if (hasExternal !== null) {
-      // 若触发了，必须为 true
-      if (hasExternal === false) {
-        // 等待更长时间
-        await browser.pause(3000);
-      }
-      const finalFlag = await getActiveExternalFlag(browser);
-      if (finalFlag === true) {
-        // 验证 alert 对话框存在
-        const alertVisible = await browser.execute(() => {
-          return !!document.querySelector(".dialog-overlay");
-        });
-        expect(alertVisible).toBe(true);
-      }
-      // 否则：事件未触发，跳过断言（已知 E2E 中 Tauri event 模拟不稳定）
-    }
+    // Phase 3 删掉了 hasExternalChange（只有写入、没有读取），
+    // 这条改为断言用户可见的部分：出现提示对话框，且编辑器里的内容还在
+    //（文件没了不代表用户正在编辑的内容该被清空）。
+    await waitForPresent(browser, ".dialog-overlay", 10000);
+    expect(await getActiveContent(browser)).toBe(before);
   });
 });

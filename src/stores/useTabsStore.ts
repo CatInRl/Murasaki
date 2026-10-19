@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import type { Tab, PersistedTab } from "../types";
+import type { Tab, PersistedTab, CursorPosition, ScrollPosition } from "../types";
 import { usePersistenceStore } from "./usePersistenceStore";
 import { useToastStore } from "./useToastStore";
 import { fileSystem } from "../services/fileSystem";
@@ -88,7 +88,6 @@ export const useTabsStore = defineStore("tabs", () => {
       content: snapshot.content,
       lastMtime: snapshot.baselineMtime,
       isDirty: snapshot.isDirty,
-      hasExternalChange: tab.hasExternalChange,
       cursor: tab.cursor,
       scroll: tab.scroll,
     };
@@ -117,14 +116,6 @@ export const useTabsStore = defineStore("tabs", () => {
       get isDirty() {
         void revision.value;
         return session.snapshot().isDirty;
-      },
-      // 外部修改标记不属于会话（ADR-0022 把它判为 watcher 领域、Phase 3 删除），
-      // 这里转发到底层 tab，保证 markExternalChange 写的值能被读到
-      get hasExternalChange() {
-        return tab.hasExternalChange;
-      },
-      set hasExternalChange(value: boolean) {
-        tab.hasExternalChange = value;
       },
       cursor: tab.cursor,
       scroll: tab.scroll,
@@ -237,7 +228,10 @@ export const useTabsStore = defineStore("tabs", () => {
    *   - 不一致 → 磁盘被外部改过，交由用户裁决（#425）：
    *     保留草稿 / 加载磁盘版本 / 稍后处理（用磁盘内容打开，草稿文件保留）
    */
-  async function openFile(path: string, options: { activate?: boolean } = {}): Promise<Tab> {
+  async function openFile(
+    path: string,
+    options: { activate?: boolean; cursor?: CursorPosition; scroll?: ScrollPosition } = {}
+  ): Promise<Tab> {
     const activate = options.activate ?? true;
     // 检查是否已打开。走 getTabByPath（按归一化路径比较）—— 同一文件可能以 `\` 或 `/`
     // 的写法到达（外部入口 / 命令行参数 / 手工拼接），字面量比较会重复开 tab
@@ -253,6 +247,9 @@ export const useTabsStore = defineStore("tabs", () => {
       id,
       path,
       store: documentStore,
+      // 跨重启恢复：把上次存下的光标 / 滚动位置交给会话
+      cursor: options.cursor,
+      scroll: options.scroll,
       onChange: () => {
         revision.value++;
         schedulePersistOnChange();
@@ -291,9 +288,10 @@ export const useTabsStore = defineStore("tabs", () => {
         content: "",
         lastMtime: null,
         isDirty: false,
-        hasExternalChange: false,
-        cursor: { line: 1, ch: 0 },
-        scroll: { x: 0, y: 0 },
+        // 与交给会话的值保持一致：恢复场景下若这里写死初始值，
+        // 下次 persist 又会把 {line:1,ch:0} 写回 tabs.json，跨重启恢复失效
+        cursor: options.cursor ?? { line: 1, ch: 0 },
+        scroll: options.scroll ?? { x: 0, y: 0 },
       },
       session,
       revision
@@ -322,7 +320,6 @@ export const useTabsStore = defineStore("tabs", () => {
         content: "",
         lastMtime: null,
         isDirty: false,
-        hasExternalChange: false,
         cursor: { line: 1, ch: 0 },
         scroll: { x: 0, y: 0 },
       },
@@ -471,27 +468,11 @@ export const useTabsStore = defineStore("tabs", () => {
       await session.reloadBaseline(
         externalContent !== undefined ? { content: externalContent, mtime } : undefined
       );
-      // 已与磁盘同步，外部修改标记随之清除
-      markExternalChange(filePath, false);
     } else {
       // keep-local：将 mtime 基线对齐磁盘当前 mtime，保证草稿 knownMtime 与磁盘一致
       // 这样关闭未保存时草稿能被下次启动正确恢复
       session.rebaseline(mtime);
-      // 用户明确选择保留本地：外部修改标记置位，提示磁盘与编辑器内容已分叉
-      markExternalChange(filePath, true);
     }
-  }
-
-  /**
-   * 标记 tab 的外部修改状态（用于文件被外部删除 / 保留本地版本等场景）。
-   *
-   * ADR-0022 判定它属于死状态，计划在 Phase 3（#450）删除；
-   * Phase 2 保留真实实现 —— e2e 用它断言「自动重载后标记清除」与
-   * 「保留本地后标记置位」两条既有行为契约。
-   */
-  function markExternalChange(filePath: string, changed: boolean): void {
-    const tab = tabs.value.find((t) => t.path !== null && isSamePath(t.path, filePath));
-    if (tab) tab.hasExternalChange = changed;
   }
 
   /**
@@ -509,8 +490,6 @@ export const useTabsStore = defineStore("tabs", () => {
       await session.flushDraft();
     }
     await session.reloadBaseline();
-    // 已与磁盘一致：外部修改标记清除
-    markExternalChange(filePath, false);
   }
 
   /**
@@ -523,8 +502,6 @@ export const useTabsStore = defineStore("tabs", () => {
       // 保存即「写盘 + 更新基线 + 删草稿」，正是会话的 save 语义
       session.setContent(mergedContent);
       await session.save();
-      // 合并结果已写盘，本地与磁盘重新一致
-      markExternalChange(filePath, false);
       return;
     }
     await fileSystem.writeText(filePath, mergedContent);
@@ -583,6 +560,34 @@ export const useTabsStore = defineStore("tabs", () => {
     if (activeTabId.value) {
       updateContent(activeTabId.value, content);
     }
+  }
+
+  /**
+   * 记录光标位置（ADR-0022 Q13：selection 经 adapter 订阅 / 由容器上报）。
+   *
+   * 过去 `Tab.cursor` 只在创建时初始化成 `{line:1,ch:0}`，运行时不更新 ——
+   * 于是 `tabs.json` 里存的永远是那个初始值，跨重启恢复光标等于没恢复。
+   * 现在由编辑器的 `cursor-change` 事件把它写回来。
+   */
+  function updateCursor(tabId: string, position: CursorPosition): void {
+    const tab = tabs.value.find((t) => t.id === tabId);
+    if (!tab) return;
+    // 光标每次移动都会触发；值没变就不动，避免无谓地触发持久化
+    if (tab.cursor.line === position.line && tab.cursor.ch === position.ch) return;
+    tab.cursor = { line: position.line, ch: position.ch };
+    getSession(tabId)?.setCursor(position);
+  }
+
+  /**
+   * 记录滚动位置（ADR-0022 Q13：滚动由容器上报）。
+   * 与 cursor 同样的理由：过去只存初始值。
+   */
+  function updateScroll(tabId: string, position: ScrollPosition): void {
+    const tab = tabs.value.find((t) => t.id === tabId);
+    if (!tab) return;
+    if (tab.scroll.x === position.x && tab.scroll.y === position.y) return;
+    tab.scroll = { x: position.x, y: position.y };
+    getSession(tabId)?.setScroll(position);
   }
 
   /**
@@ -707,13 +712,13 @@ export const useTabsStore = defineStore("tabs", () => {
       for (const persisted of state.tabs) {
         if (persisted.path) {
           try {
-            const tab = await openFile(persisted.path, { activate: false });
-            // 覆盖光标/滚动位置（openFile 不恢复这些）
-            if (tab) {
-              tab.cursor = persisted.cursor;
-              tab.scroll = persisted.scroll;
-            }
-            if (tab) orderedTabIds.push(tab.id);
+            // 直接把上次的光标 / 滚动位置带进会话（跨重启恢复，ADR-0022 Q13）
+            const tab = await openFile(persisted.path, {
+              activate: false,
+              cursor: persisted.cursor,
+              scroll: persisted.scroll,
+            });
+            orderedTabIds.push(tab.id);
           } catch (err) {
             console.warn(`恢复 tab 失败: ${persisted.path}`, err);
             failedPaths.push(persisted.path);
@@ -820,6 +825,20 @@ export const useTabsStore = defineStore("tabs", () => {
     }
   }
 
+  /**
+   * 编辑器 seam 入口（ADR-0022 Phase 3）：把 `SourceEditor` 的换入/换出交给会话。
+   *
+   * 过去 `SourceEditor` 自己维护 `stateCache: Map<tabId, EditorState>`（含 undo 栈），
+   * 从不淘汰 —— 开多少标签就留下多少份完整编辑状态，是内存单调增长的来源。
+   * 现在由会话持有，标签关闭即随会话释放。
+   *
+   * 只暴露这三个方法而不是整个 session：组件不该拿到 `save` / `dispose` 之类
+   * 的生命周期命令。
+   */
+  function getEditorBinding(tabId: string): EditorSession | null {
+    return getSession(tabId);
+  }
+
   return {
     // state
     tabs,
@@ -840,6 +859,8 @@ export const useTabsStore = defineStore("tabs", () => {
     switchPrev,
     updateContent,
     updateActiveContent,
+    updateCursor,
+    updateScroll,
     saveTab,
     saveTabAs,
     schedulePersist,
@@ -847,13 +868,14 @@ export const useTabsStore = defineStore("tabs", () => {
     bindPersist,
     restore,
     clearAll,
+    // 编辑器 seam（SourceEditor 换入/换出编辑状态）
+    getEditorBinding,
     // 外部修改相关
     getTabByPath,
     getTabById,
     setDraftConflictResolver,
     syncPathsAfterMove,
     applyExternalResolution,
-    markExternalChange,
     reloadFromDisk,
     writeMergedContent,
     // 退出落盘（useExitFlush）

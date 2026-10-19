@@ -76,7 +76,6 @@ describe("Murasaki 启动 smoke 测试", () => {
               items: tabsStore.tabs.slice(0, 5).map((t: any) => ({
                 path: t.path,
                 isDirty: t.isDirty,
-                hasExternalChange: t.hasExternalChange,
                 contentLength: typeof t.content === "string" ? t.content.length : -1,
               })),
               restoring: tabsStore.restoring === true,

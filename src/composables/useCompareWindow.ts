@@ -19,7 +19,6 @@ export interface TabsStoreLike {
     mode: "load-disk" | "keep-local",
     content?: string
   ) => Promise<unknown>;
-  markExternalChange: (path: string, marked: boolean) => void;
   writeMergedContent: (filePath: string, mergedContent: string) => Promise<unknown>;
 }
 
@@ -70,7 +69,6 @@ export function useCompareWindow(deps: CompareWindowDeps) {
     if (!tab) return;
     const mtime = await invoke<number>("get_file_mtime", { path }).catch(() => null);
     if (mtime === null) {
-      tabsStore.markExternalChange(path, true);
       if (!tab.isDirty) {
         dialog.alert({
           message: t("common.dialog.fileDeletedExternal", { path }),
@@ -139,8 +137,6 @@ export function useCompareWindow(deps: CompareWindowDeps) {
   }
 
   function onCompareClose(): void {
-    const { filePath } = compareState.value;
-    tabsStore.markExternalChange(filePath, true);
     compareState.value = { ...compareState.value, visible: false };
   }
 

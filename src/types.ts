@@ -67,11 +67,11 @@ export interface ScrollPosition {
  * - path: 文件绝对路径（null 表示未保存的新文件）
  * - content / isDirty / lastMtime: 由 store 从编辑会话快照派生的只读视图，
  *   不再是可写字段；写入口一律走 session 命令
- * - hasExternalChange: 是否检测到外部修改。ADR-0022 判定它属于死状态、
- *   计划在 Phase 3（#450）删除；Phase 2 仍需保留 —— e2e 用它断言
- *   「自动重载后标记清除」「保留本地后标记置位」两条既有行为契约
  * - cursor: 光标位置
  * - scroll: 滚动位置
+ *
+ * 曾经的 `hasExternalChange` 已在 Phase 3 删除：它只有写入、没有读取，
+ * 外部修改的判定与提示由 watcher 链路直接完成（见 useCompareWindow）。
  */
 export interface Tab {
   id: string;
@@ -79,7 +79,6 @@ export interface Tab {
   readonly content: string;
   readonly lastMtime: number | null;
   readonly isDirty: boolean;
-  hasExternalChange: boolean;
   cursor: CursorPosition;
   scroll: ScrollPosition;
 }

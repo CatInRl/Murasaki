@@ -108,12 +108,8 @@ async function setContentAndWait(
 /** 获取编辑器当前内容 */
 async function getContent(b: Browser): Promise<string> {
   return await b.execute(() => {
-    // @ts-ignore: E2E 运行时注入，类型不可静态推导
-    const bridge = window.__pinia__._s.get("editorBridge");
-    if (bridge && bridge.editorView) {
-      return bridge.editorView.state.doc.toString();
-    }
-    return "";
+    const view = window.__editorRef__?.getView();
+    return view ? view.state.doc.toString() : "";
   });
 }
 
@@ -132,15 +128,12 @@ async function getVisibleText(b: Browser): Promise<string> {
 /** 将光标设置到指定位置 */
 async function setCursor(b: Browser, pos: number): Promise<void> {
   await b.execute((p: number) => {
-    // @ts-ignore: E2E 运行时注入，类型不可静态推导
-    const bridge = window.__pinia__._s.get("editorBridge");
-    if (bridge && bridge.editorView) {
-      const view = bridge.editorView;
-      // 钳制到有效范围 [0, doc.length]
-      const clamped = Math.max(0, Math.min(p, view.state.doc.length));
-      view.dispatch({ selection: { anchor: clamped } });
-      view.focus();
-    }
+    const view = window.__editorRef__?.getView();
+    if (!view) return;
+    // 钳制到有效范围 [0, doc.length]
+    const clamped = Math.max(0, Math.min(p, view.state.doc.length));
+    view.dispatch({ selection: { anchor: clamped } });
+    view.focus();
   }, pos);
   // 等待防抖 50ms + 装饰重算
   await b.pause(150);
@@ -149,13 +142,10 @@ async function setCursor(b: Browser, pos: number): Promise<void> {
 /** 将光标设置到文档末尾（最后一个段落，确保行内/块级元素的标记被 hide 而非 dim） */
 async function setCursorToEnd(b: Browser): Promise<void> {
   await b.execute(() => {
-    // @ts-ignore: E2E 运行时注入，类型不可静态推导
-    const bridge = window.__pinia__._s.get("editorBridge");
-    if (bridge && bridge.editorView) {
-      const view = bridge.editorView;
-      view.dispatch({ selection: { anchor: view.state.doc.length } });
-      view.focus();
-    }
+    const view = window.__editorRef__?.getView();
+    if (!view) return;
+    view.dispatch({ selection: { anchor: view.state.doc.length } });
+    view.focus();
   });
   await b.pause(150);
 }
@@ -183,12 +173,8 @@ async function typeText(b: Browser, text: string): Promise<void> {
 /** 获取编辑器光标位置（selection.main.head） */
 async function getCursorHead(b: Browser): Promise<number> {
   return await b.execute(() => {
-    // @ts-ignore: E2E 运行时注入，类型不可静态推导
-    const bridge = window.__pinia__._s.get("editorBridge");
-    if (bridge && bridge.editorView) {
-      return bridge.editorView.state.selection.main.head;
-    }
-    return -1;
+    const view = window.__editorRef__?.getView();
+    return view ? view.state.selection.main.head : -1;
   });
 }
 
@@ -700,7 +686,7 @@ describe("WYSIWYG 模式全量测试", () => {
       // 选中 "**粗体**"
       await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         view.dispatch({ selection: { anchor: 0, head: 6 } });
         view.focus();
       });
@@ -798,7 +784,7 @@ describe("WYSIWYG 模式全量测试", () => {
       // 选中文本
       await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         view.dispatch({ selection: { anchor: 0, head: 2 } });
         view.focus();
       });
@@ -819,7 +805,7 @@ describe("WYSIWYG 模式全量测试", () => {
       await setContentAndWait(browser, "文本");
       await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         view.dispatch({ selection: { anchor: 0, head: 2 } });
         view.focus();
       });
@@ -928,13 +914,13 @@ describe("WYSIWYG 模式全量测试", () => {
       await setCursor(browser, 5);
       const beforePos = await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         return view.state.selection.main.head;
       });
       await setWysiwygMode(browser);
       const afterPos = await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         return view.state.selection.main.head;
       });
       expect(afterPos).toBe(beforePos);
@@ -1104,7 +1090,7 @@ describe("WYSIWYG 模式全量测试", () => {
       // 光标在第一个字符
       const pos = await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         return view.state.selection.main.head;
       });
       expect(pos).toBe(0);
@@ -1116,7 +1102,7 @@ describe("WYSIWYG 模式全量测试", () => {
       await setCursor(browser, md.length);
       const pos = await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         return view.state.selection.main.head;
       });
       expect(pos).toBe(md.length);
@@ -1149,7 +1135,7 @@ describe("WYSIWYG 模式全量测试", () => {
       // 创建选区：从"粗"到"文"
       await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         view.dispatch({ selection: { anchor: 2, head: 8 } });
         view.focus();
       });
@@ -1157,7 +1143,7 @@ describe("WYSIWYG 模式全量测试", () => {
       // 选区应存在
       const hasSelection = await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         return !view.state.selection.main.empty;
       });
       expect(hasSelection).toBe(true);
@@ -1169,14 +1155,14 @@ describe("WYSIWYG 模式全量测试", () => {
       // 创建跨 bullet widget 的选区
       await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         view.dispatch({ selection: { anchor: 0, head: 6 } });
         view.focus();
       });
       await browser.pause(150);
       const hasSelection = await browser.execute(() => {
         // @ts-ignore: E2E 运行时注入，类型不可静态推导
-        const view = window.__pinia__._s.get("editorBridge").editorView;
+        const view = window.__editorRef__?.getView();
         return !view.state.selection.main.empty;
       });
       expect(hasSelection).toBe(true);
