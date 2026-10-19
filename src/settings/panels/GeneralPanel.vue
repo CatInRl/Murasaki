@@ -16,9 +16,7 @@ const emit = defineEmits<{ "update:modelValue": [SettingsState] }>();
 const draft = computed(() => props.modelValue);
 
 /** 语言下拉选项（来自 LOCALE_DEFS 单一来源，新增语言自动包含） */
-const localeOptions = Object.entries(LOCALE_DEFS) as Array<
-  [AppLocale, { displayName: string }]
->;
+const localeOptions = Object.entries(LOCALE_DEFS) as Array<[AppLocale, { displayName: string }]>;
 
 function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): void {
   emit("update:modelValue", { ...draft.value, [key]: value });
@@ -27,17 +25,17 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
 <template>
   <div>
-    <h1 class="settings-page-title">{{ $t('settings.general.title') }}</h1>
+    <h1 class="settings-page-title">{{ $t("settings.general.title") }}</h1>
 
     <!-- 外观 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">{{ $t('settings.general.appearance') }}</h2>
+      <h2 class="settings-section-title">{{ $t("settings.general.appearance") }}</h2>
 
       <!-- 界面语言（ADR-0013） -->
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.general.language') }}</span>
-          <span class="setting-description">{{ $t('settings.general.languageDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.general.language") }}</span>
+          <span class="setting-description">{{ $t("settings.general.languageDesc") }}</span>
         </div>
         <div class="setting-control-column">
           <div class="select-wrapper">
@@ -45,15 +43,19 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
               :value="draft.language"
               @change="patch('language', ($event.target as HTMLSelectElement).value as AppLocale)"
             >
-              <option
-                v-for="[code, def] in localeOptions"
-                :key="code"
-                :value="code"
-              >
+              <option v-for="[code, def] in localeOptions" :key="code" :value="code">
                 {{ def.displayName }}
               </option>
             </select>
-            <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              class="select-chevron"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
@@ -63,11 +65,11 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
     <!-- 文件处理 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">{{ $t('settings.general.fileHandling') }}</h2>
+      <h2 class="settings-section-title">{{ $t("settings.general.fileHandling") }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.general.showHiddenFiles') }}</span>
-          <span class="setting-description">{{ $t('settings.general.showHiddenFilesDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.general.showHiddenFiles") }}</span>
+          <span class="setting-description">{{ $t("settings.general.showHiddenFilesDesc") }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">
@@ -83,8 +85,8 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.general.defaultImageDir') }}</span>
-          <span class="setting-description">{{ $t('settings.general.defaultImageDirDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.general.defaultImageDir") }}</span>
+          <span class="setting-description">{{ $t("settings.general.defaultImageDirDesc") }}</span>
         </div>
         <div class="setting-control-column">
           <input
@@ -99,19 +101,32 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.general.imageInsertMode') }}</span>
-          <span class="setting-description">{{ $t('settings.general.imageInsertModeDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.general.imageInsertMode") }}</span>
+          <span class="setting-description">{{ $t("settings.general.imageInsertModeDesc") }}</span>
         </div>
         <div class="setting-control-column">
           <div class="select-wrapper">
             <select
               :value="draft.imageInsertMode"
-              @change="patch('imageInsertMode', ($event.target as HTMLSelectElement).value as ImageInsertMode)"
+              @change="
+                patch(
+                  'imageInsertMode',
+                  ($event.target as HTMLSelectElement).value as ImageInsertMode
+                )
+              "
             >
-              <option value="file">{{ $t('settings.general.imageInsertModeFile') }}</option>
-              <option value="base64">{{ $t('settings.general.imageInsertModeBase64') }}</option>
+              <option value="file">{{ $t("settings.general.imageInsertModeFile") }}</option>
+              <option value="base64">{{ $t("settings.general.imageInsertModeBase64") }}</option>
             </select>
-            <svg class="select-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg
+              class="select-chevron"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
@@ -120,8 +135,10 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.general.reopenLastWorkspace') }}</span>
-          <span class="setting-description">{{ $t('settings.general.reopenLastWorkspaceDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.general.reopenLastWorkspace") }}</span>
+          <span class="setting-description">{{
+            $t("settings.general.reopenLastWorkspaceDesc")
+          }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">
@@ -138,11 +155,13 @@ function patch<K extends keyof SettingsState>(key: K, value: SettingsState[K]): 
 
     <!-- 更新 -->
     <section class="settings-section">
-      <h2 class="settings-section-title">{{ $t('settings.general.updates') }}</h2>
+      <h2 class="settings-section-title">{{ $t("settings.general.updates") }}</h2>
       <div class="setting-row">
         <div class="setting-label-column">
-          <span class="setting-label">{{ $t('settings.general.checkUpdatesOnStartup') }}</span>
-          <span class="setting-description">{{ $t('settings.general.checkUpdatesOnStartupDesc') }}</span>
+          <span class="setting-label">{{ $t("settings.general.checkUpdatesOnStartup") }}</span>
+          <span class="setting-description">{{
+            $t("settings.general.checkUpdatesOnStartupDesc")
+          }}</span>
         </div>
         <div class="setting-control-column">
           <label class="toggle-switch">

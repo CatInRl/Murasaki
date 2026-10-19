@@ -41,12 +41,7 @@ function onAction(): void {
     <component :is="icon" class="empty-icon" :size="48" />
     <p class="empty-title">{{ title }}</p>
     <p v-if="description" class="empty-description">{{ description }}</p>
-    <button
-      v-if="actionText"
-      type="button"
-      class="empty-action"
-      @click="onAction"
-    >
+    <button v-if="actionText" type="button" class="empty-action" @click="onAction">
       <component :is="actionIcon" v-if="actionIcon" :size="14" />
       <span>{{ actionText }}</span>
     </button>
@@ -105,8 +100,9 @@ function onAction(): void {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background var(--murasaki-transition-fast),
-              color var(--murasaki-transition-fast);
+  transition:
+    background var(--murasaki-transition-fast),
+    color var(--murasaki-transition-fast);
 }
 .empty-action:hover {
   background: var(--murasaki-purple-50);

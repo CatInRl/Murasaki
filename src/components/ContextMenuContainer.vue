@@ -10,11 +10,7 @@
  *   打开时焦点移入菜单，Esc 关闭后归还给打开前的元素（点击关闭不归还，避免抢走用户的点击焦点）
  */
 import { ref, watch, nextTick, onBeforeUnmount, computed } from "vue";
-import {
-  useContextMenuStore,
-  clampToViewport,
-  type MenuItem,
-} from "../stores/useContextMenuStore";
+import { useContextMenuStore, clampToViewport, type MenuItem } from "../stores/useContextMenuStore";
 
 const menu = useContextMenuStore();
 const menuEl = ref<HTMLDivElement | null>(null);
@@ -105,7 +101,10 @@ function attachListeners(): void {
 
 function detachListeners(): void {
   window.removeEventListener("keydown", onKeydown, true);
-  window.removeEventListener("scroll", onScrollClose, { capture: true, passive: true } as EventListenerOptions);
+  window.removeEventListener("scroll", onScrollClose, {
+    capture: true,
+    passive: true,
+  } as EventListenerOptions);
   window.removeEventListener("mousedown", onMousedown, true);
   window.removeEventListener("resize", onResizeClose);
 }
@@ -225,11 +224,7 @@ onBeforeUnmount(() => {
       @mousedown.stop
     >
       <template v-for="(item, idx) in menu.items" :key="idx">
-        <div
-          v-if="item.separator"
-          class="murasaki-context-menu-separator"
-          role="separator"
-        ></div>
+        <div v-if="item.separator" class="murasaki-context-menu-separator" role="separator"></div>
         <div
           v-else
           :id="`murasaki-context-menu-item-${idx}`"
@@ -252,11 +247,9 @@ onBeforeUnmount(() => {
             class="murasaki-context-menu-icon"
           />
           <span class="murasaki-context-menu-label">{{ item.label }}</span>
-          <span
-            v-if="item.shortcut"
-            class="murasaki-context-menu-shortcut"
-            >{{ item.shortcut }}</span
-          >
+          <span v-if="item.shortcut" class="murasaki-context-menu-shortcut">{{
+            item.shortcut
+          }}</span>
         </div>
       </template>
     </div>
@@ -279,8 +272,7 @@ onBeforeUnmount(() => {
   font-family: var(--murasaki-font-ui);
   user-select: none;
   outline: none;
-  animation: murasaki-context-menu-in var(--murasaki-duration-fast)
-    var(--murasaki-ease-out);
+  animation: murasaki-context-menu-in var(--murasaki-duration-fast) var(--murasaki-ease-out);
   transform-origin: top left;
 }
 
@@ -302,7 +294,8 @@ onBeforeUnmount(() => {
   padding: 6px 12px;
   cursor: pointer;
   color: var(--murasaki-ink);
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
     color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 

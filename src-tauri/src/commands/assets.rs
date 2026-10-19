@@ -1,9 +1,9 @@
-use std::fs;
-use std::path::{Path, PathBuf};
 use super::atomic_write::write_atomic;
 use super::sha1_hex;
 use crate::errors::{CommandError, ErrorCode};
 use serde::Serialize;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// 图片保存结果
 #[derive(Debug, Clone, Serialize)]
@@ -191,9 +191,8 @@ pub fn read_image_base64(source_path: String) -> Result<String, CommandError> {
 /// 依赖里曾有 `base64`，但已在 #264 随 AI Agent 功能一并移除；这里仅为「拖入图片内嵌」
 /// 一个用途保留极小的内置实现，避免为单点功能重新引入运行期依赖。
 fn base64_encode(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let n = ((chunk[0] as u32) << 16)
             | ((*chunk.get(1).unwrap_or(&0) as u32) << 8)
@@ -295,12 +294,9 @@ mod tests {
         fs::create_dir(&ws_dir).unwrap();
         let ws = ws_dir.to_string_lossy().to_string();
 
-        let result = copy_image_to_workspace(
-            src_path.to_string_lossy().to_string(),
-            ws.clone(),
-            None,
-        )
-        .unwrap();
+        let result =
+            copy_image_to_workspace(src_path.to_string_lossy().to_string(), ws.clone(), None)
+                .unwrap();
         assert!(result.absolute_path.ends_with(".png"));
         assert!(Path::new(&result.absolute_path).exists());
         // 默认目录回退 assets/
@@ -327,7 +323,12 @@ mod tests {
         .unwrap();
         assert!(result.relative_path.starts_with("assets/images/"));
         assert!(result.relative_path.ends_with(".jpg"));
-        assert!(dir.path().join("workspace").join("assets").join("images").exists());
+        assert!(dir
+            .path()
+            .join("workspace")
+            .join("assets")
+            .join("images")
+            .exists());
     }
 
     #[test]
@@ -336,10 +337,7 @@ mod tests {
         crate::security::policy().allow_root(dir.path());
         let ws = dir.path().to_string_lossy().to_string();
         let result = copy_image_to_workspace(
-            dir.path()
-                .join("nope.png")
-                .to_string_lossy()
-                .to_string(),
+            dir.path().join("nope.png").to_string_lossy().to_string(),
             ws,
             None,
         );
@@ -405,12 +403,7 @@ mod tests {
     fn test_read_image_base64_missing_source() {
         let dir = TempDir::new().unwrap();
         crate::security::policy().allow_root(dir.path());
-        let result = read_image_base64(
-            dir.path()
-                .join("nope.png")
-                .to_string_lossy()
-                .to_string(),
-        );
+        let result = read_image_base64(dir.path().join("nope.png").to_string_lossy().to_string());
         assert!(result.is_err());
     }
 
@@ -432,12 +425,28 @@ mod tests {
         assert_eq!(normalize_asset_dir(Some("")).unwrap(), "assets");
         assert_eq!(normalize_asset_dir(Some("  ")).unwrap(), "assets");
         // 自定义目录：统一用 /，并规整重复分隔符
-        assert_eq!(normalize_asset_dir(Some("assets/images")).unwrap(), "assets/images");
-        assert_eq!(normalize_asset_dir(Some("assets//images")).unwrap(), "assets/images");
+        assert_eq!(
+            normalize_asset_dir(Some("assets/images")).unwrap(),
+            "assets/images"
+        );
+        assert_eq!(
+            normalize_asset_dir(Some("assets//images")).unwrap(),
+            "assets/images"
+        );
         #[cfg(windows)]
-        assert_eq!(normalize_asset_dir(Some("assets\\images")).unwrap(), "assets/images");
+        assert_eq!(
+            normalize_asset_dir(Some("assets\\images")).unwrap(),
+            "assets/images"
+        );
         // 越权 / 不可用路径一律拒绝（含前导分隔符：join 出去会落到盘根）
-        for bad in ["../outside", "assets/../outside", ".", "..", "/assets/images", "/"] {
+        for bad in [
+            "../outside",
+            "assets/../outside",
+            ".",
+            "..",
+            "/assets/images",
+            "/",
+        ] {
             assert!(
                 normalize_asset_dir(Some(bad)).is_err(),
                 "应拒绝的目录被放行了: {}",
@@ -460,9 +469,13 @@ mod tests {
         crate::security::policy().allow_root(dir.path());
         let ws = dir.path().to_string_lossy().to_string();
         let bytes = b"\x89PNG\r\n\x1a\nfakepngbytes";
-        let result =
-            save_image_asset(ws, bytes.to_vec(), "png".to_string(), Some("assets/images".into()))
-                .unwrap();
+        let result = save_image_asset(
+            ws,
+            bytes.to_vec(),
+            "png".to_string(),
+            Some("assets/images".into()),
+        )
+        .unwrap();
         // 目录按设置创建
         assert!(dir.path().join("assets").join("images").exists());
         assert!(Path::new(&result.absolute_path).exists());
@@ -476,8 +489,12 @@ mod tests {
         let dir = TempDir::new().unwrap();
         crate::security::policy().allow_root(dir.path());
         let ws = dir.path().to_string_lossy().to_string();
-        let result =
-            save_image_asset(ws, vec![1, 2, 3], "png".to_string(), Some("../outside".into()));
+        let result = save_image_asset(
+            ws,
+            vec![1, 2, 3],
+            "png".to_string(),
+            Some("../outside".into()),
+        );
         assert!(result.is_err());
     }
 

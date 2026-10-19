@@ -158,10 +158,7 @@ export const useFileOpsStore = defineStore("fileOps", () => {
    *   - 重命名：用新名字重试
    *   - 取消：返回 null
    */
-  async function renamePath(
-    oldPath: string,
-    newName: string
-  ): Promise<TreeNode | null> {
+  async function renamePath(oldPath: string, newName: string): Promise<TreeNode | null> {
     const dir = dirname(oldPath);
     const newPath = joinPaths(dir, newName);
 
@@ -316,7 +313,6 @@ export const useFileOpsStore = defineStore("fileOps", () => {
       throw err;
     }
   }
-
 
   /**
    * 工作区内移动（拖拽=移动语义）

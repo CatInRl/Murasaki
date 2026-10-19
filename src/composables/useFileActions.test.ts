@@ -349,9 +349,7 @@ describe("useFileActions - exportCurrentPdf", () => {
     const { exportCurrentPdf } = useFileActions(deps);
     await exportCurrentPdf();
 
-    expect(deps.toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("导出 PDF 失败")
-    );
+    expect(deps.toast.error).toHaveBeenCalledWith(expect.stringContaining("导出 PDF 失败"));
     expect(mockedExportPdf).not.toHaveBeenCalled();
     expect(deps.toast.success).not.toHaveBeenCalled();
   });
@@ -366,9 +364,7 @@ describe("useFileActions - exportCurrentPdf", () => {
     const { exportCurrentPdf } = useFileActions(deps);
     await exportCurrentPdf();
 
-    expect(deps.toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("导出 PDF 失败")
-    );
+    expect(deps.toast.error).toHaveBeenCalledWith(expect.stringContaining("导出 PDF 失败"));
     expect(deps.toast.success).not.toHaveBeenCalled();
   });
 
@@ -439,9 +435,7 @@ describe("useFileActions - exportCurrentHtml 反馈（#384）", () => {
     const { exportCurrentHtml } = useFileActions(deps);
     await exportCurrentHtml();
 
-    expect(deps.toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("导出 HTML 失败")
-    );
+    expect(deps.toast.error).toHaveBeenCalledWith(expect.stringContaining("导出 HTML 失败"));
     expect(deps.dialog.alert).not.toHaveBeenCalled();
   });
 });

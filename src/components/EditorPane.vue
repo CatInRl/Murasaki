@@ -78,9 +78,9 @@ const emit = defineEmits<{
 }>();
 
 const editorRef = ref<InstanceType<typeof SourceEditor> | null>(null);
-const previewRef = ref<
-  InstanceType<typeof PreviewPane> | InstanceType<typeof HtmlPreview> | null
->(null);
+const previewRef = ref<InstanceType<typeof PreviewPane> | InstanceType<typeof HtmlPreview> | null>(
+  null
+);
 const cursorKey = ref(0);
 
 /** 是否演示模式（仅预览、只读） */
@@ -140,9 +140,7 @@ function onInnerKeydown(e: KeyboardEvent): void {
 }
 
 /** 当前文件是否为 html（决定右侧预览用 HtmlPreview 渲染原始 HTML） */
-const isHtml = computed(() =>
-  props.currentFilePath ? isHtmlFile(props.currentFilePath) : false
-);
+const isHtml = computed(() => (props.currentFilePath ? isHtmlFile(props.currentFilePath) : false));
 
 // 分隔条拖拽
 // 用 pointer 事件 + setPointerCapture：指针拖入右侧 HtmlPreview(iframe) 时，
@@ -333,9 +331,7 @@ function onEditorDrop(e: DragEvent): void {
 defineExpose({
   scrollToLine: (line: number) => {
     if (isPresentation.value) {
-      const preview = previewRef.value as
-        | { scrollToSourceLine?: (l: number) => void }
-        | null;
+      const preview = previewRef.value as { scrollToSourceLine?: (l: number) => void } | null;
       preview?.scrollToSourceLine?.(line);
       return;
     }
@@ -367,7 +363,7 @@ defineExpose({
       >
         <!-- 落点反馈：拖拽图片经过编辑区时提示可放下（issue #151） -->
         <div v-if="dropActive" class="drop-hint">
-          <span>{{ $t('editor.imageDrop.hint') }}</span>
+          <span>{{ $t("editor.imageDrop.hint") }}</span>
         </div>
         <SourceEditor
           ref="editorRef"
@@ -493,12 +489,12 @@ defineExpose({
 }
 /* 拖拽热区比视觉宽度更宽，便于抓取 */
 .splitter::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0 -4px;
 }
 .splitter::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   left: 50%;
@@ -507,8 +503,9 @@ defineExpose({
   height: 36px;
   border-radius: 4px;
   background: transparent;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              opacity var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    opacity var(--murasaki-duration-fast) var(--murasaki-ease);
   pointer-events: none;
 }
 .splitter:hover::after,

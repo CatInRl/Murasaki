@@ -35,7 +35,7 @@ describe("右键菜单", () => {
     // 不调用 closeWorkspace：全量 E2E 中 closeWorkspace 可能触发重渲染，
     // 干扰 ContextMenuContainer 的 Teleport 渲染时机
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
       if (menu) menu.hide();
     });
@@ -48,15 +48,12 @@ describe("右键菜单", () => {
   it("渲染菜单项", async () => {
     // 使用 show() 触发菜单（与其他测试一致，全量 E2E 下比直接赋值更稳定）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [
-          { label: "重命名" },
-          { label: "删除", danger: true },
-        ]
-      );
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
+        { label: "重命名" },
+        { label: "删除", danger: true },
+      ]);
     });
 
     await waitForPresent(browser, ".murasaki-context-menu", 5000);
@@ -77,22 +74,19 @@ describe("右键菜单", () => {
 
   it("点击菜单项触发 action 并关闭", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__actionCalled = false;
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [
-          {
-            label: "点击我",
-            action: () => {
-              // @ts-ignore
-              window.__actionCalled = true;
-            },
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
+        {
+          label: "点击我",
+          action: () => {
+            // @ts-ignore: E2E 运行时注入，类型不可静态推导
+            window.__actionCalled = true;
           },
-        ]
-      );
+        },
+      ]);
     });
 
     const item = await browser.$(".murasaki-context-menu-item");
@@ -104,7 +98,7 @@ describe("右键菜单", () => {
     await waitForAbsent(browser, ".murasaki-context-menu", 5000);
 
     const called = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__actionCalled;
     });
     expect(called).toBe(true);
@@ -112,23 +106,20 @@ describe("右键菜单", () => {
 
   it("禁用项不触发 action", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__disabledActionCalled = false;
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [
-          {
-            label: "禁用项",
-            disabled: true,
-            action: () => {
-              // @ts-ignore
-              window.__disabledActionCalled = true;
-            },
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
+        {
+          label: "禁用项",
+          disabled: true,
+          action: () => {
+            // @ts-ignore: E2E 运行时注入，类型不可静态推导
+            window.__disabledActionCalled = true;
           },
-        ]
-      );
+        },
+      ]);
     });
 
     const item = await browser.$(".murasaki-context-menu-item");
@@ -139,7 +130,7 @@ describe("右键菜单", () => {
     await item.click();
 
     const called = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__disabledActionCalled;
     });
     expect(called).toBe(false);
@@ -151,16 +142,13 @@ describe("右键菜单", () => {
 
   it("分隔符渲染", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [
-          { label: "剪切" },
-          { separator: true },
-          { label: "删除" },
-        ]
-      );
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
+        { label: "剪切" },
+        { separator: true },
+        { label: "删除" },
+      ]);
     });
 
     await waitForPresent(browser, ".murasaki-context-menu", 5000);
@@ -174,12 +162,9 @@ describe("右键菜单", () => {
 
   it("Escape 关闭菜单", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [{ label: "测试" }]
-      );
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [{ label: "测试" }]);
     });
 
     await waitForPresent(browser, ".murasaki-context-menu", 5000);
@@ -191,12 +176,9 @@ describe("右键菜单", () => {
 
   it("点击外部关闭菜单", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
-      menu.show(
-        new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-        [{ label: "测试" }]
-      );
+      menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [{ label: "测试" }]);
     });
 
     await waitForPresent(browser, ".murasaki-context-menu", 5000);
@@ -236,15 +218,12 @@ describe("右键菜单", () => {
     let shortcutTexts: string[] = [];
     for (let attempt = 1; attempt <= 3; attempt++) {
       await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const menu = window.__pinia__._s.get("contextMenu");
         menu.hide();
-        menu.show(
-          new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }),
-          [
-            { label: "重命名", shortcut: "F2" },
-          ]
-        );
+        menu.show(new MouseEvent("contextmenu", { clientX: 100, clientY: 100 }), [
+          { label: "重命名", shortcut: "F2" },
+        ]);
       });
 
       try {

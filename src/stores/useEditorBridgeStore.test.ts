@@ -24,14 +24,7 @@ describe("useEditorBridgeStore", () => {
 
     it("连续切换均生效（运行时切换语义）", () => {
       const store = useEditorBridgeStore();
-      const sequence: EditorMode[] = [
-        "wysiwyg",
-        "source",
-        "split",
-        "wysiwyg",
-        "source",
-        "split",
-      ];
+      const sequence: EditorMode[] = ["wysiwyg", "source", "split", "wysiwyg", "source", "split"];
       for (const m of sequence) {
         store.setEditorMode(m);
         expect(store.editorMode).toBe(m);

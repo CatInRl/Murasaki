@@ -37,8 +37,7 @@ const tree: TreeNode[] = [
 const expandedA = (path: string) => path === "/root/a";
 
 /** 展开 a 与 sub */
-const expandedBoth = (path: string) =>
-  path === "/root/a" || path === "/root/sub";
+const expandedBoth = (path: string) => path === "/root/a" || path === "/root/sub";
 
 describe("flattenVisibleTree", () => {
   it("仅展开的目录带出后代，顺序为深度优先、父在子前", () => {
@@ -49,14 +48,7 @@ describe("flattenVisibleTree", () => {
 
   it("嵌套目录展开时后代层级递增", () => {
     const items = flattenVisibleTree(tree, expandedBoth);
-    expect(items.map((i) => i.name)).toEqual([
-      "a",
-      "a1.md",
-      "sub",
-      "deep.md",
-      "b",
-      "c.md",
-    ]);
+    expect(items.map((i) => i.name)).toEqual(["a", "a1.md", "sub", "deep.md", "b", "c.md"]);
     expect(items.map((i) => i.level)).toEqual([0, 1, 1, 2, 0, 0]);
   });
 

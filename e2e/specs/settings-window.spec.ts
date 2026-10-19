@@ -43,9 +43,9 @@ async function openSettingsWindow(): Promise<void> {
   // JavaScript 事件循环有机会处理 invoke 的 IPC 消息发送。
   await browser.executeAsync((done: (res: unknown) => void) => {
     try {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__TAURI_INTERNALS__.invoke("open_settings");
-    } catch (e) {
+    } catch {
       // 忽略
     }
     // 等待 1 秒让 IPC 消息发送和窗口创建
@@ -66,11 +66,11 @@ async function closeSettingsWindow(): Promise<void> {
     // 用 Tauri invoke 关闭窗口（fire-and-forget，不等 Promise）
     await browser.executeAsync((done: (res: unknown) => void) => {
       try {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__TAURI_INTERNALS__.invoke("plugin:window|close", {
           label: "settings",
         });
-      } catch (e) {
+      } catch {
         // 忽略
       }
       done(null);
@@ -78,10 +78,13 @@ async function closeSettingsWindow(): Promise<void> {
   }
 
   // 等待窗口关闭
-  await browser.waitUntil(async () => {
-    const handles = await browser.getWindowHandles();
-    return handles.length === 1;
-  }, { timeout: 5000 });
+  await browser.waitUntil(
+    async () => {
+      const handles = await browser.getWindowHandles();
+      return handles.length === 1;
+    },
+    { timeout: 5000 }
+  );
 
   await browser.switchToWindow(mainHandle);
 }
@@ -103,7 +106,9 @@ describe("设置窗口", () => {
         if (handles.length > 1) {
           await closeSettingsWindow();
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       await closeSession(browser);
     }
   });
@@ -112,10 +117,22 @@ describe("设置窗口", () => {
     // 关闭残留的设置窗口
     const handles = await browser.getWindowHandles();
     if (handles.length > 1) {
-      try { await closeSettingsWindow(); } catch { /* ignore */ }
+      try {
+        await closeSettingsWindow();
+      } catch {
+        /* ignore */
+      }
     }
-    try { await browser.switchToWindow(mainHandle); } catch { /* ignore */ }
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await browser.switchToWindow(mainHandle);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
   });
 
   // 0.3.1 起 settings 改为单入口路由（index.html#settings），不再创建独立窗口。
@@ -127,10 +144,13 @@ describe("设置窗口", () => {
     await openSettingsWindow();
 
     // 等待新窗口出现
-    await browser.waitUntil(async () => {
-      const handles = await browser.getWindowHandles();
-      return handles.length > 1;
-    }, { timeout: 10000 });
+    await browser.waitUntil(
+      async () => {
+        const handles = await browser.getWindowHandles();
+        return handles.length > 1;
+      },
+      { timeout: 10000 }
+    );
 
     const handlesAfter = await browser.getWindowHandles();
     expect(handlesAfter.length).toBe(2);
@@ -162,14 +182,16 @@ describe("设置窗口", () => {
     // 前序测试可能遗留 settingsVisible=true（旧测试断言多窗口会失败但仍渲染设置页）
     // 先重置：emit navigate 事件携带非 "settings" payload，触发 settingsVisible=false
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "navigate",
-        payload: "editor",
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "navigate",
+          payload: "editor",
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     });
     await browser.pause(300);
 
@@ -193,14 +215,16 @@ describe("设置窗口", () => {
 
     // 清理：隐藏设置页，避免影响后续 spec（session 内残留 settingsVisible）
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "navigate",
-        payload: "editor",
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "navigate",
+          payload: "editor",
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     });
     await browser.pause(200);
   });

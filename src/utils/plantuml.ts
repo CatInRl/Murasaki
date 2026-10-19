@@ -27,11 +27,9 @@ function ensureVizLoaded(): Promise<void> {
     );
     if (existing) {
       existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener(
-        "error",
-        () => reject(new Error("加载 viz-global.js 失败")),
-        { once: true }
-      );
+      existing.addEventListener("error", () => reject(new Error("加载 viz-global.js 失败")), {
+        once: true,
+      });
       if ((existing as HTMLScriptElement & { _loaded?: boolean })._loaded) resolve();
       return;
     }

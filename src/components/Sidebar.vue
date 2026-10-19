@@ -42,9 +42,7 @@ const isCurrentMarkdown = computed(() =>
   props.currentFilePath ? isMarkdownFile(props.currentFilePath) : true
 );
 // 编辑态实时刷新仅在"大纲视图可见"时启用（#170）
-const liveOutlineEnabled = computed(
-  () => effectiveView(props.activeView) === "outline"
-);
+const liveOutlineEnabled = computed(() => effectiveView(props.activeView) === "outline");
 const currentContentRef = toRef(props, "currentContent");
 const {
   outline: outlineItems,
@@ -71,9 +69,18 @@ function effectiveView(view: SidebarView): SidebarView {
         :aria-label="$t('editor.sidebar.filesTabAria')"
         @click="setView('files')"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
-          <path d="M3 12h18"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+          <path d="M3 12h18" />
         </svg>
       </button>
       <button
@@ -85,13 +92,22 @@ function effectiveView(view: SidebarView): SidebarView {
         :aria-label="$t('editor.sidebar.outlineTabAria')"
         @click="setView('outline')"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="8" y1="6" x2="21" y2="6"/>
-          <line x1="8" y1="12" x2="21" y2="12"/>
-          <line x1="8" y1="18" x2="21" y2="18"/>
-          <line x1="3" y1="6" x2="3.01" y2="6"/>
-          <line x1="3" y1="12" x2="3.01" y2="12"/>
-          <line x1="3" y1="18" x2="3.01" y2="18"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
         </svg>
       </button>
       <div class="sidebar-header-spacer"></div>
@@ -157,8 +173,9 @@ function effectiveView(view: SidebarView): SidebarView {
   border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
   position: relative;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease);
   padding: 0;
 }
 
@@ -172,7 +189,7 @@ function effectiveView(view: SidebarView): SidebarView {
 }
 
 .sidebar-tab.active::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -1px;
   left: 50%;
@@ -185,8 +202,14 @@ function effectiveView(view: SidebarView): SidebarView {
 }
 
 @keyframes tab-underline-in {
-  from { width: 0; opacity: 0; }
-  to { width: 16px; opacity: 1; }
+  from {
+    width: 0;
+    opacity: 0;
+  }
+  to {
+    width: 16px;
+    opacity: 1;
+  }
 }
 
 .sidebar-content {
@@ -199,8 +222,9 @@ function effectiveView(view: SidebarView): SidebarView {
 /* 切换面板时的过渡动画 */
 .panel-fade-enter-active,
 .panel-fade-leave-active {
-  transition: opacity var(--murasaki-duration-fast) var(--murasaki-ease),
-              transform var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    opacity var(--murasaki-duration-fast) var(--murasaki-ease),
+    transform var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .panel-fade-enter-from {
   opacity: 0;

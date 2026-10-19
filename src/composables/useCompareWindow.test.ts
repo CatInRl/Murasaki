@@ -72,7 +72,7 @@ describe("useCompareWindow 三选一按钮语义（#378）", () => {
 
     expect(dialog.unsavedChanges).toHaveBeenCalledTimes(1);
     const args = dialog.unsavedChanges.mock.calls[0] as unknown as [
-      { saveText: string; discardText: string; cancelText: string }
+      { saveText: string; discardText: string; cancelText: string },
     ];
     const opts = args[0];
     expect(opts.saveText).toBe(t("common.keepLocalVersion"));

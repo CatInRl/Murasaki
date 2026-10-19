@@ -10,13 +10,7 @@
  * Escape 键等同取消；打开时聚焦默认按钮（取消），prompt 聚焦输入框
  */
 import { ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
-import {
-  Info,
-  AlertTriangle,
-  XCircle,
-  Pencil,
-  RotateCw,
-} from "lucide-vue-next";
+import { Info, AlertTriangle, XCircle, Pencil, RotateCw } from "lucide-vue-next";
 import { useDialogStore } from "../stores/useDialogStore";
 
 const dialog = useDialogStore();
@@ -112,11 +106,7 @@ function onRenameInput(e: Event): void {
 <template>
   <Teleport to="body">
     <Transition name="murasaki-dialog">
-      <div
-        v-if="dialog.current"
-        class="dialog-overlay"
-        @mousedown.self="onMaskClick"
-      >
+      <div v-if="dialog.current" class="dialog-overlay" @mousedown.self="onMaskClick">
         <div
           class="dialog-panel"
           role="dialog"
@@ -126,10 +116,7 @@ function onRenameInput(e: Event): void {
           <div class="dialog-header">
             <div class="dialog-icon" :class="`variant-${dialog.current.variant}`">
               <Info v-if="dialog.current.variant === 'info'" :size="20" />
-              <AlertTriangle
-                v-else-if="dialog.current.variant === 'warning'"
-                :size="20"
-              />
+              <AlertTriangle v-else-if="dialog.current.variant === 'warning'" :size="20" />
               <XCircle v-else :size="20" />
             </div>
             <h2 class="dialog-title">{{ dialog.current.title }}</h2>
@@ -137,12 +124,20 @@ function onRenameInput(e: Event): void {
 
           <div class="dialog-body">
             <p
-              v-if="dialog.current.kind === 'alert' || dialog.current.kind === 'confirm' || dialog.current.kind === 'unsaved'"
+              v-if="
+                dialog.current.kind === 'alert' ||
+                dialog.current.kind === 'confirm' ||
+                dialog.current.kind === 'unsaved'
+              "
               class="dialog-message"
-            >{{ dialog.current.message }}</p>
+            >
+              {{ dialog.current.message }}
+            </p>
 
             <template v-if="dialog.current.kind === 'prompt'">
-              <p v-if="dialog.current.message" class="dialog-message">{{ dialog.current.message }}</p>
+              <p v-if="dialog.current.message" class="dialog-message">
+                {{ dialog.current.message }}
+              </p>
               <input
                 ref="promptInputRef"
                 class="dialog-input"
@@ -159,7 +154,7 @@ function onRenameInput(e: Event): void {
             <template v-if="dialog.current.kind === 'conflict'">
               <p class="dialog-message">{{ dialog.current.message }}</p>
               <p v-if="dialog.current.sourcePath" class="dialog-source">
-                {{ $t('common.dialog.sourceLabel', { path: dialog.current.sourcePath }) }}
+                {{ $t("common.dialog.sourceLabel", { path: dialog.current.sourcePath }) }}
               </p>
               <div v-if="dialog.current.showRenameInput" class="conflict-rename">
                 <input
@@ -189,11 +184,7 @@ function onRenameInput(e: Event): void {
             </template>
 
             <template v-else-if="dialog.current.kind === 'confirm'">
-              <button
-                ref="cancelBtnRef"
-                class="dialog-btn"
-                @click="dialog.cancelCurrent()"
-              >
+              <button ref="cancelBtnRef" class="dialog-btn" @click="dialog.cancelCurrent()">
                 {{ dialog.current.cancelText }}
               </button>
               <button
@@ -207,36 +198,23 @@ function onRenameInput(e: Event): void {
             </template>
 
             <template v-else-if="dialog.current.kind === 'prompt'">
-              <button
-                ref="cancelBtnRef"
-                class="dialog-btn"
-                @click="dialog.cancelCurrent()"
-              >
+              <button ref="cancelBtnRef" class="dialog-btn" @click="dialog.cancelCurrent()">
                 {{ dialog.current.cancelText }}
               </button>
-              <button
-                ref="confirmBtnRef"
-                class="dialog-btn primary"
-                @click="dialog.submitPrompt()"
-              >
+              <button ref="confirmBtnRef" class="dialog-btn primary" @click="dialog.submitPrompt()">
                 {{ dialog.current.confirmText }}
               </button>
             </template>
 
             <template v-else-if="dialog.current.kind === 'conflict'">
-              <button
-                ref="cancelBtnRef"
-                class="dialog-btn"
-                @click="dialog.cancelCurrent()"
-              >
+              <button ref="cancelBtnRef" class="dialog-btn" @click="dialog.cancelCurrent()">
                 {{ dialog.current.cancelText }}
               </button>
-              <button
-                class="dialog-btn"
-                @click="dialog.conflictRename()"
-              >
+              <button class="dialog-btn" @click="dialog.conflictRename()">
                 <Pencil :size="14" />
-                {{ dialog.current.showRenameInput ? $t('common.confirmRename') : $t('common.rename') }}
+                {{
+                  dialog.current.showRenameInput ? $t("common.confirmRename") : $t("common.rename")
+                }}
               </button>
               <button
                 ref="confirmBtnRef"
@@ -249,24 +227,13 @@ function onRenameInput(e: Event): void {
             </template>
 
             <template v-else-if="dialog.current.kind === 'unsaved'">
-              <button
-                ref="cancelBtnRef"
-                class="dialog-btn"
-                @click="dialog.cancelCurrent()"
-              >
+              <button ref="cancelBtnRef" class="dialog-btn" @click="dialog.cancelCurrent()">
                 {{ dialog.current.cancelText }}
               </button>
-              <button
-                class="dialog-btn"
-                @click="dialog.unsavedDiscard()"
-              >
+              <button class="dialog-btn" @click="dialog.unsavedDiscard()">
                 {{ dialog.current.neutralText }}
               </button>
-              <button
-                ref="confirmBtnRef"
-                class="dialog-btn primary"
-                @click="dialog.unsavedSave()"
-              >
+              <button ref="confirmBtnRef" class="dialog-btn primary" @click="dialog.unsavedSave()">
                 {{ dialog.current.confirmText }}
               </button>
             </template>
@@ -402,7 +369,8 @@ function onRenameInput(e: Event): void {
   border: 1px solid var(--murasaki-border);
   border-radius: var(--murasaki-radius-md);
   cursor: pointer;
-  transition: background var(--murasaki-transition-fast),
+  transition:
+    background var(--murasaki-transition-fast),
     border-color var(--murasaki-transition-fast);
   min-width: 72px;
   justify-content: center;
@@ -435,7 +403,8 @@ function onRenameInput(e: Event): void {
 }
 .murasaki-dialog-enter-active .dialog-panel,
 .murasaki-dialog-leave-active .dialog-panel {
-  transition: transform var(--murasaki-duration-base) var(--murasaki-ease-out),
+  transition:
+    transform var(--murasaki-duration-base) var(--murasaki-ease-out),
     opacity var(--murasaki-duration-base) var(--murasaki-ease-out);
 }
 .murasaki-dialog-enter-from,

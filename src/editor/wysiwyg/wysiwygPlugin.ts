@@ -18,12 +18,23 @@
  *
  * 详见 ADR-0008（CodeMirror 6 内 WYSIWYG / Typora 路线）。
  */
-import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, WidgetType } from "@codemirror/view";
+import {
+  EditorView,
+  ViewPlugin,
+  ViewUpdate,
+  Decoration,
+  DecorationSet,
+  WidgetType,
+} from "@codemirror/view";
 import { EditorState, StateField, StateEffect } from "@codemirror/state";
 import { syntaxTree, syntaxTreeAvailable } from "@codemirror/language";
 import { codeToHtml } from "shiki";
 import katex from "katex";
-import { currentShikiTheme, resolveShikiThemeOption, getCurrentFilePath } from "../../composables/useMarkdownRenderer";
+import {
+  currentShikiTheme,
+  resolveShikiThemeOption,
+  getCurrentFilePath,
+} from "../../composables/useMarkdownRenderer";
 import {
   computeDecorations,
   getParagraphRange,
@@ -101,7 +112,11 @@ class HrWidget extends WidgetType {
  * 通过 CustomEvent 通知 SourceEditor dispatch changes。
  */
 class TaskCheckboxWidget extends WidgetType {
-  constructor(private checked: boolean, private from: number, private to: number) {
+  constructor(
+    private checked: boolean,
+    private from: number,
+    private to: number
+  ) {
     super();
   }
   eq(other: TaskCheckboxWidget): boolean {
@@ -118,10 +133,12 @@ class TaskCheckboxWidget extends WidgetType {
       e.stopPropagation();
       // 发出事件，携带替换信息，SourceEditor 监听后 dispatch changes 修改 markdown
       // 携带切换后的 checked 状态，监听端据此生成 `- [x]` 或 `- [ ]`
-      input.dispatchEvent(new CustomEvent("murasaki-toggle-task", {
-        bubbles: true,
-        detail: { from: this.from, to: this.to, checked: !this.checked },
-      }));
+      input.dispatchEvent(
+        new CustomEvent("murasaki-toggle-task", {
+          bubbles: true,
+          detail: { from: this.from, to: this.to, checked: !this.checked },
+        })
+      );
     });
     return input;
   }
@@ -173,7 +190,12 @@ abstract class WysiwygBlockWidget extends WidgetType {
  * 占位阶段保持代码可读，避免视觉跳变。
  */
 class CodeBlockWidget extends WysiwygBlockWidget {
-  constructor(private lang: string, private code: string, private from: number, selected: boolean) {
+  constructor(
+    private lang: string,
+    private code: string,
+    private from: number,
+    selected: boolean
+  ) {
     super(selected);
   }
   eq(other: CodeBlockWidget): boolean {
@@ -199,7 +221,10 @@ class CodeBlockWidget extends WysiwygBlockWidget {
     pre.appendChild(codeEl);
     wrapper.appendChild(pre);
     // 异步 Shiki 高亮：完成后用高亮 HTML 替换占位 <pre>（保留 wrapper + 语言标签）
-    void codeToHtml(this.code, { lang: this.lang || "text", theme: resolveShikiThemeOption(currentShikiTheme.value) })
+    void codeToHtml(this.code, {
+      lang: this.lang || "text",
+      theme: resolveShikiThemeOption(currentShikiTheme.value),
+    })
       .then((html) => {
         if (!pre.isConnected) return;
         const tmp = document.createElement("div");
@@ -212,10 +237,12 @@ class CodeBlockWidget extends WysiwygBlockWidget {
       });
     // 点击 widget：发出事件让 SourceEditor 把光标定位到块起始位置，触发原始 markdown 编辑
     wrapper.addEventListener("click", () => {
-      wrapper.dispatchEvent(new CustomEvent("murasaki-focus-block", {
-        bubbles: true,
-        detail: { from: this.from },
-      }));
+      wrapper.dispatchEvent(
+        new CustomEvent("murasaki-focus-block", {
+          bubbles: true,
+          detail: { from: this.from },
+        })
+      );
     });
     return wrapper;
   }
@@ -232,7 +259,12 @@ class CodeBlockWidget extends WysiwygBlockWidget {
  * id 由调用方传入（来自 WysiwygPluginValue 实例计数器），保证 SVG id 唯一。
  */
 class MermaidWidget extends WysiwygBlockWidget {
-  constructor(private code: string, private id: string, private from: number, selected: boolean) {
+  constructor(
+    private code: string,
+    private id: string,
+    private from: number,
+    selected: boolean
+  ) {
     super(selected);
   }
   eq(other: MermaidWidget): boolean {
@@ -261,10 +293,12 @@ class MermaidWidget extends WysiwygBlockWidget {
       });
     // 点击 widget：发出事件定位光标到块起始位置
     container.addEventListener("click", () => {
-      container.dispatchEvent(new CustomEvent("murasaki-focus-block", {
-        bubbles: true,
-        detail: { from: this.from },
-      }));
+      container.dispatchEvent(
+        new CustomEvent("murasaki-focus-block", {
+          bubbles: true,
+          detail: { from: this.from },
+        })
+      );
     });
     return container;
   }
@@ -280,7 +314,11 @@ class MermaidWidget extends WysiwygBlockWidget {
  * 源码仍保持可编辑（围栏 CodeMark dim），预览随键入实时更新。
  */
 class DiagramPreviewWidget extends WysiwygBlockWidget {
-  constructor(private lang: string, private code: string, selected: boolean) {
+  constructor(
+    private lang: string,
+    private code: string,
+    selected: boolean
+  ) {
     super(selected);
   }
   eq(other: DiagramPreviewWidget): boolean {
@@ -352,7 +390,11 @@ class DiagramPreviewWidget extends WysiwygBlockWidget {
  *   在 Ctrl/Cmd 按下时调用 preventDefault 阻止 CM 定位，转而打开链接
  */
 class LinkWidget extends WysiwygBlockWidget {
-  constructor(private text: string, private url: string, selected: boolean) {
+  constructor(
+    private text: string,
+    private url: string,
+    selected: boolean
+  ) {
     super(selected);
   }
   eq(other: LinkWidget): boolean {
@@ -382,10 +424,12 @@ class LinkWidget extends WysiwygBlockWidget {
       // 相对 .md 链接的内部跳交由父组件处理（通过自定义事件）
       // 这里发自定义事件，App.vue 监听后调用 openFile
       else {
-        a.dispatchEvent(new CustomEvent("murasaki-open-internal", {
-          bubbles: true,
-          detail: href,
-        }));
+        a.dispatchEvent(
+          new CustomEvent("murasaki-open-internal", {
+            bubbles: true,
+            detail: href,
+          })
+        );
       }
     });
     return a;
@@ -401,7 +445,11 @@ class ImageWidget extends WysiwygBlockWidget {
   /** 构造时解析好的 src（基于当前文件路径）。eq 比较此值，路径变化时触发重渲染。 */
   private resolvedSrc: string;
 
-  constructor(private alt: string, url: string, selected: boolean) {
+  constructor(
+    private alt: string,
+    url: string,
+    selected: boolean
+  ) {
     super(selected);
     // ADR-0015：在构造时解析 src（而非 toDOM 时），这样 eq 比较解析后的值，
     // 当 currentFilePath 变化时（切 tab），新 widget 的 resolvedSrc 不同，
@@ -409,7 +457,9 @@ class ImageWidget extends WysiwygBlockWidget {
     this.resolvedSrc = resolveImageSrc(url, getCurrentFilePath());
   }
   eq(other: ImageWidget): boolean {
-    return other.alt === this.alt && other.resolvedSrc === this.resolvedSrc && this.sameSelection(other);
+    return (
+      other.alt === this.alt && other.resolvedSrc === this.resolvedSrc && this.sameSelection(other)
+    );
   }
   toDOM(): HTMLElement {
     const img = document.createElement("img");
@@ -434,7 +484,11 @@ class ImageWidget extends WysiwygBlockWidget {
  * 单元格内容以纯文本（转义）呈现，便于直接编辑；真正的写回由 T1.5 处理。
  */
 class TableWidget extends WysiwygBlockWidget {
-  constructor(private source: string, private from: number, selected: boolean) {
+  constructor(
+    private source: string,
+    private from: number,
+    selected: boolean
+  ) {
     super(selected);
   }
   eq(other: TableWidget): boolean {
@@ -458,10 +512,12 @@ class TableWidget extends WysiwygBlockWidget {
       // 由 SourceEditor dispatch 进入 CM 文档（因此可撤销，T1.6）。
       // 携带锚点坐标：提交后表格块重建，宿主据此把焦点/光标放回同一单元格（留在表格内）。
       onCommit: (nextSource, anchorCell) => {
-        wrapper.dispatchEvent(new CustomEvent("murasaki-table-commit", {
-          bubbles: true,
-          detail: { from: this.from, to, source: nextSource, anchorCell: anchorCell ?? null },
-        }));
+        wrapper.dispatchEvent(
+          new CustomEvent("murasaki-table-commit", {
+            bubbles: true,
+            detail: { from: this.from, to, source: nextSource, anchorCell: anchorCell ?? null },
+          })
+        );
       },
     });
 
@@ -488,7 +544,12 @@ class TableWidget extends WysiwygBlockWidget {
     };
 
     // 工具按钮：innerHTML 由调用方提供（图标/图标+文字），样式类统一给 .murasaki-wysiwyg-table-tool
-    const mkBtn = (inner: string, title: string, onClick: () => void, opts: { active?: boolean; data?: string } = {}) => {
+    const mkBtn = (
+      inner: string,
+      title: string,
+      onClick: () => void,
+      opts: { active?: boolean; data?: string } = {}
+    ) => {
       const b = doc.createElement("button");
       b.type = "button";
       b.title = title;
@@ -511,25 +572,54 @@ class TableWidget extends WysiwygBlockWidget {
     const label = doc.createElement("span");
     label.className = "murasaki-wysiwyg-table-tool-label";
     label.textContent = "表格";
-    const prevColBtn = mkBtn(ic("<path d=\"m15 18-6-6 6-6\"/>"), "上一列", () => editor.navigateColumn(-1));
-    const nextColBtn = mkBtn(ic("<path d=\"m9 18 6-6-6-6\"/>"), "下一列", () => editor.navigateColumn(1));
+    const prevColBtn = mkBtn(ic('<path d="m15 18-6-6 6-6"/>'), "上一列", () =>
+      editor.navigateColumn(-1)
+    );
+    const nextColBtn = mkBtn(ic('<path d="m9 18 6-6-6-6"/>'), "下一列", () =>
+      editor.navigateColumn(1)
+    );
 
     // 中部：插入行/插入列
-    const rowsIcon = ic("<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M21 9H3\"/><path d=\"M21 15H3\"/>");
-    const colsIcon = ic("<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"/><path d=\"M9 3v18\"/><path d=\"M15 3v18\"/>");
-    const addRowBtn = mkBtn(`${rowsIcon}<span>行</span>`, "插入行", () => editor.addRowAfterAnchor());
-    const addColBtn = mkBtn(`${colsIcon}<span>列</span>`, "插入列", () => editor.addColumnAfterAnchor());
+    const rowsIcon = ic(
+      '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M21 9H3"/><path d="M21 15H3"/>'
+    );
+    const colsIcon = ic(
+      '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/>'
+    );
+    const addRowBtn = mkBtn(`${rowsIcon}<span>行</span>`, "插入行", () =>
+      editor.addRowAfterAnchor()
+    );
+    const addColBtn = mkBtn(`${colsIcon}<span>列</span>`, "插入列", () =>
+      editor.addColumnAfterAnchor()
+    );
 
     // 删除行/删除列（删除列旋转 90° 与设计稿一致）
-    const trashIcon = ic("<path d=\"M3 6h18\"/><path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\"/><path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\"/><line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\"/><line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\"/>");
+    const trashIcon = ic(
+      '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>'
+    );
     const delRowBtn = mkBtn(trashIcon, "删除行", () => editor.removeRowAtAnchor());
     const delColBtn = mkBtn(trashIcon, "删除列", () => editor.removeColumnAtAnchor());
     delColBtn.classList.add("murasaki-wysiwyg-table-tool-rotate");
 
     // 对齐：左/中/右，激活态随锚点列对齐刷新
-    const alignL = mkBtn(ic("<path d=\"M21 6H3\"/><path d=\"M15 12H3\"/><path d=\"M17 18H3\"/>"), "左对齐", () => editor.setAnchorAlignment("l"), { data: "l" });
-    const alignC = mkBtn(ic("<path d=\"M21 6H3\"/><path d=\"M17 12H7\"/><path d=\"M16 18H8\"/>"), "居中对齐", () => editor.setAnchorAlignment("c"), { data: "c" });
-    const alignR = mkBtn(ic("<path d=\"M21 6H3\"/><path d=\"M21 12H9\"/><path d=\"M21 18H7\"/>"), "右对齐", () => editor.setAnchorAlignment("r"), { data: "r" });
+    const alignL = mkBtn(
+      ic('<path d="M21 6H3"/><path d="M15 12H3"/><path d="M17 18H3"/>'),
+      "左对齐",
+      () => editor.setAnchorAlignment("l"),
+      { data: "l" }
+    );
+    const alignC = mkBtn(
+      ic('<path d="M21 6H3"/><path d="M17 12H7"/><path d="M16 18H8"/>'),
+      "居中对齐",
+      () => editor.setAnchorAlignment("c"),
+      { data: "c" }
+    );
+    const alignR = mkBtn(
+      ic('<path d="M21 6H3"/><path d="M21 12H9"/><path d="M21 18H7"/>'),
+      "右对齐",
+      () => editor.setAnchorAlignment("r"),
+      { data: "r" }
+    );
     const alignBtns = [alignL, alignC, alignR];
 
     // 锚点变化 → 刷新边界按钮置灰 + 对齐激活态 + 编辑态样式（无锚点时隐藏工具条）
@@ -557,7 +647,7 @@ class TableWidget extends WysiwygBlockWidget {
       divider(),
       alignL,
       alignC,
-      alignR,
+      alignR
     );
     wrapper.appendChild(toolbar);
   }
@@ -584,11 +674,20 @@ class TableWidget extends WysiwygBlockWidget {
  * displayMode=true → 块级 <div>；false → 行内 <span>。
  */
 class MathWidget extends WysiwygBlockWidget {
-  constructor(private expr: string, private displayMode: boolean, private from: number, selected: boolean) {
+  constructor(
+    private expr: string,
+    private displayMode: boolean,
+    private from: number,
+    selected: boolean
+  ) {
     super(selected);
   }
   eq(other: MathWidget): boolean {
-    return other.expr === this.expr && other.displayMode === this.displayMode && this.sameSelection(other);
+    return (
+      other.expr === this.expr &&
+      other.displayMode === this.displayMode &&
+      this.sameSelection(other)
+    );
   }
   toDOM(): HTMLElement {
     const el = document.createElement(this.displayMode ? "div" : "span");
@@ -608,10 +707,12 @@ class MathWidget extends WysiwygBlockWidget {
     }
     // 点击 widget：发出事件定位光标到块起始位置
     el.addEventListener("click", () => {
-      el.dispatchEvent(new CustomEvent("murasaki-focus-block", {
-        bubbles: true,
-        detail: { from: this.from },
-      }));
+      el.dispatchEvent(
+        new CustomEvent("murasaki-focus-block", {
+          bubbles: true,
+          detail: { from: this.from },
+        })
+      );
     });
     return el;
   }
@@ -626,7 +727,11 @@ class MathWidget extends WysiwygBlockWidget {
  * 行内 widget，显示 emoji unicode 字符，光标离开段时渲染。
  */
 class EmojiWidget extends WysiwygBlockWidget {
-  constructor(private emoji: string, private shortcode: string, selected: boolean) {
+  constructor(
+    private emoji: string,
+    private shortcode: string,
+    selected: boolean
+  ) {
     super(selected);
   }
   eq(other: EmojiWidget): boolean {
@@ -656,7 +761,11 @@ class EmojiWidget extends WysiwygBlockWidget {
  * 仅在光标离开 frontmatter 范围时生成此 widget（光标进入时显示原始文本可编辑）。
  */
 class FrontmatterCardWidget extends WysiwygBlockWidget {
-  constructor(private content: string, private from: number, selected: boolean) {
+  constructor(
+    private content: string,
+    private from: number,
+    selected: boolean
+  ) {
     super(selected);
   }
   eq(other: FrontmatterCardWidget): boolean {
@@ -670,10 +779,12 @@ class FrontmatterCardWidget extends WysiwygBlockWidget {
     wrapper.innerHTML = renderFrontMatterCard(this.content);
     // 点击卡片：发出事件让 SourceEditor 切源码模式并定位光标
     wrapper.addEventListener("click", () => {
-      wrapper.dispatchEvent(new CustomEvent("murasaki-focus-frontmatter", {
-        bubbles: true,
-        detail: { from: this.from },
-      }));
+      wrapper.dispatchEvent(
+        new CustomEvent("murasaki-focus-frontmatter", {
+          bubbles: true,
+          detail: { from: this.from },
+        })
+      );
     });
     return wrapper;
   }
@@ -696,7 +807,11 @@ class FrontmatterCardWidget extends WysiwygBlockWidget {
  * 点击 widget：发出 murasaki-focus-block 事件定位光标到块起始位置（与其他块 widget 一致）。
  */
 class HtmlWidget extends WysiwygBlockWidget {
-  constructor(private source: string, private from: number, selected: boolean) {
+  constructor(
+    private source: string,
+    private from: number,
+    selected: boolean
+  ) {
     super(selected);
   }
   eq(other: HtmlWidget): boolean {
@@ -709,10 +824,12 @@ class HtmlWidget extends WysiwygBlockWidget {
     wrapper.innerHTML = sanitizeInlineHtml(this.source);
     // 点击 widget：发出事件定位光标到块起始位置
     wrapper.addEventListener("click", () => {
-      wrapper.dispatchEvent(new CustomEvent("murasaki-focus-block", {
-        bubbles: true,
-        detail: { from: this.from },
-      }));
+      wrapper.dispatchEvent(
+        new CustomEvent("murasaki-focus-block", {
+          bubbles: true,
+          detail: { from: this.from },
+        })
+      );
     });
     return wrapper;
   }
@@ -761,8 +878,7 @@ function toDecorationSet(
 ): DecorationSet {
   const ranges = decos.map((d) => {
     if (d.type === "mark") {
-      const cls =
-        d.kind === "hide" ? "murasaki-wysiwyg-mark-hide" : "murasaki-wysiwyg-mark-dim";
+      const cls = d.kind === "hide" ? "murasaki-wysiwyg-mark-hide" : "murasaki-wysiwyg-mark-dim";
       return Decoration.mark({ class: cls }).range(d.from, d.to);
     }
     if (d.type === "replace") {
@@ -784,7 +900,10 @@ function toDecorationSet(
     }
     // blockWidget：用渲染 widget 替换原始 markdown；选区覆盖时叠加选中高亮
     const selected = selectionIntersects(d.from, d.to, selection);
-    return Decoration.replace({ widget: createBlockWidget(d, nextMermaidId, selected) }).range(d.from, d.to);
+    return Decoration.replace({ widget: createBlockWidget(d, nextMermaidId, selected) }).range(
+      d.from,
+      d.to
+    );
   });
   return Decoration.set(ranges, true);
 }
@@ -973,10 +1092,7 @@ const emojiSourceReplacer = ViewPlugin.fromClass(
     private lastPara: { from: number; to: number } | null = null;
 
     constructor(view: EditorView) {
-      this.lastPara = getParagraphRange(
-        view.state.doc.toString(),
-        view.state.selection.main.head
-      );
+      this.lastPara = getParagraphRange(view.state.doc.toString(), view.state.selection.main.head);
     }
 
     update(u: ViewUpdate): void {
@@ -1056,14 +1172,15 @@ export const wysiwygTheme = EditorView.theme({
   // 用 ::after 半透明紫色覆盖层指示选中态（pointer-events:none 不挡交互），
   // 同时保持块自身背景与内容不变（对齐 VS Code 深色代码块上的选区样式）。
   // 覆盖层不设 z-index（默认 0）：表内锚点胶囊（z-index:2）与工具条（z-index:3）仍在上层可交互。
-  ".murasaki-wysiwyg-codeblock-wrapper.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-mermaid.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-diagram-preview.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-table-edit.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-frontmatter.murasaki-wysiwyg-selected::after": {
-    content: '""',
-    position: "absolute",
-    inset: "0",
-    borderRadius: "inherit",
-    backgroundColor: "var(--murasaki-primary-soft)",
-    pointerEvents: "none",
-  },
+  ".murasaki-wysiwyg-codeblock-wrapper.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-mermaid.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-diagram-preview.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-table-edit.murasaki-wysiwyg-selected::after, .murasaki-wysiwyg-frontmatter.murasaki-wysiwyg-selected::after":
+    {
+      content: '""',
+      position: "absolute",
+      inset: "0",
+      borderRadius: "inherit",
+      backgroundColor: "var(--murasaki-primary-soft)",
+      pointerEvents: "none",
+    },
   // 行内代码：与预览 .markdown-body code 一致的视觉样式（背景/圆角/等宽字体）。
   // 覆盖整段（含反引号）；内层高亮 token span 会被后代选择器重置，
   // 避免高亮样式（固定紫色背景/紫 800 文字）盖住 --md-code-* 主题变量。
@@ -1078,16 +1195,17 @@ export const wysiwygTheme = EditorView.theme({
   // 中性化 CM 高亮 token span（class 以 ͼ 前缀开头）对 render 装饰内部文本的干扰：
   // 标题/引用/行内代码的视觉由 --md-* 变量统一提供，否则高亮样式（紫色、em 字号）
   // 会盖住 render 装饰，导致 WYSIWYG 与预览不一致（与行内代码同一根因）。
-  ".murasaki-wysiwyg-inline-code [class^=\"ͼ\"]": {
+  '.murasaki-wysiwyg-inline-code [class^="ͼ"]': {
     background: "transparent",
     color: "inherit",
   },
-  ".murasaki-wysiwyg-h1 [class^=\"ͼ\"], .murasaki-wysiwyg-h2 [class^=\"ͼ\"], .murasaki-wysiwyg-h3 [class^=\"ͼ\"], .murasaki-wysiwyg-h4 [class^=\"ͼ\"], .murasaki-wysiwyg-h5 [class^=\"ͼ\"], .murasaki-wysiwyg-h6 [class^=\"ͼ\"]": {
-    color: "inherit",
-    fontSize: "inherit",
-    fontWeight: "inherit",
-  },
-  ".murasaki-wysiwyg-blockquote [class^=\"ͼ\"]": {
+  '.murasaki-wysiwyg-h1 [class^="ͼ"], .murasaki-wysiwyg-h2 [class^="ͼ"], .murasaki-wysiwyg-h3 [class^="ͼ"], .murasaki-wysiwyg-h4 [class^="ͼ"], .murasaki-wysiwyg-h5 [class^="ͼ"], .murasaki-wysiwyg-h6 [class^="ͼ"]':
+    {
+      color: "inherit",
+      fontSize: "inherit",
+      fontWeight: "inherit",
+    },
+  '.murasaki-wysiwyg-blockquote [class^="ͼ"]': {
     color: "inherit",
   },
   // 引用块：CM6 mark decoration 样式（无法用 <blockquote> 标签，需独立样式）
@@ -1111,23 +1229,44 @@ export const wysiwygTheme = EditorView.theme({
   },
   // 标题排版：与 markdown-content.css 的 .markdown-body h1-h6 保持一致（issue：WYSIWYG 与预览视觉统一）
   ".murasaki-wysiwyg-h1": {
-    fontSize: "22px", fontWeight: "700", letterSpacing: "-0.02em", lineHeight: "1.3", color: "var(--md-heading-color)",
+    fontSize: "22px",
+    fontWeight: "700",
+    letterSpacing: "-0.02em",
+    lineHeight: "1.3",
+    color: "var(--md-heading-color)",
   },
   ".murasaki-wysiwyg-h2": {
-    fontSize: "18px", fontWeight: "700", letterSpacing: "-0.01em", lineHeight: "1.35", color: "var(--md-heading-color)",
+    fontSize: "18px",
+    fontWeight: "700",
+    letterSpacing: "-0.01em",
+    lineHeight: "1.35",
+    color: "var(--md-heading-color)",
   },
   ".murasaki-wysiwyg-h3": {
-    fontSize: "15px", fontWeight: "600", lineHeight: "1.4", color: "var(--md-heading-color)",
+    fontSize: "15px",
+    fontWeight: "600",
+    lineHeight: "1.4",
+    color: "var(--md-heading-color)",
   },
   ".murasaki-wysiwyg-h4": {
-    fontSize: "14px", fontWeight: "600", lineHeight: "1.4", color: "var(--md-heading-color)",
+    fontSize: "14px",
+    fontWeight: "600",
+    lineHeight: "1.4",
+    color: "var(--md-heading-color)",
   },
   ".murasaki-wysiwyg-h5": {
-    fontSize: "13px", fontWeight: "600", lineHeight: "1.4", color: "var(--md-heading-color-2)",
+    fontSize: "13px",
+    fontWeight: "600",
+    lineHeight: "1.4",
+    color: "var(--md-heading-color-2)",
   },
   ".murasaki-wysiwyg-h6": {
-    fontSize: "12px", fontWeight: "600", lineHeight: "1.4", color: "var(--md-heading-color-3)",
-    textTransform: "uppercase", letterSpacing: "0.05em",
+    fontSize: "12px",
+    fontWeight: "600",
+    lineHeight: "1.4",
+    color: "var(--md-heading-color-3)",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
   },
   // 行为样式：cursor / userSelect 等（视觉由 markdown-content.css 提供）
   ".murasaki-wysiwyg-task-checkbox": {

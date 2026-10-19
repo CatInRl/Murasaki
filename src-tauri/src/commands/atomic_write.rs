@@ -19,7 +19,9 @@ pub(crate) fn write_atomic(path: &Path, content: &[u8]) -> io::Result<()> {
     fs::create_dir_all(parent)?;
 
     // rename 会带走临时文件的权限，先记住原文件的再补回去
-    let permissions = fs::metadata(path).ok().map(|metadata| metadata.permissions());
+    let permissions = fs::metadata(path)
+        .ok()
+        .map(|metadata| metadata.permissions());
     let file_name = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -27,9 +29,7 @@ pub(crate) fn write_atomic(path: &Path, content: &[u8]) -> io::Result<()> {
 
     let (tmp_path, mut file) = create_temp_file(parent, file_name)?;
 
-    let write_result = file
-        .write_all(content)
-        .and_then(|_| file.sync_all());
+    let write_result = file.write_all(content).and_then(|_| file.sync_all());
     // Windows 上必须先关闭句柄才能 rename 覆盖
     drop(file);
 
@@ -73,12 +73,7 @@ fn resolve_symlink(path: &Path) -> PathBuf {
 
 fn create_temp_file(parent: &Path, file_name: &str) -> io::Result<(PathBuf, File)> {
     for attempt in 0..16u32 {
-        let candidate = parent.join(format!(
-            ".{}.tmp-{}-{}",
-            file_name,
-            process::id(),
-            attempt
-        ));
+        let candidate = parent.join(format!(".{}.tmp-{}-{}", file_name, process::id(), attempt));
         match OpenOptions::new()
             .write(true)
             .create_new(true)

@@ -294,5 +294,3 @@ export const DEFAULT_SETTINGS: SettingsState = {
   shortcuts: {},
   presentationZoom: PRESENTATION_ZOOM_DEFAULT,
 };
-
-

@@ -5,11 +5,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   convertFileSrc: (path: string) => `asset://localhost/${path}`,
 }));
 
-import {
-  getMarkdownRenderer,
-  getCurrentFilePath,
-  setCurrentFilePath,
-} from "./useMarkdownRenderer";
+import { getMarkdownRenderer, getCurrentFilePath, setCurrentFilePath } from "./useMarkdownRenderer";
 
 /**
  * #434：渲染上下文（filePath / frontMatter / theme）必须是显式参数与返回值，

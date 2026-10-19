@@ -32,13 +32,8 @@ const TARGET_SELECTOR = ".markdown-body .mermaid svg p";
 export function findMermaidSvgPLineHeightRule(css: string): string | null {
   const noComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
   for (const m of noComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    const selectors = m[1]
-      .split(",")
-      .map((s) => s.replace(/\s+/g, " ").trim());
-    if (
-      selectors.includes(TARGET_SELECTOR) &&
-      /line-height\s*:\s*inherit/.test(m[2])
-    ) {
+    const selectors = m[1].split(",").map((s) => s.replace(/\s+/g, " ").trim());
+    if (selectors.includes(TARGET_SELECTOR) && /line-height\s*:\s*inherit/.test(m[2])) {
       return m[2].trim();
     }
   }
@@ -61,7 +56,9 @@ describe("mermaid 节点文字裁切守卫（issue #342）", () => {
   });
 
   it("守卫本身能识别缺失/形制错误的规则（样例验证）", () => {
-    expect(findMermaidSvgPLineHeightRule(".markdown-body .mermaid svg p { color: red; }")).toBeNull();
+    expect(
+      findMermaidSvgPLineHeightRule(".markdown-body .mermaid svg p { color: red; }")
+    ).toBeNull();
     expect(
       findMermaidSvgPLineHeightRule(`${TARGET_SELECTOR} { line-height: inherit; }`)
     ).not.toBeNull();
@@ -71,14 +68,10 @@ describe("mermaid 节点文字裁切守卫（issue #342）", () => {
       )
     ).not.toBeNull();
     expect(
-      findMermaidSvgPLineHeightRule(
-        `/* 注释里出现 ${TARGET_SELECTOR} { line-height: inherit } */`
-      )
+      findMermaidSvgPLineHeightRule(`/* 注释里出现 ${TARGET_SELECTOR} { line-height: inherit } */`)
     ).toBeNull();
     expect(
-      findMermaidSvgPLineHeightRule(
-        ".markdown-body .mermaid svg p { line-height: 1.75; }"
-      )
+      findMermaidSvgPLineHeightRule(".markdown-body .mermaid svg p { line-height: 1.75; }")
     ).toBeNull();
   });
 });

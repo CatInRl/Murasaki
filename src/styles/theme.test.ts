@@ -11,10 +11,7 @@ import { resolve } from "node:path";
  * 实现细节不测（不解析 CSS AST、不断言具体颜色值），只断言变量名存在，
  * 这样后续调整数值时测试不会频繁失败（符合 spec.md 的测试哲学）。
  */
-const themeCss = readFileSync(
-  resolve(process.cwd(), "src/styles/theme.css"),
-  "utf-8",
-);
+const themeCss = readFileSync(resolve(process.cwd(), "src/styles/theme.css"), "utf-8");
 
 describe("styles/theme.css tokens — Ticket #60", () => {
   describe("字号 token（:root 全局）", () => {
@@ -50,7 +47,7 @@ describe("styles/theme.css tokens — Ticket #60", () => {
       expect(themeCss).not.toMatch(/@media\s*\(prefers-color-scheme:\s*dark\)/);
     });
 
-    it("不含 [data-theme=\"dark\"] 选择器（issue #114 移除深色模式）", () => {
+    it('不含 [data-theme="dark"] 选择器（issue #114 移除深色模式）', () => {
       expect(themeCss).not.toMatch(/\[data-theme="dark"\]/);
     });
   });

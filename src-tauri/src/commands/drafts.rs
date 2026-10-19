@@ -1,9 +1,9 @@
-use std::fs;
-use std::path::{Path, PathBuf};
 use super::atomic_write::write_atomic;
 use super::sha1_hex;
 use crate::errors::{CommandError, ErrorCode};
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// 草稿元数据（与前端 DraftMeta 对齐）
 /// 用于 tabs.json 中记录每个 tab 的草稿状态
@@ -27,7 +27,9 @@ fn app_data_dir() -> Result<PathBuf, CommandError> {
     // 注意：开发环境启动脚本可能重定向 APPDATA 到工作区 .appdata/
     let base = dirs::data_dir()
         .or_else(|| std::env::var_os("APPDATA").map(PathBuf::from))
-        .ok_or_else(|| CommandError::new(ErrorCode::Internal).with_param("detail", "app data dir"))?;
+        .ok_or_else(|| {
+            CommandError::new(ErrorCode::Internal).with_param("detail", "app data dir")
+        })?;
     let dir = base.join("murasaki");
     if !dir.exists() {
         fs::create_dir_all(&dir).map_err(|e| CommandError::io_at(&e, &dir))?;
@@ -56,7 +58,10 @@ fn draft_path_for(original_path: &str) -> Result<PathBuf, CommandError> {
 /// 用于持久化 known_mtime（保存草稿时文件的 mtime），启动恢复时检测外部修改
 fn draft_meta_path_for(original_path: &str) -> Result<PathBuf, CommandError> {
     let draft_path = draft_path_for(original_path)?;
-    Ok(PathBuf::from(format!("{}.meta.json", draft_path.to_string_lossy())))
+    Ok(PathBuf::from(format!(
+        "{}.meta.json",
+        draft_path.to_string_lossy()
+    )))
 }
 
 /// 草稿 sidecar 元数据（仅持久化 known_mtime，其他字段运行时计算）
@@ -99,7 +104,8 @@ pub fn save_draft(
     let draft_path = draft_path_for(&path)?;
     // 正文与 known_mtime 写在同一个文件里，一次原子替换完成
     let payload = encode_draft(known_mtime, &content);
-    write_atomic(&draft_path, payload.as_bytes()).map_err(|e| CommandError::io_at(&e, &draft_path))?;
+    write_atomic(&draft_path, payload.as_bytes())
+        .map_err(|e| CommandError::io_at(&e, &draft_path))?;
     // 旧格式遗留的 sidecar 不再需要；删除失败不影响草稿本身
     let meta_path = draft_meta_path_for(&path)?;
     if meta_path.exists() {

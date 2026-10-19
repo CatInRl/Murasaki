@@ -136,7 +136,10 @@ function onEmptyContextMenu(e: MouseEvent): void {
         try {
           await fileOps.paste(root);
         } catch (err) {
-          dialog.alert({ message: t("common.error.pasteFailed", { error: formatCommandError(err) }), variant: "error" });
+          dialog.alert({
+            message: t("common.error.pasteFailed", { error: formatCommandError(err) }),
+            variant: "error",
+          });
         }
       },
     },
@@ -148,7 +151,10 @@ function onEmptyContextMenu(e: MouseEvent): void {
         try {
           await fileOps.revealInExplorer(root);
         } catch (err) {
-          dialog.alert({ message: t("common.error.revealFailed", { error: formatCommandError(err) }), variant: "error" });
+          dialog.alert({
+            message: t("common.error.revealFailed", { error: formatCommandError(err) }),
+            variant: "error",
+          });
         }
       },
     },
@@ -168,7 +174,10 @@ async function submitRootCreating(): Promise<void> {
       await fileOps.createDirectory(workspace.workspacePath, name);
     }
   } catch (err) {
-    dialog.alert({ message: t("common.error.createFailed", { error: formatCommandError(err) }), variant: "error" });
+    dialog.alert({
+      message: t("common.error.createFailed", { error: formatCommandError(err) }),
+      variant: "error",
+    });
   } finally {
     fileOps.endRootCreate();
     rootCreatingName.value = "";
@@ -219,10 +228,7 @@ function retryLoad(): void {
 
     <!-- 文件树内容 -->
     <NScrollbar class="tree-scroll">
-      <Skeleton
-        v-if="workspace.loading && workspace.fileTree.length === 0"
-        :lines="4"
-      />
+      <Skeleton v-if="workspace.loading && workspace.fileTree.length === 0" :lines="4" />
       <!-- 先于 EmptyState 判断：首次打开失败时 workspacePath 尚未赋值，否则只剩「未打开工作区」 -->
       <ErrorState
         v-else-if="workspace.loadError && workspace.fileTree.length === 0"
@@ -246,25 +252,41 @@ function retryLoad(): void {
           <svg
             v-if="fileOps.rootCreatingType === 'directory'"
             class="root-creating-icon"
-            width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           >
-            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
           </svg>
           <svg
             v-else
             class="root-creating-icon"
-            width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
           </svg>
           <NInput
             v-model:value="rootCreatingName"
             size="tiny"
             autofocus
-            :placeholder="fileOps.rootCreatingType === 'file' ? t('editor.fileTree.newFilePlaceholder') : t('editor.fileTree.newFolderPlaceholder')"
+            :placeholder="
+              fileOps.rootCreatingType === 'file'
+                ? t('editor.fileTree.newFilePlaceholder')
+                : t('editor.fileTree.newFolderPlaceholder')
+            "
             @keyup.enter="submitRootCreating"
             @keyup.escape="cancelRootCreating"
             @blur="submitRootCreating"

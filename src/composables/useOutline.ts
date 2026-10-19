@@ -11,7 +11,7 @@ import { parseCommandError, type CommandErrorInfo } from "../utils/commandError"
 export function useOutline(
   filePath: Ref<string | null>,
   content: Ref<string> | null = null,
-  enabled: Ref<boolean> | (() => boolean) = () => true,
+  enabled: Ref<boolean> | (() => boolean) = () => true
 ) {
   const isLiveEnabled = typeof enabled === "function" ? enabled : () => enabled.value;
   const outline = ref<OutlineItem[]>([]);

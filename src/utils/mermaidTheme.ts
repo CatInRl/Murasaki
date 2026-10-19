@@ -11,11 +11,7 @@
 
 interface MermaidApi {
   initialize(config: Record<string, unknown>): void;
-  render(
-    id: string,
-    code: string,
-    svgContainingElement?: Element,
-  ): Promise<{ svg: string }>;
+  render(id: string, code: string, svgContainingElement?: Element): Promise<{ svg: string }>;
 }
 
 /** themeVariables 缓存：主色运行期不变，首次读一次即可（issue #295） */
@@ -90,16 +86,14 @@ const GANTT_USEWIDTH_FALLBACK = 1200;
 export async function renderMermaidDiagram(
   container: HTMLElement | undefined,
   id: string,
-  code: string,
+  code: string
 ): Promise<string> {
   const mermaid = await ensureMermaid();
   const useContainer =
     container !== undefined && container.isConnected && container.offsetWidth > 0
       ? container
       : undefined;
-  const width = useContainer
-    ? Math.round(useContainer.offsetWidth)
-    : GANTT_USEWIDTH_FALLBACK;
+  const width = useContainer ? Math.round(useContainer.offsetWidth) : GANTT_USEWIDTH_FALLBACK;
   if (width !== lastUseWidth) {
     mermaid.initialize({
       startOnLoad: false,
@@ -157,7 +151,7 @@ export interface MermaidRect {
  */
 export function todayLineIndexesOutsideContentBox(
   contentBox: MermaidRect,
-  todayBBoxes: MermaidRect[],
+  todayBBoxes: MermaidRect[]
 ): number[] {
   const left = contentBox.x;
   const right = contentBox.x + contentBox.width;
@@ -191,8 +185,7 @@ export function unionRect(a: MermaidRect, b: MermaidRect): MermaidRect {
  * viewBox、无 g.today 时全部静默 no-op 且不改动原状。
  */
 export function sanitizeMermaidSvg(container: ParentNode): void {
-  const svg =
-    container instanceof SVGElement ? container : container.querySelector("svg");
+  const svg = container instanceof SVGElement ? container : container.querySelector("svg");
   if (!svg) return;
   if (!svg.getAttribute("viewBox")) return;
   const todayGroups = svg.querySelectorAll("g.today");
@@ -238,9 +231,6 @@ export function sanitizeMermaidSvg(container: ParentNode): void {
     finalBox = unionRect(finalBox, bboxes[i]);
   }
 
-  svg.setAttribute(
-    "viewBox",
-    `${finalBox.x} ${finalBox.y} ${finalBox.width} ${finalBox.height}`,
-  );
+  svg.setAttribute("viewBox", `${finalBox.x} ${finalBox.y} ${finalBox.width} ${finalBox.height}`);
   (svg as SVGElement).style.maxWidth = `${finalBox.width}px`;
 }

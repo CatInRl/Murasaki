@@ -167,10 +167,7 @@ export function isPathUnder(base: string, target: string): boolean {
  *      isTabOutOfWorkspace("C:/docs", null) → false（未命名标签）
  *      isTabOutOfWorkspace(null, "C:/other/a.md") → false（无工作区）
  */
-export function isTabOutOfWorkspace(
-  workspacePath: string | null,
-  tabPath: string | null
-): boolean {
+export function isTabOutOfWorkspace(workspacePath: string | null, tabPath: string | null): boolean {
   if (!workspacePath || !tabPath) return false;
   return !isPathUnder(workspacePath, tabPath);
 }

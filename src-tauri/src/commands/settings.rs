@@ -1,5 +1,5 @@
-use tauri::{AppHandle, Emitter, Manager};
 use crate::errors::CommandError;
+use tauri::{AppHandle, Emitter, Manager};
 
 /// 在当前活动窗口内通过 hash 路由切换到设置页（单入口路由，见 ADR-0009 变更）
 ///

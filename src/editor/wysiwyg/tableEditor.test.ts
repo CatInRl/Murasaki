@@ -35,7 +35,8 @@ function setup(src = source) {
   const cellAt = (row: number, col: number) =>
     table.querySelector(`[data-row="${row}"][data-col="${col}"]`) as HTMLTableCellElement;
   /** jsdom 的 focus() 是 no-op：手动派发 FocusEvent 以触发 bindCell 的锚点逻辑。 */
-  const focus = (row: number, col: number) => cellAt(row, col).dispatchEvent(new FocusEvent("focus"));
+  const focus = (row: number, col: number) =>
+    cellAt(row, col).dispatchEvent(new FocusEvent("focus"));
   const lastCommit = (): string => {
     const calls = commit.mock.calls as [string][];
     return calls[calls.length - 1][0];
@@ -51,7 +52,9 @@ function placeCaret(cell: HTMLTableCellElement, offset: number) {
   range.collapse(true);
   rangeHolder.range = range;
   if (!getSelectionSpy) {
-    getSelectionSpy = vi.spyOn(document, "getSelection").mockReturnValue(selectionStub as unknown as Selection);
+    getSelectionSpy = vi
+      .spyOn(document, "getSelection")
+      .mockReturnValue(selectionStub as unknown as Selection);
   }
 }
 
@@ -138,7 +141,9 @@ describe("方向键格间导航", () => {
     const target = cellAt(1, 0);
     const spy = vi.spyOn(target, "focus");
     placeCaret(cellAt(1, 1), 0); // 行首
-    cellAt(1, 1).dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
+    cellAt(1, 1).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true })
+    );
     expect(spy).toHaveBeenCalled();
   });
 
@@ -147,7 +152,9 @@ describe("方向键格间导航", () => {
     const target = cellAt(1, 1);
     const spy = vi.spyOn(target, "focus");
     placeCaret(cellAt(1, 0), cellAt(1, 0).textContent!.length); // 行尾
-    cellAt(1, 0).dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+    cellAt(1, 0).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true })
+    );
     expect(spy).toHaveBeenCalled();
   });
 
@@ -156,7 +163,9 @@ describe("方向键格间导航", () => {
     const target = cellAt(0, 0);
     const spy = vi.spyOn(target, "focus");
     placeCaret(cellAt(1, 0), 0); // 行首（before 为空）
-    cellAt(1, 0).dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true }));
+    cellAt(1, 0).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true })
+    );
     expect(spy).toHaveBeenCalled();
   });
 
@@ -165,7 +174,9 @@ describe("方向键格间导航", () => {
     const stay = vi.spyOn(cellAt(1, 0), "focus");
     const header = vi.spyOn(cellAt(0, 0), "focus");
     placeCaret(cellAt(1, 0), 0);
-    cellAt(1, 0).dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
+    cellAt(1, 0).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true })
+    );
     expect(stay).toHaveBeenCalled(); // clamp 到列 0，仍在 (1,0)
     expect(header).not.toHaveBeenCalled(); // 未越界跳到表头
   });
@@ -176,7 +187,9 @@ describe("方向键格间导航", () => {
     const spy = vi.spyOn(neighbor, "focus");
     // “就地编辑” 光标放中间（offset 1）
     placeCaret(cellAt(1, 0), 1);
-    cellAt(1, 0).dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+    cellAt(1, 0).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true })
+    );
     expect(spy).not.toHaveBeenCalled();
   });
 });
@@ -187,12 +200,16 @@ describe("Tab / 多行格", () => {
     let target = cellAt(0, 2);
     let spy = vi.spyOn(target, "focus");
     placeCaret(cellAt(0, 1), 2);
-    cellAt(0, 1).dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    cellAt(0, 1).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true })
+    );
     expect(spy).toHaveBeenCalled();
 
     target = cellAt(0, 1);
     spy = vi.spyOn(target, "focus");
-    cellAt(0, 2).dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }));
+    cellAt(0, 2).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true })
+    );
     expect(spy).toHaveBeenCalled();
   });
 
@@ -200,7 +217,9 @@ describe("Tab / 多行格", () => {
     const { cellAt, commit } = setup();
     const cell = cellAt(1, 0);
     placeCaret(cell, cell.textContent!.length);
-    cell.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    cell.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })
+    );
     expect(cell.querySelector("br")).not.toBeNull();
     expect(commit).not.toHaveBeenCalled();
   });
@@ -223,7 +242,9 @@ describe("Tab / 多行格", () => {
   it("Esc 提交整表并写回，随后锚点清除", () => {
     const { cellAt, lastCommit } = setup();
     placeCaret(cellAt(1, 0), 0);
-    cellAt(1, 0).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    cellAt(1, 0).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+    );
     expect(parseTable(lastCommit())).not.toBeNull();
     expect(cellAt(1, 0).classList.contains("murasaki-anchor-cell")).toBe(false);
   });
@@ -232,7 +253,10 @@ describe("Tab / 多行格", () => {
     const { editor, focus, commit } = setup();
     focus(1, 2); // 锚点 = (1,2)
     editor.commit();
-    const last = commit.mock.calls[commit.mock.calls.length - 1] as [string, { row: number; col: number }];
+    const last = commit.mock.calls[commit.mock.calls.length - 1] as [
+      string,
+      { row: number; col: number },
+    ];
     expect(last[1]).toEqual({ row: 1, col: 2 });
   });
 

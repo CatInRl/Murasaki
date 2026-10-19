@@ -135,8 +135,8 @@ function disableOne(cmdId: string): void {
 
 <template>
   <div>
-    <h1 class="settings-page-title">{{ t('settings.shortcuts.title') }}</h1>
-    <p class="settings-page-description">{{ t('settings.shortcuts.description') }}</p>
+    <h1 class="settings-page-title">{{ t("settings.shortcuts.title") }}</h1>
+    <p class="settings-page-description">{{ t("settings.shortcuts.description") }}</p>
 
     <p v-if="invalidHint" class="shortcut-hint" role="alert">
       {{ invalidHint }}
@@ -167,13 +167,13 @@ function disableOne(cmdId: string): void {
               @click="toggleRecord(cmd.id)"
             >
               <template v-if="recordingId === cmd.id">
-                {{ t('settings.shortcuts.recording') }}
+                {{ t("settings.shortcuts.recording") }}
               </template>
               <template v-else-if="effective[cmd.id]">
                 {{ formatShortcutForDisplay(effective[cmd.id]) }}
               </template>
               <template v-else>
-                <span class="unset">{{ t('settings.shortcuts.unset') }}</span>
+                <span class="unset">{{ t("settings.shortcuts.unset") }}</span>
               </template>
             </button>
 
@@ -276,7 +276,9 @@ function disableOne(cmdId: string): void {
   border-radius: 4px;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05); /* 一次性键帽下沿投影，无色 token 对应 */
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 .shortcut-key-btn:hover {
   border-color: var(--murasaki-ring);
@@ -308,7 +310,9 @@ function disableOne(cmdId: string): void {
   border: 1px solid transparent;
   border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
 }
 .icon-button:hover {
   color: var(--murasaki-ink);

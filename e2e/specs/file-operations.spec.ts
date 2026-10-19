@@ -25,7 +25,14 @@ import {
 } from "../helpers/store";
 import { existsSync, statSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readText, textOfElement, waitForAbsent, waitForInBrowser, waitForPresent, waitForRendered } from "../helpers/wait";
+import {
+  readText,
+  textOfElement,
+  waitForAbsent,
+  waitForInBrowser,
+  waitForPresent,
+  waitForRendered,
+} from "../helpers/wait";
 import { waitForTreeSettled } from "../helpers/tree";
 
 let browser: Browser;
@@ -42,7 +49,7 @@ async function openTreeNodeContextMenu(b: Browser, nodeName: string): Promise<vo
   const attempts = 3;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const dispatched = await b.execute((name: string) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const menu = window.__pinia__._s.get("contextMenu");
       menu.hide();
       const evt = new MouseEvent("contextmenu", {
@@ -50,7 +57,7 @@ async function openTreeNodeContextMenu(b: Browser, nodeName: string): Promise<vo
         clientX: 100,
         clientY: 100,
       });
-      const nodes = document.querySelectorAll('.file-tree .tree-node .node-name');
+      const nodes = document.querySelectorAll(".file-tree .tree-node .node-name");
       const node = Array.from(nodes).find((n) => n.textContent?.trim() === name);
       if (!node) return false;
       const row = node.closest(".node-row");
@@ -191,7 +198,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     await browser.keys(["Escape"]);
     await waitForAbsent(browser, ".murasaki-context-menu", 5000);
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       if (toast) toast.dismissAll();
     });
@@ -207,13 +214,10 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // 1.16MB 的无后缀文本：此前「无后缀 ≥1MB」被直接判定为打不开，点击毫无反应。
     // 文件写进**夹具**再打开工作区，不走「中途写文件等监听刷树」—— 那条路在本 harness
     // 里只在 session 的首个工作区有效（#311），会让用例带上顺序依赖。
-    const bigContent = Array.from({ length: 15000 }, (_, i) =>
-      `line ${i} `.padEnd(80, "x")
-    ).join("\n");
-    wsPath = resetWorkspace([
-      ...defaultFixtureFiles(),
-      { path: "build-log", content: bigContent },
-    ]);
+    const bigContent = Array.from({ length: 15000 }, (_, i) => `line ${i} `.padEnd(80, "x")).join(
+      "\n"
+    );
+    wsPath = resetWorkspace([...defaultFixtureFiles(), { path: "build-log", content: bigContent }]);
     await openWorkspace(browser, wsPath);
     await waitForTreeSettled(browser);
     await waitForTreeNode(browser, "build-log");
@@ -236,19 +240,20 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     await waitForPresent(browser, ".dialog-overlay", 5000);
     const confirmBtn = await browser.$(".dialog-footer .dialog-btn.primary");
     await confirmBtn.click();
-    await waitForInBrowser(
-      browser,
-      () => window.__pinia__._s.get("tabs").tabs.length > 0,
-      [],
-      { timeout: 10000, message: "确认后打开为标签" }
-    );
+    await waitForInBrowser(browser, () => window.__pinia__._s.get("tabs").tabs.length > 0, [], {
+      timeout: 10000,
+      message: "确认后打开为标签",
+    });
   });
 
   it("无后缀二进制文件（非 UTF-8）：打开失败给出「用系统默认程序打开」兜底（#308）", async () => {
     // 0xff/0xfe 非法 UTF-8 → Rust read_text_file 直接报错，不再只有一句「打开文件失败」。
     // 夹具写入器只写文本，所以这里写完显式刷树（`refreshTree` 正是监听里调用的那个动作；
     // 本用例测的是打开失败的兜底，不是监听本身）。
-    writeFileSync(resolve(wsPath, "raw-bin"), Buffer.from([0x00, 0xff, 0xfe, 0x01, 0x02, 0x80, 0x81]));
+    writeFileSync(
+      resolve(wsPath, "raw-bin"),
+      Buffer.from([0x00, 0xff, 0xfe, 0x01, 0x02, 0x80, 0x81])
+    );
     await callStoreAction(browser, "workspace", "refreshTree");
     await waitForTreeNode(browser, "raw-bin");
     await waitForTreeSettled(browser);
@@ -282,7 +287,13 @@ describe("文件树右键菜单 + 文件操作安全", () => {
   // ===== H2: 文件操作闭环 =====
 
   it("新建文件：fileOps.createFile 后文件树刷新显示新文件", async () => {
-    const node = await callStoreAction<any>(browser, "fileOps", "createFile", wsPath, "new-file.md");
+    const node = await callStoreAction<any>(
+      browser,
+      "fileOps",
+      "createFile",
+      wsPath,
+      "new-file.md"
+    );
 
     expect(node).toBeTruthy();
     expect(node.name).toBe("new-file.md");
@@ -301,7 +312,13 @@ describe("文件树右键菜单 + 文件操作安全", () => {
   });
 
   it("新建文件夹：fileOps.createDirectory 后文件树刷新显示新目录", async () => {
-    const node = await callStoreAction<any>(browser, "fileOps", "createDirectory", wsPath, "new-folder");
+    const node = await callStoreAction<any>(
+      browser,
+      "fileOps",
+      "createDirectory",
+      wsPath,
+      "new-folder"
+    );
 
     expect(node).toBeTruthy();
     expect(node.type).toBe("directory");
@@ -323,8 +340,10 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     const newRelPath = "intro-renamed.md";
     expect(existsSync(oldPath)).toBe(true);
 
-    const node = await callStoreAction<any>(
-      browser, "fileOps", "renamePath",
+    await callStoreAction<any>(
+      browser,
+      "fileOps",
+      "renamePath",
       oldPath.replace(/\\/g, "/"),
       newRelPath
     );
@@ -357,7 +376,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
 
     // 标签路径已跟随改名，而不是仍指向旧路径
     const tabPath = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__pinia__._s.get("tabs").activeTab?.path;
     });
     expect(tabPath).toContain("notes-renamed.md");
@@ -366,7 +385,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     await callStoreAction(browser, "tabs", "updateActiveContent", "# 重命名后保存\n");
 
     const tabId = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__pinia__._s.get("tabs").activeTab?.id;
     });
     await callStoreAction(browser, "tabs", "saveTab", tabId);
@@ -401,12 +420,15 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     expect(existsSync(srcPath)).toBe(true);
 
     // 剪切 intro.md（同步操作，无需等待）
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const fileOps = pinia._s.get("fileOps");
-      fileOps.cut(path);
-    }, srcPath.replace(/\\/g, "/"));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        const pinia = window.__pinia__;
+        const fileOps = pinia._s.get("fileOps");
+        fileOps.cut(path);
+      },
+      srcPath.replace(/\\/g, "/")
+    );
 
     // 粘贴到 sub/
     await callStoreAction(browser, "fileOps", "paste", targetDir.replace(/\\/g, "/"));
@@ -419,10 +441,10 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // 文件树 sub/ 下应能找到 intro.md（需要展开 sub 目录）
     // 先展开 sub 目录
     await browser.execute(() => {
-      const nodes = document.querySelectorAll('.file-tree .tree-node .node-name');
+      const nodes = document.querySelectorAll(".file-tree .tree-node .node-name");
       const subNode = Array.from(nodes).find((n) => n.textContent?.trim() === "sub");
       if (subNode) {
-        const row = subNode.closest(".node-row");
+        const row = subNode.closest(".node-row") as HTMLElement | null;
         row?.click();
         // 双击展开
         row?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
@@ -437,12 +459,15 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     const originalContent = readFileSync(srcPath, "utf-8");
 
     // 复制 notes.md（同步操作，无需等待）
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const fileOps = pinia._s.get("fileOps");
-      fileOps.copy(path);
-    }, srcPath.replace(/\\/g, "/"));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        const pinia = window.__pinia__;
+        const fileOps = pinia._s.get("fileOps");
+        fileOps.copy(path);
+      },
+      srcPath.replace(/\\/g, "/")
+    );
 
     // 粘贴到 sub/
     await callStoreAction(browser, "fileOps", "paste", targetDir.replace(/\\/g, "/"));
@@ -461,19 +486,21 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // 模拟将 intro.md 重命名为 notes.md（已存在）
     // 需要注入冲突 resolver：因为 setConflictResolver 由 App.vue 注入，E2E 中需要重新注入
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const fileOps = pinia._s.get("fileOps");
       const dialog = pinia._s.get("dialog");
 
       // 注入 resolver：使用 dialog.conflict
-      fileOps.setConflictResolver(async (targetPath: string, operation: string, sourcePath?: string) => {
-        return dialog.conflict({
-          filename: targetPath.split(/[\\/]/).pop() ?? "",
-          sourcePath,
-          operation: operation as any,
-        });
-      });
+      fileOps.setConflictResolver(
+        async (targetPath: string, operation: string, sourcePath?: string) => {
+          return dialog.conflict({
+            filename: targetPath.split(/[\\/]/).pop() ?? "",
+            sourcePath,
+            operation: operation as any,
+          });
+        }
+      );
     });
 
     const oldPath = resolve(wsPath, "intro.md");
@@ -481,15 +508,23 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // 1. Start rename without blocking — executeAsync 会阻塞 session 直到 done 被调用，
     //    导致后续 button click 命令无法送达浏览器（script timeout 死锁）。
     //    改用同步 execute 启动异步操作，结果暂存到 window.__testResult。
-    await browser.execute((old: string, newName: string) => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const fileOps = pinia._s.get("fileOps");
-      (window as any).__testResult = null;
-      Promise.resolve(fileOps.renamePath(old, newName))
-        .then((node: any) => { (window as any).__testResult = { ok: true, node: node ? { name: node.name } : null }; })
-        .catch((err: any) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
-    }, oldPath.replace(/\\/g, "/"), "notes.md");
+    await browser.execute(
+      (old: string, newName: string) => {
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        const pinia = window.__pinia__;
+        const fileOps = pinia._s.get("fileOps");
+        (window as any).__testResult = null;
+        Promise.resolve(fileOps.renamePath(old, newName))
+          .then((node: any) => {
+            (window as any).__testResult = { ok: true, node: node ? { name: node.name } : null };
+          })
+          .catch((err: any) => {
+            (window as any).__testResult = { ok: false, error: err ? String(err) : null };
+          });
+      },
+      oldPath.replace(/\\/g, "/"),
+      "notes.md"
+    );
 
     // 2. 等待冲突对话框出现（用 waitForPresent 而非元素可见性等待，Vue Transition 会让元素
     //    存在但 opacity:0 延迟显示，可见性判定可能误判）
@@ -502,7 +537,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     } else {
       // 回退：通过 store 直接 cancelCurrent
       await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const dialog = pinia._s.get("dialog");
         dialog.cancelCurrent();
@@ -510,10 +545,10 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     }
 
     // 4. Poll for result（对话框 resolve 后 renamePath promise 才会 settle）
-    await browser.waitUntil(
-      async () => await browser.execute(() => (window as any).__testResult),
-      { timeout: 5000, interval: 100 }
-    );
+    await browser.waitUntil(async () => await browser.execute(() => (window as any).__testResult), {
+      timeout: 5000,
+      interval: 100,
+    });
     const result = await browser.execute(() => (window as any).__testResult);
 
     expect((result as any).ok).toBe(true);
@@ -526,17 +561,19 @@ describe("文件树右键菜单 + 文件操作安全", () => {
 
   it("重命名到已存在文件名：选择覆盖则源文件替换目标", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const fileOps = pinia._s.get("fileOps");
       const dialog = pinia._s.get("dialog");
-      fileOps.setConflictResolver(async (targetPath: string, operation: string, sourcePath?: string) => {
-        return dialog.conflict({
-          filename: targetPath.split(/[\\/]/).pop() ?? "",
-          sourcePath,
-          operation: operation as any,
-        });
-      });
+      fileOps.setConflictResolver(
+        async (targetPath: string, operation: string, sourcePath?: string) => {
+          return dialog.conflict({
+            filename: targetPath.split(/[\\/]/).pop() ?? "",
+            sourcePath,
+            operation: operation as any,
+          });
+        }
+      );
     });
 
     const srcPath = resolve(wsPath, "intro.md");
@@ -546,15 +583,23 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // 1. Start rename without blocking — executeAsync 会阻塞 session 直到 done 被调用，
     //    导致后续 button click 命令无法送达浏览器（script timeout 死锁）。
     //    改用同步 execute 启动异步操作，结果暂存到 window.__testResult。
-    await browser.execute((old: string, newName: string) => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
-      const fileOps = pinia._s.get("fileOps");
-      (window as any).__testResult = null;
-      Promise.resolve(fileOps.renamePath(old, newName))
-        .then((node: any) => { (window as any).__testResult = { ok: true, node: node ? { name: node.name } : null }; })
-        .catch((err: any) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
-    }, srcPath.replace(/\\/g, "/"), targetName);
+    await browser.execute(
+      (old: string, newName: string) => {
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        const pinia = window.__pinia__;
+        const fileOps = pinia._s.get("fileOps");
+        (window as any).__testResult = null;
+        Promise.resolve(fileOps.renamePath(old, newName))
+          .then((node: any) => {
+            (window as any).__testResult = { ok: true, node: node ? { name: node.name } : null };
+          })
+          .catch((err: any) => {
+            (window as any).__testResult = { ok: false, error: err ? String(err) : null };
+          });
+      },
+      srcPath.replace(/\\/g, "/"),
+      targetName
+    );
 
     // 2. 等待对话框出现并点击"覆盖"（用 waitForPresent 而非元素可见性等待，Vue Transition
     //    会让元素存在但 opacity:0 延迟显示）
@@ -567,7 +612,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     } else {
       // 回退：通过 store 直接 conflictOverwrite
       await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const dialog = pinia._s.get("dialog");
         dialog.conflictOverwrite();
@@ -575,10 +620,10 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     }
 
     // 4. Poll for result（对话框 resolve 后 renamePath promise 才会 settle）
-    await browser.waitUntil(
-      async () => await browser.execute(() => (window as any).__testResult),
-      { timeout: 5000, interval: 100 }
-    );
+    await browser.waitUntil(async () => await browser.execute(() => (window as any).__testResult), {
+      timeout: 5000,
+      interval: 100,
+    });
     const result = await browser.execute(() => (window as any).__testResult);
 
     expect((result as any).ok).toBe(true);
@@ -616,7 +661,13 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     // window.__testResult，然后 callStoreAction 将其转为 thrown Error。
     let caughtError: Error | null = null;
     try {
-      await callStoreAction(browser, "fileOps", "renamePath", srcPath.replace(/\\/g, "/"), targetName);
+      await callStoreAction(
+        browser,
+        "fileOps",
+        "renamePath",
+        srcPath.replace(/\\/g, "/"),
+        targetName
+      );
     } catch (err: unknown) {
       caughtError = err instanceof Error ? err : new Error(String(err));
     }
@@ -634,7 +685,7 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     if (browser) {
       try {
         await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const pinia = window.__pinia__;
           const fileOps = pinia?._s?.get("fileOps");
           if (fileOps) fileOps.setConflictResolver(null);

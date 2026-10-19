@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ref } from "vue";
-import {
-  useCopyRichText,
-  extractRichTextFragment,
-  type CopyRichTextDeps,
-} from "./useCopyRichText";
+import { useCopyRichText, extractRichTextFragment, type CopyRichTextDeps } from "./useCopyRichText";
 import type { Tab } from "../types";
 
 // mock exportHtml（避免触发 markdown-it / shiki 真实渲染）
@@ -107,7 +103,7 @@ describe("extractRichTextFragment", () => {
 </html>`;
     const fragment = extractRichTextFragment(fullHtml);
     expect(fragment).toContain("<style>.a { color: red; }</style>");
-    expect(fragment).toContain('<h1>Hello</h1>');
+    expect(fragment).toContain("<h1>Hello</h1>");
     expect(fragment).not.toContain("<html");
     expect(fragment).not.toContain("<head>");
     expect(fragment).not.toContain("</body>");

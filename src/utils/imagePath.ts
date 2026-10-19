@@ -82,7 +82,7 @@ export function resolveImageSrc(src: string, currentFilePath: string | null): st
   }
 
   // 本地路径：markdown-it 会把反斜杠编码为 %5C，先 decode 还原原始路径
-  let decoded = src;
+  let decoded: string;
   try {
     decoded = decodeURIComponent(src);
   } catch {
@@ -135,7 +135,7 @@ export function assetUrlToPath(src: string): string {
 
   const stripped = src.replace(ASSET_URL_PREFIX, "");
 
-  let decoded = stripped;
+  let decoded: string;
   try {
     decoded = decodeURIComponent(stripped);
   } catch {

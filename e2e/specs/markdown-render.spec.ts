@@ -17,10 +17,17 @@
  *
  * 通过 setTabContent 直接修改内容，然后等待预览 DOM 更新
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
-import { openWorkspace, closeWorkspace, openFileInTab, getTabsState, waitForPinia, ensureSplitMode } from "../helpers/store";
+import {
+  openWorkspace,
+  closeWorkspace,
+  openFileInTab,
+  getTabsState,
+  waitForPinia,
+  ensureSplitMode,
+} from "../helpers/store";
 import { waitForPresent, waitForInBrowser } from "../helpers/wait";
 import { toAppPath } from "../helpers/platform";
 import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
@@ -331,9 +338,12 @@ beforeEach(async () => {
   // 清空所有 tab
   try {
     await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
-      Promise.resolve(tabs.clearAll()).then(() => done(null), (e) => done(String(e)));
+      Promise.resolve(tabs.clearAll()).then(
+        () => done(null),
+        (e) => done(String(e))
+      );
     });
   } catch {
     // ignore
@@ -354,13 +364,16 @@ async function openAndWait(browser: Browser, relPath: string, timeout = 15000): 
   const fullPath = `${WS1}\\${relPath}`;
   await openFileInTab(browser, fullPath);
   // 直接等预览区出现内容（跨过 tabs.length 检查，避免启动慢时误超时）
-  await browser.waitUntil(async () => {
-    const html = await browser.execute(() => {
-      const el = document.querySelector(".preview-pane");
-      return el ? el.innerHTML.length : 0;
-    });
-    return html > 0;
-  }, { timeout });
+  await browser.waitUntil(
+    async () => {
+      const html = await browser.execute(() => {
+        const el = document.querySelector(".preview-pane");
+        return el ? el.innerHTML.length : 0;
+      });
+      return html > 0;
+    },
+    { timeout }
+  );
   // 给 mermaid/katex/shiki 等异步渲染留时间
   await browser.pause(800);
 }
@@ -385,13 +398,21 @@ async function previewText(browser: Browser, selector: string): Promise<string |
 }
 
 /** 获取预览区元素属性 */
-async function previewAttr(browser: Browser, selector: string, attr: string): Promise<string | null> {
-  return browser.execute((s: string, a: string) => {
-    const root = document.querySelector(".preview-pane");
-    if (!root) return null;
-    const el = s ? root.querySelector(s) : root;
-    return el ? el.getAttribute(a) : null;
-  }, selector, attr);
+async function previewAttr(
+  browser: Browser,
+  selector: string,
+  attr: string
+): Promise<string | null> {
+  return browser.execute(
+    (s: string, a: string) => {
+      const root = document.querySelector(".preview-pane");
+      if (!root) return null;
+      const el = s ? root.querySelector(s) : root;
+      return el ? el.getAttribute(a) : null;
+    },
+    selector,
+    attr
+  );
 }
 
 /** 获取预览区元素 outerHTML（用于断言 class 等） */
@@ -524,15 +545,18 @@ describe("4. Mermaid 图表", () => {
   it("4.4 渲染失败的 mermaid 显示错误信息（不崩溃）", async () => {
     // 用一个语法错误的 mermaid 块
     await openFileInTab(browser, `${WS1}\\render\\mermaid.md`);
-    await browser.waitUntil(async () => {
-      const tabs = await getTabsState(browser);
-      return tabs.tabs.length === 1;
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        const tabs = await getTabsState(browser);
+        return tabs.tabs.length === 1;
+      },
+      { timeout: 5000 }
+    );
     // 替换为错误内容
     await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
-      tabs.updateContent(tabs.activeTabId, '```mermaid\nthis is not valid mermaid syntax\n```');
+      tabs.updateContent(tabs.activeTabId, "```mermaid\nthis is not valid mermaid syntax\n```");
       done(null);
     });
     await browser.pause(2000); // 等待渲染与错误处理
@@ -551,33 +575,38 @@ describe("4. Mermaid 图表", () => {
       { message: "mermaid SVG 未渲染完整", timeout: 20000 }
     );
     const infos = await browser.execute(() => {
-      return Array.from(document.querySelectorAll(".preview-pane .mermaid svg")).map((svg, index) => {
-        const el = svg as SVGSVGElement;
-        const vb = (el.getAttribute("viewBox") ?? "").trim().split(/[\s,]+/).map(Number);
-        const rect = el.getBoundingClientRect();
-        const today = el.querySelector("g.today");
-        const ok = vb.length === 4 && vb.every((n) => Number.isFinite(n));
-        // 图类型探测（#342 CI 取证用）：循环 expect 失败只报裸比值，
-        // 无法指认失败的是哪张图，所以把类型与全部度量带进失败信息
-        const kind = today
-          ? "gantt"
-          : el.querySelector(".actor")
-            ? "sequence"
-            : el.querySelector(".node, .edgePaths")
-              ? "flowchart"
-              : "unknown";
-        return {
-          index,
-          kind,
-          vbW: ok ? vb[2] : 0,
-          vbH: ok ? vb[3] : 0,
-          w: rect.width,
-          h: rect.height,
-          maxW: el.style.maxWidth,
-          hasToday: !!today,
-          todayHidden: today ? (today as SVGElement).style.display === "none" : null,
-        };
-      });
+      return Array.from(document.querySelectorAll(".preview-pane .mermaid svg")).map(
+        (svg, index) => {
+          const el = svg as SVGSVGElement;
+          const vb = (el.getAttribute("viewBox") ?? "")
+            .trim()
+            .split(/[\s,]+/)
+            .map(Number);
+          const rect = el.getBoundingClientRect();
+          const today = el.querySelector("g.today");
+          const ok = vb.length === 4 && vb.every((n) => Number.isFinite(n));
+          // 图类型探测（#342 CI 取证用）：循环 expect 失败只报裸比值，
+          // 无法指认失败的是哪张图，所以把类型与全部度量带进失败信息
+          const kind = today
+            ? "gantt"
+            : el.querySelector(".actor")
+              ? "sequence"
+              : el.querySelector(".node, .edgePaths")
+                ? "flowchart"
+                : "unknown";
+          return {
+            index,
+            kind,
+            vbW: ok ? vb[2] : 0,
+            vbH: ok ? vb[3] : 0,
+            w: rect.width,
+            h: rect.height,
+            maxW: el.style.maxWidth,
+            hasToday: !!today,
+            todayHidden: today ? (today as SVGElement).style.display === "none" : null,
+          };
+        }
+      );
     });
     expect(infos.length).toBeGreaterThanOrEqual(3);
     // 完整显示守卫（单点断言，失败信息带每张 SVG 的完整诊断）。三项都是「渲染性质」，
@@ -623,7 +652,9 @@ describe("5. Emoji 短代码", () => {
     const text = await previewText(browser, "p");
     // 应包含至少一个 emoji 字符（😄 ❤️ 👍 🚀 🔥）
     // 检查是否含非 ASCII 字符（emoji 在 BMP 之外或符号区）
-    const hasEmoji = text ? /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u.test(text) : false;
+    const hasEmoji = text
+      ? /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u.test(text)
+      : false;
     expect(hasEmoji).toBe(true);
   });
 
@@ -664,7 +695,7 @@ describe("6. 任务列表", () => {
     await openAndWait(browser, "render/tasklist.md");
     // 通过 store 模拟点击（避免动画/事件冒泡问题）
     const beforeContent = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.content ?? "";
     });
@@ -673,7 +704,7 @@ describe("6. 任务列表", () => {
     // 模拟 PreviewPane emit task-toggle：找未完成项的 li 并改源
     // 这里直接通过更新 store 验证渲染重绘
     await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       const newContent = tabs.activeTab.content.replace("- [ ] 未完成项", "- [x] 未完成项");
       tabs.updateContent(tabs.activeTabId, newContent);
@@ -837,14 +868,22 @@ describe("12. 标题与分隔线", () => {
 // ===== 测试组 12.5：T7 样式对齐（ux-markdown-structures.html） =====
 describe("12.5 T7 样式对齐设计稿", () => {
   /** 获取预览区内某元素的计算样式 */
-  async function previewComputedStyle(browser: Browser, selector: string, prop: string): Promise<string | null> {
-    return browser.execute((s: string, p: string) => {
-      const root = document.querySelector(".preview-pane");
-      if (!root) return null;
-      const el = s ? root.querySelector(s) : root;
-      if (!el) return null;
-      return window.getComputedStyle(el).getPropertyValue(p);
-    }, selector, prop);
+  async function previewComputedStyle(
+    browser: Browser,
+    selector: string,
+    prop: string
+  ): Promise<string | null> {
+    return browser.execute(
+      (s: string, p: string) => {
+        const root = document.querySelector(".preview-pane");
+        if (!root) return null;
+        const el = s ? root.querySelector(s) : root;
+        if (!el) return null;
+        return window.getComputedStyle(el).getPropertyValue(p);
+      },
+      selector,
+      prop
+    );
   }
 
   it("12.5.1 H1 字号为 22px（对齐 ux-markdown-structures）", async () => {
@@ -985,17 +1024,21 @@ describe("15. 图表配色跟随 token", () => {
     value: string,
     container = "body"
   ): Promise<string> {
-    return browser.execute((v: string, c: string) => {
-      const host = document.querySelector(c) ?? document.body;
-      const probe = document.createElement("div");
-      probe.style.position = "fixed";
-      probe.style.left = "-9999px";
-      probe.style.color = v;
-      host.appendChild(probe);
-      const color = getComputedStyle(probe).color;
-      probe.remove();
-      return color;
-    }, value, container);
+    return browser.execute(
+      (v: string, c: string) => {
+        const host = document.querySelector(c) ?? document.body;
+        const probe = document.createElement("div");
+        probe.style.position = "fixed";
+        probe.style.left = "-9999px";
+        probe.style.color = v;
+        host.appendChild(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      },
+      value,
+      container
+    );
   }
 
   /** 收集容器内 SVG 后代元素的计算描边色（过滤 none / 空） */
@@ -1037,12 +1080,9 @@ describe("15. 图表配色跟随 token", () => {
 
   it("15.3 KaTeX 公式颜色跟随主题内容色（--md-fg，非信息蓝）", async () => {
     await openAndWait(browser, "render/math.md");
-    await waitForInBrowser(
-      browser,
-      () => !!document.querySelector(".preview-pane .katex"),
-      [],
-      { message: "KaTeX 未渲染" }
-    );
+    await waitForInBrowser(browser, () => !!document.querySelector(".preview-pane .katex"), [], {
+      message: "KaTeX 未渲染",
+    });
     const expected = await resolveCssColor(browser, "var(--md-fg)", ".preview-pane");
     const actual = await browser.execute(() => {
       const el = document.querySelector(".preview-pane .katex");
@@ -1051,4 +1091,3 @@ describe("15. 图表配色跟随 token", () => {
     expect(actual).toBe(expected);
   });
 });
-

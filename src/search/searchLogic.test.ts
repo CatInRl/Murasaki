@@ -191,12 +191,12 @@ describe("buildGroups", () => {
       {
         path: "/ws/a.md",
         title: "a.md",
-        hits: [
-          { lineNumber: 1, snippet: "Mura.*editor 命中", ranges: [[0, 13]] },
-        ],
+        hits: [{ lineNumber: 1, snippet: "Mura.*editor 命中", ranges: [[0, 13]] }],
       },
     ];
-    const groups = buildGroups(makeCtx({ query: "Mura.*editor", contentQuery: "Mura.*editor", content }));
+    const groups = buildGroups(
+      makeCtx({ query: "Mura.*editor", contentQuery: "Mura.*editor", content })
+    );
     const g = groups.find((x) => x.kind === "content")!;
     expect(g.items[0].snippetRanges).toEqual([[0, 13]]);
   });
@@ -300,7 +300,11 @@ describe("buildGroups", () => {
       contentQuery: "a",
       tabs: [tab("t1", "/ws/a.md", "a.md")],
       content: [
-        { path: "/ws/a.md", title: "a.md", hits: [{ lineNumber: 3, snippet: "three", ranges: [] }] },
+        {
+          path: "/ws/a.md",
+          title: "a.md",
+          hits: [{ lineNumber: 3, snippet: "three", ranges: [] }],
+        },
       ],
     });
     const groups = buildGroups(ctx);

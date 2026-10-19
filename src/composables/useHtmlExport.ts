@@ -1,7 +1,4 @@
-import {
-  getMarkdownRenderer,
-  resolveShikiThemeOption,
-} from "./useMarkdownRenderer";
+import { getMarkdownRenderer, resolveShikiThemeOption } from "./useMarkdownRenderer";
 import { renderFrontMatterCard } from "./useFrontMatter";
 import { MARKDOWN_THEMES } from "./useTheme";
 import { codeToHtml, type ThemeRegistration } from "shiki";
@@ -110,9 +107,7 @@ export interface ExportHtmlOptions {
 
 /** 解析 Shiki 主题名 */
 function resolveShikiTheme(themeName: string): string {
-  return (
-    MARKDOWN_THEMES.find((t) => t.name === themeName)?.shikiTheme ?? "github-light"
-  );
+  return MARKDOWN_THEMES.find((t) => t.name === themeName)?.shikiTheme ?? "github-light";
 }
 
 interface InlineImagesResult {
@@ -204,8 +199,7 @@ async function highlightCodeBlocksInHtml(
   shikiTheme: string | ThemeRegistration
 ): Promise<string> {
   // 匹配 <pre><code class="language-xxx" data-lang="xxx">...</code></pre>
-  const blockRegex =
-    /<pre[^>]*><code[^>]*data-lang="([^"]*)"[^>]*>([\s\S]*?)<\/code><\/pre>/g;
+  const blockRegex = /<pre[^>]*><code[^>]*data-lang="([^"]*)"[^>]*>([\s\S]*?)<\/code><\/pre>/g;
   const replacements: Array<{ original: string; replacement: string }> = [];
   let match: RegExpExecArray | null;
 

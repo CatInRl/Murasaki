@@ -85,7 +85,12 @@ interface FormatButton {
 const textButtons = computed<FormatButton[]>(() => [
   { id: "bold", icon: Bold, title: t("editor.toolbar.bold"), marker: "**" },
   { id: "italic", icon: Italic, title: t("editor.toolbar.italic"), marker: "*" },
-  { id: "strikethrough", icon: Strikethrough, title: t("editor.toolbar.strikethrough"), marker: "~~" },
+  {
+    id: "strikethrough",
+    icon: Strikethrough,
+    title: t("editor.toolbar.strikethrough"),
+    marker: "~~",
+  },
   { id: "code", icon: Code, title: t("editor.toolbar.inlineCode"), marker: "`" },
 ]);
 
@@ -96,8 +101,18 @@ const headingButtons = computed<FormatButton[]>(() => [
 ]);
 
 const listButtons = computed<FormatButton[]>(() => [
-  { id: "unordered-list", icon: List, title: t("editor.toolbar.unorderedList"), listType: "unordered" },
-  { id: "ordered-list", icon: ListOrdered, title: t("editor.toolbar.orderedList"), listType: "ordered" },
+  {
+    id: "unordered-list",
+    icon: List,
+    title: t("editor.toolbar.unorderedList"),
+    listType: "unordered",
+  },
+  {
+    id: "ordered-list",
+    icon: ListOrdered,
+    title: t("editor.toolbar.orderedList"),
+    listType: "ordered",
+  },
   { id: "task-list", icon: ListChecks, title: t("editor.toolbar.taskList"), listType: "task" },
   { id: "blockquote", icon: Quote, title: t("editor.toolbar.blockquote"), blockquote: true },
 ]);
@@ -269,14 +284,9 @@ function confirmTable(): void {
         </button>
       </template>
       <div class="pop-form">
-        <label class="pop-label">{{ $t('editor.toolbar.linkUrl') }}</label>
-        <NInput
-          v-model:value="linkUrl"
-          size="small"
-          placeholder="https://..."
-          class="pop-input"
-        />
-        <label class="pop-label">{{ $t('editor.toolbar.linkText') }}</label>
+        <label class="pop-label">{{ $t("editor.toolbar.linkUrl") }}</label>
+        <NInput v-model:value="linkUrl" size="small" placeholder="https://..." class="pop-input" />
+        <label class="pop-label">{{ $t("editor.toolbar.linkText") }}</label>
         <NInput
           v-model:value="linkText"
           size="small"
@@ -284,8 +294,10 @@ function confirmTable(): void {
           class="pop-input"
         />
         <NSpace justify="end" class="pop-actions">
-          <NButton size="small" @click="linkPopoverShow = false">{{ $t('common.cancel') }}</NButton>
-          <NButton size="small" type="primary" @click="confirmLink">{{ $t('common.confirm') }}</NButton>
+          <NButton size="small" @click="linkPopoverShow = false">{{ $t("common.cancel") }}</NButton>
+          <NButton size="small" type="primary" @click="confirmLink">{{
+            $t("common.confirm")
+          }}</NButton>
         </NSpace>
       </div>
     </NPopover>
@@ -303,14 +315,14 @@ function confirmTable(): void {
         </button>
       </template>
       <div class="pop-form">
-        <label class="pop-label">{{ $t('editor.toolbar.imagePath') }}</label>
+        <label class="pop-label">{{ $t("editor.toolbar.imagePath") }}</label>
         <NInput
           v-model:value="imageUrl"
           size="small"
           placeholder="/assets/figure.png"
           class="pop-input"
         />
-        <label class="pop-label">{{ $t('editor.toolbar.imageAlt') }}</label>
+        <label class="pop-label">{{ $t("editor.toolbar.imageAlt") }}</label>
         <NInput
           v-model:value="imageAlt"
           size="small"
@@ -318,8 +330,12 @@ function confirmTable(): void {
           class="pop-input"
         />
         <NSpace justify="end" class="pop-actions">
-          <NButton size="small" @click="imagePopoverShow = false">{{ $t('common.cancel') }}</NButton>
-          <NButton size="small" type="primary" @click="confirmImage">{{ $t('editor.tableDialog.insert') }}</NButton>
+          <NButton size="small" @click="imagePopoverShow = false">{{
+            $t("common.cancel")
+          }}</NButton>
+          <NButton size="small" type="primary" @click="confirmImage">{{
+            $t("editor.tableDialog.insert")
+          }}</NButton>
         </NSpace>
       </div>
     </NPopover>
@@ -339,17 +355,21 @@ function confirmTable(): void {
       <div class="pop-form">
         <div class="pop-row">
           <div class="pop-col">
-            <label class="pop-label">{{ $t('editor.toolbar.rows') }}</label>
+            <label class="pop-label">{{ $t("editor.toolbar.rows") }}</label>
             <NInputNumber v-model:value="tableRows" :min="1" :max="50" size="small" />
           </div>
           <div class="pop-col">
-            <label class="pop-label">{{ $t('editor.toolbar.cols') }}</label>
+            <label class="pop-label">{{ $t("editor.toolbar.cols") }}</label>
             <NInputNumber v-model:value="tableCols" :min="1" :max="20" size="small" />
           </div>
         </div>
         <NSpace justify="end" class="pop-actions">
-          <NButton size="small" @click="tablePopoverShow = false">{{ $t('common.cancel') }}</NButton>
-          <NButton size="small" type="primary" @click="confirmTable">{{ $t('editor.tableDialog.insert') }}</NButton>
+          <NButton size="small" @click="tablePopoverShow = false">{{
+            $t("common.cancel")
+          }}</NButton>
+          <NButton size="small" type="primary" @click="confirmTable">{{
+            $t("editor.tableDialog.insert")
+          }}</NButton>
         </NSpace>
       </div>
     </NPopover>
@@ -392,8 +412,9 @@ function confirmTable(): void {
   background: transparent;
   color: var(--murasaki-muted-foreground);
   cursor: pointer;
-  transition: background-color var(--murasaki-duration-fast) ease,
-              color var(--murasaki-duration-fast) ease;
+  transition:
+    background-color var(--murasaki-duration-fast) ease,
+    color var(--murasaki-duration-fast) ease;
 }
 
 .tb-btn:hover {

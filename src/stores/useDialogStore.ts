@@ -249,9 +249,7 @@ export const useDialogStore = defineStore("dialog", () => {
    * 用于设置窗口关闭未保存确认（Ticket #80 / T8.3）。
    * 按钮顺序：取消（左） / 不保存（中） / 保存（右，primary）
    */
-  function unsavedChanges(
-    options: UnsavedChangesDialogOptions
-  ): Promise<UnsavedChangesResult> {
+  function unsavedChanges(options: UnsavedChangesDialogOptions): Promise<UnsavedChangesResult> {
     return new Promise<UnsavedChangesResult>((resolve) => {
       enqueue({
         kind: "unsaved",

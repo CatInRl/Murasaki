@@ -70,7 +70,9 @@ body {
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition:
+    background 120ms,
+    color 120ms;
   user-select: none;
   text-align: left;
   width: 100%;
@@ -207,7 +209,7 @@ body {
   position: relative;
 }
 .toggle-track::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 2px;
   left: 2px;
@@ -247,7 +249,9 @@ body {
   border: 1px solid var(--murasaki-border);
   border-radius: var(--murasaki-radius-md);
   cursor: pointer;
-  transition: border-color 120ms, box-shadow 120ms;
+  transition:
+    border-color 120ms,
+    box-shadow 120ms;
 }
 .select-wrapper select:hover {
   border-color: var(--murasaki-neutral-300);
@@ -275,7 +279,9 @@ body {
   background: var(--murasaki-background);
   border: 1px solid var(--murasaki-border);
   border-radius: var(--murasaki-radius-md);
-  transition: border-color 120ms, box-shadow 120ms;
+  transition:
+    border-color 120ms,
+    box-shadow 120ms;
 }
 .setting-input::placeholder {
   color: var(--murasaki-ink-3);
@@ -318,7 +324,9 @@ body {
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition:
+    background 120ms,
+    color 120ms;
 }
 .stepper-btn:hover {
   background: var(--murasaki-neutral-200);
@@ -369,7 +377,9 @@ body {
   border: none;
   border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
-  transition: background 120ms, color 120ms;
+  transition:
+    background 120ms,
+    color 120ms;
 }
 .segmented-item:hover {
   color: var(--murasaki-ink);
@@ -399,7 +409,10 @@ body {
   font-family: inherit;
   border-radius: var(--murasaki-radius-md);
   cursor: pointer;
-  transition: background 120ms, border-color 120ms, color 120ms;
+  transition:
+    background 120ms,
+    border-color 120ms,
+    color 120ms;
   border: 1px solid transparent;
 }
 .primary-button {
@@ -461,7 +474,9 @@ body {
   border: 1px solid var(--murasaki-border);
   border-radius: var(--murasaki-radius-md);
   cursor: pointer;
-  transition: border-color 120ms, box-shadow 120ms;
+  transition:
+    border-color 120ms,
+    box-shadow 120ms;
 }
 .font-preset-card:hover {
   border-color: var(--murasaki-ring);

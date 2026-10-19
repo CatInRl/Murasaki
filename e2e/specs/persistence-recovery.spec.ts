@@ -69,7 +69,7 @@ describe("持久化恢复", () => {
 
     // 切换激活到 intro.md（activeIndex=0）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       const intro = tabs.tabs.find((t: any) => t.path?.endsWith("intro.md"));
       if (intro) tabs.switchTo(intro.id);
@@ -78,7 +78,7 @@ describe("持久化恢复", () => {
 
     // 持久化当前状态
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const tabs = pinia._s.get("tabs");
       Promise.resolve(tabs.persist())
@@ -88,7 +88,7 @@ describe("持久化恢复", () => {
 
     // 清空 tabs（模拟应用关闭）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.clearAll();
     });
@@ -96,7 +96,7 @@ describe("持久化恢复", () => {
 
     // 验证 tabs 已清空
     const empty = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return { count: tabs.tabs.length, activeId: tabs.activeTabId };
     });
@@ -104,7 +104,7 @@ describe("持久化恢复", () => {
 
     // 调用 restore 模拟重启恢复
     const restoreErr = await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const tabs = pinia._s.get("tabs");
       Promise.resolve(tabs.restore())
@@ -119,7 +119,7 @@ describe("持久化恢复", () => {
     await browser.waitUntil(
       async () => {
         const count = await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const tabs = window.__pinia__._s.get("tabs");
           return tabs.tabs.length;
         });
@@ -134,7 +134,7 @@ describe("持久化恢复", () => {
 
     // 验证恢复的 tab 列表
     const restored = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return {
         tabs: tabs.tabs.map((t: any) => ({
@@ -164,7 +164,7 @@ describe("持久化恢复", () => {
     await browser.pause(300);
 
     const mtime = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.lastMtime;
     });
@@ -175,14 +175,15 @@ describe("持久化恢复", () => {
 
     // 通过 Tauri 命令写入草稿（模拟关闭未保存 tab 时保存草稿）
     const draftContent = "# 这是未保存的草稿内容\n\n不应丢失。\n";
-    const draftResult = await browser.executeAsync(
+    const draftResult = await browser.executeAsync<unknown, [string, string, number]>(
       (path: string, content: string, mt: number, done: (res: unknown) => void) => {
-        // @ts-ignore
-        window.__TAURI_INTERNALS__.invoke("save_draft", {
-          path,
-          content,
-          knownMtime: mt,
-        })
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        window.__TAURI_INTERNALS__
+          .invoke("save_draft", {
+            path,
+            content,
+            knownMtime: mt,
+          })
           .then(() => done({ ok: true }))
           .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
       },
@@ -194,8 +195,9 @@ describe("持久化恢复", () => {
 
     // 验证草稿存在
     const exists = await browser.executeAsync((path: string, done: (res: unknown) => void) => {
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("draft_exists", { path })
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__TAURI_INTERNALS__
+        .invoke("draft_exists", { path })
         .then((r: boolean) => done({ ok: true, exists: r }))
         .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
     }, introPath);
@@ -211,7 +213,7 @@ describe("持久化恢复", () => {
 
     // 验证 isDirty = true（草稿内容与磁盘不一致）
     const isDirty = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.isDirty;
     });
@@ -219,8 +221,9 @@ describe("持久化恢复", () => {
 
     // 清理草稿
     await browser.executeAsync((path: string, done: (res: unknown) => void) => {
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("delete_draft", { path })
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__TAURI_INTERNALS__
+        .invoke("delete_draft", { path })
         .then(() => done(null))
         .catch((err: unknown) => done(err ? String(err) : null));
     }, introPath);
@@ -234,7 +237,7 @@ describe("持久化恢复", () => {
     await browser.pause(300);
 
     const originalMtime = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.lastMtime;
     });
@@ -244,10 +247,11 @@ describe("持久化恢复", () => {
 
     // 写入草稿（knownMtime = originalMtime）
     const draftContent = "# 草稿内容\n";
-    await browser.executeAsync(
+    await browser.executeAsync<unknown, [string, string, number]>(
       (p: string, c: string, mt: number, done: (res: unknown) => void) => {
-        // @ts-ignore
-        window.__TAURI_INTERNALS__.invoke("save_draft", { path: p, content: c, knownMtime: mt })
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        window.__TAURI_INTERNALS__
+          .invoke("save_draft", { path: p, content: c, knownMtime: mt })
           .then(() => done(null))
           .catch((err: unknown) => done(err ? String(err) : null));
       },
@@ -265,7 +269,7 @@ describe("持久化恢复", () => {
 
     // 再次打开文件：mtime 不匹配 → 弹窗。openFile 会阻塞在弹窗上，不能 await
     await browser.execute((p: string) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       void window.__pinia__._s.get("tabs").openFile(p);
     }, path);
     await waitForPresent(browser, ".dialog-overlay", 5000);
@@ -278,7 +282,7 @@ describe("持久化恢复", () => {
 
     // isDirty 应为 false（磁盘内容即当前内容）
     const isDirty = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.isDirty;
     });
@@ -286,8 +290,9 @@ describe("持久化恢复", () => {
 
     // 草稿应已被清理
     const draftExists = await browser.executeAsync((p: string, done: (res: unknown) => void) => {
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("draft_exists", { path: p })
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__TAURI_INTERNALS__
+        .invoke("draft_exists", { path: p })
         .then((r: boolean) => done({ exists: r }))
         .catch((err: unknown) => done({ error: err ? String(err) : null }));
     }, path);
@@ -301,7 +306,7 @@ describe("持久化恢复", () => {
     await openFileInTab(browser, path);
     await browser.pause(300);
     const mtime = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.lastMtime;
     });
@@ -312,8 +317,9 @@ describe("持久化恢复", () => {
     const draftContent = "# 保留这份草稿\n";
     await browser.executeAsync(
       (p: string, c: string, mt: number, done: (res: unknown) => void) => {
-        // @ts-ignore
-        window.__TAURI_INTERNALS__.invoke("save_draft", { path: p, content: c, knownMtime: mt })
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        window.__TAURI_INTERNALS__
+          .invoke("save_draft", { path: p, content: c, knownMtime: mt })
           .then(() => done(null))
           .catch((err: unknown) => done(err ? String(err) : null));
       },
@@ -324,7 +330,7 @@ describe("持久化恢复", () => {
 
     // openFile 会阻塞在弹窗上，不能 await
     await browser.execute((p: string) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       void window.__pinia__._s.get("tabs").openFile(p);
     }, path);
     await waitForPresent(browser, ".dialog-overlay", 5000);
@@ -335,7 +341,7 @@ describe("持久化恢复", () => {
 
     expect(await getActiveContent(browser)).toBe(draftContent);
     const isDirty = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return tabs.activeTab?.isDirty;
     });
@@ -343,14 +349,17 @@ describe("持久化恢复", () => {
 
     // 清理：关闭标签，再删除测试草稿
     await browser.executeAsync((done) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
-      Promise.resolve(tabs.doCloseTab(tabs.activeTabId))
-        .then(() => done(null), (e: unknown) => done(String(e)));
+      Promise.resolve(tabs.doCloseTab(tabs.activeTabId)).then(
+        () => done(null),
+        (e: unknown) => done(String(e))
+      );
     });
     await browser.executeAsync((p: string, done: (res: unknown) => void) => {
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("delete_draft", { path: p })
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__TAURI_INTERNALS__
+        .invoke("delete_draft", { path: p })
         .then(() => done(null))
         .catch((err: unknown) => done(err ? String(err) : null));
     }, path);
@@ -359,7 +368,7 @@ describe("持久化恢复", () => {
   it("未保存的新文件 tab（无 path）持久化后恢复", async () => {
     // 创建未命名 tab 并写入内容
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const tabs = pinia._s.get("tabs");
       tabs.newTab("# 未保存的新内容\n");
@@ -368,7 +377,7 @@ describe("持久化恢复", () => {
 
     // 持久化
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const tabs = pinia._s.get("tabs");
       Promise.resolve(tabs.persist())
@@ -378,14 +387,14 @@ describe("持久化恢复", () => {
 
     // 清空 + 恢复
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       tabs.clearAll();
     });
     await browser.pause(200);
 
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const tabs = pinia._s.get("tabs");
       Promise.resolve(tabs.restore())
@@ -396,7 +405,7 @@ describe("持久化恢复", () => {
     await browser.waitUntil(
       async () => {
         const count = await browser.execute(() => {
-          // @ts-ignore
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
           const tabs = window.__pinia__._s.get("tabs");
           return tabs.tabs.length;
         });
@@ -410,7 +419,7 @@ describe("持久化恢复", () => {
     );
 
     const restored = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return {
         path: tabs.activeTab?.path,

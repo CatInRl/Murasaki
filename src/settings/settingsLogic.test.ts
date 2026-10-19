@@ -58,7 +58,9 @@ describe("settingsLogic - shortcutsEqual", () => {
   });
 
   it("键值完全一致时相等（键顺序无关）", () => {
-    expect(shortcutsEqual({ save: "Ctrl+S", quit: "Ctrl+Q" }, { quit: "Ctrl+Q", save: "Ctrl+S" })).toBe(true);
+    expect(
+      shortcutsEqual({ save: "Ctrl+S", quit: "Ctrl+Q" }, { quit: "Ctrl+Q", save: "Ctrl+S" })
+    ).toBe(true);
   });
 
   it("值不同时不相等", () => {
@@ -73,7 +75,6 @@ describe("settingsLogic - shortcutsEqual", () => {
     expect(shortcutsEqual({ save: null }, { save: "Ctrl+S" })).toBe(false);
   });
 });
-
 
 describe("settingsLogic - isCategoryDirty", () => {
   it("draft 与 snapshot 完全一致时 general 不 dirty", () => {
