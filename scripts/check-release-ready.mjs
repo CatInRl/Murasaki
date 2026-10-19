@@ -20,7 +20,23 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
-const REQUIRED_CHECKS = ["frontend", "rust", "e2e", "e2e (linux)", "e2e (macos)"];
+
+/**
+ * 发布前必须全绿的 check 名。
+ *
+ * e2e 自 #444 起在三个平台各切 4 片（见 .github/workflows/test.yml），
+ * job 名带形如 `e2e (2/4)` 的分片后缀 —— 改分片数时这里要同步改，
+ * 否则发布会被拦在「等一个不存在的 check」。与本文件保持一致的地方还有：
+ * 分支保护的 required_status_checks、AGENTS.md 的「过门禁」一节。
+ */
+const E2E_SHARD_COUNT = 4;
+const REQUIRED_CHECKS = [
+  "frontend",
+  "rust",
+  ...Array.from({ length: E2E_SHARD_COUNT }, (_, i) => `e2e (${i + 1}/${E2E_SHARD_COUNT})`),
+  ...Array.from({ length: E2E_SHARD_COUNT }, (_, i) => `e2e (linux) (${i + 1}/${E2E_SHARD_COUNT})`),
+  ...Array.from({ length: E2E_SHARD_COUNT }, (_, i) => `e2e (macos) (${i + 1}/${E2E_SHARD_COUNT})`),
+];
 
 function fail(message) {
   console.error(`✖ ${message}`);
