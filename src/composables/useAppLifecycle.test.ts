@@ -35,6 +35,7 @@ function makeDeps(overrides: Partial<AppLifecycleDeps> = {}): AppLifecycleDeps {
       activeTabId: null as string | null,
       restoring: false,
       schedulePersist: vi.fn(),
+      bindPersist: vi.fn(),
       persist: vi.fn().mockResolvedValue(undefined),
     }) as never,
     persistence: {

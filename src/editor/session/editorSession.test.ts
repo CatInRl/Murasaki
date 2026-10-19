@@ -299,6 +299,47 @@ describe("保存", () => {
   });
 });
 
+describe("rebaseline", () => {
+  it("只对齐 mtime 基线，不改内容与脏态", async () => {
+    const store = new MemoryStore({ "/a.md": { content: "a", mtime: 1 } });
+    const { session } = await openEditorSession({ id: "t1", path: "/a.md", store });
+    session.setContent("本地修改");
+
+    session.rebaseline(200);
+
+    const snapshot = session.snapshot();
+    expect(snapshot.baselineMtime).toBe(200);
+    expect(snapshot.content).toBe("本地修改");
+    expect(snapshot.isDirty).toBe(true);
+  });
+
+  it("重设基线后，草稿带上的 knownMtime 是新的磁盘 mtime", async () => {
+    const store = new MemoryStore({ "/a.md": { content: "a", mtime: 1 } });
+    const { session } = await openEditorSession({ id: "t1", path: "/a.md", store });
+    session.setContent("本地修改");
+    // 「保留本地版本」：磁盘已被外部改动，基线对齐到磁盘当前 mtime
+    session.rebaseline(200);
+
+    await session.flushDraft();
+
+    expect(store.drafts.get("/a.md")).toEqual({
+      content: "本地修改",
+      knownMtime: 200,
+      savedAt: expect.any(Number),
+    });
+  });
+
+  it("dispose 后不再接受重设基线", async () => {
+    const store = new MemoryStore({ "/a.md": { content: "a", mtime: 1 } });
+    const { session } = await openEditorSession({ id: "t1", path: "/a.md", store });
+
+    await session.dispose();
+    session.rebaseline(200);
+
+    expect(session.snapshot().baselineMtime).toBe(1);
+  });
+});
+
 describe("编辑器 seam", () => {
   it("首次挂载把会话内容写入编辑器，并保存编辑器状态", async () => {
     const store = new MemoryStore({ "/a.md": { content: "hello", mtime: 1 } });

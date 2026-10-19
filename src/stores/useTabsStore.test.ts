@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useTabsStore } from "./useTabsStore";
 import type { Tab } from "../types";
+import type { DocumentStore, DraftSnapshot } from "../editor/session/types";
 
 // 路径去重（#304）：同一文件可能以不同分隔符写法到达，openFile 的「是否已打开」与
 // getTabByPath 的查找都必须按归一化路径比较，否则会重复开 tab / 找不到 tab。
@@ -10,6 +11,7 @@ import type { Tab } from "../types";
 vi.mock("../services/fileSystem", () => ({
   fileSystem: {
     readText: vi.fn(async (path: string) => `content of ${path}`),
+    writeText: vi.fn(async () => undefined),
     getMtime: vi.fn(async () => 1_700_000_000_000),
     draftExists: vi.fn(async () => false),
     readDraft: vi.fn(),
@@ -17,6 +19,38 @@ vi.mock("../services/fileSystem", () => ({
     deleteDraft: vi.fn(async () => undefined),
   },
 }));
+
+// 编辑会话（ADR-0022）通过 DocumentStore 走磁盘，测试替身直接架在上面这个
+// fileSystem mock 上——这样草稿断言仍落在 fileSystem.saveDraft 上，行为不变。
+const { documentStoreStub } = vi.hoisted(() => ({ documentStoreStub: { value: null as unknown } }));
+vi.mock("../editor/session/documentStore", async () => {
+  const { fileSystem } = await import("../services/fileSystem");
+  const fs = fileSystem as unknown as {
+    readText: (path: string) => Promise<string>;
+    writeText: (path: string, content: string) => Promise<void>;
+    getMtime: (path: string) => Promise<number>;
+    draftExists: (path: string) => Promise<boolean>;
+    readDraft: (path: string) => Promise<[string, { knownMtime: number; savedAt: number }]>;
+    saveDraft: (path: string, content: string, knownMtime: number) => Promise<void>;
+    deleteDraft: (path: string) => Promise<void>;
+  };
+  const store: DocumentStore = {
+    readText: (path) => fs.readText(path),
+    writeText: (path, content) => fs.writeText(path, content),
+    // 与 fileSystem.getMtime 的差别：这里不把失败吞成 0——mtime 是草稿冲突判定的基线，
+    // 取不到应当报错，而不是伪造一个会让冲突判断失效的值。
+    mtime: (path) => fs.getMtime(path),
+    draftExists: (path) => fs.draftExists(path),
+    async readDraft(path): Promise<DraftSnapshot> {
+      const [content, meta] = await fs.readDraft(path);
+      return { content, knownMtime: meta.knownMtime, savedAt: meta.savedAt };
+    },
+    writeDraft: (path, content, knownMtime) => fs.saveDraft(path, content, knownMtime),
+    deleteDraft: (path) => fs.deleteDraft(path),
+  };
+  documentStoreStub.value = store;
+  return { createDocumentStore: () => documentStoreStub.value };
+});
 
 // useTabsStore 依赖持久化 store，这里只关心标签本身，故整个替换掉
 // saveTabs 用 hoisted 单例，便于断言落盘次数（#429）
@@ -181,6 +215,32 @@ describe("useTabsStore", () => {
       expect(saveDraftSpy).not.toHaveBeenCalled();
       expect(tab.content).toBe("本地未保存的修改");
       expect(tab.isDirty).toBe(true);
+    });
+
+    it("keep-local 置位外部修改标记；load-disk 清除它", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "本地未保存的修改");
+      (fileSystem.getMtime as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        1_700_000_999_000
+      );
+
+      await store.applyExternalResolution("C:\\docs\\a.md", "keep-local");
+      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(true);
+
+      await store.applyExternalResolution("C:\\docs\\a.md", "load-disk", "磁盘新内容");
+      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(false);
+    });
+
+    it("reloadFromDisk 后清除外部修改标记（H4 契约）", async () => {
+      const store = useTabsStore();
+      await store.openFile("C:\\docs\\a.md");
+      store.markExternalChange("C:\\docs\\a.md", true);
+      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(true);
+
+      await store.reloadFromDisk("C:\\docs\\a.md");
+      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(false);
     });
   });
 
@@ -496,6 +556,121 @@ describe("useTabsStore", () => {
       release?.();
       await Promise.all([first, second]);
       expect(saveTabsSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ADR-0022 落地（#449）：草稿从「关闭/退出时才写」变为「脏后 2s 防抖自动写」。
+  // 断言走 fileSystem.saveDraft 替身——documentStore 就架在它上面。
+  describe("草稿自动写入（#449 / ADR-0022）", () => {
+    async function draftSpies() {
+      const { fileSystem } = await import("../services/fileSystem");
+      return {
+        saveDraft: fileSystem.saveDraft as unknown as ReturnType<typeof vi.fn>,
+        deleteDraft: fileSystem.deleteDraft as unknown as ReturnType<typeof vi.fn>,
+      };
+    }
+
+    it("内容变更后约 2s 自动写草稿，无需关闭或退出", async () => {
+      vi.useFakeTimers();
+      try {
+        const { saveDraft } = await draftSpies();
+        saveDraft.mockClear();
+        const store = useTabsStore();
+        const tab = await store.openFile("C:\\docs\\a.md");
+
+        store.updateContent(tab.id, "边写边存");
+        expect(saveDraft).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1999);
+        expect(saveDraft).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1);
+        expect(saveDraft).toHaveBeenCalledWith("C:\\docs\\a.md", "边写边存", tab.lastMtime);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("连续输入只写一次草稿（防抖重置）", async () => {
+      vi.useFakeTimers();
+      try {
+        const { saveDraft } = await draftSpies();
+        saveDraft.mockClear();
+        const store = useTabsStore();
+        const tab = await store.openFile("C:\\docs\\a.md");
+
+        for (let i = 1; i <= 5; i++) {
+          store.updateContent(tab.id, `输入 ${i}`);
+          await vi.advanceTimersByTimeAsync(500);
+        }
+        expect(saveDraft).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(saveDraft).toHaveBeenCalledTimes(1);
+        expect(saveDraft).toHaveBeenCalledWith("C:\\docs\\a.md", "输入 5", tab.lastMtime);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("内容改回磁盘版本时清掉已写入的草稿（不再是待保存的修改）", async () => {
+      const { saveDraft, deleteDraft } = await draftSpies();
+      saveDraft.mockClear();
+      deleteDraft.mockClear();
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      const diskContent = tab.content;
+
+      store.updateContent(tab.id, "临时改动");
+      await store.flushAllDrafts();
+      expect(saveDraft).toHaveBeenCalledTimes(1);
+
+      store.updateContent(tab.id, diskContent);
+      await store.flushAllDrafts();
+      expect(deleteDraft).toHaveBeenCalledWith("C:\\docs\\a.md");
+    });
+
+    it("未命名 tab 不写草稿（没有磁盘位置可挂）", async () => {
+      const { saveDraft } = await draftSpies();
+      saveDraft.mockClear();
+      const store = useTabsStore();
+      const tab = store.newTab("");
+
+      store.updateContent(tab.id, "未命名内容");
+      await store.flushAllDrafts();
+
+      expect(saveDraft).not.toHaveBeenCalled();
+    });
+
+    it("保存成功后删除草稿（内容已进磁盘）", async () => {
+      const { saveDraft, deleteDraft } = await draftSpies();
+      saveDraft.mockClear();
+      deleteDraft.mockClear();
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+
+      store.updateContent(tab.id, "要保存的内容");
+      await store.saveTab(tab.id);
+
+      expect(deleteDraft).toHaveBeenCalledWith("C:\\docs\\a.md");
+      // 保存后会话已不脏：自动写入触发时也不会再留草稿
+      await store.flushAllDrafts();
+      expect(saveDraft).not.toHaveBeenCalled();
+    });
+
+    it("关闭标签释放会话：撤销历史与草稿定时器随之回收", async () => {
+      const { saveDraft } = await draftSpies();
+      saveDraft.mockClear();
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "关闭前落盘");
+
+      await store.doCloseTab(tab.id);
+
+      expect(saveDraft).toHaveBeenCalledWith("C:\\docs\\a.md", "关闭前落盘", tab.lastMtime);
+      // 关闭后 tab 已不在列表，读点拿不到它
+      expect(store.tabs).toHaveLength(0);
+      expect(store.getTabById(tab.id)).toBeNull();
     });
   });
 });

@@ -68,7 +68,6 @@ function makeTab(overrides: Partial<Tab> = {}): Tab {
     id: "tab1",
     path: "/test/file.md",
     content: "# Hello\n\nworld",
-    savedContent: "# Hello\n\nworld",
     lastMtime: null,
     isDirty: false,
     hasExternalChange: false,

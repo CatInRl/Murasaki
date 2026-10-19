@@ -63,23 +63,22 @@ export interface ScrollPosition {
 }
 
 /**
- * 标签页数据结构
+ * 标签页数据结构（ADR-0022：会话是当前文档的唯一真相）
  * - path: 文件绝对路径（null 表示未保存的新文件）
- * - content: 当前编辑器内容
- * - savedContent: 已保存到磁盘的内容快照，用于 dirty 比较
- * - lastMtime: 上次已知文件 mtime（毫秒），用于外部修改检测
- * - isDirty: 是否有未保存修改
- * - hasExternalChange: 是否检测到外部修改（用于冲突处理）
+ * - content / isDirty / lastMtime: 由 store 从编辑会话快照派生的只读视图，
+ *   不再是可写字段；写入口一律走 session 命令
+ * - hasExternalChange: 是否检测到外部修改。ADR-0022 判定它属于死状态、
+ *   计划在 Phase 3（#450）删除；Phase 2 仍需保留 —— e2e 用它断言
+ *   「自动重载后标记清除」「保留本地后标记置位」两条既有行为契约
  * - cursor: 光标位置
  * - scroll: 滚动位置
  */
 export interface Tab {
   id: string;
   path: string | null;
-  content: string;
-  savedContent: string;
-  lastMtime: number | null;
-  isDirty: boolean;
+  readonly content: string;
+  readonly lastMtime: number | null;
+  readonly isDirty: boolean;
   hasExternalChange: boolean;
   cursor: CursorPosition;
   scroll: ScrollPosition;
