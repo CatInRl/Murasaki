@@ -169,6 +169,9 @@ gh api -X PUT repos/CatInRl/Murasaki/branches/main/protection -F "required_statu
 ### 发版本
 
 - **发布流程**：开 `chore(release)` PR 更新三处版本号（package.json / src-tauri/Cargo.toml / src-tauri/tauri.conf.json），并把 `## [Unreleased]` 段落切成 `## [X.Y.Z] - YYYY-MM-DD` → CI 绿后合入 main → 在 main 打 `vX.Y.Z` tag → 推送 tag 触发 `release.yml` → 关闭 milestone → 同步更新本文件变更记录部分
+  - 打 tag 前可本地自检版本一致性：`TAG=vX.Y.Z node scripts/check-release-ready.mjs`
+  - `release.yml` 会先校验「tag 与三处版本号一致」并等该提交的 frontend / rust / e2e / e2e (linux) / e2e (macos) 全绿；任何一项不满足都会拒绝发布
+  - Release 先以**草稿**创建，四个平台产物与 `latest.json` 齐全后才自动转正；中途失败时保持草稿，便于排查后重跑
 - **Release 必须包含 CHANGELOG 内容**：`release.yml` 会用 `awk` 从 `CHANGELOG.md` 提取 `## [VERSION]` 段落，拼接到 Release Notes（安装说明 + 变更记录）。因此打 tag 前必须先在 CHANGELOG.md 写好对应版本条目，否则 Release Notes 的"变更记录"章节为空
 - **重新发布同版本**：删除旧 release（`gh release delete vX.Y.Z --yes --cleanup-tag`）→ 删除本地 tag（`git tag -d vX.Y.Z`）→ 提交修复代码并推送 → 重新打 tag 并推送触发构建
 - **构建产物**：Windows / Ubuntu / macOS arm64 / macOS x64 多平台包，构建约需 10 分钟，进度在 GitHub Actions 页面查看
