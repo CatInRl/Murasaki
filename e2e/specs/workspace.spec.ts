@@ -14,6 +14,7 @@ import {
   openWorkspace,
   closeWorkspace,
   closeAllTabs,
+  dismissAllDialogs,
   waitForPinia,
   resetPersistenceSettings,
 } from "../helpers/store";
@@ -51,6 +52,9 @@ describe("工作区 + 文件树", () => {
     } catch {
       // 首次启动无工作区，忽略
     }
+    // 前序 spec 残留的 dialog-overlay 会遮住文件树点击（element click intercepted）。
+    // 分片后文件执行顺序变了，这个泄漏才暴露出来 —— 清理是幂等的，无对话框时什么也不做
+    await dismissAllDialogs(browser);
   });
 
   it("打开工作区后侧栏可见", async () => {
