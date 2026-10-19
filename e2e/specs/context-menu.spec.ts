@@ -89,9 +89,10 @@ describe("右键菜单", () => {
       ]);
     });
 
-    const item = await browser.$(".murasaki-context-menu-item");
     // 菜单项在淡入浮层内：等存在即可，别用 waitForRendered（#273）
+    // 顺序：先等出现、再取句柄 —— $() 对不存在的元素不抛错，先取会让等待白做（#320）
     await waitForPresent(browser, ".murasaki-context-menu-item", 10000);
+    const item = await browser.$(".murasaki-context-menu-item");
     await item.click();
 
     // 菜单应关闭
@@ -122,8 +123,8 @@ describe("右键菜单", () => {
       ]);
     });
 
-    const item = await browser.$(".murasaki-context-menu-item");
     await waitForPresent(browser, ".murasaki-context-menu-item", 5000);
+    const item = await browser.$(".murasaki-context-menu-item");
     expect(await item.getAttribute("class")).toContain("is-disabled");
 
     // 点击禁用项（不应触发 action，也不应关闭菜单）

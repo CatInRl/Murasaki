@@ -19,6 +19,7 @@ import {
   resetPersistenceSettings,
 } from "../helpers/store";
 import {
+  actUntil,
   isRendered,
   readText,
   textOfElement,
@@ -98,32 +99,75 @@ describe("工作区 + 文件树", () => {
     const wsPath = resetWorkspace(defaultFixtureFiles());
     await openWorkspace(browser, wsPath);
 
-    // 点击 intro.md（用 XPath 文本匹配，避免 CSS 与 =text 混用）
-    const node = await browser.$(
-      '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="intro.md"]'
-    );
-    await waitForPresent(
-      browser,
-      '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="intro.md"]',
-      10000
-    );
-    await node.click();
+    // 失败时把「点击后到底发生了什么」一并报出来。这条用例偶发失败时，
+    // 光看「tab 没出现」无法区分是点击没送达、openFile 报错、还是 tab 渲染了但尺寸为 0，
+    // 而这三种的修法完全不同。
+    const diagnose = async (): Promise<string> => {
+      try {
+        const info = await browser.execute(() => {
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
+          const pinia = window.__pinia__._s;
+          const tabs = pinia.get("tabs");
+          const workspace = pinia.get("workspace");
+          const dialog = pinia.get("dialog");
+          return {
+            tabCount: tabs.tabs.length,
+            tabPaths: tabs.tabs.map((t: any) => t.path),
+            tabTitles: Array.from(document.querySelectorAll(".tab-bar-container .tab-title")).map(
+              (el) => ({
+                text: (el.textContent ?? "").trim(),
+                w: (el as HTMLElement).getBoundingClientRect().width,
+              })
+            ),
+            workspacePath: workspace.workspacePath,
+            loading: workspace.loading,
+            editorPane: Boolean(document.querySelector(".editor-pane")),
+            tabBar: Boolean(document.querySelector(".tab-bar-container")),
+            dialogOpen: (dialog?.queue?.length ?? 0) > 0,
+          };
+        });
+        return JSON.stringify(info);
+      } catch (err) {
+        return `诊断脚本本身失败: ${String(err)}`;
+      }
+    };
 
-    // 等 tab 栏出现名为 intro.md 且真正渲染出来的标签。
-    // 必须手写轮询：元素等待命令（waitForExist / waitForDisplayed）在 tauri-driver +
-    // msedgedriver 下**不重试**（对不存在的元素 ~10ms 内即抛错），本地跑得快掩盖了
-    // 这一点，CI 上就成片失败（#266）。
-    const tabRendered = await waitForInBrowser(
-      browser,
-      (name: string) =>
-        Array.from(document.querySelectorAll(".tab-bar-container .tab-title")).some((el) => {
-          const rect = (el as HTMLElement).getBoundingClientRect();
-          return (el.textContent ?? "").trim() === name && rect.width > 0 && rect.height > 0;
-        }),
-      ["intro.md"],
-      { timeout: 15000, message: 'tab 栏出现已渲染的 "intro.md" 标签' }
-    );
-    expect(tabRendered).toBe(true);
+    // 用「有界重派发」点击：工作区刚打开时树会被文件监听触发的刷新整体重建，
+    // 取到的句柄可能已经脱离文档 —— 点击落到已移除的节点上不会有任何反应。
+    // 每次重试都重新等树安静、重新等出现、重新取句柄。
+    try {
+      await actUntil(
+        browser,
+        async () => {
+          await waitForTreeSettled(browser);
+          const selector =
+            '//div[contains(@class, "file-tree")]//span[contains(@class, "node-name") and normalize-space()="intro.md"]';
+          // 顺序：先等出现、再取句柄（$() 对不存在的元素不抛错，#320）
+          await waitForPresent(browser, selector, 10000);
+          const node = await browser.$(selector);
+          await node.click();
+        },
+        () =>
+          // 必须判「渲染出来且尺寸 > 0」：tab 元素存在但布局为 0 时点开等于没开
+          waitForInBrowser(
+            browser,
+            (name: string) =>
+              Array.from(document.querySelectorAll(".tab-bar-container .tab-title")).some((el) => {
+                const rect = (el as HTMLElement).getBoundingClientRect();
+                return (el.textContent ?? "").trim() === name && rect.width > 0 && rect.height > 0;
+              }),
+            ["intro.md"],
+            { timeout: 3000, message: 'tab 栏出现已渲染的 "intro.md" 标签' }
+          )
+            .then(() => true)
+            .catch(() => false),
+        { message: "点击 intro.md 后未出现已渲染的 tab" }
+      );
+    } catch (err) {
+      throw new Error(
+        `${err instanceof Error ? err.message : String(err)}\n点击后现场：${await diagnose()}`
+      );
+    }
   });
 
   it("关闭工作区后侧栏消失", async () => {
@@ -174,8 +218,9 @@ describe("工作区 + 文件树", () => {
     await waitForPresent(browser, ".file-tree", 10000);
 
     // 点击刷新按钮（FileTree.vue 中 title="刷新" 的 NButton）
-    const refreshBtn = await browser.$(".file-tree button[title='刷新']");
+    // 先等出现、再取句柄（#320），否则首个查询早于渲染时点击必然失败
     await waitForPresent(browser, ".file-tree button[title='刷新']", 5000);
+    const refreshBtn = await browser.$(".file-tree button[title='刷新']");
     await refreshBtn.click();
 
     // 等待 loading 归位。预算 45s **必须大于** refreshTree 自身的 30s 兜底

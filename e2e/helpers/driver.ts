@@ -20,6 +20,7 @@ import http from "node:http";
 import { createConnection } from "node:net";
 import { existsSync, rmSync } from "node:fs";
 import { clearPersistedTabs, waitForAppReady, waitForPinia } from "./store";
+import { closeExtraWindows } from "./window";
 import { IS_WINDOWS, IS_MACOS, EMBEDDED_DRIVER_PORT } from "./platform";
 import { SLOW_EXECUTE_MS } from "./wait";
 import { isProcessAlive, killProcessesByName } from "./processes";
@@ -498,6 +499,22 @@ export async function closeSession(browser: Browser): Promise<void> {
     // 忽略：session 可能已失效
   }
 
+  // 关掉多余窗口（设置窗口 / 拖拽与打开文件夹新开的窗口）。
+  // 不关的话，下一个 spec 的 createSession 可能附着到那个没有 __pinia__ 的窗口上，
+  // 表现是 waitForPinia 超时、报 title="" 这类与真实原因相距很远的信息
+  //（drag-drop 那次 CI 失败就是这条路）。
+  //
+  // macOS 跳过：内嵌驱动的 session 与应用进程同生命周期，每个 spec 都会 spawn
+  // 一个新进程，窗口不会跨 session 残留；而 close_window 在 macOS 会连带断开
+  // session 的 socket（multi-window.spec.ts 里 UND_ERR_SOCKET 那条），得不偿失。
+  if (!IS_MACOS) {
+    try {
+      await closeExtraWindows(browser);
+    } catch {
+      // 忽略：session 可能已失效
+    }
+  }
+
   try {
     await browser.deleteSession();
   } catch {
@@ -547,16 +564,25 @@ export async function closeSession(browser: Browser): Promise<void> {
     const identifier = "com.murasaki.app";
     const localAppData = `${process.env.USERPROFILE}\\AppData\\Local`;
     const webviewDir = resolve(localAppData, identifier, "EBWebView");
-    if (existsSync(webviewDir)) {
+    // 重试删除：WebView2 子进程释放句柄有几毫秒延迟，单次 rmSync 常撞 EPERM。
+    // 一次失败就放任不管的代价是**下一个 spec 整体崩掉**（WebView2 恢复上次窗口
+    // 状态 → 活动窗口没有 __pinia__ → waitForPinia 超时），所以这里值得多等几轮。
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (!existsSync(webviewDir)) break;
       try {
         rmSync(webviewDir, { recursive: true, force: true });
       } catch (err) {
-        // 忽略：偶发 EPERM（WebView2 子进程残留句柄）
-        console.warn(
-          `[driver] failed to clean EBWebView:`,
-          err instanceof Error ? err.message : String(err)
-        );
+        if (attempt === 4) {
+          console.warn(
+            `[driver] EBWebView 清理失败（已重试 5 次）：${
+              err instanceof Error ? err.message : String(err)
+            }\n` +
+              `  下一个 spec 可能因 WebView2 恢复窗口状态而失败（waitForPinia 超时 / title=""）。`
+          );
+        }
       }
+      if (!existsSync(webviewDir)) break;
+      await new Promise((r) => setTimeout(r, 300));
     }
   }
 }
