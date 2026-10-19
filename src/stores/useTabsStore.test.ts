@@ -216,6 +216,32 @@ describe("useTabsStore", () => {
       expect(tab.content).toBe("本地未保存的修改");
       expect(tab.isDirty).toBe(true);
     });
+
+    it("keep-local 置位外部修改标记；load-disk 清除它", async () => {
+      const { fileSystem } = await import("../services/fileSystem");
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "本地未保存的修改");
+      (fileSystem.getMtime as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        1_700_000_999_000
+      );
+
+      await store.applyExternalResolution("C:\\docs\\a.md", "keep-local");
+      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(true);
+
+      await store.applyExternalResolution("C:\\docs\\a.md", "load-disk", "磁盘新内容");
+      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(false);
+    });
+
+    it("reloadFromDisk 后清除外部修改标记（H4 契约）", async () => {
+      const store = useTabsStore();
+      await store.openFile("C:\\docs\\a.md");
+      store.markExternalChange("C:\\docs\\a.md", true);
+      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(true);
+
+      await store.reloadFromDisk("C:\\docs\\a.md");
+      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(false);
+    });
   });
 
   describe("草稿兜底写失败时的用户反馈（#378 评审补充）", () => {

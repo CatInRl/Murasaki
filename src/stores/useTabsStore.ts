@@ -88,6 +88,7 @@ export const useTabsStore = defineStore("tabs", () => {
       content: snapshot.content,
       lastMtime: snapshot.baselineMtime,
       isDirty: snapshot.isDirty,
+      hasExternalChange: tab.hasExternalChange,
       cursor: tab.cursor,
       scroll: tab.scroll,
     };
@@ -116,6 +117,14 @@ export const useTabsStore = defineStore("tabs", () => {
       get isDirty() {
         void revision.value;
         return session.snapshot().isDirty;
+      },
+      // 外部修改标记不属于会话（ADR-0022 把它判为 watcher 领域、Phase 3 删除），
+      // 这里转发到底层 tab，保证 markExternalChange 写的值能被读到
+      get hasExternalChange() {
+        return tab.hasExternalChange;
+      },
+      set hasExternalChange(value: boolean) {
+        tab.hasExternalChange = value;
       },
       cursor: tab.cursor,
       scroll: tab.scroll,
@@ -282,6 +291,7 @@ export const useTabsStore = defineStore("tabs", () => {
         content: "",
         lastMtime: null,
         isDirty: false,
+        hasExternalChange: false,
         cursor: { line: 1, ch: 0 },
         scroll: { x: 0, y: 0 },
       },
@@ -312,6 +322,7 @@ export const useTabsStore = defineStore("tabs", () => {
         content: "",
         lastMtime: null,
         isDirty: false,
+        hasExternalChange: false,
         cursor: { line: 1, ch: 0 },
         scroll: { x: 0, y: 0 },
       },
@@ -460,21 +471,27 @@ export const useTabsStore = defineStore("tabs", () => {
       await session.reloadBaseline(
         externalContent !== undefined ? { content: externalContent, mtime } : undefined
       );
+      // 已与磁盘同步，外部修改标记随之清除
+      markExternalChange(filePath, false);
     } else {
       // keep-local：将 mtime 基线对齐磁盘当前 mtime，保证草稿 knownMtime 与磁盘一致
       // 这样关闭未保存时草稿能被下次启动正确恢复
       session.rebaseline(mtime);
+      // 用户明确选择保留本地：外部修改标记置位，提示磁盘与编辑器内容已分叉
+      markExternalChange(filePath, true);
     }
   }
 
   /**
-   * 标记 tab 的外部修改状态（用于文件被外部删除等场景）。
+   * 标记 tab 的外部修改状态（用于文件被外部删除 / 保留本地版本等场景）。
    *
-   * ADR-0022：`hasExternalChange` 已随 Tab 瘦身移除（应用代码读取次数为 0），
-   * 这里保留入口以兼容调用方，待 Phase 3 清理 `useCompareWindow` 的调用点后删除。
+   * ADR-0022 判定它属于死状态，计划在 Phase 3（#450）删除；
+   * Phase 2 保留真实实现 —— e2e 用它断言「自动重载后标记清除」与
+   * 「保留本地后标记置位」两条既有行为契约。
    */
-  function markExternalChange(_filePath: string, _changed: boolean): void {
-    // 有意空实现：外部修改检测属于 watcher 领域，不再由 tab 持有（ADR-0022 Q1）
+  function markExternalChange(filePath: string, changed: boolean): void {
+    const tab = tabs.value.find((t) => t.path !== null && isSamePath(t.path, filePath));
+    if (tab) tab.hasExternalChange = changed;
   }
 
   /**
@@ -492,6 +509,8 @@ export const useTabsStore = defineStore("tabs", () => {
       await session.flushDraft();
     }
     await session.reloadBaseline();
+    // 已与磁盘一致：外部修改标记清除
+    markExternalChange(filePath, false);
   }
 
   /**
@@ -504,6 +523,8 @@ export const useTabsStore = defineStore("tabs", () => {
       // 保存即「写盘 + 更新基线 + 删草稿」，正是会话的 save 语义
       session.setContent(mergedContent);
       await session.save();
+      // 合并结果已写盘，本地与磁盘重新一致
+      markExternalChange(filePath, false);
       return;
     }
     await fileSystem.writeText(filePath, mergedContent);
