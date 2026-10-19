@@ -55,8 +55,8 @@ jobs:
       - name: e2e 类型检查
         run: npm run typecheck:e2e
 
-      - name: 单元测试
-        run: npm test
+      - name: 单元测试（含覆盖率阈值）
+        run: npm run test:coverage
 
       - name: 类型检查与构建
         run: npm run build

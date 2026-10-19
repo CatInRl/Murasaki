@@ -94,6 +94,7 @@ murasaki/
 | `npm run tauri:dev` | 启动开发模式 |
 | `npm run tauri:build` | 生产构建 |
 | `npm test` | 前端单元测试 |
+| `npm run test:coverage` | 单元测试 + 覆盖率阈值（CI 门禁用） |
 | `npm run lint` | ESLint 静态检查（含 e2e） |
 | `npm run format:check` | Prettier 格式检查 |
 | `npm run typecheck:e2e` | e2e TypeScript 类型检查（`tsc -p e2e`） |
