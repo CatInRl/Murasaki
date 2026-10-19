@@ -20,6 +20,7 @@ import http from "node:http";
 import { createConnection } from "node:net";
 import { existsSync, rmSync } from "node:fs";
 import { clearPersistedTabs, waitForAppReady, waitForPinia } from "./store";
+import { closeExtraWindows } from "./window";
 import { IS_WINDOWS, IS_MACOS, EMBEDDED_DRIVER_PORT } from "./platform";
 import { SLOW_EXECUTE_MS } from "./wait";
 import { isProcessAlive, killProcessesByName } from "./processes";
@@ -317,6 +318,15 @@ export async function createSession(_opts: CreateSessionOptions = {}): Promise<B
 
   const binary = getBinaryPath();
 
+  // 建 session 前再清一次 WebView2 profile（不只是关 session 后清）。
+  //
+  // 为什么两侧都要清：`closeSession` 的删除可能撞 EPERM（WebView2 子进程尚未完全
+  // 释放句柄）。那一次失败若就此放过，WebView2 会在下一个 spec 启动时恢复上次的
+  // 窗口状态，活动窗口变成没有 `__pinia__` 的那个，报出「waitForPinia 超时 / title=""」
+  // —— 失败点与真实原因相距极远。放在这里等于给同一件事第二次机会：
+  // 此刻上一个 murasaki 进程早已退出，句柄也基本释放完毕，成功率最高。
+  await prepareWebViewProfile();
+
   // 预检：tauri-driver 在线但 msedgedriver 端口（4445）不在线 = 孤立状态。
   // tauri-driver 只在启动时 spawn 一次 msedgedriver，无法恢复；这种情况下重试
   // POST /session 永远只会得到 socket hang up / 10061，浪费 60s 超时。
@@ -498,6 +508,22 @@ export async function closeSession(browser: Browser): Promise<void> {
     // 忽略：session 可能已失效
   }
 
+  // 关掉多余窗口（设置窗口 / 拖拽与打开文件夹新开的窗口）。
+  // 不关的话，下一个 spec 的 createSession 可能附着到那个没有 __pinia__ 的窗口上，
+  // 表现是 waitForPinia 超时、报 title="" 这类与真实原因相距很远的信息
+  //（drag-drop 那次 CI 失败就是这条路）。
+  //
+  // macOS 跳过：内嵌驱动的 session 与应用进程同生命周期，每个 spec 都会 spawn
+  // 一个新进程，窗口不会跨 session 残留；而 close_window 在 macOS 会连带断开
+  // session 的 socket（multi-window.spec.ts 里 UND_ERR_SOCKET 那条），得不偿失。
+  if (!IS_MACOS) {
+    try {
+      await closeExtraWindows(browser);
+    } catch {
+      // 忽略：session 可能已失效
+    }
+  }
+
   try {
     await browser.deleteSession();
   } catch {
@@ -543,20 +569,75 @@ export async function closeSession(browser: Browser): Promise<void> {
   // TRAE Sandbox 会阻止 Node.js 和 PowerShell 子进程删除 %APPDATA%\com.murasaki.app\，
   // 直接 kill 进程。持久化设置泄漏通过 resetPersistenceSettings(browser) 在
   // 各 spec 的 beforeEach 中重置（走 Pinia store API，不涉及文件操作）。
-  if (IS_WINDOWS) {
-    const identifier = "com.murasaki.app";
-    const localAppData = `${process.env.USERPROFILE}\\AppData\\Local`;
-    const webviewDir = resolve(localAppData, identifier, "EBWebView");
-    if (existsSync(webviewDir)) {
-      try {
-        rmSync(webviewDir, { recursive: true, force: true });
-      } catch (err) {
-        // 忽略：偶发 EPERM（WebView2 子进程残留句柄）
+  //
+  // 这里的预算比 createSession 那次宽松：afterAll 的 60s 里不含建 session，
+  // 而「关会话时把 profile 清掉」能顺手控制它的体积，避免越跑越大。
+  await prepareWebViewProfile(15000);
+}
+
+/** WebView2 的 profile 目录（仅 Windows 有意义） */
+function webViewProfileDir(): string {
+  const identifier = "com.murasaki.app";
+  const localAppData = `${process.env.USERPROFILE}\\AppData\\Local`;
+  return resolve(localAppData, identifier, "EBWebView");
+}
+
+/**
+ * 让 WebView2 的 profile 处于「干净」状态，返回是否成功清空。
+ *
+ * 这个目录是 WebView2 恢复上次窗口状态的地方（设置窗口、多窗口布局）。它一旦残留，
+ * 下一个 session 的活动窗口可能不是主窗口 —— 该窗口没有 `__pinia__`，
+ * 于是报「waitForPinia 超时，title=""」，与真实原因相距极远。
+ *
+ * 注意：目录位置由 driver 侧（tauri-driver / msedgedriver）通过 `--user-data-dir`
+ * 与本应用共享，**不能改用独立的 `data_directory`** —— 那样 WebView2 真实 profile 与
+ * msedgedriver 等待 `DevToolsActivePort` 的目录会不一致，连 session 都建不起来。
+ * 所以能做的是「保证它是空的」，而不是「换一个目录」。
+ */
+async function prepareWebViewProfile(budgetMs = 5000): Promise<boolean> {
+  if (!IS_WINDOWS) return true;
+  const webviewDir = webViewProfileDir();
+  if (!existsSync(webviewDir)) return true;
+
+  // 预算必须**硬性**：本函数在建 session 前同步执行，而调用方（各 spec 的
+  // `beforeAll(..., 60000)`）只有 60s 总预算。WebView2 的 profile 跑久了会涨到
+  // 几十 MB，删一次可能要几秒；再叠上重试就可能把建 session 挤到超时
+  //（本地实测过一次 `Hook timed out in 60000ms`）。超预算就放弃，
+  // 留给「关 session 后」那次清理，并把原因说清楚。
+  const deadline = Date.now() + budgetMs;
+  const outOfBudget = (): boolean => Date.now() > deadline;
+
+  // 上一个进程若还活着，profile 一定被锁着。先等它退出，超时再强杀 ——
+  // 否则下面几轮重试全是白费（每轮都撞 EPERM）。
+  if (isProcessAlive("murasaki")) {
+    for (let i = 0; i < 4 && !outOfBudget(); i++) {
+      if (!isProcessAlive("murasaki")) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    if (isProcessAlive("murasaki") && !outOfBudget()) {
+      killProcessesByName("murasaki", 3000);
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
+
+  // WebView2 子进程释放句柄有几毫秒延迟，单次 rmSync 常撞 EPERM，必须多等几轮。
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (!existsSync(webviewDir)) return true;
+    if (outOfBudget()) break;
+    try {
+      rmSync(webviewDir, { recursive: true, force: true });
+    } catch (err) {
+      if (attempt === 4 || outOfBudget()) {
         console.warn(
-          `[driver] failed to clean EBWebView:`,
-          err instanceof Error ? err.message : String(err)
+          `[driver] EBWebView 未能清空（预算 ${budgetMs}ms 内重试 ${attempt + 1} 次，路径 ${webviewDir}）：${
+            err instanceof Error ? err.message : String(err)
+          }\n` +
+            `  若它残留，本 session 可能因 WebView2 恢复窗口状态而失败（waitForPinia 超时 / title=""）。`
         );
       }
     }
+    if (!existsSync(webviewDir)) return true;
+    await new Promise((r) => setTimeout(r, 300));
   }
+  return !existsSync(webviewDir);
 }
