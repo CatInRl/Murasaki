@@ -9,10 +9,8 @@ function tab(partial: Partial<Tab> & { id: string }): Tab {
   return {
     path: null,
     content: "",
-    savedContent: "",
     lastMtime: null,
     isDirty: false,
-    hasExternalChange: false,
     cursor: 0,
     scroll: 0,
     ...partial,

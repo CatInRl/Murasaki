@@ -88,10 +88,36 @@ export async function openEditorSession(
   return { session, result };
 }
 
+/**
+ * 同步创建一个「未命名」会话（无磁盘路径、无草稿）。
+ *
+ * 调用方（如新建标签）是同步入口，不值得为它引入 await；
+ * 未命名会话没有磁盘基线（基线为空串），脏态由内容比较自然得出。
+ */
+export function createUntitledSession(
+  id: string,
+  initialContent = "",
+  hooks: Pick<OpenSessionOptions, "onChange" | "onDraftError"> = {}
+): EditorSession {
+  return createSession({
+    id,
+    path: null,
+    store: null,
+    content: initialContent,
+    baselineContent: "",
+    baselineMtime: null,
+    pendingConflict: null,
+    draftDebounceMs: DEFAULT_DRAFT_DEBOUNCE_MS,
+    onChange: hooks.onChange,
+    onDraftError: hooks.onDraftError,
+  });
+}
+
 interface CreateSessionParams {
   id: string;
   path: string | null;
-  store: DocumentStore;
+  /** 未命名会话没有磁盘能力，传 null */
+  store: DocumentStore | null;
   content: string;
   baselineContent: string;
   baselineMtime: number | null;
@@ -146,7 +172,7 @@ function createSession(params: CreateSessionParams): EditorSession {
 
   async function discardDraftIfClean(): Promise<void> {
     // 待裁决冲突期间不得删除草稿：那正是用户还没决定要不要保留的内容
-    if (currentPath === null || pendingConflict !== null || isDirty()) return;
+    if (store === null || currentPath === null || pendingConflict !== null || isDirty()) return;
     try {
       await store.deleteDraft(currentPath);
     } catch (error) {
@@ -155,7 +181,7 @@ function createSession(params: CreateSessionParams): EditorSession {
   }
 
   async function draftWriteNow(): Promise<void> {
-    if (currentPath === null) return;
+    if (store === null || currentPath === null) return;
     if (!isDirty()) {
       await discardDraftIfClean();
       return;
@@ -209,6 +235,9 @@ function createSession(params: CreateSessionParams): EditorSession {
     if (disposed) {
       return { kind: "failed", error: new Error("session disposed") };
     }
+    if (store === null) {
+      return { kind: "failed", error: new Error("untitled session has no document store") };
+    }
     const previousPath = currentPath;
     try {
       await store.writeText(target, content);
@@ -254,10 +283,52 @@ function createSession(params: CreateSessionParams): EditorSession {
     } else {
       content = resolved.diskContent;
       baselineContent = resolved.diskContent;
-      if (currentPath !== null) {
+      if (store !== null && currentPath !== null) {
         void store.deleteDraft(currentPath).catch(() => {});
       }
     }
+    notify();
+  }
+
+  /**
+   * 只对齐 mtime 基线（「保留本地版本」）：内容与脏态不变，
+   * 但后续草稿写入带上新的 knownMtime，下次打开不会被判为过期草稿。
+   */
+  function rebaseline(mtime: number): void {
+    if (disposed) return;
+    baselineMtime = mtime;
+  }
+
+  /**
+   * 路径迁移（应用内重命名/移动）：草稿以路径为键，键变了后续草稿写入
+   * 必须落到新键下。旧键草稿由调用方删除。
+   */
+  function renamePath(path: string): void {
+    if (disposed) return;
+    currentPath = path;
+  }
+
+  /**
+   * 以磁盘内容重设基线（重新加载 / 用户选「加载磁盘版本」）。
+   *
+   * `disk` 由调用方在已知时传入（它刚为弹窗读过盘），省一次重复 IO；
+   * 未传则自己读。
+   *
+   * **不删草稿**：#378 的兜底语义是「本地内容被覆盖前先留一份草稿，
+   * 让用户事后仍能找回」。删草稿由调用方显式决定（reloadFromDisk 是
+   * 用户主动丢弃，删；load-disk 弹窗路径留）。
+   */
+  async function reloadBaseline(disk?: { content: string; mtime: number }): Promise<void> {
+    if (disposed || store === null || currentPath === null) {
+      throw new Error("cannot reload baseline: session has no document");
+    }
+    const nextContent = disk?.content ?? (await store.readText(currentPath));
+    const mtime = disk?.mtime ?? (await store.mtime(currentPath));
+    content = nextContent;
+    baselineContent = nextContent;
+    baselineMtime = mtime;
+    pendingConflict = null;
+    cancelDraftTimer();
     notify();
   }
 
@@ -294,7 +365,7 @@ function createSession(params: CreateSessionParams): EditorSession {
       await flushDraft();
     } else {
       cancelDraftTimer();
-      if (currentPath !== null) {
+      if (store !== null && currentPath !== null) {
         await store.deleteDraft(currentPath).catch(() => {});
       }
     }
@@ -312,6 +383,9 @@ function createSession(params: CreateSessionParams): EditorSession {
     saveAs,
     resolveConflict,
     flushDraft,
+    rebaseline,
+    renamePath,
+    reloadBaseline,
     attachEditor,
     detachEditor,
     dispose,
