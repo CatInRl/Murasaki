@@ -94,6 +94,7 @@ murasaki/
 | `npm run tauri:dev` | 启动开发模式 |
 | `npm run tauri:build` | 生产构建 |
 | `npm test` | 前端单元测试 |
+| `npm run test:coverage` | 单元测试 + 覆盖率阈值（CI 门禁用） |
 | `npm run test:rust` | Rust 测试 |
 | `npm run test:e2e` | E2E（真实 WebView2；需先构建 + 装 tauri-driver/msedgedriver） |
 | `npm run build` | 仅构建前端（vue-tsc + vite build） |

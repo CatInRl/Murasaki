@@ -3,7 +3,6 @@ pub mod errors;
 pub mod i18n;
 pub mod security;
 
-use tauri::{Emitter, Manager, WebviewWindowBuilder};
 use commands::assets;
 use commands::dialogs;
 use commands::drafts;
@@ -18,6 +17,7 @@ use commands::search;
 use commands::settings;
 use commands::watcher::{self, WatcherState};
 use commands::windows::{self, WindowRegistry};
+use tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 /// E2E 测试模式标志，按平台各有一条判定通道：
 ///
@@ -58,7 +58,10 @@ fn is_e2e_mode_from(
     embedded_server_env: Option<&str>,
     webdriver_port_env: Option<&str>,
 ) -> bool {
-    if argv.iter().any(|a| a.starts_with("--remote-debugging-port=")) {
+    if argv
+        .iter()
+        .any(|a| a.starts_with("--remote-debugging-port="))
+    {
         return true;
     }
     if automation_env == Some("true") {
@@ -254,9 +257,7 @@ fn rewrite_env_debug_port(port: u16) {
                 result.push_str(&rest[..idx + PREFIX.len()]);
                 rest = &rest[idx + PREFIX.len()..];
                 // 跳过端口值直到空白符
-                let val_end = rest
-                    .find(char::is_whitespace)
-                    .unwrap_or(rest.len());
+                let val_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
                 let old_val = &rest[..val_end];
                 if !replaced {
                     result.push_str(&port.to_string());
@@ -380,9 +381,7 @@ fn e2e_trace(msg: &str) {
         .create(true)
         .append(true)
         .open(&log_path)
-        .and_then(|mut f| {
-            writeln!(f, "[ts={}] {}", now, msg)
-        });
+        .and_then(|mut f| writeln!(f, "[ts={}] {}", now, msg));
     eprintln!("[murasaki] {}", msg);
 }
 
@@ -417,16 +416,17 @@ fn spawn_devtools_active_port_writer(port: u16, user_data_dir: std::path::PathBu
                 }
             };
 
-            e2e_trace(&format!("CDP 已响应，attempt={} body_len={}", attempt, body.len()));
+            e2e_trace(&format!(
+                "CDP 已响应，attempt={} body_len={}",
+                attempt,
+                body.len()
+            ));
 
             let ws_url = extract_ws_url(&body);
             if let Some(ws_url) = ws_url {
                 e2e_trace(&format!("ws_url={}", ws_url));
                 // ws://127.0.0.1:PORT/devtools/browser/UUID -> /devtools/browser/UUID
-                let ws_path = ws_url
-                    .splitn(4, '/')
-                    .nth(3)
-                    .map(|p| format!("/{}", p));
+                let ws_path = ws_url.splitn(4, '/').nth(3).map(|p| format!("/{}", p));
 
                 if let Some(ws_path) = ws_path {
                     let content = format!("{}\n{}", port, ws_path);
@@ -456,7 +456,10 @@ fn spawn_devtools_active_port_writer(port: u16, user_data_dir: std::path::PathBu
                     e2e_trace("ws_path 解析失败");
                 }
             } else {
-                e2e_trace(&format!("ws_url 解析失败，body 前 200 字符: {}", body.chars().take(200).collect::<String>()));
+                e2e_trace(&format!(
+                    "ws_url 解析失败，body 前 200 字符: {}",
+                    body.chars().take(200).collect::<String>()
+                ));
             }
         }
 
@@ -814,13 +817,7 @@ mod tests {
     #[test]
     fn e2e_mode_detects_env_injection() {
         let env = "--enable-automation --remote-debugging-port=0 --test-type=webdriver";
-        assert!(is_e2e_mode_from(
-            &argv(&[]),
-            Some(env),
-            None,
-            None,
-            None
-        ));
+        assert!(is_e2e_mode_from(&argv(&[]), Some(env), None, None, None));
     }
 
     /// 只含调试端口、缺 `--test-type=webdriver` 时不判 E2E，
@@ -853,13 +850,7 @@ mod tests {
     /// WebKitWebDriver 启动应用时环境被继承 —— 应用侧读环境变量即可判定
     #[test]
     fn e2e_mode_detects_tauri_automation_env() {
-        assert!(is_e2e_mode_from(
-            &argv(&[]),
-            None,
-            Some("true"),
-            None,
-            None
-        ));
+        assert!(is_e2e_mode_from(&argv(&[]), None, Some("true"), None, None));
     }
 
     /// automation 标志严格匹配 "true"：其它值（"1"/"false"/空串）不判 E2E，
@@ -874,26 +865,14 @@ mod tests {
             None
         ));
         assert!(!is_e2e_mode_from(&argv(&[]), None, Some("1"), None, None));
-        assert!(!is_e2e_mode_from(
-            &argv(&[]),
-            None,
-            Some(""),
-            None,
-            None
-        ));
+        assert!(!is_e2e_mode_from(&argv(&[]), None, Some(""), None, None));
     }
 
     /// macOS：wdio-service 拉起应用时注入 `WDIO_EMBEDDED_SERVER=true`，
     /// harness 直接 spawn 二进制时同样注入该变量
     #[test]
     fn e2e_mode_detects_wdio_embedded_server_env() {
-        assert!(is_e2e_mode_from(
-            &argv(&[]),
-            None,
-            None,
-            Some("true"),
-            None
-        ));
+        assert!(is_e2e_mode_from(&argv(&[]), None, None, Some("true"), None));
     }
 
     /// `WDIO_EMBEDDED_SERVER` 严格匹配 "true"：其它值不判 E2E，
@@ -915,31 +894,13 @@ mod tests {
     /// 该变量正是内嵌服务端自身的端口配置，二者天然对齐
     #[test]
     fn e2e_mode_detects_webdriver_port_env() {
-        assert!(is_e2e_mode_from(
-            &argv(&[]),
-            None,
-            None,
-            None,
-            Some("4445")
-        ));
+        assert!(is_e2e_mode_from(&argv(&[]), None, None, None, Some("4445")));
     }
 
     /// 端口变量为空 / 纯空白视为未设置，不判 E2E
     #[test]
     fn e2e_mode_ignores_blank_webdriver_port_env() {
-        assert!(!is_e2e_mode_from(
-            &argv(&[]),
-            None,
-            None,
-            None,
-            Some("")
-        ));
-        assert!(!is_e2e_mode_from(
-            &argv(&[]),
-            None,
-            None,
-            None,
-            Some("   ")
-        ));
+        assert!(!is_e2e_mode_from(&argv(&[]), None, None, None, Some("")));
+        assert!(!is_e2e_mode_from(&argv(&[]), None, None, None, Some("   ")));
     }
 }

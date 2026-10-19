@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use crate::errors::{CommandError, ErrorCode};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use walkdir::WalkDir;
-use crate::errors::{CommandError, ErrorCode};
 
 /// 搜索匹配项
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,8 +111,9 @@ fn build_search_regex(query: &str, options: &SearchOptions) -> Result<Regex, Com
         pattern
     };
     let flags = if options.case_sensitive { "" } else { "(?i)" };
-    Regex::new(&format!("{}{}", flags, pattern))
-        .map_err(|e| CommandError::new(ErrorCode::InvalidArgument).with_param("detail", e.to_string()))
+    Regex::new(&format!("{}{}", flags, pattern)).map_err(|e| {
+        CommandError::new(ErrorCode::InvalidArgument).with_param("detail", e.to_string())
+    })
 }
 
 /// 检查文件名是否匹配查询
@@ -126,7 +127,9 @@ fn filename_matches(file_path: &Path, regex: &Regex) -> bool {
 
 /// 将字节偏移转换为 UTF-16 码元偏移（regex 返回字节偏移；前端 JS 按 UTF-16 码元索引切片高亮）
 fn byte_to_utf16_offset(line: &str, byte: usize) -> u32 {
-    line.get(..byte).map(|s| s.encode_utf16().count()).unwrap_or(0) as u32
+    line.get(..byte)
+        .map(|s| s.encode_utf16().count())
+        .unwrap_or(0) as u32
 }
 
 /// 文件内每扫描多少行检查一次取消（大文件也能及时中断）
@@ -153,7 +156,12 @@ fn search_in_content(
             // 命中段：按当前正则（含大小写/全词选项）精确计算 UTF-16 码元偏移
             let ranges: Vec<(u32, u32)> = regex
                 .find_iter(line)
-                .map(|m| (byte_to_utf16_offset(line, m.start()), byte_to_utf16_offset(line, m.end())))
+                .map(|m| {
+                    (
+                        byte_to_utf16_offset(line, m.start()),
+                        byte_to_utf16_offset(line, m.end()),
+                    )
+                })
                 .collect();
             // 上下文：前 2 行 + 后 2 行
             let before_start = i.saturating_sub(2);
@@ -182,7 +190,12 @@ fn search_in_content(
 fn is_markdown(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
-        .map(|e| matches!(e.to_lowercase().as_str(), "md" | "markdown" | "mdown" | "mkd"))
+        .map(|e| {
+            matches!(
+                e.to_lowercase().as_str(),
+                "md" | "markdown" | "mdown" | "mkd"
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -658,10 +671,19 @@ mod tests {
         );
         // whole_word: MurasakiXXX 不算 Murasaki 匹配
         // intro.md 和 notes.md 仍包含独立的 Murasaki
-        assert!(resp.content_results.iter().any(|r| r.file_path.ends_with("intro.md")));
-        assert!(resp.content_results.iter().any(|r| r.file_path.ends_with("notes.md")));
+        assert!(resp
+            .content_results
+            .iter()
+            .any(|r| r.file_path.ends_with("intro.md")));
+        assert!(resp
+            .content_results
+            .iter()
+            .any(|r| r.file_path.ends_with("notes.md")));
         // deep.md 中是 MurasakiXXX，不应匹配
-        assert!(!resp.content_results.iter().any(|r| r.file_path.ends_with("deep.md")));
+        assert!(!resp
+            .content_results
+            .iter()
+            .any(|r| r.file_path.ends_with("deep.md")));
     }
 
     #[test]
@@ -689,7 +711,11 @@ mod tests {
             None,
             None,
         );
-        let result = resp.content_results.iter().find(|r| r.file_path.ends_with("intro.md")).unwrap();
+        let result = resp
+            .content_results
+            .iter()
+            .find(|r| r.file_path.ends_with("intro.md"))
+            .unwrap();
         let m = &result.matches[0];
         assert_eq!(m.line_number, 3);
         // context_before: 前 2 行
