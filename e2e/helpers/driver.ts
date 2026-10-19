@@ -452,6 +452,52 @@ export async function closeSession(browser: Browser): Promise<void> {
     // 忽略：session 可能已失效，或应用还没就绪（createSession 的就绪失败分支会调本函数）
   }
 
+  // 同理收口对话框与 toast（#444 分片后暴露）：前一个 spec 若以打开中的 dialog 结束，
+  // 它的 overlay 会留在 DOM 里遮住下一个 spec 的点击（`element click intercepted`）。
+  // 本地全量按固定顺序跑时恰好没撞上，分片打乱顺序后就稳定复现。
+  try {
+    await browser.execute(() => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      const pinia = window.__pinia__;
+      if (!pinia?._s) return;
+
+      const dialog = pinia._s.get("dialog");
+      if (dialog?.queue?.length) {
+        for (const item of dialog.queue.slice()) {
+          try {
+            switch (item.kind) {
+              case "confirm":
+                item.resolver(false);
+                break;
+              case "prompt":
+                item.resolver(null);
+                break;
+              case "conflict":
+                item.resolver({ action: "cancel" });
+                break;
+              case "unsaved":
+                item.resolver("cancel");
+                break;
+              default:
+                item.resolver(undefined);
+                break;
+            }
+          } catch {
+            // 单个 resolver 失败不影响其余
+          }
+        }
+        dialog.queue.length = 0;
+      }
+
+      const toast = pinia._s.get("toast");
+      if (Array.isArray(toast?.toasts)) {
+        toast.toasts.length = 0;
+      }
+    });
+  } catch {
+    // 忽略：session 可能已失效
+  }
+
   try {
     await browser.deleteSession();
   } catch {

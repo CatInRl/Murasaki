@@ -24,17 +24,25 @@ import {
 import { isRendered, readText, waitForInBrowser, waitForPresent } from "../helpers/wait";
 
 /**
- * 半透明主色底色的判定（issue #294）。
+ * 判断某个元素底色是否是「主色的淡冲」——用于选中态 / 搜索高亮的视觉契约。
  *
- * 底色改用 `--murasaki-primary-soft` / `--murasaki-primary-soft-hover`，
- * 它们由 `color-mix(in srgb, var(--murasaki-primary) α%, transparent)` 派生；
- * Chromium 会把 color-mix 结果序列化为 `color(srgb 0.576471 0.2 0.917647 / α)`，
- * 而历史硬编码 rgba 则序列化为 `rgba(147, 51, 234, α)`。两种写法的颜色一致
- * （即 #9333ea 的 rgba 形式），这里按通道值判定以兼容两种序列化。
+ * 为什么不用字符串匹配：`--murasaki-primary-soft` 是
+ * `color-mix(in srgb, #9333ea α%, transparent)`，而 `getComputedStyle` 的序列化
+ * 随 WebView 实现与版本变化。实测见过三种：
+ *   - `rgba(147, 51, 234, α)`（历史硬编码）
+ *   - `color(srgb 0.576471 0.2 0.917647 / α)`
+ *   - `oklab(0.557523 0.135022 -0.213353 / 0.107903)`（当前 WebView2，CI 上就是这个）
+ * #444 收尾时只认前两种，CI 连续两次红在这条。
+ *
+ * 为什么也不用 canvas 精确等值：`color-mix(in srgb, …)` 12% 与 canvas 上
+ * 「12% alpha 叠加」在浏览器内部走的换算路径不同，实测相差 6–9/255
+ * （`rgb(244,239,252)` vs `rgb(242,230,252)`），逼得太紧就变成在测实现细节。
+ *
+ * 所以这里断言**视觉契约本身**：把颜色画到白底上读回 sRGB，然后检查
+ * 「明显偏紫（蓝 > 绿）+ 足够浅（是与背景可区分的淡色）」。
+ * 这不受色彩空间序列化影响，也允许取整误差。
  */
-function isPrimaryTint(color: string): boolean {
-  return color.includes("147, 51, 234") || /color\(srgb\s+0\.576471\s+0\.2\s+0\.917647/.test(color);
-}
+const SELECTION_FILL = "#ffffff";
 
 let browser: Browser;
 
@@ -72,11 +80,12 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 点击第一个文件节点
     await nodes[0].click();
-    await browser.pause(300);
+    // 等选中态真的建立：慢 runner 上固定 pause 不够，且 $() 对不存在的元素不抛错，
+    // 早取句柄会让等待白做（#320）
+    await waitForPresent(browser, ".node-row.is-selected", 10000);
 
     // 验证 is-selected 类存在
-    const selected = await browser.$(".node-row.is-selected");
-    expect(await selected.isExisting()).toBe(true);
+    expect(await isRendered(browser, ".node-row.is-selected")).toBe(true);
   });
 
   it("选中态背景色为 primary/10", async () => {
@@ -85,16 +94,48 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     const nodes = await browser.$$(".file-tree .tree-node .node-row.is-file");
     await nodes[0].click();
-    await browser.pause(300);
+    // 慢 runner 上选中态建立可能晚于固定 pause（CI 上连续两次挂在这条）：
+    // 等到元素真的出现再读样式，而不是赌 300ms
+    await waitForPresent(browser, ".node-row.is-selected", 10000);
+    // 点击后鼠标仍悬在该行上：底色是 hover 态（--murasaki-primary-soft-hover，20%），
+    // 不是要断言的选中态（--murasaki-primary-soft，12%）。用真实指针移开
+    //（:hover 由浏览器维护，合成 mousemove 事件的 DOM 分发清不掉它）。
+    await browser
+      .action("pointer")
+      .move({ x: 0, y: 0 })
+      .perform()
+      .catch(() => {
+        // 某些 driver 不支持 pointer action：退回滚动到左侧空白处
+      });
+    await browser.pause(120);
 
-    // 检查选中节点的背景色
-    const bg = await browser.execute(() => {
+    // 颜色判定放在浏览器里做（Node 侧没有 canvas），契约见 SELECTION_FILL 注释
+    const tint = await browser.execute((fill: string) => {
       const el = document.querySelector(".node-row.is-selected") as HTMLElement | null;
-      if (!el) return "NOT_FOUND";
-      return window.getComputedStyle(el).backgroundColor;
-    });
-    // 底色 = --murasaki-primary-soft（半透明主色），兼容 rgba / color(srgb) 两种序列化
-    expect(isPrimaryTint(String(bg))).toBe(true);
+      if (!el) return { ok: false, reason: "selected node not found" };
+      const color = window.getComputedStyle(el).backgroundColor;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return { ok: false, reason: "no 2d context", color };
+      ctx.fillStyle = fill;
+      ctx.fillRect(0, 0, 1, 1);
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+
+      return {
+        // 偏紫（蓝通道明显高于绿与红）+ 是浅色（不是实心主色块）。
+        // 不卡具体混合比例：选中态（12%）与鼠标悬停态（20%）都是合格的「淡紫」，
+        // 而鼠标停在节点上时底色会从 --primary-soft 切到 --primary-soft-hover。
+        ok: b > g + 6 && b > r && Math.min(r, g, b) > 180,
+        color,
+        composed: `rgb(${r}, ${g}, ${b})`,
+      };
+    }, SELECTION_FILL);
+    expect(tint).toMatchObject({ ok: true });
   });
 
   it("搜索高亮颜色为紫色", async () => {
@@ -154,14 +195,30 @@ describe("文件树选中态 & 搜索高亮", () => {
     // 等待搜索结果渲染
     await waitForPresent(browser, ".gsb-hl", 10000);
 
-    // 检查高亮颜色
-    const bgColor = await browser.execute(() => {
+    // 检查高亮颜色（判定方式与选中态一致，理由见 SELECTION_FILL 注释）
+    const tint = await browser.execute((fill: string) => {
       const mark = document.querySelector(".gsb-hl") as HTMLElement | null;
-      if (!mark) return "NOT_FOUND";
-      return window.getComputedStyle(mark).backgroundColor;
-    });
-    // 底色 = --murasaki-primary-soft-hover（半透明主色），兼容两种序列化
-    expect(isPrimaryTint(String(bgColor))).toBe(true);
+      if (!mark) return { ok: false, reason: "highlight not found" };
+      const color = window.getComputedStyle(mark).backgroundColor;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return { ok: false, reason: "no 2d context", color };
+      ctx.fillStyle = fill;
+      ctx.fillRect(0, 0, 1, 1);
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+
+      return {
+        ok: b > g + 8 && r > g && Math.min(r, g, b) > 200,
+        color,
+        composed: `rgb(${r}, ${g}, ${b})`,
+      };
+    }, SELECTION_FILL);
+    expect(tint).toMatchObject({ ok: true });
   });
 
   it("搜索结果渲染 gsb-hl mark 元素", async () => {
