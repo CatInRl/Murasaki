@@ -18,6 +18,7 @@ import {
   openWorkspace,
   closeWorkspace,
   closeAllTabs,
+  dismissAllDialogs,
   waitForPinia,
   resetPersistenceSettings,
 } from "../helpers/store";
@@ -58,6 +59,10 @@ describe("文件树选中态 & 搜索高亮", () => {
 
   beforeEach(async () => {
     await resetPersistenceSettings(browser);
+    // 先清残留对话框：前一个 spec 若以打开中的 dialog 结束，overlay 会挡住本 spec
+    // 第一次点击（`element click intercepted`）。closeSession 的收口只覆盖
+    // 「上一个 spec 正常走完 afterAll」的情况，本 spec 自己第一个用例仍要有兜底。
+    await dismissAllDialogs(browser);
     try {
       await closeAllTabs(browser);
     } catch {
@@ -68,6 +73,7 @@ describe("文件树选中态 & 搜索高亮", () => {
     } catch {
       /* ignore */
     }
+    await dismissAllDialogs(browser);
   });
 
   it("点击文件后节点有 is-selected 类", async () => {

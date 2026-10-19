@@ -18,6 +18,8 @@ export interface AppLifecycleDeps {
     restoring: boolean;
     /** 合并落盘（#429）：高频输入时最多每 1.5s 写一次 tabs.json */
     schedulePersist(): void;
+    /** 打开会话 onChange → 合并落盘的门（#449 / ADR-0022） */
+    bindPersist(): void;
     persist(): Promise<unknown>;
   };
   persistence: {
@@ -74,12 +76,19 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
 
   const initialized = ref(false);
 
+  // 编辑会话的内容变化不再经过 tabs 深监听（content 已是派生 getter，
+  // 深层遍历只看到快照字段），由会话的 onChange 直接排合并写（#449 / ADR-0022）。
+  // 这里只是把「可以落盘」的门打开，并把合并写入口接到 store 自己那份上。
+  tabsStore.bindPersist();
+
   // ===== 5 个 watcher =====
 
   // 1. Tab 状态变化时持久化（gated）
   //    restoring=true 时跳过（clearAll/restore 期间不 persist，避免覆盖 tabs.json）
   //    #429：输入时每个字符都会触发本 watcher，落盘改走 schedulePersist 合并，
   //    避免每键一次全文序列化 + 磁盘写；退出路径仍由 persist() 立即落盘。
+  //    注意：内容变更本身由会话 onChange 触发（见上），本 watcher 只覆盖
+  //    增删 tab 与切换激活项。
   watch(
     () => [tabsStore.tabs, tabsStore.activeTabId],
     () => {

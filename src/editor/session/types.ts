@@ -88,6 +88,19 @@ export interface EditorSession {
   resolveConflict(choice: ConflictChoice): void;
   /** 立即把脏内容写入草稿（关闭 / 退出时调用） */
   flushDraft(): Promise<void>;
+  /**
+   * 只把磁盘 mtime 基线对齐到给定值，不改内容与脏态。
+   *
+   * 用于「保留本地版本」：磁盘已被外部修改，用户选择留本地，
+   * 此时必须让草稿的 knownMtime 与磁盘当前 mtime 一致，
+   * 否则下次打开会被判为过期草稿而丢弃（ADR-0001）。
+   */
+  rebaseline(mtime: number): void;
+  /** 路径迁移（应用内重命名/移动）：草稿键跟随新路径 */
+  renamePath(path: string): void;
+  /** 重新以磁盘内容为基线（重新加载 / 加载磁盘版本）；
+   *  调用方已知磁盘内容与 mtime 时传入，省一次重复 IO */
+  reloadBaseline(disk?: { content: string; mtime: number }): Promise<void>;
   attachEditor(adapter: EditorAdapter): void;
   detachEditor(): void;
   dispose(options?: DisposeOptions): Promise<void>;

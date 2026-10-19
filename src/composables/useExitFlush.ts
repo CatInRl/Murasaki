@@ -5,7 +5,7 @@
  * 前端在此处理本窗口的未保存改动，完成后调用 `close_window` 真正销毁本窗口：
  * - 有未保存改动且注入了 `resolveUnsaved` → 先弹一次汇总确认（保存 / 不保存 / 取消），
  *   选「取消」则**中止退出**（窗口留着，也不落盘），见 [ADR-0017](../../docs/adr/0017-close-interception-with-draft-flush-on-exit.md)
- * - 已命名且 dirty 的 tab → 写草稿（沿用 ADR-0001 草稿恢复机制）
+ * - 已命名且 dirty 的 tab → 会话 flush 草稿（沿用 ADR-0001 草稿恢复机制）
  * - 全部 tab → 刷新本窗口的 tabs.json 槽位（未命名 tab 的内容只能靠这里保留）
  *
  * 关掉最后一个窗口时由 Rust 侧 `exit_if_no_other_windows` 退出应用，
@@ -15,7 +15,6 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { fileSystem } from "../services/fileSystem";
 
 /** 退出落盘所需的 tab 最小切片 */
 export interface ExitFlushTab {
@@ -28,9 +27,10 @@ export interface ExitFlushTab {
 
 export interface ExitFlushDeps {
   tabs: readonly ExitFlushTab[];
-  saveDraft(path: string, content: string, knownMtime: number): Promise<void>;
-  /** 用户明确「不保存」时清理已有草稿 */
-  deleteDraft?(path: string): Promise<void>;
+  /** 把全部脏会话的草稿强制落盘；返回失败数（由 tabs store 提供） */
+  flushAllDrafts(): Promise<number>;
+  /** 用户明确「不保存」时清掉全部会话的草稿 */
+  discardAllDrafts(): Promise<void>;
   persist(): Promise<unknown>;
   /** 用户明确「不保存」时传 false：不写草稿并清掉已有草稿 */
   writeDrafts?: boolean;
@@ -49,25 +49,12 @@ export const EXIT_FLUSH_TIMEOUT_MS = 3000;
 export async function flushUnsavedOnExit(deps: ExitFlushDeps): Promise<number> {
   let failed = 0;
   if (deps.writeDrafts !== false) {
-    for (const tab of deps.tabs) {
-      if (!tab.isDirty || !tab.path) continue;
-      try {
-        await deps.saveDraft(tab.path, tab.content, tab.lastMtime ?? 0);
-      } catch (err) {
-        failed++;
-        console.error("[Murasaki] 退出前保存草稿失败:", err);
-      }
-    }
+    failed = await deps.flushAllDrafts();
   } else {
     // 「不保存」：清掉已有草稿，否则下次打开会把它读回来
-    for (const tab of deps.tabs) {
-      if (!tab.isDirty || !tab.path) continue;
-      try {
-        await deps.deleteDraft?.(tab.path);
-      } catch (err) {
-        console.error("[Murasaki] 退出前清理草稿失败:", err);
-      }
-    }
+    await deps.discardAllDrafts().catch((err) => {
+      console.error("[Murasaki] 退出前清理草稿失败:", err);
+    });
   }
   try {
     await deps.persist();
@@ -79,6 +66,10 @@ export async function flushUnsavedOnExit(deps: ExitFlushDeps): Promise<number> {
 
 export interface ExitFlushStoreSlice {
   tabs: readonly ExitFlushTab[];
+  /** 把全部脏会话的草稿强制落盘；返回失败数 */
+  flushAllDrafts(): Promise<number>;
+  /** 用户明确「不保存」时清掉全部会话的草稿 */
+  discardAllDrafts(): Promise<void>;
   persist(): Promise<unknown>;
 }
 
@@ -130,8 +121,8 @@ export function useExitFlush(tabsStore: ExitFlushStoreSlice, options: ExitFlushO
       await Promise.race([
         flushUnsavedOnExit({
           tabs: tabsStore.tabs,
-          saveDraft: (path, content, knownMtime) => fileSystem.saveDraft(path, content, knownMtime),
-          deleteDraft: (path) => fileSystem.deleteDraft(path),
+          flushAllDrafts: () => tabsStore.flushAllDrafts(),
+          discardAllDrafts: () => tabsStore.discardAllDrafts(),
           persist: () => tabsStore.persist(),
           writeDrafts,
         }),
