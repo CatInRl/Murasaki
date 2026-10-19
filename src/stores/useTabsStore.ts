@@ -65,6 +65,16 @@ export const useTabsStore = defineStore("tabs", () => {
   const sessions = new Map<string, EditorSession>();
   const documentStore: DocumentStore = createDocumentStore();
 
+  /**
+   * 会话内容/脏态变化的响应式信号（tabId → 版本号）。
+   *
+   * 会话本身是普通对象、不经 Vue 响应式包裹，`snapshot()` 读出来的是普通值；
+   * TabBar 的 dirty 圆点、状态栏的「未保存」、关闭前的未保存确认都依赖
+   * 「tabs 变化时重算」。故每个 tab 挂一个 ref，会话 onChange 时自增，
+   * 派生字段的 getter 先读它建立依赖（ADR-0022 落地时踩过的坑：#449）。
+   */
+  const revisions = new Map<string, { value: number }>();
+
   /** 取会话；未命名/已释放返回 null */
   function getSession(tabId: string): EditorSession | null {
     return sessions.get(tabId) ?? null;
@@ -87,23 +97,43 @@ export const useTabsStore = defineStore("tabs", () => {
    * 把派生字段挂成 getter：调用方（openFile 的返回值、restore 的光标回写）
    * 会持有 tab 对象跨越多次内容变更，快照拷贝会让它停在旧值。
    * getter 每次读取都回到会话，保证「拿到的是活的 tab」。
+   *
+   * 先读 revision 再读快照：revision 是 ref，读取即建立依赖，
+   * 否则会话内容变化不会触发重算（UI 上的 dirty 指示会停住）。
    */
-  function materializeLive(tab: Tab, session: EditorSession): Tab {
+  function materializeLive(tab: Tab, session: EditorSession, revision: { value: number }): Tab {
     return {
       id: tab.id,
       path: tab.path,
       get content() {
+        void revision.value;
         return session.snapshot().content;
       },
       get lastMtime() {
+        void revision.value;
         return session.snapshot().baselineMtime;
       },
       get isDirty() {
+        void revision.value;
         return session.snapshot().isDirty;
       },
       cursor: tab.cursor,
       scroll: tab.scroll,
     };
+  }
+
+  /** 新建一个 tab 的会话 + 响应式版本号，并把 onChange 接上（内容变化 → 版本号自增 + 合并落盘） */
+  function createTrackedSession(
+    id: string,
+    makeSession: (onChange: () => void) => EditorSession
+  ): { session: EditorSession; revision: { value: number } } {
+    const revision = ref(0);
+    const session = makeSession(() => {
+      revision.value++;
+      schedulePersistOnChange();
+    });
+    revisions.set(id, revision);
+    return { session, revision };
   }
 
   // ===== Getters =====
@@ -122,7 +152,10 @@ export const useTabsStore = defineStore("tabs", () => {
     const tab = idx >= 0 ? tabs.value[idx] : null;
     if (!tab) return null;
     const session = sessions.get(tab.id);
-    return session ? materialize(tab, session.snapshot()) : tab;
+    if (!session) return tab;
+    // 读版本号建立依赖：会话内容变化时本 computed 才会重算
+    void revisions.get(tab.id)?.value;
+    return materialize(tab, session.snapshot());
   });
 
   /** 是否有打开的标签页 */
@@ -176,7 +209,9 @@ export const useTabsStore = defineStore("tabs", () => {
     const tab = tabs.value.find((t) => t.id === tabId);
     if (!tab) return null;
     const session = sessions.get(tab.id);
-    return session ? materialize(tab, session.snapshot()) : tab;
+    if (!session) return tab;
+    void revisions.get(tab.id)?.value;
+    return materialize(tab, session.snapshot());
   }
 
   // ===== Actions =====
@@ -204,13 +239,18 @@ export const useTabsStore = defineStore("tabs", () => {
     }
 
     const id = genId();
+    const revision = ref(0);
     const { session, result } = await openEditorSession({
       id,
       path,
       store: documentStore,
-      onChange: schedulePersistOnChange,
+      onChange: () => {
+        revision.value++;
+        schedulePersistOnChange();
+      },
       onDraftError: notifyDraftError,
     });
+    revisions.set(id, revision);
 
     if (result.kind === "conflict") {
       const { conflict } = result;
@@ -245,7 +285,8 @@ export const useTabsStore = defineStore("tabs", () => {
         cursor: { line: 1, ch: 0 },
         scroll: { x: 0, y: 0 },
       },
-      session
+      session,
+      revision
     );
     tabs.value.push(tab);
     if (activate) activeTabId.value = tab.id;
@@ -259,11 +300,10 @@ export const useTabsStore = defineStore("tabs", () => {
   function newTab(initialContent = "", options: { activate?: boolean } = {}): Tab {
     // 未命名会话没有磁盘基线（baseline 为空串），
     // 因此 isDirty = content !== "" = initialContent.length > 0，与原逻辑一致
-    const session = createUntitledSession(genId(), initialContent, {
-      onChange: schedulePersistOnChange,
-      onDraftError: notifyDraftError,
-    });
-    const id = session.id;
+    const id = genId();
+    const { session, revision } = createTrackedSession(id, (onChange) =>
+      createUntitledSession(id, initialContent, { onChange, onDraftError: notifyDraftError })
+    );
     sessions.set(id, session);
     const tab: Tab = materializeLive(
       {
@@ -275,7 +315,8 @@ export const useTabsStore = defineStore("tabs", () => {
         cursor: { line: 1, ch: 0 },
         scroll: { x: 0, y: 0 },
       },
-      session
+      session,
+      revision
     );
     tabs.value.push(tab);
     if (options.activate ?? true) activeTabId.value = tab.id;
@@ -291,13 +332,13 @@ export const useTabsStore = defineStore("tabs", () => {
    * - 本方法只负责释放会话（草稿随之落盘或清理）+ 从列表中移除 + 调整激活 tab
    */
   async function closeTab(tabId: string): Promise<{ needsConfirm: boolean; tab: Tab | null }> {
-    const idx = tabs.value.findIndex((t) => t.id === tabId);
-    if (idx < 0) return { needsConfirm: false, tab: null };
+    const tab = getTabById(tabId);
+    if (!tab) return { needsConfirm: false, tab: null };
 
     // 通知调用方：此 tab 需要弹出"保存/不保存/取消"对话框
     // 调用方应处理完用户选择后再调用本方法执行真正的关闭
-    if (getTabById(tabId)?.isDirty) {
-      return { needsConfirm: true, tab: getTabById(tabId) };
+    if (tab.isDirty) {
+      return { needsConfirm: true, tab };
     }
 
     // 无未保存修改：直接关闭
@@ -316,7 +357,8 @@ export const useTabsStore = defineStore("tabs", () => {
     const idx = tabs.value.findIndex((t) => t.id === tabId);
     if (idx < 0) return { needsConfirm: false, tab: null };
 
-    const tab = tabs.value[idx];
+    // 先取快照：会话随后会被释放，返回值代表「关闭那一刻的状态」
+    const tab = getTabById(tabId) ?? tabs.value[idx];
     const session = sessions.get(tabId);
     if (session) {
       // keepDraft:false = 用户明确「不保存」：删草稿；
@@ -324,6 +366,7 @@ export const useTabsStore = defineStore("tabs", () => {
       // 内容已与磁盘一致时 flush 会顺带清掉过期草稿（#426）
       await session.dispose({ draft: options.keepDraft === false ? "discard" : "keep" });
       sessions.delete(tabId);
+      revisions.delete(tabId);
     }
 
     tabs.value.splice(idx, 1);
@@ -721,6 +764,7 @@ export const useTabsStore = defineStore("tabs", () => {
       void session.dispose({ draft: "keep" }).catch(() => {});
     }
     sessions.clear();
+    revisions.clear();
     restoring.value = true;
     tabs.value = [];
     activeTabId.value = null;
