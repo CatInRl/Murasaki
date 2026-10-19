@@ -63,9 +63,7 @@ describe("findEmojiShortcodesInRange", () => {
     // 代码块范围覆盖整个 ``` 块
     const codeStart = doc.indexOf("```");
     const codeEnd = doc.lastIndexOf("```") + 3;
-    const r = findEmojiShortcodesInRange(doc, 0, doc.length, [
-      { from: codeStart, to: codeEnd },
-    ]);
+    const r = findEmojiShortcodesInRange(doc, 0, doc.length, [{ from: codeStart, to: codeEnd }]);
     expect(r.map((x) => x.shortcode).sort()).toEqual(["fire", "smile"]);
   });
 

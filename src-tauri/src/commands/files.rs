@@ -37,7 +37,7 @@ const NOISE_NAMES: &[&str] = &[
 ];
 
 pub(crate) fn is_noise(name: &str) -> bool {
-    NOISE_NAMES.iter().any(|n| *n == name)
+    NOISE_NAMES.contains(&name)
 }
 
 /// 是否展示该条目：show_hidden=false 时过滤 NOISE_NAMES 清单与 dotfile
@@ -92,7 +92,7 @@ fn pinyin_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 ///   1. 目录优先于文件
 ///   2. 同优先级内按字符类别分组：数字 → 英文 → 中文 → 其他
 ///   3. 组内排序：数字自然序、英文大小写不敏感字母序、中文拼音序、其他 Unicode 码点序
-fn sort_tree_nodes(nodes: &mut Vec<TreeNode>) {
+fn sort_tree_nodes(nodes: &mut [TreeNode]) {
     nodes.sort_by(|a, b| {
         // 1. 目录优先
         let da = a.node_type == "directory";

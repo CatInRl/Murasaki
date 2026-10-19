@@ -9,11 +9,9 @@ import { lightTheme, type GlobalTheme, type GlobalThemeOverrides } from "naive-u
  */
 
 /** UI 模式字体（来自 --murasaki-font-ui） */
-const FONT_UI =
-  '"Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+const FONT_UI = '"Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
 /** UI 模式等宽字体（来自 --murasaki-font-mono） */
-const FONT_MONO =
-  '"JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace';
+const FONT_MONO = '"JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace';
 
 /** 紫色品牌色板（来自 --murasaki-purple-*） */
 const PURPLE = {
@@ -145,9 +143,7 @@ export function useNaiveTheme(_uiMode?: Ref<unknown>): {
   themeOverrides: Ref<GlobalThemeOverrides>;
 } {
   const theme = computed<GlobalTheme | null>(() => lightTheme);
-  const themeOverrides = computed<GlobalThemeOverrides>(() =>
-    createMurasakiThemeOverrides()
-  );
+  const themeOverrides = computed<GlobalThemeOverrides>(() => createMurasakiThemeOverrides());
 
   return { theme, themeOverrides };
 }

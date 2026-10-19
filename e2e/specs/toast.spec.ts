@@ -29,10 +29,14 @@ describe("吐司系统", () => {
   });
 
   beforeEach(async () => {
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
     // 清空所有吐司
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       if (toast) toast.dismissAll();
     });
@@ -41,7 +45,7 @@ describe("吐司系统", () => {
 
   it("success 变体渲染标题和图标", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       // duration: 0 防止 3s 自动消失导致测试期间 toast 消失
       toast.success("操作成功", { duration: 0 });
@@ -61,7 +65,7 @@ describe("吐司系统", () => {
 
   it("error 变体渲染", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       // duration: 0 防止 3s 自动消失导致测试期间 toast 消失
       toast.error("操作失败", { duration: 0 });
@@ -76,7 +80,7 @@ describe("吐司系统", () => {
 
   it("progress 变体显示进度条", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       toast.progress("加载中", { progress: 50 });
     });
@@ -92,7 +96,7 @@ describe("吐司系统", () => {
 
   it("description 副标题渲染", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       // duration: 0 防止 3s 自动消失导致测试期间 toast 消失
       toast.info("提示", { description: "详细说明文字", duration: 0 });
@@ -104,7 +108,7 @@ describe("吐司系统", () => {
 
   it("点击关闭按钮 dismiss 吐司", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       // duration: 0 防止自动消失
       toast.warning("警告", { duration: 0 });
@@ -118,27 +122,29 @@ describe("吐司系统", () => {
     await closeBtn.click();
 
     // 等待 toast 从 store 中移除（Vue transition 可能使 DOM 元素延迟消失）
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("toast").toasts.length === 0;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
+          return window.__pinia__._s.get("toast").toasts.length === 0;
+        });
+      },
+      { timeout: 5000 }
+    );
   });
 
   it("action 按钮触发回调并关闭吐司", async () => {
-    let actionCalled = false;
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__testActionCalled = false;
       toast.success("已删除", {
         duration: 0,
         action: {
           label: "撤销",
           onClick: () => {
-            // @ts-ignore
+            // @ts-ignore: E2E 运行时注入，类型不可静态推导
             window.__testActionCalled = true;
           },
         },
@@ -152,16 +158,19 @@ describe("吐司系统", () => {
     await actionBtn.click();
 
     // 等待 toast 从 store 中移除
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("toast").toasts.length === 0;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
+          return window.__pinia__._s.get("toast").toasts.length === 0;
+        });
+      },
+      { timeout: 5000 }
+    );
 
     // action 应被调用
     const called = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__testActionCalled;
     });
     expect(called).toBe(true);
@@ -169,7 +178,7 @@ describe("吐司系统", () => {
 
   it("dismissAll 清空所有吐司", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       toast.success("A", { duration: 0 });
       toast.info("B", { duration: 0 });
@@ -177,34 +186,40 @@ describe("吐司系统", () => {
     });
 
     // 等待 3 条吐司渲染（store 中应有 3 条）
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("toast").toasts.length === 3;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
+          return window.__pinia__._s.get("toast").toasts.length === 3;
+        });
+      },
+      { timeout: 5000 }
+    );
     // 等待 DOM 渲染
     await browser.pause(200);
 
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       toast.dismissAll();
     });
 
     // 检查 store（source of truth）而非 DOM：transition-group 的 leave 动画
     // 可能在 timeout 窗口内仍保留 DOM 元素
-    await browser.waitUntil(async () => {
-      return await browser.execute(() => {
-        // @ts-ignore
-        return window.__pinia__._s.get("toast").toasts.length === 0;
-      });
-    }, { timeout: 5000 });
+    await browser.waitUntil(
+      async () => {
+        return await browser.execute(() => {
+          // @ts-ignore: E2E 运行时注入，类型不可静态推导
+          return window.__pinia__._s.get("toast").toasts.length === 0;
+        });
+      },
+      { timeout: 5000 }
+    );
   });
 
   it("success 变体 3 秒后自动消失", async () => {
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       toast.success("自动消失");
     });
@@ -223,7 +238,7 @@ describe("吐司系统", () => {
     while (Date.now() - start < 8000) {
       await browser.pause(500);
       const count = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return window.__pinia__._s.get("toast").toasts.length;
       });
       if (count === 0) {

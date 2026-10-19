@@ -30,7 +30,7 @@ fn rejects_non_utf8_file_with_io_error() {
         .expect_err("invalid UTF-8 must fail");
     assert_eq!(err.code, ErrorCode::Io, "错误码应保持为 io: {err:?}");
     assert!(
-        err.params.get("path").is_some(),
+        err.params.contains_key("path"),
         "错误应带上出错路径，便于前端提示: {err:?}"
     );
 }

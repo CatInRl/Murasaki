@@ -120,9 +120,7 @@ export function buildEditorShortcutExtension(
   overrides: ShortcutOverrides,
   options: { isMarkdown?: () => boolean } = {}
 ): Extension {
-  const bindings: KeyBinding[] = [
-    { key: "Enter", run: (v) => handleEnterInBlockquote(v) },
-  ];
+  const bindings: KeyBinding[] = [{ key: "Enter", run: (v) => handleEnterInBlockquote(v) }];
   for (const cmd of SHORTCUT_COMMANDS) {
     if (cmd.scope !== "editor") continue;
     const binding = resolveShortcut(overrides, cmd.id);
@@ -146,9 +144,7 @@ export function useShortcuts() {
   const persistence = usePersistenceStore();
 
   /** 快捷键覆盖表（响应式，设置保存后自动更新） */
-  const overrides = computed<ShortcutOverrides>(
-    () => persistence.settings.shortcuts ?? {}
-  );
+  const overrides = computed<ShortcutOverrides>(() => persistence.settings.shortcuts ?? {});
 
   /** 所有命令的有效绑定（id → 规范快捷键或 null） */
   const effective = computed(() => effectiveShortcuts(overrides.value));

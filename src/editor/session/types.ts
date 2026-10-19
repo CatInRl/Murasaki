@@ -35,13 +35,9 @@ export interface SessionSnapshot {
   pendingConflict: ConflictInfo | null;
 }
 
-export type OpenResult =
-  | { kind: "ready" }
-  | { kind: "conflict"; conflict: ConflictInfo };
+export type OpenResult = { kind: "ready" } | { kind: "conflict"; conflict: ConflictInfo };
 
-export type SaveResult =
-  | { kind: "saved"; mtime: number }
-  | { kind: "failed"; error: unknown };
+export type SaveResult = { kind: "saved"; mtime: number } | { kind: "failed"; error: unknown };
 
 export interface DraftSnapshot {
   content: string;

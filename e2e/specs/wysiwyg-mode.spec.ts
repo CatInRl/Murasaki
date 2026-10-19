@@ -14,7 +14,14 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
+import {
+  openWorkspace,
+  closeWorkspace,
+  openFileInTab,
+  closeAllTabs,
+  waitForPinia,
+  resetPersistenceSettings,
+} from "../helpers/store";
 import { isRendered, waitForPresent, waitForInBrowser } from "../helpers/wait";
 
 let browser: Browser;
@@ -33,8 +40,16 @@ describe("WYSIWYG 模式切换", () => {
     // 重置持久化设置：前序 spec 可能把 editorMode 持久化为 wysiwyg/source，
     // 若不重置，本 spec 的「默认 split 模式」前提不成立（实测读到 mode-wysiwyg）
     await resetPersistenceSettings(browser);
-    try { await closeAllTabs(browser); } catch { /* ignore */ }
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await closeAllTabs(browser);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
   });
 
   it("默认 split 模式显示预览区", async () => {
@@ -62,7 +77,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // 切换到 source 模式
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
       editorBridge.setEditorMode("source");
@@ -86,7 +101,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // 切换到 wysiwyg 模式
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
       editorBridge.setEditorMode("wysiwyg");
@@ -115,7 +130,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // 切换到 source 模式
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       editorBridge.setEditorMode("source");
     });
@@ -124,7 +139,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // 切换到 wysiwyg 模式
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       editorBridge.setEditorMode("wysiwyg");
     });
@@ -134,15 +149,13 @@ describe("WYSIWYG 模式切换", () => {
 
   it("wysiwyg 模式下标题标记被隐藏", async () => {
     // 准备含标题 + 正文两段的 markdown（光标需移到标题段之外才能触发 hide）
-    const wsPath = resetWorkspace([
-      { path: "heading.md", content: "# 大标题\n\n正文内容\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "heading.md", content: "# 大标题\n\n正文内容\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\heading.md`);
 
     // 先切到 source 模式，确认 # 标记可见
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       editorBridge.setEditorMode("source");
     });
@@ -150,7 +163,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // 切到 wysiwyg 模式
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       editorBridge.setEditorMode("wysiwyg");
     });
@@ -159,7 +172,7 @@ describe("WYSIWYG 模式切换", () => {
     // 移动光标到正文段（position 7 = "正"之前），使标题段脱离光标所在段落
     // "# 大标题\n\n正文内容\n" 中 position 7 是 "正"
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
       const view = editorBridge.editorView;
@@ -176,7 +189,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // 诊断：检查 editorView 状态和装饰
     const diag = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
       const view = editorBridge.editorView;
@@ -212,7 +225,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // 切到 wysiwyg 模式
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       editorBridge.setEditorMode("wysiwyg");
     });
@@ -221,7 +234,7 @@ describe("WYSIWYG 模式切换", () => {
     // 移动光标到正文段（position 22 = "正"之前），使列表段脱离光标所在段落
     // "- 项目一\n- 项目二\n- 项目三\n\n" = 22 chars
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
       const view = editorBridge.editorView;
@@ -250,7 +263,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // source
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       editorBridge.setEditorMode("source");
     });
@@ -259,7 +272,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // wysiwyg
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       editorBridge.setEditorMode("wysiwyg");
     });
@@ -268,7 +281,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // split
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const editorBridge = window.__pinia__._s.get("editorBridge");
       editorBridge.setEditorMode("split");
     });
@@ -284,7 +297,7 @@ describe("WYSIWYG 模式切换", () => {
     // 先切到 wysiwyg（在任何预览渲染之前）：此时 mermaid 只能由 WYSIWYG 侧首次初始化，
     // 专门覆盖「WYSIWYG 先渲染会掉回 Mermaid 默认主题」这一隐式副作用（issue #295）。
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__pinia__._s.get("editorBridge").setEditorMode("wysiwyg");
     });
     await browser.pause(200);
@@ -301,7 +314,7 @@ describe("WYSIWYG 模式切换", () => {
 
     // 光标移到正文（脱离 mermaid 段落）→ 该块被替换为 MermaidWidget
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__pinia__._s.get("editorBridge").editorView;
       if (view) {
         const pos = view.state.doc.toString().indexOf("正文");

@@ -123,7 +123,7 @@ fn push_unique(list: &RwLock<Vec<String>>, value: String) {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
     };
-    if !guard.iter().any(|item| *item == value) {
+    if !guard.contains(&value) {
         guard.push(value);
     }
 }
@@ -318,7 +318,7 @@ mod tests {
         policy.allow_root(&root);
 
         assert!(!policy.can_read(&sibling.join("x.md")));
-        let err = policy.ensure_read(&sibling.join("x.md")).unwrap_err();
+        let err = policy.ensure_read(sibling.join("x.md")).unwrap_err();
         assert_eq!(err.code, ErrorCode::OutsideWorkspace);
 
         let _ = std::fs::remove_dir_all(&root);

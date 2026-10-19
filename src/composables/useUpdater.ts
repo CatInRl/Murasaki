@@ -23,10 +23,7 @@ export interface UpdaterToast {
   /** 显示 indeterminate 进度 toast（duration=0 表示不自动消失），返回 toast id */
   progress(title: string, opts?: { duration?: number; progress?: number }): string;
   /** 更新已有 toast 的标题 / 进度 / duration */
-  update(
-    id: string,
-    patch: { title?: string; progress?: number; duration?: number }
-  ): void;
+  update(id: string, patch: { title?: string; progress?: number; duration?: number }): void;
   /** 关闭指定 toast */
   dismiss(id: string): void;
 }
@@ -131,9 +128,8 @@ export function useUpdater(deps: UpdaterDeps) {
           total = event.data.contentLength;
         } else if (event.event === "Progress") {
           downloaded += event.data.chunkLength;
-          const pct = total && total > 0
-            ? Math.min(100, Math.round((downloaded / total) * 100))
-            : 0;
+          const pct =
+            total && total > 0 ? Math.min(100, Math.round((downloaded / total) * 100)) : 0;
           toast.update(toastId, {
             title: total
               ? t("editor.update.downloadingProgress", { percent: pct })

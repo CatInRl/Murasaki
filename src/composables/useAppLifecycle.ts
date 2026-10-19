@@ -171,34 +171,31 @@ export function useAppLifecycle(deps: AppLifecycleDeps) {
     // 新窗口的路径统一走 `take_pending_open_path` 拉取模型（spec #194 决策 ①/④），
     // 推送事件在「窗口还没到家」时必然丢失，保留只会留下误导性的单窗口语义。
 
-    const unlistenSettingsSaved = await listen<unknown>(
-      "settings://saved",
-      async () => {
-        await persistence.loadSettings();
-        // 同步阅读字体预设（--murasaki-font-reading）
-        applyReadingFontPreset(persistence.settings.editorFontPreset);
-        // 同步主题（currentTheme 不在 watch 监听内，需手动同步）
-        if (persistence.settings.markdownTheme) {
-          currentTheme.value = persistence.settings.markdownTheme;
-          // 显式同步原生菜单勾选状态：设置窗口可能修改了 markdownTheme，
-          // 若新值与旧值相同 watch 不会触发，故在此补一次保证菜单勾选正确
-          void invoke("set_theme_checked", {
-            themeId: "theme-" + persistence.settings.markdownTheme,
-          });
-        }
-        // 同步界面语言：前端 i18n + Rust 原生菜单（ADR-0013）
-        // 始终调用，即使值未变也保证前端与 Rust 状态一致
-        setLocale(persistence.settings.language);
-        void invoke("reload_menu", { lang: persistence.settings.language });
-        // 显示模式菜单勾选不再此处补推（issue #381）：reload_menu 重建菜单时
-        // build_app_menu 会按活动窗口的 WindowUiState 恢复勾选，而该状态已由
-        // useModeMenuSync 随生效模式维护；前端按偏好值补推反而会写错勾选
-        // 同步快捷键覆盖到原生菜单（菜单项右侧快捷键提示跟随用户自定义）
-        void invoke("update_shortcut_labels", {
-          overrides: toMenuAccelerators(persistence.settings.shortcuts ?? {}),
+    const unlistenSettingsSaved = await listen<unknown>("settings://saved", async () => {
+      await persistence.loadSettings();
+      // 同步阅读字体预设（--murasaki-font-reading）
+      applyReadingFontPreset(persistence.settings.editorFontPreset);
+      // 同步主题（currentTheme 不在 watch 监听内，需手动同步）
+      if (persistence.settings.markdownTheme) {
+        currentTheme.value = persistence.settings.markdownTheme;
+        // 显式同步原生菜单勾选状态：设置窗口可能修改了 markdownTheme，
+        // 若新值与旧值相同 watch 不会触发，故在此补一次保证菜单勾选正确
+        void invoke("set_theme_checked", {
+          themeId: "theme-" + persistence.settings.markdownTheme,
         });
       }
-    );
+      // 同步界面语言：前端 i18n + Rust 原生菜单（ADR-0013）
+      // 始终调用，即使值未变也保证前端与 Rust 状态一致
+      setLocale(persistence.settings.language);
+      void invoke("reload_menu", { lang: persistence.settings.language });
+      // 显示模式菜单勾选不再此处补推（issue #381）：reload_menu 重建菜单时
+      // build_app_menu 会按活动窗口的 WindowUiState 恢复勾选，而该状态已由
+      // useModeMenuSync 随生效模式维护；前端按偏好值补推反而会写错勾选
+      // 同步快捷键覆盖到原生菜单（菜单项右侧快捷键提示跟随用户自定义）
+      void invoke("update_shortcut_labels", {
+        overrides: toMenuAccelerators(persistence.settings.shortcuts ?? {}),
+      });
+    });
 
     const unlistenNavigate = await getCurrentWebviewWindow().listen<string>("navigate", (event) => {
       settingsVisible.value = event.payload === "settings";

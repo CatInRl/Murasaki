@@ -25,10 +25,7 @@ function treeOf(doc: string): Tree {
   return t;
 }
 
-function compute(
-  doc: string,
-  head: number
-): ComputedDeco[] {
+function compute(doc: string, head: number): ComputedDeco[] {
   return computeDecorations({
     doc,
     selectionHead: head,
@@ -230,9 +227,7 @@ describe("computeDecorations — 引用块", () => {
     const doc = "> quote\n\nbody";
     const d = compute(doc, 10);
     expect(marks(d).some((m) => m.markType === "QuoteMark" && m.kind === "hide")).toBe(true);
-    expect(
-      renders(d).some((r) => r.cssClass === "murasaki-wysiwyg-blockquote")
-    ).toBe(true);
+    expect(renders(d).some((r) => r.cssClass === "murasaki-wysiwyg-blockquote")).toBe(true);
   });
 
   it("> quote 光标在段内 → QuoteMark dim", () => {
@@ -275,9 +270,7 @@ describe("computeDecorations — 列表", () => {
   it("- [ ] 任务列表项 → TaskMarker 隐藏（光标离开）", () => {
     const doc = "- [ ] item\n\nbody";
     const d = compute(doc, 12);
-    expect(
-      marks(d).some((m) => m.markType === "TaskMarker" && m.kind === "hide")
-    ).toBe(true);
+    expect(marks(d).some((m) => m.markType === "TaskMarker" && m.kind === "hide")).toBe(true);
   });
 });
 
@@ -292,9 +285,7 @@ describe("computeDecorations — 分隔线", () => {
 
   it("--- 光标在段内 → dim（不替换）", () => {
     const d = compute("---", 1);
-    expect(
-      marks(d).some((m) => m.markType === "HorizontalRule" && m.kind === "dim")
-    ).toBe(true);
+    expect(marks(d).some((m) => m.markType === "HorizontalRule" && m.kind === "dim")).toBe(true);
     expect(replaces(d).some((r) => r.widget === "hr")).toBe(false);
   });
 });
@@ -377,28 +368,20 @@ describe("computeDecorations — 代码块 widget (T7.2)", () => {
 
   it("光标进入 plantuml/katex 围栏 → 生成 diagramPreview；普通语言不生成", () => {
     const d1 = compute("```plantuml\nA->B\n```\n\nbody", 12);
-    expect(
-      blockWidgets(d1).filter((w) => w.widget === "diagramPreview")
-    ).toHaveLength(1);
+    expect(blockWidgets(d1).filter((w) => w.widget === "diagramPreview")).toHaveLength(1);
 
     const d2 = compute("```katex\nx^2\n```\n\nbody", 9);
-    expect(
-      blockWidgets(d2).filter((w) => w.widget === "diagramPreview")
-    ).toHaveLength(1);
+    expect(blockWidgets(d2).filter((w) => w.widget === "diagramPreview")).toHaveLength(1);
 
     // 普通 js 代码块：光标在内 → 无 preview
     const d3 = compute("```js\nconst x=1\n```\n\nbody", 13);
-    expect(
-      blockWidgets(d3).filter((w) => w.widget === "diagramPreview")
-    ).toHaveLength(0);
+    expect(blockWidgets(d3).filter((w) => w.widget === "diagramPreview")).toHaveLength(0);
   });
 
   it("光标离开 mermaid 围栏 → 不生成 diagramPreview", () => {
     const doc = "```mermaid\ngraph LR\nA-->B\n```\n\nbody";
     const d = compute(doc, 40); // 光标在 body
-    expect(
-      blockWidgets(d).filter((w) => w.widget === "diagramPreview")
-    ).toHaveLength(0);
+    expect(blockWidgets(d).filter((w) => w.widget === "diagramPreview")).toHaveLength(0);
   });
 
   it("无语言围栏代码块 → codeBlock widget lang 为空", () => {

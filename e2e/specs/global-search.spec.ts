@@ -25,7 +25,6 @@ import {
   resetPersistenceSettings,
 } from "../helpers/store";
 import { textOfElement, waitForPresent } from "../helpers/wait";
-import { resolve } from "node:path";
 
 let browser: Browser;
 let wsPath: string;
@@ -36,31 +35,33 @@ async function pressShortcut(
   key: string,
   opts: { ctrl?: boolean; shift?: boolean; alt?: boolean; meta?: boolean } = {}
 ): Promise<void> {
-  await browser.execute((k: string, c: boolean, s: boolean, a: boolean, m: boolean) => {
-    const ev = new KeyboardEvent("keydown", {
-      key: k,
-      bubbles: true,
-      cancelable: true,
-      ctrlKey: c,
-      shiftKey: s,
-      altKey: a,
-      metaKey: m,
-    });
-    window.dispatchEvent(ev);
-  }, key, !!opts.ctrl, !!opts.shift, !!opts.alt, !!opts.meta);
+  await browser.execute(
+    (k: string, c: boolean, s: boolean, a: boolean, m: boolean) => {
+      const ev = new KeyboardEvent("keydown", {
+        key: k,
+        bubbles: true,
+        cancelable: true,
+        ctrlKey: c,
+        shiftKey: s,
+        altKey: a,
+        metaKey: m,
+      });
+      window.dispatchEvent(ev);
+    },
+    key,
+    !!opts.ctrl,
+    !!opts.shift,
+    !!opts.alt,
+    !!opts.meta
+  );
 }
 
 /** 在搜索条输入框上触发按键（回车 / Esc 等由 onInputKeydown 处理） */
-async function pressOnInput(
-  browser: Browser,
-  key: string
-): Promise<void> {
+async function pressOnInput(browser: Browser, key: string): Promise<void> {
   await browser.execute((k: string) => {
     const input = document.querySelector<HTMLInputElement>(".gsb__input input");
     if (!input) throw new Error("搜索条输入框未找到");
-    input.dispatchEvent(
-      new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true })
-    );
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
   }, key);
 }
 
@@ -73,7 +74,7 @@ async function waitForSearchVisible(
   await browser.waitUntil(
     async () => {
       const v = await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return window.__pinia__._s.get("search")?.visible ?? false;
       });
       return v === visible;
@@ -159,9 +160,7 @@ describe("统一搜索条主链路", () => {
     const texts = await items.map((i) => textOfElement(browser, i));
     // 条目渲染为「图标字形 + 文件名分段」多行文本（实测形如 "M\nnotes\n.md"），
     // 直接 includes("notes.md") 会被换行卡住，故先去掉所有空白再比对
-    expect(
-      texts.some((t) => t.replace(/\s/g, "").includes("notes.md"))
-    ).toBe(true);
+    expect(texts.some((t) => t.replace(/\s/g, "").includes("notes.md"))).toBe(true);
 
     // 回车打开首项
     await pressOnInput(browser, "Enter");
@@ -170,7 +169,7 @@ describe("统一搜索条主链路", () => {
     // 搜索条关闭 + 目标文件已在 tab 打开
     await waitForSearchVisible(browser, false);
     const tabsState = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       return {
         count: tabs.tabs.length,

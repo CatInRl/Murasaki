@@ -400,7 +400,7 @@ fn scan_workspace(
             .map(|meta| meta.len() > MAX_SEARCH_FILE_BYTES)
             .unwrap_or(false);
         if too_large {
-            if scanned % PROGRESS_EMIT_INTERVAL == 0 || idx + 1 == md_files.len() {
+            if scanned.is_multiple_of(PROGRESS_EMIT_INTERVAL) || idx + 1 == md_files.len() {
                 on_progress(
                     scanned,
                     total_files,
@@ -416,7 +416,7 @@ fn scan_workspace(
             Ok(c) => c,
             Err(_) => {
                 // 即便读取失败也推送进度
-                if scanned % PROGRESS_EMIT_INTERVAL == 0 || idx + 1 == md_files.len() {
+                if scanned.is_multiple_of(PROGRESS_EMIT_INTERVAL) || idx + 1 == md_files.len() {
                     on_progress(
                         scanned,
                         total_files,
@@ -464,7 +464,7 @@ fn scan_workspace(
         }
 
         // 推送进度（每 PROGRESS_EMIT_INTERVAL 个文件一次 + 最后一次）
-        if scanned % PROGRESS_EMIT_INTERVAL == 0 || idx + 1 == md_files.len() {
+        if scanned.is_multiple_of(PROGRESS_EMIT_INTERVAL) || idx + 1 == md_files.len() {
             on_progress(
                 scanned,
                 total_files,

@@ -10,7 +10,17 @@
  * 通过 onCommit(nextSource) 一次性写回整表。这避免每次击键重建 widget
  * 导致失焦与颤动。
  */
-import { TableModel, CellAlign, parseTable, reflowTable, addColumn, removeColumn, addRow, removeRow, setAlignment } from "./tableReflow";
+import {
+  TableModel,
+  CellAlign,
+  parseTable,
+  reflowTable,
+  addColumn,
+  removeColumn,
+  addRow,
+  removeRow,
+  setAlignment,
+} from "./tableReflow";
 
 /**
  * 提交回调：把新的 markdown 表格源码交回宿主（wysiwygPlugin 通过事件 → SourceEditor dispatch）。
@@ -75,8 +85,12 @@ export class TableEditor {
       });
       return b;
     };
-    wrapper.appendChild(mkCap("锚点格右侧插列", "murasaki-table-edge-cap-right", () => this.addColumnAfterAnchor()));
-    wrapper.appendChild(mkCap("锚点格下方插行", "murasaki-table-edge-cap-bottom", () => this.addRowAfterAnchor()));
+    wrapper.appendChild(
+      mkCap("锚点格右侧插列", "murasaki-table-edge-cap-right", () => this.addColumnAfterAnchor())
+    );
+    wrapper.appendChild(
+      mkCap("锚点格下方插行", "murasaki-table-edge-cap-bottom", () => this.addRowAfterAnchor())
+    );
   }
 
   /** 用当前 model 重建 <table> 内部结构（含 th/td、对齐样式、事件绑定）。 */
@@ -197,7 +211,9 @@ export class TableEditor {
         // 本次失焦提交交由发起重建的结构化操作自身完成，这里不应再提交——
         // 否则每次结构化操作都会因重建 detach 而级联触发多次重复提交（多表格下重复写回）。
         if (!this.table.isConnected) return;
-        const cellEls = Array.from(this.table.querySelectorAll("[data-row]")) as HTMLTableCellElement[];
+        const cellEls = Array.from(
+          this.table.querySelectorAll("[data-row]")
+        ) as HTMLTableCellElement[];
         if (cellEls.some((c) => c === cell.ownerDocument.activeElement)) return;
         if (this.anchor && this.anchor.row === row && this.anchor.col === col) {
           // 失焦离开表格：提交时不带锚点（stay=false），宿主写回后不会再把焦点拉回，
@@ -211,20 +227,36 @@ export class TableEditor {
 
   /** 定位单元格 DOM（th/td 通用）。 */
   private cellAt(row: number, col: number): HTMLTableCellElement | null {
-    return this.table.querySelector(`[data-row="${row}"][data-col="${col}"]`) as HTMLTableCellElement | null;
+    return this.table.querySelector(
+      `[data-row="${row}"][data-col="${col}"]`
+    ) as HTMLTableCellElement | null;
   }
 
   /** 清除锚点高亮。 */
   private clearAnchor(): void {
-    this.table.querySelectorAll(".murasaki-anchor-cell").forEach((c) => c.classList.remove("murasaki-anchor-cell"));
+    this.table
+      .querySelectorAll(".murasaki-anchor-cell")
+      .forEach((c) => c.classList.remove("murasaki-anchor-cell"));
   }
   private moveAnchor(nextCol: number, row: number): void {
     const cols = this.model.align.length;
     const rows = this.model.cells.length;
     let r = row;
     let c = nextCol;
-    if (c < 0) { c = cols - 1; if (r > 0) r--; else { c = cols - 1; } }
-    if (c >= cols) { c = 0; if (r < rows - 1) r++; else { c = 0; } }
+    if (c < 0) {
+      c = cols - 1;
+      if (r > 0) r--;
+      else {
+        c = cols - 1;
+      }
+    }
+    if (c >= cols) {
+      c = 0;
+      if (r < rows - 1) r++;
+      else {
+        c = 0;
+      }
+    }
     const cell = this.cellAt(r, c);
     if (cell) {
       cell.focus();
@@ -243,11 +275,16 @@ export class TableEditor {
   /** 方向键 → [行偏移, 列偏移]。 */
   private arrowDelta(key: string): readonly [number, number] | null {
     switch (key) {
-      case "ArrowLeft": return [0, -1];
-      case "ArrowRight": return [0, 1];
-      case "ArrowUp": return [-1, 0];
-      case "ArrowDown": return [1, 0];
-      default: return null;
+      case "ArrowLeft":
+        return [0, -1];
+      case "ArrowRight":
+        return [0, 1];
+      case "ArrowUp":
+        return [-1, 0];
+      case "ArrowDown":
+        return [1, 0];
+      default:
+        return null;
     }
   }
 
@@ -266,16 +303,24 @@ export class TableEditor {
     const before = chars.slice(0, idx);
     const after = chars.slice(idx);
     switch (key) {
-      case "ArrowLeft": return before === "";
-      case "ArrowRight": return after === "";
-      case "ArrowUp": return before === ""; // 在首行行首才跨到上一格
-      case "ArrowDown": return after === ""; // 在末行行尾才跨到下一格
-      default: return false;
+      case "ArrowLeft":
+        return before === "";
+      case "ArrowRight":
+        return after === "";
+      case "ArrowUp":
+        return before === ""; // 在首行行首才跨到上一格
+      case "ArrowDown":
+        return after === ""; // 在末行行尾才跨到下一格
+      default:
+        return false;
     }
   }
 
   /** 把单元格 DOM 拍平为字符序列（文本节点按原样、<br> → \n），供光标边界计算。 */
-  private flattenCell(cell: HTMLTableCellElement): { nodes: (Text | HTMLBRElement)[]; chars: string } {
+  private flattenCell(cell: HTMLTableCellElement): {
+    nodes: (Text | HTMLBRElement)[];
+    chars: string;
+  } {
     const nodes: (Text | HTMLBRElement)[] = [];
     let chars = "";
     const walk = (node: Node): void => {

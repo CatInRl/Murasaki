@@ -19,8 +19,8 @@ export function useModeMenuSync(mode: Ref<EditorMode>): void {
   watch(
     mode,
     (m) => {
-      void invoke("set_mode_checked", { modeId: "mode-" + m }).catch(
-        (err: unknown) => console.warn("同步显示模式菜单勾选失败:", err)
+      void invoke("set_mode_checked", { modeId: "mode-" + m }).catch((err: unknown) =>
+        console.warn("同步显示模式菜单勾选失败:", err)
       );
     },
     { immediate: true }

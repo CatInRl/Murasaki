@@ -44,11 +44,7 @@ function killStaleDriver(): void {
 }
 
 /** 轮询等待端口可连 */
-async function waitForPort(
-  port: number,
-  host = "127.0.0.1",
-  timeout = 30000
-): Promise<void> {
+async function waitForPort(port: number, host = "127.0.0.1", timeout = 30000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const ok = await new Promise<boolean>((res) => {
@@ -78,12 +74,7 @@ function findDriverPath(): string {
   if (process.env.TAURI_DRIVER_PATH) return process.env.TAURI_DRIVER_PATH;
   const home = IS_WINDOWS ? process.env.USERPROFILE : process.env.HOME;
   if (home) {
-    const p = join(
-      home,
-      ".cargo",
-      "bin",
-      IS_WINDOWS ? "tauri-driver.exe" : "tauri-driver"
-    );
+    const p = join(home, ".cargo", "bin", IS_WINDOWS ? "tauri-driver.exe" : "tauri-driver");
     if (existsSync(p)) return p;
   }
   // Windows 上 spawn 不查 PATH，返回裸名让系统查找；POSIX 上 spawn 会查 PATH
@@ -133,9 +124,7 @@ async function isPortListening(port: number, host = "127.0.0.1"): Promise<boolea
 function appDataDir(): string | null {
   if (IS_WINDOWS) return process.env.APPDATA ?? null;
   if (process.platform === "darwin") {
-    return process.env.HOME
-      ? join(process.env.HOME, "Library", "Application Support")
-      : null;
+    return process.env.HOME ? join(process.env.HOME, "Library", "Application Support") : null;
   }
   if (process.env.XDG_DATA_HOME) return process.env.XDG_DATA_HOME;
   return process.env.HOME ? join(process.env.HOME, ".local", "share") : null;
@@ -198,9 +187,7 @@ export default async function setup(): Promise<void | (() => Promise<void>)> {
   //    应用内嵌的 WebDriver 服务端（仅 debug 构建注册）由 driver.ts 的 createSession
   //    spawn 应用时自动启动，本文件无需启动任何 driver。
   if (IS_MACOS) {
-    console.log(
-      "[e2e] macOS：跳过 tauri-driver，应用内嵌 WebDriver 服务端由 driver.ts 管理"
-    );
+    console.log("[e2e] macOS：跳过 tauri-driver，应用内嵌 WebDriver 服务端由 driver.ts 管理");
     return async () => {
       // 正常情况下 closeSession 已按 session 生命周期杀掉应用，这里只兜底清理残留
       killProcessesByName("murasaki");
@@ -249,12 +236,10 @@ export default async function setup(): Promise<void | (() => Promise<void>)> {
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env },
     detached: true,
-    shell: false
+    shell: false,
   });
 
-  driverProcess.stdout?.on("data", (d: Buffer) =>
-    process.stdout.write(`[driver] ${d.toString()}`)
-  );
+  driverProcess.stdout?.on("data", (d: Buffer) => process.stdout.write(`[driver] ${d.toString()}`));
   driverProcess.stderr?.on("data", (d: Buffer) =>
     process.stderr.write(`[driver!] ${d.toString()}`)
   );
@@ -281,7 +266,11 @@ export default async function setup(): Promise<void | (() => Promise<void>)> {
         // detached 进程需要 process.kill 而非 driverProcess.kill
         process.kill(-driverProcess.pid!);
       } catch {
-        try { driverProcess.kill(); } catch { /* ignore */ }
+        try {
+          driverProcess.kill();
+        } catch {
+          /* ignore */
+        }
       }
       driverProcess = null;
     }

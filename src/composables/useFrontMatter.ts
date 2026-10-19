@@ -13,10 +13,7 @@
 
 /** 转义 HTML 特殊字符 */
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**
@@ -25,9 +22,7 @@ function escapeHtml(s: string): string {
  */
 export function formatDate(value: string): string {
   // ISO 日期 YYYY-MM-DD 或 YYYY-MM-DDTHH:mm:ss
-  const match = value.match(
-    /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/
-  );
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
   if (!match) return value;
   const [, y, m, d, hh, mm] = match;
   const date = new Date(
@@ -93,17 +88,13 @@ export function renderFrontMatterCard(frontMatter: string): string {
       parts.push(
         `<div class="fm-row"><span class="fm-key">${escapeHtml(
           f.key
-        )}</span><span class="fm-value fm-date">${escapeHtml(
-          formatted
-        )}</span></div>`
+        )}</span><span class="fm-value fm-date">${escapeHtml(formatted)}</span></div>`
       );
     } else {
       parts.push(
         `<div class="fm-row"><span class="fm-key">${escapeHtml(
           f.key
-        )}</span><span class="fm-value">${escapeHtml(
-          f.value
-        )}</span></div>`
+        )}</span><span class="fm-value">${escapeHtml(f.value)}</span></div>`
       );
     }
   }

@@ -192,7 +192,7 @@ pub fn read_image_base64(source_path: String) -> Result<String, CommandError> {
 /// 一个用途保留极小的内置实现，避免为单点功能重新引入运行期依赖。
 fn base64_encode(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let n = ((chunk[0] as u32) << 16)
             | ((*chunk.get(1).unwrap_or(&0) as u32) << 8)

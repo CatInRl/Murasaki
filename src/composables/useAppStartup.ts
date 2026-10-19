@@ -153,8 +153,8 @@ async function runStartup(
   Promise.resolve(deps.i18n.reloadMenu(effectiveLanguage)).catch((err: unknown) =>
     console.warn("初始化菜单语言失败:", err)
   );
-  Promise.resolve(deps.i18n.updateShortcutLabels(settings.shortcuts ?? {})).catch(
-    (err: unknown) => console.warn("初始化菜单快捷键失败:", err)
+  Promise.resolve(deps.i18n.updateShortcutLabels(settings.shortcuts ?? {})).catch((err: unknown) =>
+    console.warn("初始化菜单快捷键失败:", err)
   );
 
   deps.sidebar.setView(settings.sidebarView);

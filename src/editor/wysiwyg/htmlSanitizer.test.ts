@@ -86,7 +86,7 @@ describe("sanitizeInlineHtml — XSS 净化", () => {
     expect(out).toContain("<p>safe</p>");
   });
 
-  it("task list 复选框 <input type=\"checkbox\"> 保留（task list 依赖）", () => {
+  it('task list 复选框 <input type="checkbox"> 保留（task list 依赖）', () => {
     const html = `<ul><li><input type="checkbox" checked>task</li></ul>`;
     const out = sanitizeInlineHtml(html);
     expect(out).toContain("<input");
@@ -97,7 +97,7 @@ describe("sanitizeInlineHtml — XSS 净化", () => {
 });
 
 describe("sanitizeInlineHtml — 白名单标签保留", () => {
-  it("<span style=\"color:red\"> 保留 style 属性", () => {
+  it('<span style="color:red"> 保留 style 属性', () => {
     const html = `<span style="color:red">red text</span>`;
     const out = sanitizeInlineHtml(html);
     expect(out).toContain("<span");
@@ -105,7 +105,7 @@ describe("sanitizeInlineHtml — 白名单标签保留", () => {
     expect(out).toContain("red text");
   });
 
-  it("<div class=\"note\"> 保留 class 属性", () => {
+  it('<div class="note"> 保留 class 属性', () => {
     const html = `<div class="note">content</div>`;
     const out = sanitizeInlineHtml(html);
     expect(out).toContain("<div");
@@ -134,28 +134,28 @@ describe("sanitizeInlineHtml — 白名单标签保留", () => {
     expect(out).toContain("<ul><li>item</li></ul>");
   });
 
-  it("<a href=\"https://...\"> 合法外部链接保留", () => {
+  it('<a href="https://..."> 合法外部链接保留', () => {
     const html = `<a href="https://example.com" title="example">link</a>`;
     const out = sanitizeInlineHtml(html);
     expect(out).toContain('href="https://example.com"');
     expect(out).toContain(">link</a>");
   });
 
-  it("<img src=\"https://...\"> 合法图片保留", () => {
+  it('<img src="https://..."> 合法图片保留', () => {
     const html = `<img src="https://example.com/a.png" alt="alt text">`;
     const out = sanitizeInlineHtml(html);
     expect(out).toContain('src="https://example.com/a.png"');
     expect(out).toContain('alt="alt text"');
   });
 
-  it("<img src=\"asset://...\"> Tauri asset 协议图片保留（Linux/macOS 本地图）", () => {
+  it('<img src="asset://..."> Tauri asset 协议图片保留（Linux/macOS 本地图）', () => {
     const html = `<img src="asset://localhost/home/user/pic.png" alt="local">`;
     const out = sanitizeInlineHtml(html);
     expect(out).toContain('src="asset://localhost/home/user/pic.png"');
     expect(out).toContain('alt="local"');
   });
 
-  it("<img src=\"http://asset.localhost/...\"> Windows asset 域名图片保留", () => {
+  it('<img src="http://asset.localhost/..."> Windows asset 域名图片保留', () => {
     const html = `<img src="http://asset.localhost/C%3A%2Fpic.png" alt="local">`;
     const out = sanitizeInlineHtml(html);
     expect(out).toContain('src="http://asset.localhost/C%3A%2Fpic.png"');

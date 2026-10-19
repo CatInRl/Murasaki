@@ -11,11 +11,7 @@
  * - 语言列表与 messages 均来自 locales/registry.ts（单一事实来源，T2）
  */
 import { createI18n } from "vue-i18n";
-import {
-  DEFAULT_LOCALE,
-  SUPPORTED_LOCALES,
-  localeMessages,
-} from "./locales/registry";
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, localeMessages } from "./locales/registry";
 import type { AppLocale } from "./locales/registry";
 
 export type { AppLocale } from "./locales/registry";

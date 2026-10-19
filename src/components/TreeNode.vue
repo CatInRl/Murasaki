@@ -220,7 +220,10 @@ async function onDrop(e: DragEvent): Promise<void> {
     try {
       await fileOps.moveInto(internalPath, targetDir);
     } catch (err) {
-      dialog.alert({ message: t("common.error.moveFailed", { error: formatCommandError(err) }), variant: "error" });
+      dialog.alert({
+        message: t("common.error.moveFailed", { error: formatCommandError(err) }),
+        variant: "error",
+      });
     }
     return;
   }
@@ -234,7 +237,10 @@ async function onDrop(e: DragEvent): Promise<void> {
       try {
         await fileOps.copyInto(externalPath, targetDir);
       } catch (err) {
-        dialog.alert({ message: t("common.error.copyFailed", { error: formatCommandError(err) }), variant: "error" });
+        dialog.alert({
+          message: t("common.error.copyFailed", { error: formatCommandError(err) }),
+          variant: "error",
+        });
       }
     }
   }
@@ -346,7 +352,10 @@ function buildMenuItems(): MenuItem[] {
         try {
           await fileOps.paste(props.node.path);
         } catch (err) {
-          dialog.alert({ message: t("common.error.pasteFailed", { error: formatCommandError(err) }), variant: "error" });
+          dialog.alert({
+            message: t("common.error.pasteFailed", { error: formatCommandError(err) }),
+            variant: "error",
+          });
         }
       },
     });
@@ -360,7 +369,10 @@ function buildMenuItems(): MenuItem[] {
       try {
         await fileOps.copyAbsolutePath(props.node.path);
       } catch (err) {
-        dialog.alert({ message: t("common.error.copyPathFailed", { error: formatCommandError(err) }), variant: "error" });
+        dialog.alert({
+          message: t("common.error.copyPathFailed", { error: formatCommandError(err) }),
+          variant: "error",
+        });
       }
     },
   });
@@ -371,7 +383,10 @@ function buildMenuItems(): MenuItem[] {
       try {
         await fileOps.copyRelativePath(props.node.path);
       } catch (err) {
-        dialog.alert({ message: t("common.error.copyRelativePathFailed", { error: formatCommandError(err) }), variant: "error" });
+        dialog.alert({
+          message: t("common.error.copyRelativePathFailed", { error: formatCommandError(err) }),
+          variant: "error",
+        });
       }
     },
   });
@@ -382,11 +397,19 @@ function buildMenuItems(): MenuItem[] {
     icon: Trash2,
     danger: true,
     action: async () => {
-      if (await dialog.confirm({ message: t("common.deleteConfirm", { name: props.node.name }), danger: true })) {
+      if (
+        await dialog.confirm({
+          message: t("common.deleteConfirm", { name: props.node.name }),
+          danger: true,
+        })
+      ) {
         try {
           await fileOps.deletePath(props.node.path);
         } catch (err) {
-          dialog.alert({ message: t("common.error.deleteFailed", { error: formatCommandError(err) }), variant: "error" });
+          dialog.alert({
+            message: t("common.error.deleteFailed", { error: formatCommandError(err) }),
+            variant: "error",
+          });
         }
       }
     },
@@ -398,7 +421,10 @@ function buildMenuItems(): MenuItem[] {
       try {
         await fileOps.revealInExplorer(props.node.path);
       } catch (err) {
-        dialog.alert({ message: t("common.error.revealFailed", { error: formatCommandError(err) }), variant: "error" });
+        dialog.alert({
+          message: t("common.error.revealFailed", { error: formatCommandError(err) }),
+          variant: "error",
+        });
       }
     },
   });
@@ -416,7 +442,10 @@ async function submitRename(): Promise<void> {
   try {
     await fileOps.renamePath(props.node.path, newName);
   } catch (err) {
-    dialog.alert({ message: t("common.error.renameFailed", { error: formatCommandError(err) }), variant: "error" });
+    dialog.alert({
+      message: t("common.error.renameFailed", { error: formatCommandError(err) }),
+      variant: "error",
+    });
   } finally {
     renaming.value = false;
   }
@@ -445,7 +474,10 @@ async function submitCreating(): Promise<void> {
       fileTreeNav.setExpanded(props.node.path, true);
     }
   } catch (err) {
-    dialog.alert({ message: t("common.error.createFailed", { error: formatCommandError(err) }), variant: "error" });
+    dialog.alert({
+      message: t("common.error.createFailed", { error: formatCommandError(err) }),
+      variant: "error",
+    });
   } finally {
     creating.value = false;
     creatingName.value = "";
@@ -480,7 +512,7 @@ function cancelCreating(): void {
         'wrap-mode': wrapMode,
       }"
       :style="{ paddingLeft: level * 14 + 8 + 'px' }"
-      :draggable="(node.type === 'file') || (node.type === 'directory')"
+      :draggable="node.type === 'file' || node.type === 'directory'"
       @focus="fileTreeNav.setActive(node.path)"
       @keydown="onRowKeydown"
       @click="onClick"
@@ -495,18 +527,30 @@ function cancelCreating(): void {
         v-if="node.type === 'directory'"
         class="node-arrow"
         :class="{ 'is-expanded': expanded }"
-        width="12" height="12" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
       >
-        <polyline points="9 18 15 12 9 6"/>
+        <polyline points="9 18 15 12 9 6" />
       </svg>
       <svg
         v-if="node.type === 'directory'"
         class="node-folder-icon"
-        width="14" height="14" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
       >
-        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
       </svg>
       <!-- 文件：按类型分级图标（markdown=M 徽标 / html=角码 / 文本=文本文件 / 图片=图片 / 其他=通用文件） -->
       <template v-else>
@@ -514,72 +558,104 @@ function cancelCreating(): void {
         <svg
           v-else-if="isHtmlFile(node.name)"
           class="node-file-icon is-html"
-          width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <polyline points="10 12 8 14 10 16"/>
-          <polyline points="14 12 16 14 14 16"/>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <polyline points="10 12 8 14 10 16" />
+          <polyline points="14 12 16 14 14 16" />
         </svg>
         <svg
           v-else-if="isTextFile(node.name)"
           class="node-file-icon is-text"
-          width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
         </svg>
         <svg
           v-else-if="isImageFile(node.name)"
           class="node-file-icon"
-          width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <polyline points="21 15 16 10 5 21" />
         </svg>
         <svg
           v-else
           class="node-file-icon"
-          width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
         </svg>
       </template>
       <span class="node-name" :title="node.name">{{ node.name }}</span>
     </div>
 
     <!-- 重命名输入框（替换节点行） -->
-    <div
-      v-else
-      class="node-row rename-row"
-      :style="{ paddingLeft: level * 14 + 8 + 'px' }"
-    >
+    <div v-else class="node-row rename-row" :style="{ paddingLeft: level * 14 + 8 + 'px' }">
       <svg
         v-if="node.type === 'directory'"
         class="node-arrow"
         :class="{ 'is-expanded': expanded }"
-        width="12" height="12" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
       >
-        <polyline points="9 18 15 12 9 6"/>
+        <polyline points="9 18 15 12 9 6" />
       </svg>
       <span v-if="isMarkdownFile(node.name)" class="md-badge">M</span>
       <svg
         v-else
         class="node-file-icon"
-        width="14" height="14" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
       >
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14 2 14 8 20 8"/>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
       </svg>
       <NInput
         v-model:value="renameValue"
@@ -601,25 +677,41 @@ function cancelCreating(): void {
       <svg
         v-if="creatingType === 'directory'"
         class="node-folder-icon"
-        width="14" height="14" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
       >
-        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
       </svg>
       <svg
         v-else
         class="node-file-icon"
-        width="14" height="14" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
       >
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14 2 14 8 20 8"/>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
       </svg>
       <NInput
         v-model:value="creatingName"
         size="tiny"
         autofocus
-        :placeholder="creatingType === 'file' ? $t('editor.fileTree.newFilePlaceholder') : $t('editor.fileTree.newFolderPlaceholder')"
+        :placeholder="
+          creatingType === 'file'
+            ? $t('editor.fileTree.newFilePlaceholder')
+            : $t('editor.fileTree.newFolderPlaceholder')
+        "
         @keyup.enter="submitCreating"
         @keyup.escape="cancelCreating"
         @blur="submitCreating"
@@ -658,8 +750,9 @@ export default { name: "TreeNode" };
   font-size: 13px;
   color: var(--murasaki-ink-2);
   border-radius: 3px;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .node-row:hover {
   background: var(--murasaki-muted);

@@ -17,9 +17,17 @@ export async function invoke<T = unknown>(
 ): Promise<T> {
   // tauri-driver 通过扩展命令 `tauri:invoke` 调用后端
   // WebDriver 协议走 POST /session/:id/tauri/invoke
-  const result = await browser.sendCommand(`tauri:invoke`, "POST", {
+  // webdriverio 的 Chromium `sendCommand` 类型只有 (cmd, params) 两个参数，
+  // 而 tauri-driver 扩展命令需要额外的 HTTP 方法（"POST"）—— 这里按实际调用收窄类型。
+  const result = await (
+    browser.sendCommand as unknown as (
+      cmd: string,
+      method: string,
+      params: Record<string, unknown>
+    ) => Promise<unknown>
+  )(`tauri:invoke`, "POST", {
     cmd,
-    args
+    args,
   });
   return result as T;
 }

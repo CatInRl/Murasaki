@@ -34,9 +34,8 @@ export function resolvedToken(name: string, seen: Set<string> = new Set()): stri
   let value = raw;
   let guard = 0;
   while (/var\(/.test(value) && guard++ < 20) {
-    value = value.replace(
-      /var\(\s*(--[A-Za-z0-9-]+)\s*\)/g,
-      (_m, ref: string) => resolvedToken(ref, seen)
+    value = value.replace(/var\(\s*(--[A-Za-z0-9-]+)\s*\)/g, (_m, ref: string) =>
+      resolvedToken(ref, seen)
     );
   }
   return value;
@@ -47,7 +46,10 @@ export function resolvedToken(name: string, seen: Set<string> = new Set()): stri
  * 不一致（30 起保留声明原文，旧版按 `, ` 规范化），比较前先抹平这层差异。
  */
 const norm = (value: string): string =>
-  value.trim().toLowerCase().replace(/\s*,\s*/g, ",");
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/\s*,\s*/g, ",");
 
 describe("composables/useNaiveTheme", () => {
   describe("createMurasakiThemeOverrides", () => {
@@ -172,8 +174,7 @@ describe("composables/useNaiveTheme", () => {
     it.each(cases)("%s.%s == theme.css 的 %s 解析值", (field, scope, token) => {
       const overrides = createMurasakiThemeOverrides();
       const bucket = (scope === "common" ? overrides.common : overrides.Popover) as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       expect(bucket).toBeTruthy();
       expect(norm(String(bucket![field]))).toBe(norm(resolvedToken(token)));
     });

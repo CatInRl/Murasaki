@@ -30,11 +30,7 @@ vi.mock("./useWorkspaceStore", () => ({
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useSearchStore, DEFAULT_MAX_RESULTS } from "./useSearchStore";
-import type {
-  SearchProgressEvent,
-  SearchResultChunkEvent,
-  SearchResponse,
-} from "../types";
+import type { SearchProgressEvent, SearchResultChunkEvent, SearchResponse } from "../types";
 
 const mockedInvoke = invoke as unknown as ReturnType<typeof vi.fn>;
 const mockedListen = listen as unknown as ReturnType<typeof vi.fn>;
@@ -105,7 +101,12 @@ describe("useSearchStore", () => {
       const store = useSearchStore();
       store.setQuery("hello");
       store.results = [
-        { filePath: "/a.md", matches: [{ lineNumber: 1, lineContent: "x", contextBefore: [], contextAfter: [], ranges: [] }] },
+        {
+          filePath: "/a.md",
+          matches: [
+            { lineNumber: 1, lineContent: "x", contextBefore: [], contextAfter: [], ranges: [] },
+          ],
+        },
       ];
       store.truncated = true;
       store.cancelToken = "old-token";
@@ -140,10 +141,7 @@ describe("useSearchStore", () => {
         truncated: false,
         cancelled: false,
       });
-      expect(mockedInvoke).not.toHaveBeenCalledWith(
-        "search_workspace",
-        expect.anything()
-      );
+      expect(mockedInvoke).not.toHaveBeenCalledWith("search_workspace", expect.anything());
     });
 
     it("空查询时返回空结果且不调用 invoke search_workspace", async () => {
@@ -158,10 +156,7 @@ describe("useSearchStore", () => {
         truncated: false,
         cancelled: false,
       });
-      expect(mockedInvoke).not.toHaveBeenCalledWith(
-        "search_workspace",
-        expect.anything()
-      );
+      expect(mockedInvoke).not.toHaveBeenCalledWith("search_workspace", expect.anything());
     });
 
     it("正常搜索：调用 search_workspace 传入 cancelToken + maxResults，结果写入 state", async () => {
@@ -170,7 +165,13 @@ describe("useSearchStore", () => {
           {
             filePath: "/test/workspace/a.md",
             matches: [
-              { lineNumber: 3, lineContent: "hello world", contextBefore: [], contextAfter: [], ranges: [] },
+              {
+                lineNumber: 3,
+                lineContent: "hello world",
+                contextBefore: [],
+                contextAfter: [],
+                ranges: [],
+              },
             ],
           },
         ],
@@ -254,7 +255,13 @@ describe("useSearchStore", () => {
           {
             filePath: "/test/workspace/a.md",
             matches: [
-              { lineNumber: 1, lineContent: "hello", contextBefore: [], contextAfter: [], ranges: [] },
+              {
+                lineNumber: 1,
+                lineContent: "hello",
+                contextBefore: [],
+                contextAfter: [],
+                ranges: [],
+              },
             ],
           },
         ],
@@ -435,7 +442,13 @@ describe("useSearchStore", () => {
         result: {
           filePath: "/test/workspace/c.md",
           matches: [
-            { lineNumber: 1, lineContent: "hello", contextBefore: [], contextAfter: [], ranges: [] },
+            {
+              lineNumber: 1,
+              lineContent: "hello",
+              contextBefore: [],
+              contextAfter: [],
+              ranges: [],
+            },
           ],
         },
         filenameMatch: null,
@@ -508,7 +521,13 @@ describe("useSearchStore", () => {
           {
             filePath: "/test/workspace/final.md",
             matches: [
-              { lineNumber: 10, lineContent: "final", contextBefore: [], contextAfter: [], ranges: [] },
+              {
+                lineNumber: 10,
+                lineContent: "final",
+                contextBefore: [],
+                contextAfter: [],
+                ranges: [],
+              },
             ],
           },
         ],
@@ -526,7 +545,13 @@ describe("useSearchStore", () => {
             result: {
               filePath: "/test/workspace/incremental.md",
               matches: [
-                { lineNumber: 1, lineContent: "inc", contextBefore: [], contextAfter: [], ranges: [] },
+                {
+                  lineNumber: 1,
+                  lineContent: "inc",
+                  contextBefore: [],
+                  contextAfter: [],
+                  ranges: [],
+                },
               ],
             },
             filenameMatch: null,

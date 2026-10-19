@@ -603,8 +603,8 @@ pub fn run() {
         .setup(|app| {
             // 路径访问策略（#437）：应用数据目录 + 上次会话用到的路径；E2E 额外放行夹目录
             // （grant_* 会同时扩展 asset protocol scope，预览里的本地图片才加载得出来）
-            security::seed_from_persistence(&app.handle());
-            security::seed_e2e_roots(&app.handle());
+            security::seed_from_persistence(app.handle());
+            security::seed_e2e_roots(app.handle());
 
             // 手动创建主窗口（tauri.conf.json 中 windows 数组为空）
             // 这样可以根据命令行参数动态注入 WebView2 additional_browser_args
@@ -676,7 +676,7 @@ pub fn run() {
             tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
                 let app = window.app_handle();
                 for path in paths {
-                    security::grant_path(app, &path);
+                    security::grant_path(app, path);
                 }
             }
             // 焦点切换：把该窗口的主题/显示模式/侧栏视图勾选重放到共享菜单栏

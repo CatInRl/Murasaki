@@ -78,7 +78,8 @@
   --murasaki-menubar-height: 32px;
 
   /* Typography */
-  --murasaki-font-ui: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --murasaki-font-ui:
+    "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --murasaki-font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
   /* 阅读 font（预览/WYSIWYG）：运行时由 editorFontPreset 设置动态改写；
      此处静态默认 = 预设 D（等宽），issue #111 */
@@ -108,7 +109,8 @@
   --murasaki-shadow-purple: 0 8px 24px rgba(147, 51, 234, 0.18);
   /* Floating-layer shadow for popovers / dialogs / context menus (Ticket #60).
      Two-layer shadow mirrors the design-spec `.shadow-2` utility. */
-  --murasaki-shadow-2: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+  --murasaki-shadow-2:
+    0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
 }
 
 /* Global reset & base */
@@ -199,7 +201,10 @@ body,
   .tab-item .close-btn,
   .sidebar-tab,
   .tree-node .node-row {
-    min-height: var(--murasaki-touch-target, 36px); /* 条件定义 token：仅在本 @media (pointer: coarse) 内声明，保留 fallback 以防该媒体查询未命中定义 */
+    min-height: var(
+      --murasaki-touch-target,
+      36px
+    ); /* 条件定义 token：仅在本 @media (pointer: coarse) 内声明，保留 fallback 以防该媒体查询未命中定义 */
   }
 }
 
@@ -224,42 +229,88 @@ body,
 
 /* === Animations library === */
 @keyframes murasaki-fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes murasaki-scale-in {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes murasaki-slide-in-right {
-  from { opacity: 0; transform: translateX(8px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes murasaki-slide-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes murasaki-pulse-soft {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 @keyframes murasaki-shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes murasaki-blink {
-  0%, 50% { opacity: 1; }
-  50.01%, 100% { opacity: 0; }
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
 }
 
-.murasaki-fade-in { animation: murasaki-fade-in var(--murasaki-duration-base) var(--murasaki-ease-out) both; }
-.murasaki-scale-in { animation: murasaki-scale-in var(--murasaki-duration-base) var(--murasaki-ease-out) both; }
-.murasaki-slide-up { animation: murasaki-slide-up var(--murasaki-duration-base) var(--murasaki-ease-out) both; }
-.murasaki-slide-in-right { animation: murasaki-slide-in-right var(--murasaki-duration-base) var(--murasaki-ease-out) both; }
-
+.murasaki-fade-in {
+  animation: murasaki-fade-in var(--murasaki-duration-base) var(--murasaki-ease-out) both;
+}
+.murasaki-scale-in {
+  animation: murasaki-scale-in var(--murasaki-duration-base) var(--murasaki-ease-out) both;
+}
+.murasaki-slide-up {
+  animation: murasaki-slide-up var(--murasaki-duration-base) var(--murasaki-ease-out) both;
+}
+.murasaki-slide-in-right {
+  animation: murasaki-slide-in-right var(--murasaki-duration-base) var(--murasaki-ease-out) both;
+}

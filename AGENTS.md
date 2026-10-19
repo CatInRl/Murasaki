@@ -95,7 +95,10 @@ murasaki/
 | `npm run tauri:build` | 生产构建 |
 | `npm test` | 前端单元测试 |
 | `npm run test:coverage` | 单元测试 + 覆盖率阈值（CI 门禁用） |
-| `npm run test:rust` | Rust 测试 |
+| `npm run lint` | ESLint 静态检查（含 e2e） |
+| `npm run format:check` | Prettier 格式检查 |
+| `npm run typecheck:e2e` | e2e TypeScript 类型检查（`tsc -p e2e`） |
+| `npm run test:rust` | Rust 测试（CI 另跑 `cargo fmt --check` 与 `cargo clippy -D warnings`） |
 | `npm run test:e2e` | E2E（真实 WebView2；需先构建 + 装 tauri-driver/msedgedriver） |
 | `npm run build` | 仅构建前端（vue-tsc + vite build） |
 

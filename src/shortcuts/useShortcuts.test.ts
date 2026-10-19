@@ -49,15 +49,42 @@ function getDoc(v: EditorView): string {
 
 /** US 布局上档字符映射（仅字母无此项，直接大写即可） */
 const SHIFTED_KEYS: Record<string, string> = {
-  "`": "~", "1": "!", "2": "@", "3": "#", "4": "$", "5": "%", "6": "^",
-  "7": "&", "8": "*", "9": "(", "0": ")", "-": "_", "=": "+",
-  "[": "{", "]": "}", "\\": "|", ";": ":", "'": "\"", ",": "<", ".": ">", "/": "?",
+  "`": "~",
+  "1": "!",
+  "2": "@",
+  "3": "#",
+  "4": "$",
+  "5": "%",
+  "6": "^",
+  "7": "&",
+  "8": "*",
+  "9": "(",
+  "0": ")",
+  "-": "_",
+  "=": "+",
+  "[": "{",
+  "]": "}",
+  "\\": "|",
+  ";": ":",
+  "'": '"',
+  ",": "<",
+  ".": ">",
+  "/": "?",
 };
 
 /** 按键 keyCode（字母/数字/F 键动态计算） */
 const PUNCT_CODES: Record<string, number> = {
-  "`": 192, "-": 189, "=": 187, "[": 219, "]": 221, "\\": 220,
-  ";": 186, "'": 222, ",": 188, ".": 190, "/": 191,
+  "`": 192,
+  "-": 189,
+  "=": 187,
+  "[": 219,
+  "]": 221,
+  "\\": 220,
+  ";": 186,
+  "'": 222,
+  ",": 188,
+  ".": 190,
+  "/": 191,
 };
 
 function keyCodeFor(key: string): number {
@@ -181,17 +208,17 @@ beforeEach(() => {
 describe("useShortcuts - matchGlobalKeydown", () => {
   it("默认绑定：Ctrl+S 匹配 save", () => {
     const { matchGlobalKeydown } = useShortcuts();
-    expect(
-      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }))
-    ).toBe("save");
+    expect(matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }))).toBe(
+      "save"
+    );
   });
 
   it("统一搜索条：Ctrl+P 匹配 global-search，Ctrl+Shift+F 匹配 find-in-files", () => {
     const { matchGlobalKeydown } = useShortcuts();
     // Ctrl+P → global-search（统一搜索条主入口）
-    expect(
-      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "p", ctrlKey: true }))
-    ).toBe("global-search");
+    expect(matchGlobalKeydown(new KeyboardEvent("keydown", { key: "p", ctrlKey: true }))).toBe(
+      "global-search"
+    );
     // Ctrl+Shift+F → find-in-files（重指向统一搜索条）
     expect(
       matchGlobalKeydown(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, shiftKey: true }))
@@ -214,9 +241,9 @@ describe("useShortcuts - matchGlobalKeydown", () => {
     const persistence = usePersistenceStore();
     persistence.settings.shortcuts = { save: "Alt+S" };
     const { matchGlobalKeydown } = useShortcuts();
-    expect(
-      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", altKey: true }))
-    ).toBe("save");
+    expect(matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", altKey: true }))).toBe(
+      "save"
+    );
     expect(
       matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }))
     ).toBeNull();
@@ -236,12 +263,10 @@ describe("useShortcuts - matchGlobalKeydown", () => {
     const { matchGlobalKeydown, effective } = useShortcuts();
 
     // 初始默认：Ctrl+S 匹配 save，Alt+S 未命中
-    expect(
-      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }))
-    ).toBe("save");
-    expect(
-      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", altKey: true }))
-    ).toBeNull();
+    expect(matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }))).toBe(
+      "save"
+    );
+    expect(matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", altKey: true }))).toBeNull();
 
     // 运行中修改 settings.shortcuts（模拟设置窗口保存后 loadSettings 覆盖 store）
     // 直接赋值以验证响应式链（settings → overrides computed → matchGlobalKeydown），
@@ -249,9 +274,9 @@ describe("useShortcuts - matchGlobalKeydown", () => {
     persistence.settings.shortcuts = { save: "Alt+S" };
 
     // 新绑定立即生效
-    expect(
-      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", altKey: true }))
-    ).toBe("save");
+    expect(matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", altKey: true }))).toBe(
+      "save"
+    );
     // 旧绑定已失效
     expect(
       matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }))
@@ -264,18 +289,16 @@ describe("useShortcuts - matchGlobalKeydown", () => {
     const persistence = usePersistenceStore();
     persistence.settings.shortcuts = { save: "Alt+S" };
     const { matchGlobalKeydown } = useShortcuts();
-    expect(
-      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", altKey: true }))
-    ).toBe("save");
+    expect(matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", altKey: true }))).toBe(
+      "save"
+    );
 
     // 运行中清空覆盖（等价于恢复默认）
     persistence.settings.shortcuts = {};
-    expect(
-      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }))
-    ).toBe("save");
-    expect(
-      matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", altKey: true }))
-    ).toBeNull();
+    expect(matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", ctrlKey: true }))).toBe(
+      "save"
+    );
+    expect(matchGlobalKeydown(new KeyboardEvent("keydown", { key: "s", altKey: true }))).toBeNull();
   });
 
   it("编辑器作用域命令不参与全局匹配", () => {

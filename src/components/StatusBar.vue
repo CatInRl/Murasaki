@@ -60,7 +60,9 @@ const displayPath = computed<string>(() => {
   if (!root) return props.filePath;
   // 路径口径统一走 utils/path（#435）：分隔符归一、目录边界、大小写口径与文件树一致
   if (!isPathUnder(root, props.filePath)) return props.filePath;
-  return normalizePath(props.filePath).slice(stripTrailingSep(normalizePath(root)).length).replace(/^\//, "");
+  return normalizePath(props.filePath)
+    .slice(stripTrailingSep(normalizePath(root)).length)
+    .replace(/^\//, "");
 });
 
 const fileName = computed(() =>
@@ -129,19 +131,19 @@ function onModeSelect(key: string): void {
     <!-- 光标位置 -->
     <div class="status-group">
       <AlignLeft class="status-icon" :size="14" />
-      <span>{{ $t('editor.statusBar.lineCol', { line: cursorLine, col: cursorCol }) }}</span>
+      <span>{{ $t("editor.statusBar.lineCol", { line: cursorLine, col: cursorCol }) }}</span>
     </div>
 
     <!-- 字数（CJK 逐字 + 拉丁逐词） -->
     <div class="status-group">
       <Type class="status-icon" :size="14" />
-      <span>{{ $t('editor.statusBar.wordCount', { count: wordCount }) }}</span>
+      <span>{{ $t("editor.statusBar.wordCount", { count: wordCount }) }}</span>
     </div>
 
     <!-- 字符数（不含空白字符） -->
     <div class="status-group">
       <Hash class="status-icon" :size="14" />
-      <span>{{ $t('editor.statusBar.charCount', { count: charCount }) }}</span>
+      <span>{{ $t("editor.statusBar.charCount", { count: charCount }) }}</span>
     </div>
 
     <!-- 已保存指示：check + text-state-success -->
@@ -151,7 +153,7 @@ function onModeSelect(key: string): void {
       :title="$t('common.status.savedTooltip')"
     >
       <Check :size="14" />
-      <span>{{ $t('common.status.saved') }}</span>
+      <span>{{ $t("common.status.saved") }}</span>
     </div>
     <div
       v-else-if="savedState === 'unsaved'"
@@ -159,7 +161,7 @@ function onModeSelect(key: string): void {
       :title="$t('common.status.unsavedTooltip')"
     >
       <PencilLine :size="14" />
-      <span>{{ $t('common.status.unsaved') }}</span>
+      <span>{{ $t("common.status.unsaved") }}</span>
     </div>
 
     <!-- 右侧：显示模式下拉 + 缩放 -->
@@ -190,7 +192,7 @@ function onModeSelect(key: string): void {
         @click="emit('zoom-reset')"
       >
         <ZoomIn :size="14" />
-        <span>{{ $t('editor.statusBar.zoomLabel', { percent: zoom }) }}</span>
+        <span>{{ $t("editor.statusBar.zoomLabel", { percent: zoom }) }}</span>
       </button>
     </div>
   </div>
@@ -287,8 +289,9 @@ function onModeSelect(key: string): void {
   border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--murasaki-transition-fast),
-              background var(--murasaki-transition-fast);
+  transition:
+    color var(--murasaki-transition-fast),
+    background var(--murasaki-transition-fast);
 }
 .status-chip:hover {
   color: var(--murasaki-primary);

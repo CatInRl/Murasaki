@@ -29,7 +29,14 @@ import {
 import { SHORTCUT_COMMANDS, DEFAULT_SHORTCUTS } from "./shortcutRegistry";
 
 function keyEvent(partial: Partial<KeyboardEvent>): KeyboardEvent {
-  return { ctrlKey: false, shiftKey: false, altKey: false, metaKey: false, key: "", ...partial } as KeyboardEvent;
+  return {
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    key: "",
+    ...partial,
+  } as KeyboardEvent;
 }
 
 describe("shortcutsLogic - normalizeKeyName", () => {
@@ -93,7 +100,12 @@ describe("shortcutsLogic - normalizeShortcut", () => {
 
 describe("shortcutsLogic - parseShortcut", () => {
   it("解析修饰键与主键", () => {
-    expect(parseShortcut("Ctrl+Shift+K")).toEqual({ ctrl: true, shift: true, alt: false, key: "K" });
+    expect(parseShortcut("Ctrl+Shift+K")).toEqual({
+      ctrl: true,
+      shift: true,
+      alt: false,
+      key: "K",
+    });
     expect(parseShortcut("Alt+Shift+S")).toEqual({ ctrl: false, shift: true, alt: true, key: "S" });
     expect(parseShortcut("F11")).toEqual({ ctrl: false, shift: false, alt: false, key: "F11" });
     expect(parseShortcut("Ctrl+1")).toEqual({ ctrl: true, shift: false, alt: false, key: "1" });
@@ -136,7 +148,9 @@ describe("shortcutsLogic - shortcutMatchesEvent", () => {
   });
 
   it("额外修饰键不匹配", () => {
-    expect(shortcutMatchesEvent("Ctrl+S", keyEvent({ ctrlKey: true, shiftKey: true, key: "s" }))).toBe(false);
+    expect(
+      shortcutMatchesEvent("Ctrl+S", keyEvent({ ctrlKey: true, shiftKey: true, key: "s" }))
+    ).toBe(false);
   });
 
   it("F11 单独匹配", () => {
@@ -145,10 +159,12 @@ describe("shortcutsLogic - shortcutMatchesEvent", () => {
   });
 
   it("Alt+Shift+S 匹配", () => {
-    expect(shortcutMatchesEvent("Alt+Shift+S", keyEvent({ altKey: true, shiftKey: true, key: "S" }))).toBe(true);
+    expect(
+      shortcutMatchesEvent("Alt+Shift+S", keyEvent({ altKey: true, shiftKey: true, key: "S" }))
+    ).toBe(true);
   });
 
-  it("Shift 组合：e.key 为上档字符时回退基础键匹配（Ctrl+Shift+1 ← \"!\"）", () => {
+  it('Shift 组合：e.key 为上档字符时回退基础键匹配（Ctrl+Shift+1 ← "!"）', () => {
     expect(
       shortcutMatchesEvent("Ctrl+Shift+1", keyEvent({ ctrlKey: true, shiftKey: true, key: "!" }))
     ).toBe(true);
@@ -167,11 +183,15 @@ describe("shortcutsLogic - shortcutMatchesEvent", () => {
 
 describe("shortcutsLogic - eventToShortcut", () => {
   it("录制 Ctrl+Shift+K", () => {
-    expect(eventToShortcut(keyEvent({ ctrlKey: true, shiftKey: true, key: "k" }))).toBe("Ctrl+Shift+K");
+    expect(eventToShortcut(keyEvent({ ctrlKey: true, shiftKey: true, key: "k" }))).toBe(
+      "Ctrl+Shift+K"
+    );
   });
 
-  it("Shift 组合的上档字符录制为基础键（\"!\" → Ctrl+Shift+1）", () => {
-    expect(eventToShortcut(keyEvent({ ctrlKey: true, shiftKey: true, key: "!" }))).toBe("Ctrl+Shift+1");
+  it('Shift 组合的上档字符录制为基础键（"!" → Ctrl+Shift+1）', () => {
+    expect(eventToShortcut(keyEvent({ ctrlKey: true, shiftKey: true, key: "!" }))).toBe(
+      "Ctrl+Shift+1"
+    );
   });
 
   it("metaKey 折叠为主修饰键 Ctrl", () => {
@@ -184,7 +204,9 @@ describe("shortcutsLogic - eventToShortcut", () => {
 
   it("录制结果可被 normalize 还原", () => {
     // eventToShortcut 按 Ctrl > Shift > Alt 顺序输出
-    expect(normalizeShortcut(eventToShortcut(keyEvent({ altKey: true, shiftKey: true, key: "s" })))).toBe("Shift+Alt+S");
+    expect(
+      normalizeShortcut(eventToShortcut(keyEvent({ altKey: true, shiftKey: true, key: "s" })))
+    ).toBe("Shift+Alt+S");
   });
 
   it("纯修饰键返回 null", () => {
