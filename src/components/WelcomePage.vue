@@ -32,16 +32,40 @@ const recentFiles = computed(() => persistence.getRecentFiles(5));
 
 // 三个主操作按钮配置
 const primaryActions = computed(() => [
-  { key: "open-folder", label: t("editor.welcome.openFolder"), desc: t("editor.welcome.openFolderDesc"), icon: "folder", primary: true },
-  { key: "open-file", label: t("editor.welcome.openFile"), desc: t("editor.welcome.openFileDesc"), icon: "file", primary: false },
-  { key: "new-file", label: t("editor.welcome.newFile"), desc: t("editor.welcome.newFileDesc"), icon: "plus", primary: false },
+  {
+    key: "open-folder",
+    label: t("editor.welcome.openFolder"),
+    desc: t("editor.welcome.openFolderDesc"),
+    icon: "folder",
+    primary: true,
+  },
+  {
+    key: "open-file",
+    label: t("editor.welcome.openFile"),
+    desc: t("editor.welcome.openFileDesc"),
+    icon: "file",
+    primary: false,
+  },
+  {
+    key: "new-file",
+    label: t("editor.welcome.newFile"),
+    desc: t("editor.welcome.newFileDesc"),
+    icon: "plus",
+    primary: false,
+  },
 ]);
 
 function onAction(key: string) {
   switch (key) {
-    case "open-folder": emit("open-folder"); break;
-    case "open-file": emit("open-file"); break;
-    case "new-file": emit("new-file"); break;
+    case "open-folder":
+      emit("open-folder");
+      break;
+    case "open-file":
+      emit("open-file");
+      break;
+    case "new-file":
+      emit("new-file");
+      break;
   }
 }
 
@@ -49,7 +73,10 @@ function onAction(key: string) {
 const shortcutHints = computed(() => [
   { keys: formatShortcutForDisplay("Ctrl+O") ?? "", label: t("editor.welcome.shortcutOpen") },
   { keys: formatShortcutForDisplay("Ctrl+N") ?? "", label: t("editor.welcome.shortcutNew") },
-  { keys: formatShortcutForDisplay("Ctrl+Shift+O") ?? "", label: t("editor.welcome.shortcutOpenFolder") },
+  {
+    keys: formatShortcutForDisplay("Ctrl+Shift+O") ?? "",
+    label: t("editor.welcome.shortcutOpenFolder"),
+  },
 ]);
 </script>
 
@@ -69,7 +96,7 @@ const shortcutHints = computed(() => [
           <BookOpen :size="36" />
         </div>
         <h1 class="brand-title">Murasaki</h1>
-        <p class="brand-tagline">{{ $t('editor.welcome.tagline') }}</p>
+        <p class="brand-tagline">{{ $t("editor.welcome.tagline") }}</p>
       </header>
 
       <!-- 主操作区：三张卡片 -->
@@ -83,16 +110,48 @@ const shortcutHints = computed(() => [
           @click="onAction(act.key)"
         >
           <span class="action-icon" aria-hidden="true">
-            <svg v-if="act.icon === 'folder'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+            <svg
+              v-if="act.icon === 'folder'"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
+              />
             </svg>
-            <svg v-else-if="act.icon === 'file'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
+            <svg
+              v-else-if="act.icon === 'file'"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
             </svg>
-            <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
+            <svg
+              v-else
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </span>
           <span class="action-text">
@@ -107,7 +166,7 @@ const shortcutHints = computed(() => [
         <div v-if="recentFolders.length > 0" class="recent-block">
           <h3 class="block-title">
             <span class="block-dot"></span>
-            {{ $t('editor.welcome.recentFolders') }}
+            {{ $t("editor.welcome.recentFolders") }}
           </h3>
           <ul class="recent-list">
             <li v-for="entry in recentFolders" :key="entry.path" class="recent-item-wrap">
@@ -118,8 +177,19 @@ const shortcutHints = computed(() => [
                 @click="emit('open-recent', entry.path, 'folder')"
               >
                 <span class="recent-icon recent-icon-folder" aria-hidden="true">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
+                    />
                   </svg>
                 </span>
                 <div class="item-text">
@@ -135,7 +205,7 @@ const shortcutHints = computed(() => [
         <div v-if="recentFiles.length > 0" class="recent-block">
           <h3 class="block-title">
             <span class="block-dot"></span>
-            {{ $t('editor.welcome.recentFiles') }}
+            {{ $t("editor.welcome.recentFiles") }}
           </h3>
           <ul class="recent-list">
             <li v-for="entry in recentFiles" :key="entry.path" class="recent-item-wrap">
@@ -178,7 +248,7 @@ const shortcutHints = computed(() => [
         <span v-if="versionText" class="version-text">{{ versionText }}</span>
         <span v-if="versionText" class="footer-sep">·</span>
         <a class="settings-link" href="#" @click.prevent="emit('open-settings')">
-          {{ $t('editor.welcome.settings') }}
+          {{ $t("editor.welcome.settings") }}
         </a>
       </footer>
     </div>
@@ -238,16 +308,26 @@ const shortcutHints = computed(() => [
     linear-gradient(to bottom, rgba(147, 51, 234, 0.04) 1px, transparent 1px);
   background-size: 32px 32px;
   -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
-          mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
 }
 
 @keyframes glow-drift-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(40px, 60px) scale(1.08); }
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(40px, 60px) scale(1.08);
+  }
 }
 @keyframes glow-drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-50px, -30px) scale(1.12); }
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-50px, -30px) scale(1.12);
+  }
 }
 
 /* === 内容容器 === */
@@ -278,8 +358,8 @@ const shortcutHints = computed(() => [
   background: linear-gradient(135deg, var(--murasaki-purple-50), var(--murasaki-purple-100));
   border: 1px solid var(--murasaki-purple-200);
   box-shadow:
-    0 8px 24px rgba(147, 51, 234, 0.15), /* 品牌图标光晕，纯装饰，不进 token */
-    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    0 8px 24px rgba(147, 51, 234, 0.15),
+    /* 品牌图标光晕，纯装饰，不进 token */ inset 0 1px 0 rgba(255, 255, 255, 0.6);
   margin-bottom: 16px;
 }
 .brand-title {
@@ -329,7 +409,7 @@ const shortcutHints = computed(() => [
     background var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .action-card::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg, var(--murasaki-purple-50) 0%, transparent 60%);
@@ -350,7 +430,11 @@ const shortcutHints = computed(() => [
   box-shadow: var(--murasaki-shadow-sm);
 }
 .action-card.is-primary {
-  background: linear-gradient(135deg, var(--murasaki-purple-600) 0%, var(--murasaki-purple-800) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--murasaki-purple-600) 0%,
+    var(--murasaki-purple-800) 100%
+  );
   border-color: transparent;
   color: var(--murasaki-primary-foreground);
   box-shadow: var(--murasaki-shadow-purple);
@@ -513,8 +597,9 @@ const shortcutHints = computed(() => [
   opacity: 0;
   flex-shrink: 0;
   font-size: 14px;
-  transition: transform var(--murasaki-duration-fast) var(--murasaki-ease-out),
-              opacity var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    transform var(--murasaki-duration-fast) var(--murasaki-ease-out),
+    opacity var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 
 /* === 快捷键提示 === */

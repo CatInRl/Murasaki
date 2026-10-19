@@ -648,7 +648,9 @@ export const useTabsStore = defineStore("tabs", () => {
     tabs.value = [];
     activeTabId.value = null;
     // 用 setTimeout 在下一个 macrotask 恢复，确保 Vue watcher（microtask）在 restoring=true 时触发
-    setTimeout(() => { restoring.value = false; }, 0);
+    setTimeout(() => {
+      restoring.value = false;
+    }, 0);
   }
 
   return {

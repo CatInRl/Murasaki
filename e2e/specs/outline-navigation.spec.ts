@@ -88,7 +88,7 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 通过 sidebarView ref 切换到 outline 视图
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     await browser.pause(300);
@@ -105,7 +105,7 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 切换到大纲视图
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     await browser.pause(500);
@@ -118,7 +118,9 @@ describe("大纲视图切换 + 标题跳转", () => {
     }
 
     // 应包含三个层级的标题
-    expect(texts).toEqual(expect.arrayContaining(["一级标题", "二级标题 A", "三级标题", "二级标题 B"]));
+    expect(texts).toEqual(
+      expect.arrayContaining(["一级标题", "二级标题 A", "三级标题", "二级标题 B"])
+    );
   });
 
   it("点击大纲项触发 jump-to-line（编辑器滚动）", async () => {
@@ -128,19 +130,15 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 切换到大纲视图
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     await browser.pause(500);
 
-    // 记录当前编辑器滚动位置
-    const scrollBefore = await browser.execute(() => {
-      const cmScroller = document.querySelector(".cm-scroller");
-      return cmScroller ? cmScroller.scrollTop : 0;
-    });
-
     // 点击 "二级标题 B"（靠后的大纲项，应触发滚动）
-    const outlineItems = await browser.$$(".outline-pane .outline-item, [class*='outline'] .outline-item");
+    const outlineItems = (await browser.$$(
+      ".outline-pane .outline-item, [class*='outline'] .outline-item"
+    )) as unknown as WebdriverIO.ElementArray;
     let clicked = false;
     for (const item of outlineItems) {
       const text = await textOfElement(browser, item);
@@ -157,12 +155,6 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     await browser.pause(500);
 
-    // 验证编辑器滚动位置变化（或光标位置变化）
-    const scrollAfter = await browser.execute(() => {
-      const cmScroller = document.querySelector(".cm-scroller");
-      return cmScroller ? cmScroller.scrollTop : 0;
-    });
-
     // 滚动位置应有变化（如果之前不在顶部则可能相同，所以只验证不报错）
     // 主要验证：点击没有抛出异常，且编辑器仍可见
     const editorVisible = await browser.execute(() => {
@@ -178,14 +170,14 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 先切换到大纲
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     await browser.pause(300);
 
     // 再切换回文件树
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("files");
     });
     await browser.pause(300);
@@ -202,7 +194,7 @@ describe("大纲视图切换 + 标题跳转", () => {
 
     // 切换到大纲视图
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       (window as any).__setSidebarView__("outline");
     });
     await browser.pause(300);

@@ -1,17 +1,17 @@
+use crate::errors::{CommandError, ErrorCode};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
-use serde::{Deserialize, Serialize};
-use crate::errors::{CommandError, ErrorCode};
 
 /// 大纲项：与前端 OutlineItem 类型对齐
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutlineItem {
-    pub level: u8,       // 1-6（对应 # ~ ######）
-    pub text: String,    // 标题文本（去除 # 前缀）
-    pub line: u32,       // 1-indexed 行号
+    pub level: u8,    // 1-6（对应 # ~ ######）
+    pub text: String, // 标题文本（去除 # 前缀）
+    pub line: u32,    // 1-indexed 行号
 }
 
 /// 缓存条目：(mtime_millis, outline)
@@ -71,7 +71,11 @@ pub fn parse_outline_from_text(content: &str) -> Vec<OutlineItem> {
             continue;
         } else if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
             in_code_block = true;
-            code_fence = Some(if trimmed.starts_with("```") { "```" } else { "~~~" });
+            code_fence = Some(if trimmed.starts_with("```") {
+                "```"
+            } else {
+                "~~~"
+            });
             continue;
         }
 

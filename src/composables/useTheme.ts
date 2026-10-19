@@ -64,10 +64,7 @@ const currentTheme = ref<string>(DEFAULT_THEME);
 
 /** 获取当前主题对象 */
 export function getCurrentTheme(): MarkdownTheme {
-  return (
-    MARKDOWN_THEMES.find((t) => t.name === currentTheme.value) ??
-    MARKDOWN_THEMES[0]
-  );
+  return MARKDOWN_THEMES.find((t) => t.name === currentTheme.value) ?? MARKDOWN_THEMES[0];
 }
 
 /** 切换主题 */

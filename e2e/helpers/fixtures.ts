@@ -66,7 +66,7 @@ function deleteContents(dir: string): void {
 export function resetWorkspace(files: FixtureFile[] = []): string {
   if (existsSync(WORKSPACE_ROOT)) {
     // 策略 1：尝试用 rmSync 删除整个目录（最快，大多数情况有效）
-    let deleted = false;
+    let deleted: boolean;
     try {
       rmSync(WORKSPACE_ROOT, {
         recursive: true,
@@ -140,8 +140,8 @@ export function defaultFixtureFiles(): FixtureFile[] {
         "## 二级标题",
         "",
         "正文内容。",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     },
     {
       path: "notes.md",
@@ -153,12 +153,12 @@ export function defaultFixtureFiles(): FixtureFile[] {
         "",
         "# 笔记标题",
         "",
-        "正文。"
-      ].join("\n")
+        "正文。",
+      ].join("\n"),
     },
     {
       path: "sub/deep.md",
-      content: "# 子目录文件\n\n嵌套文件。"
-    }
+      content: "# 子目录文件\n\n嵌套文件。",
+    },
   ];
 }

@@ -61,9 +61,7 @@ if (isMacOS) {
     } else if (inPath("msedgedriver.exe")) {
       console.log("[ok] msedgedriver: PATH");
     } else {
-      problems.push(
-        "未找到 msedgedriver。运行 e2e/scripts/install-msedgedriver.ps1 安装"
-      );
+      problems.push("未找到 msedgedriver。运行 e2e/scripts/install-msedgedriver.ps1 安装");
     }
   } else if (inPath("WebKitWebDriver")) {
     console.log("[ok] WebKitWebDriver: PATH");
@@ -76,9 +74,7 @@ if (isMacOS) {
 //    release 二进制没有 /status，waitForEmbeddedServer 必超时）
 const binary =
   process.env.MURASAKI_BINARY ??
-  (isMacOS
-    ? "src-tauri/target/debug/murasaki"
-    : `src-tauri/target/release/murasaki${exeSuffix}`);
+  (isMacOS ? "src-tauri/target/debug/murasaki" : `src-tauri/target/release/murasaki${exeSuffix}`);
 if (existsSync(binary)) {
   console.log(`[ok] 应用二进制: ${binary}`);
 } else {

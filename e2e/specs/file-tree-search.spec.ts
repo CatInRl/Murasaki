@@ -14,7 +14,13 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
+import {
+  openWorkspace,
+  closeWorkspace,
+  closeAllTabs,
+  waitForPinia,
+  resetPersistenceSettings,
+} from "../helpers/store";
 import { isRendered, readText, waitForInBrowser, waitForPresent } from "../helpers/wait";
 
 /**
@@ -27,10 +33,7 @@ import { isRendered, readText, waitForInBrowser, waitForPresent } from "../helpe
  * （即 #9333ea 的 rgba 形式），这里按通道值判定以兼容两种序列化。
  */
 function isPrimaryTint(color: string): boolean {
-  return (
-    color.includes("147, 51, 234") ||
-    /color\(srgb\s+0\.576471\s+0\.2\s+0\.917647/.test(color)
-  );
+  return color.includes("147, 51, 234") || /color\(srgb\s+0\.576471\s+0\.2\s+0\.917647/.test(color);
 }
 
 let browser: Browser;
@@ -47,8 +50,16 @@ describe("文件树选中态 & 搜索高亮", () => {
 
   beforeEach(async () => {
     await resetPersistenceSettings(browser);
-    try { await closeAllTabs(browser); } catch { /* ignore */ }
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await closeAllTabs(browser);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
   });
 
   it("点击文件后节点有 is-selected 类", async () => {
@@ -97,37 +108,45 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 诊断：直接调用 Tauri search_workspace 命令
     const diagInvoke = await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const workspace = pinia._s.get("workspace");
       const wsPath = workspace.workspacePath;
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("search_workspace", {
-        workspace: wsPath,
-        query: "keyword",
-        options: { regex: false, caseSensitive: false, wholeWord: false },
-      }).then(
-        (resp: any) => done({ ok: true, resp: JSON.stringify(resp).substring(0, 500) }),
-        (err: any) => done({ ok: false, error: String(err) })
-      );
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__TAURI_INTERNALS__
+        .invoke("search_workspace", {
+          workspace: wsPath,
+          query: "keyword",
+          options: { regex: false, caseSensitive: false, wholeWord: false },
+        })
+        .then(
+          (resp: any) => done({ ok: true, resp: JSON.stringify(resp).substring(0, 500) }),
+          (err: any) => done({ ok: false, error: String(err) })
+        );
     });
     console.log("[diag_invoke] " + JSON.stringify(diagInvoke));
 
     // 打开统一搜索条（挂载会 clear 旧查询），再通过 store 触发内容搜索
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
     await browser.pause(200);
     const searchResult = await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setOptions({ regex: false, caseSensitive: false, wholeWord: false });
       search.setQuery("keyword");
       Promise.resolve(search.search())
-        .then((resp: any) => done({ ok: true, results: search.results.length, resp: resp ? JSON.stringify(resp).substring(0, 500) : null }))
+        .then((resp: any) =>
+          done({
+            ok: true,
+            results: search.results.length,
+            resp: resp ? JSON.stringify(resp).substring(0, 500) : null,
+          })
+        )
         .catch((err: unknown) => done({ ok: false, error: err ? String(err) : null }));
     });
     console.log("[diag_search] " + JSON.stringify(searchResult));
@@ -153,13 +172,13 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 打开统一搜索条，再触发搜索
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
     await browser.pause(200);
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const search = pinia._s.get("search");
       search.setQuery("特殊关键词");
@@ -185,7 +204,7 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 打开统一搜索条，输入文件名（前端模糊匹配）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
@@ -214,7 +233,7 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 通过 store 打开统一搜索条
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
@@ -227,7 +246,7 @@ describe("文件树选中态 & 搜索高亮", () => {
 
     // 关闭统一搜索条
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = false;
     });

@@ -4,19 +4,19 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
   # 支持手动触发（用于测试构建流程）
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v0.1.0)'
+        description: "Release tag (e.g. v0.1.0)"
         required: true
-        default: 'v0.1.0'
+        default: "v0.1.0"
 
 permissions:
-  contents: write  # 创建 Release 与上传资源所需
-  checks: read      # 发布前校验 tag 提交的 CI 结果（#446）
+  contents: write # 创建 Release 与上传资源所需
+  checks: read # 发布前校验 tag 提交的 CI 结果（#446）
 
 jobs:
   # === 发布前门禁（版本一致性 + CI 结果，issue #446）===
@@ -146,15 +146,15 @@ jobs:
   build:
     needs: create-release
     strategy:
-      fail-fast: false  # 单个平台失败不影响其他平台
+      fail-fast: false # 单个平台失败不影响其他平台
       matrix:
         include:
           - platform: windows-latest
-            args: ''
+            args: ""
           - platform: macos-latest
-            args: '--target aarch64-apple-darwin'
+            args: "--target aarch64-apple-darwin"
           - platform: macos-latest
-            args: '--target x86_64-apple-darwin'
+            args: "--target x86_64-apple-darwin"
           - platform: ubuntu-24.04
             args: ""
 
@@ -166,8 +166,8 @@ jobs:
       - name: 安装 Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
+          node-version: "lts/*"
+          cache: "npm"
 
       - name: 安装 Rust stable
         uses: dtolnay/rust-toolchain@stable

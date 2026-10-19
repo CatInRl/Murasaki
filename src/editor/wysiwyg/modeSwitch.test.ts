@@ -26,10 +26,7 @@ describe("模式切换：source/split → wysiwyg", () => {
     // 初始：source 模式（wysiwygComp 为空）
     const initialState = EditorState.create({
       doc,
-      extensions: [
-        markdown({ base: markdownLanguage }),
-        wysiwygComp.of([]),
-      ],
+      extensions: [markdown({ base: markdownLanguage }), wysiwygComp.of([])],
     });
     ensureSyntaxTree(initialState, doc.length + 1);
     view = new EditorView({ state: initialState });
@@ -54,10 +51,7 @@ describe("模式切换：source/split → wysiwyg", () => {
 
     const initialState = EditorState.create({
       doc,
-      extensions: [
-        markdown({ base: markdownLanguage }),
-        wysiwygComp.of([]),
-      ],
+      extensions: [markdown({ base: markdownLanguage }), wysiwygComp.of([])],
     });
     ensureSyntaxTree(initialState, doc.length + 1);
     view = new EditorView({ state: initialState });
@@ -81,10 +75,7 @@ describe("模式切换：source/split → wysiwyg", () => {
     // 光标放在 "tail" 段（离开列表段）→ 列表标记应被替换为 bullet widget
     const initialState = EditorState.create({
       doc,
-      extensions: [
-        markdown({ base: markdownLanguage }),
-        wysiwygComp.of([]),
-      ],
+      extensions: [markdown({ base: markdownLanguage }), wysiwygComp.of([])],
     });
     ensureSyntaxTree(initialState, doc.length + 1);
     // 设置光标到 "tail" 位置
@@ -116,10 +107,7 @@ describe("初始挂载：wysiwyg 模式（非 reconfigure）", () => {
     // 小文档在 EditorState.create 时由 markdown parser 同步解析完成
     const state = EditorState.create({
       doc,
-      extensions: [
-        markdown({ base: markdownLanguage }),
-        ...wysiwygExtensions,
-      ],
+      extensions: [markdown({ base: markdownLanguage }), ...wysiwygExtensions],
     });
     // 光标放到 "tail" 段（离开标题/bold/code 段）
     const stateWithCursor = state.update({
@@ -149,10 +137,7 @@ describe("Tab 切换：cached state 的 wysiwygComp 不匹配当前模式", () =
     // 1. 初始：split 模式（wysiwygComp 为空），光标在 "tail" 段
     const initialState = EditorState.create({
       doc,
-      extensions: [
-        markdown({ base: markdownLanguage }),
-        wysiwygComp.of([]),
-      ],
+      extensions: [markdown({ base: markdownLanguage }), wysiwygComp.of([])],
     });
     ensureSyntaxTree(initialState, doc.length + 1);
     const stateWithCursor = initialState.update({
@@ -162,7 +147,9 @@ describe("Tab 切换：cached state 的 wysiwygComp 不匹配当前模式", () =
 
     // 2. 切换到 wysiwyg 模式 → 装饰应用
     view.dispatch({ effects: wysiwygComp.reconfigure(wysiwygExtensions) });
-    expect(view.dom.querySelectorAll(".murasaki-wysiwyg-mark-hide").length).toBeGreaterThanOrEqual(1);
+    expect(view.dom.querySelectorAll(".murasaki-wysiwyg-mark-hide").length).toBeGreaterThanOrEqual(
+      1
+    );
 
     // 3. 模拟切走再切回：保存当前 state（含 wysiwygExtensions），然后模拟
     //    另一个 tab 的 cached state（wysiwygComp=[]，split 模式时缓存的）
@@ -170,7 +157,7 @@ describe("Tab 切换：cached state 的 wysiwygComp 不匹配当前模式", () =
       doc,
       extensions: [
         markdown({ base: markdownLanguage }),
-        wysiwygComp.of([]),  // split 模式缓存
+        wysiwygComp.of([]), // split 模式缓存
       ],
     });
     ensureSyntaxTree(splitCachedState, doc.length + 1);
@@ -188,6 +175,8 @@ describe("Tab 切换：cached state 的 wysiwygComp 不匹配当前模式", () =
     });
 
     // 6. 装饰重新应用
-    expect(view.dom.querySelectorAll(".murasaki-wysiwyg-mark-hide").length).toBeGreaterThanOrEqual(1);
+    expect(view.dom.querySelectorAll(".murasaki-wysiwyg-mark-hide").length).toBeGreaterThanOrEqual(
+      1
+    );
   });
 });

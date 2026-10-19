@@ -40,9 +40,7 @@ export const EDITOR_FIELDS: (keyof SettingsState)[] = [
 export const SHORTCUTS_FIELD: (keyof SettingsState)[] = ["shortcuts"];
 
 /** 返回某分类下参与 draft 比较的字段列表 */
-export function fieldsForCategory(
-  category: SettingsCategory
-): (keyof SettingsState)[] {
+export function fieldsForCategory(category: SettingsCategory): (keyof SettingsState)[] {
   switch (category) {
     case "general":
       return GENERAL_FIELDS;
@@ -88,10 +86,7 @@ export function isCategoryDirty(
 }
 
 /** 判断是否有任意未保存改动（general + editor + shortcuts） */
-export function isDirty(
-  draft: SettingsState,
-  snapshot: SettingsState
-): boolean {
+export function isDirty(draft: SettingsState, snapshot: SettingsState): boolean {
   return (
     isCategoryDirty(draft, snapshot, "general") ||
     isCategoryDirty(draft, snapshot, "editor") ||

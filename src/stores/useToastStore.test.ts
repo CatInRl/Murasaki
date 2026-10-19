@@ -49,14 +49,7 @@ describe("useToastStore", () => {
       store.deleted("d");
       expect(store.toasts).toHaveLength(6);
       const variants = store.toasts.map((t) => t.variant);
-      expect(variants).toEqual([
-        "success",
-        "info",
-        "warning",
-        "error",
-        "progress",
-        "deleted",
-      ]);
+      expect(variants).toEqual(["success", "info", "warning", "error", "progress", "deleted"]);
     });
 
     it("每次入队返回唯一 id", () => {

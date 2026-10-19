@@ -206,24 +206,20 @@ function makeState(doc: string, opts: StateOpts = {}): EditorState {
 
 /** 在 pos 处模拟"键入单个空格"事务（input.type），返回新状态 */
 function typeSpace(state: EditorState, pos: number): EditorState {
-  return state
-    .update({
-      changes: { from: pos, to: pos, insert: " " },
-      userEvent: "input.type",
-      selection: { anchor: pos + 1 },
-    })
-    .state;
+  return state.update({
+    changes: { from: pos, to: pos, insert: " " },
+    userEvent: "input.type",
+    selection: { anchor: pos + 1 },
+  }).state;
 }
 
 /** 在 pos 处模拟"键入回车"事务（insertNewlineAndIndent 的 userEvent 为 input） */
 function typeNewline(state: EditorState, pos: number): EditorState {
-  return state
-    .update({
-      changes: { from: pos, to: pos, insert: "\n" },
-      userEvent: "input",
-      selection: { anchor: pos + 1 },
-    })
-    .state;
+  return state.update({
+    changes: { from: pos, to: pos, insert: "\n" },
+    userEvent: "input",
+    selection: { anchor: pos + 1 },
+  }).state;
 }
 
 describe("fullwidthToMarkdownExtension - 运行时转换", () => {
@@ -276,28 +272,24 @@ describe("fullwidthToMarkdownExtension - 回车触发", () => {
 
   it("回车携带跟随缩进（insertNewlineAndIndent）时缩进保留", () => {
     const s = makeState("  ···");
-    const next = s
-      .update({
-        changes: { from: 5, to: 5, insert: "\n  " },
-        userEvent: "input",
-        selection: { anchor: 8 },
-      })
-      .state;
+    const next = s.update({
+      changes: { from: 5, to: 5, insert: "\n  " },
+      userEvent: "input",
+      selection: { anchor: 8 },
+    }).state;
     expect(next.doc.toString()).toBe("  ```\n  ");
   });
 
   it("多光标同时键入回车不转换", () => {
     const s = makeState("》\n·");
-    const next = s
-      .update({
-        changes: [
-          { from: 1, to: 1, insert: "\n" },
-          { from: 3, to: 3, insert: "\n" },
-        ],
-        userEvent: "input",
-        selection: { anchor: 2, head: 5 },
-      })
-      .state;
+    const next = s.update({
+      changes: [
+        { from: 1, to: 1, insert: "\n" },
+        { from: 3, to: 3, insert: "\n" },
+      ],
+      userEvent: "input",
+      selection: { anchor: 2, head: 5 },
+    }).state;
     expect(next.doc.toString()).toBe("》\n\n·\n");
   });
 });
@@ -351,4 +343,3 @@ describe("fullwidthToMarkdownExtension - 门控（gating）", () => {
     expect(next.doc.toString()).toBe("》 \n》 ");
   });
 });
-

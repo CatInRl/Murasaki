@@ -6,10 +6,7 @@ import { MARKDOWN_THEMES } from "../composables/useTheme";
 // 共享 markdown 元素样式（预览/导出统一来源，通过 --md-* 变量参数化主题差异）
 import "../styles/markdown-content.css";
 import { renderMermaidDiagram, sanitizeMermaidSvg } from "../utils/mermaidTheme";
-import {
-  isAnchorLink,
-  resolveInternalMarkdownLink,
-} from "../utils/internalLink";
+import { isAnchorLink, resolveInternalMarkdownLink } from "../utils/internalLink";
 import { isExternalUrl } from "../utils/url";
 import { createRenderGate } from "../utils/renderGate";
 
@@ -45,10 +42,7 @@ const emit = defineEmits<{
 
 /** 根据 Markdown 主题名查找对应的 Shiki 主题 */
 function resolveShikiTheme(themeName: string): string {
-  return (
-    MARKDOWN_THEMES.find((t) => t.name === themeName)?.shikiTheme ??
-    "github-light"
-  );
+  return MARKDOWN_THEMES.find((t) => t.name === themeName)?.shikiTheme ?? "github-light";
 }
 
 // 初始化 Shiki 主题（与 props.theme 同步，确保首次渲染就用对的主题）
@@ -284,7 +278,8 @@ defineExpose({
   getContentContainer: (): HTMLElement | null => containerRef.value,
   /** 滚动到指定源码行对应的块级元素（演示模式大纲跳转） */
   scrollToSourceLine,
-});</script>
+});
+</script>
 
 <template>
   <div ref="scrollRef" class="preview-pane" :data-md-theme="theme">

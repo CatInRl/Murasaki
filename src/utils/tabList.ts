@@ -46,7 +46,5 @@ export function buildTabList(tabs: Tab[], opts: BuildTabListOptions): TabListEnt
 export function filterTabList(entries: TabListEntry[], query: string): TabListEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return entries;
-  return entries.filter((e) =>
-    `${e.title} ${e.subtitle ?? ""}`.toLowerCase().includes(q)
-  );
+  return entries.filter((e) => `${e.title} ${e.subtitle ?? ""}`.toLowerCase().includes(q));
 }

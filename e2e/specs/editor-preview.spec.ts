@@ -16,7 +16,7 @@ import {
   setActiveContent,
   waitForPinia,
   ensureSplitMode,
-  resetPersistenceSettings
+  resetPersistenceSettings,
 } from "../helpers/store";
 import { isRendered, readText, waitForPresent } from "../helpers/wait";
 
@@ -87,8 +87,8 @@ describe("编辑器 + 预览 同步", () => {
     const ws = resetWorkspace([
       {
         path: "tasks.md",
-        content: "# 任务\n\n- [x] 已完成项\n- [ ] 未完成项\n"
-      }
+        content: "# 任务\n\n- [x] 已完成项\n- [ ] 未完成项\n",
+      },
     ]);
     await openFileInTab(browser, `${ws}/tasks.md`);
 

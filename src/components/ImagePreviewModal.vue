@@ -129,7 +129,10 @@ async function revealInExplorer(): Promise<void> {
   try {
     await invoke("reveal_in_explorer", { path: props.path });
   } catch (err) {
-    dialog.alert({ message: t("common.error.revealFailed", { error: formatCommandError(err) }), variant: "error" });
+    dialog.alert({
+      message: t("common.error.revealFailed", { error: formatCommandError(err) }),
+      variant: "error",
+    });
   }
 }
 </script>
@@ -151,14 +154,10 @@ async function revealInExplorer(): Promise<void> {
         <NText type="error">{{ errorMsg }}</NText>
       </div>
       <div v-else-if="dataUrl" class="image-container">
-        <img
-          :src="dataUrl"
-          :alt="fileName"
-          class="preview-image"
-        />
+        <img :src="dataUrl" :alt="fileName" class="preview-image" />
       </div>
       <div v-else class="empty-block">
-        <NText depth="3">{{ $t('editor.imagePreview.noImage') }}</NText>
+        <NText depth="3">{{ $t("editor.imagePreview.noImage") }}</NText>
       </div>
 
       <div v-if="props.path" class="path-line" :title="props.path">
@@ -168,9 +167,13 @@ async function revealInExplorer(): Promise<void> {
 
     <template #footer>
       <NSpace justify="end" :size="8">
-        <NButton size="small" @click="copyPath">{{ $t('common.copyPath') }}</NButton>
-        <NButton size="small" @click="revealInExplorer">{{ $t('common.revealInExplorer') }}</NButton>
-        <NButton size="small" type="primary" @click="emit('close')">{{ $t('common.close') }}</NButton>
+        <NButton size="small" @click="copyPath">{{ $t("common.copyPath") }}</NButton>
+        <NButton size="small" @click="revealInExplorer">{{
+          $t("common.revealInExplorer")
+        }}</NButton>
+        <NButton size="small" type="primary" @click="emit('close')">{{
+          $t("common.close")
+        }}</NButton>
       </NSpace>
     </template>
   </NModal>

@@ -65,7 +65,7 @@ async function waitForTabCount(expected: number, message: string): Promise<void>
   await waitForInBrowser(
     browser,
     (want: number) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       return window.__pinia__._s.get("tabs").tabs.length === want;
     },
     [expected],
@@ -183,7 +183,7 @@ async function waitForActivePathEndingWith(suffix: string, message: string): Pro
   await waitForInBrowser(
     browser,
     (want: string) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const tabs = window.__pinia__._s.get("tabs");
       const active = tabs.tabs.find((t: { id: string }) => t.id === tabs.activeTabId);
       return !!active && String(active.path ?? "").endsWith(want);
@@ -232,7 +232,9 @@ describe("全部标签面板", () => {
 
     // 计数徽标 = 标签总数
     await waitForPresent(browser, BTN, 8000);
-    expect(await readText(browser, `${BTN} .all-tabs-count`, String(state.tabs.length))).toBe(String(state.tabs.length));
+    expect(await readText(browser, `${BTN} .all-tabs-count`, String(state.tabs.length))).toBe(
+      String(state.tabs.length)
+    );
 
     await openPanel();
     await waitForEntryCount(8, "面板列出全部 8 个标签");
@@ -331,7 +333,9 @@ describe("全部标签面板", () => {
     await waitForInBrowser(
       browser,
       (sel: string) =>
-        Array.from(document.querySelectorAll(`${sel} .all-tabs-item`))[1]?.classList.contains("focused") === true,
+        Array.from(document.querySelectorAll(`${sel} .all-tabs-item`))[1]?.classList.contains(
+          "focused"
+        ) === true,
       [PANEL],
       { timeout: 5000, message: "↓↓ 后第 2 项成为键盘高亮项" }
     );

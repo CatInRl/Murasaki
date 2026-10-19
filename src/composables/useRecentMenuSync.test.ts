@@ -63,7 +63,10 @@ describe("useRecentMenuSync", () => {
     it("并发调用不重复 invoke（in-flight 锁）", async () => {
       const resolvers: (() => void)[] = [];
       mockedInvoke.mockImplementation(
-        () => new Promise<void>((r) => { resolvers.push(r); })
+        () =>
+          new Promise<void>((r) => {
+            resolvers.push(r);
+          })
       );
       const persistence = makePersistence(["/a"], []);
       const { syncNow } = useRecentMenuSync({ persistence, initialized: ref(true) });
@@ -85,7 +88,10 @@ describe("useRecentMenuSync", () => {
     it("scheduled 在 flight 期间清零后不再重排", async () => {
       const resolvers: (() => void)[] = [];
       mockedInvoke.mockImplementation(
-        () => new Promise<void>((r) => { resolvers.push(r); })
+        () =>
+          new Promise<void>((r) => {
+            resolvers.push(r);
+          })
       );
       const persistence = makePersistence(["/a"], []);
       const { syncNow } = useRecentMenuSync({ persistence, initialized: ref(true) });

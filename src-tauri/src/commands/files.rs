@@ -1,11 +1,11 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
-use lexical_sort::natural_lexical_cmp;
-use pinyin::ToPinyin;
 use super::atomic_write::write_atomic;
 use crate::errors::{CommandError, ErrorCode};
 use crate::security::policy;
+use lexical_sort::natural_lexical_cmp;
+use pinyin::ToPinyin;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// 文件树节点：与前端 TreeNode 类型对齐
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,7 +37,7 @@ const NOISE_NAMES: &[&str] = &[
 ];
 
 pub(crate) fn is_noise(name: &str) -> bool {
-    NOISE_NAMES.iter().any(|n| *n == name)
+    NOISE_NAMES.contains(&name)
 }
 
 /// 是否展示该条目：show_hidden=false 时过滤 NOISE_NAMES 清单与 dotfile
@@ -73,10 +73,16 @@ fn category_of(s: &str) -> u8 {
 
 /// 中文拼音排序：取首字符拼音 plain 形式比较，无法识别时回退到原字符串小写
 fn pinyin_cmp(a: &str, b: &str) -> std::cmp::Ordering {
-    let pa = a.to_pinyin().next().flatten()
+    let pa = a
+        .to_pinyin()
+        .next()
+        .flatten()
         .map(|p| p.plain().to_string())
         .unwrap_or_else(|| a.to_lowercase());
-    let pb = b.to_pinyin().next().flatten()
+    let pb = b
+        .to_pinyin()
+        .next()
+        .flatten()
         .map(|p| p.plain().to_string())
         .unwrap_or_else(|| b.to_lowercase());
     pa.cmp(&pb)
@@ -86,7 +92,7 @@ fn pinyin_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 ///   1. 目录优先于文件
 ///   2. 同优先级内按字符类别分组：数字 → 英文 → 中文 → 其他
 ///   3. 组内排序：数字自然序、英文大小写不敏感字母序、中文拼音序、其他 Unicode 码点序
-fn sort_tree_nodes(nodes: &mut Vec<TreeNode>) {
+fn sort_tree_nodes(nodes: &mut [TreeNode]) {
     nodes.sort_by(|a, b| {
         // 1. 目录优先
         let da = a.node_type == "directory";
@@ -110,17 +116,20 @@ fn sort_tree_nodes(nodes: &mut Vec<TreeNode>) {
         }
         // 4. 组内排序
         match ca {
-            0 => natural_lexical_cmp(&a.name, &b.name),        // 数字自然序
+            0 => natural_lexical_cmp(&a.name, &b.name), // 数字自然序
             1 => a.name.to_lowercase().cmp(&b.name.to_lowercase()), // 英文字母序（大小写不敏感）
-            2 => pinyin_cmp(&a.name, &b.name),                 // 中文拼音序
-            _ => a.name.cmp(&b.name),                          // 其他 Unicode 码点序
+            2 => pinyin_cmp(&a.name, &b.name),          // 中文拼音序
+            _ => a.name.cmp(&b.name),                   // 其他 Unicode 码点序
         }
     });
 }
 
 fn is_markdown(name: &str) -> bool {
     let lower = name.to_lowercase();
-    lower.ends_with(".md") || lower.ends_with(".markdown") || lower.ends_with(".mdown") || lower.ends_with(".mkd")
+    lower.ends_with(".md")
+        || lower.ends_with(".markdown")
+        || lower.ends_with(".mdown")
+        || lower.ends_with(".mkd")
 }
 
 /// 文件树递归深度上限（根目录为第 0 层）。
@@ -243,7 +252,10 @@ fn build_tree_inner(
 /// #432：改为 `async` + `spawn_blocking`，避免递归遍历大目录时阻塞主线程；
 /// 超过深度 / 节点数上限时返回 `truncated = true`。
 #[tauri::command]
-pub async fn list_tree(path: String, show_hidden: Option<bool>) -> Result<TreeListing, CommandError> {
+pub async fn list_tree(
+    path: String,
+    show_hidden: Option<bool>,
+) -> Result<TreeListing, CommandError> {
     policy().ensure_read(&path)?;
     tauri::async_runtime::spawn_blocking(move || {
         let dir = PathBuf::from(&path);
@@ -351,18 +363,13 @@ pub fn rename_path(from: String, to: String) -> Result<TreeNode, CommandError> {
     if let Some(parent) = dst.parent() {
         fs::create_dir_all(parent).map_err(|e| CommandError::io_at(&e, parent))?;
     }
-    fs::rename(&src, &dst).map_err(|e| {
-        CommandError::io_at(&e, &from).with_param("to", to.clone())
-    })?;
+    fs::rename(&src, &dst)
+        .map_err(|e| CommandError::io_at(&e, &from).with_param("to", to.clone()))?;
     let name = dst
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
-    let node_type = if dst.is_dir() {
-        "directory"
-    } else {
-        "file"
-    };
+    let node_type = if dst.is_dir() { "directory" } else { "file" };
     Ok(TreeNode {
         name,
         path: dst.to_string_lossy().to_string(),
@@ -386,8 +393,9 @@ pub fn copy_file(from: String, to: String) -> Result<TreeNode, CommandError> {
         return Err(CommandError::path(ErrorCode::AlreadyExists, &to));
     }
     if src.is_dir() {
-        return Err(CommandError::new(ErrorCode::Unsupported)
-            .with_param("operation", "copy_directory"));
+        return Err(
+            CommandError::new(ErrorCode::Unsupported).with_param("operation", "copy_directory")
+        );
     }
     if let Some(parent) = dst.parent() {
         fs::create_dir_all(parent).map_err(|e| CommandError::io_at(&e, parent))?;
@@ -574,7 +582,11 @@ mod tests {
             "/definitely/not/here/murasaki-307.txt"
         };
         let err = open_with_default_app(missing.to_string()).unwrap_err();
-        assert_eq!(err.code, ErrorCode::OutsideWorkspace, "unexpected error: {err}");
+        assert_eq!(
+            err.code,
+            ErrorCode::OutsideWorkspace,
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
@@ -601,7 +613,11 @@ mod tests {
             "/definitely/not/here/murasaki-308"
         };
         let err = get_file_size(missing.to_string()).unwrap_err();
-        assert_eq!(err.code, ErrorCode::OutsideWorkspace, "unexpected error: {err}");
+        assert_eq!(
+            err.code,
+            ErrorCode::OutsideWorkspace,
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
@@ -612,7 +628,11 @@ mod tests {
             "/definitely/not/here/murasaki-437.md"
         };
         let err = create_file(outside.to_string()).unwrap_err();
-        assert_eq!(err.code, ErrorCode::OutsideWorkspace, "unexpected error: {err}");
+        assert_eq!(
+            err.code,
+            ErrorCode::OutsideWorkspace,
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
@@ -640,7 +660,8 @@ mod tests {
         let hidden = build_tree_inner(&dir, true, 0, &mut TreeBudget::new(MAX_TREE_NODES)).unwrap();
         assert_eq!(hidden.len(), 2);
 
-        let visible = build_tree_inner(&dir, false, 0, &mut TreeBudget::new(MAX_TREE_NODES)).unwrap();
+        let visible =
+            build_tree_inner(&dir, false, 0, &mut TreeBudget::new(MAX_TREE_NODES)).unwrap();
         assert_eq!(visible.len(), 1);
         assert_eq!(visible[0].name, "a.md");
 

@@ -94,8 +94,7 @@ describe("useImagePaste utilities", () => {
       const paste = useImagePaste({
         getEditorView: () => view,
         getWorkspacePath: () => (opts.workspace === undefined ? "/ws" : opts.workspace),
-        getCurrentFilePath: () =>
-          opts.currentFile === undefined ? "/ws/a.md" : opts.currentFile,
+        getCurrentFilePath: () => (opts.currentFile === undefined ? "/ws/a.md" : opts.currentFile),
         getInsertMode: () => opts.mode ?? "file",
         getImageDir: () => "assets/images",
       });
@@ -159,7 +158,9 @@ describe("useImagePaste utilities", () => {
       const { paste, dispatch } = makePaste({ mode: "base64" });
       expect(await paste.insertDroppedImages(["/tmp/pic.png"])).toBe(true);
 
-      expect(mockedInvoke).toHaveBeenCalledWith("read_image_base64", { sourcePath: "/tmp/pic.png" });
+      expect(mockedInvoke).toHaveBeenCalledWith("read_image_base64", {
+        sourcePath: "/tmp/pic.png",
+      });
       expect(dispatch).toHaveBeenCalledWith(
         expect.objectContaining({
           changes: { from: 0, to: 0, insert: "![](data:image/png;base64,Zm9v)" },
@@ -171,7 +172,9 @@ describe("useImagePaste utilities", () => {
       mockedInvoke.mockResolvedValue("Zm9v");
       const { paste, dispatch } = makePaste({ mode: "file", workspace: null });
       await paste.insertDroppedImages(["/tmp/pic.png"]);
-      expect(mockedInvoke).toHaveBeenCalledWith("read_image_base64", { sourcePath: "/tmp/pic.png" });
+      expect(mockedInvoke).toHaveBeenCalledWith("read_image_base64", {
+        sourcePath: "/tmp/pic.png",
+      });
       expect(dispatch).toHaveBeenCalledWith(
         expect.objectContaining({
           changes: { from: 0, to: 0, insert: "![](data:image/png;base64,Zm9v)" },
@@ -321,9 +324,9 @@ describe("useImagePaste utilities", () => {
       // 已有配置也不会改变结论
       expect(resolveInsertMode({ configured: "base64", hasWorkspace: false })).toBe("base64");
       // Alt 也救不了：没有工作区就是内嵌
-      expect(
-        resolveInsertMode({ configured: "file", altKey: true, hasWorkspace: false })
-      ).toBe("base64");
+      expect(resolveInsertMode({ configured: "file", altKey: true, hasWorkspace: false })).toBe(
+        "base64"
+      );
     });
 
     it("有工作区时按配置走", () => {

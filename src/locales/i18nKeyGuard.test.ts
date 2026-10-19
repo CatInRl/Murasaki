@@ -64,7 +64,7 @@ describe("findI18nKeys", () => {
 });
 
 describe("i18n key 守卫", () => {
-  it("src 里所有字面量 t(\"...\") key 都能在三种语言里解析", () => {
+  it('src 里所有字面量 t("...") key 都能在三种语言里解析', () => {
     const broken: string[] = [];
     for (const path of walk(SRC_ROOT)) {
       const rel = relative(SRC_ROOT, path).replace(/\\/g, "/");

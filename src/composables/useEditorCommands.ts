@@ -164,8 +164,7 @@ export function toggleCodeBlock(view: EditorView): void {
   if (isStartFence) {
     // 已在代码块内，移除围栏
     const afterLineNum = toLine.number + 1;
-    const afterLine =
-      afterLineNum <= doc.lines ? doc.line(afterLineNum).text : "";
+    const afterLine = afterLineNum <= doc.lines ? doc.line(afterLineNum).text : "";
     if (/^```\s*$/.test(afterLine)) {
       const start = doc.line(prevLineNum).from;
       const end = doc.line(afterLineNum).to;
@@ -474,7 +473,10 @@ export function handleEnterInBlockquote(view: EditorView): boolean {
   // 非空行：换行并保持相同层级
   // 去除光标前的尾部空白（避免行末多余空格）
   let from = head;
-  while (from > line.from + fullPrefix.length && /\s/.test(line.text.charAt(from - line.from - 1))) {
+  while (
+    from > line.from + fullPrefix.length &&
+    /\s/.test(line.text.charAt(from - line.from - 1))
+  ) {
     from--;
   }
 

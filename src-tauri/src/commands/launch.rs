@@ -141,17 +141,9 @@ mod tests {
     fn classify_drop_paths_splits_file_folder_missing() {
         let dir = tempfile::tempdir().unwrap();
         let folder = dir.path().to_string_lossy().to_string();
-        let file = dir
-            .path()
-            .join("a.md")
-            .to_string_lossy()
-            .to_string();
+        let file = dir.path().join("a.md").to_string_lossy().to_string();
         std::fs::write(&file, "x").unwrap();
-        let missing = dir
-            .path()
-            .join("nope.md")
-            .to_string_lossy()
-            .to_string();
+        let missing = dir.path().join("nope.md").to_string_lossy().to_string();
 
         let got = classify_drop_paths_impl(&[file.clone(), folder.clone(), missing.clone()]);
 

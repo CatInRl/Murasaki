@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
-import {
-  useContextMenuStore,
-  clampToViewport,
-  type MenuItem,
-} from "./useContextMenuStore";
+import { useContextMenuStore, clampToViewport, type MenuItem } from "./useContextMenuStore";
 
 beforeEach(() => {
   setActivePinia(createPinia());
@@ -79,11 +75,7 @@ describe("useContextMenuStore", () => {
       expect(menu.items).toHaveLength(1);
       expect(menu.items[0].label).toBe("第一组");
 
-      menu.show(mockEvent(300, 400), [
-        { label: "A" },
-        { separator: true },
-        { label: "B" },
-      ]);
+      menu.show(mockEvent(300, 400), [{ label: "A" }, { separator: true }, { label: "B" }]);
 
       // 仍只显示一个菜单（visible 保持 true，无第二个实例）
       expect(menu.visible).toBe(true);
@@ -144,7 +136,12 @@ describe("useContextMenuStore", () => {
       const menu = useContextMenuStore();
       let called = false;
       const items: MenuItem[] = [
-        { label: "点我", action: () => { called = true; } },
+        {
+          label: "点我",
+          action: () => {
+            called = true;
+          },
+        },
       ];
       menu.show(mockEvent(0, 0), items);
 

@@ -145,13 +145,16 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcher {
     if (!unlistenFileChanged) {
       // 窗口级 target：Rust 侧用 `emit_to(label)` 定向发送，裸 `listen` 的
       // `Any` target 会匹配一切 emit，导致本窗口收到其它窗口工作区的变更。
-      unlistenFileChanged = await getCurrentWebviewWindow().listen<FileChangePayload>("file-changed", (event) => {
-        const change = event.payload;
-        if (change?.path) {
-          mergeChange(change);
-          scheduleFlush();
+      unlistenFileChanged = await getCurrentWebviewWindow().listen<FileChangePayload>(
+        "file-changed",
+        (event) => {
+          const change = event.payload;
+          if (change?.path) {
+            mergeChange(change);
+            scheduleFlush();
+          }
         }
-      });
+      );
     }
 
     // 启动工作区监听

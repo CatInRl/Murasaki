@@ -71,30 +71,24 @@ import { IS_MACOS, EMBEDDED_DRIVER_PORT } from "./platform";
  * 所以这段几何/样式判定只能写一次，由 `isRendered` 与 `isRenderedElement` 共用（#284）。
  */
 async function renderedCheck(browser: Browser, target: unknown): Promise<boolean> {
-  return await browser.execute(
-    (t: unknown) => {
-      // 选择器字符串 → 取首个匹配；元素句柄 → webdriverio 已还原成 DOM 节点
-      const el = (typeof t === "string" ? document.querySelector(t) : t) as HTMLElement | null;
-      if (!el) return false;
-      const rect = el.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) return false;
-      const style = getComputedStyle(el);
-      if (style.display === "none") return false;
-      if (style.visibility === "hidden") return false;
-      if (style.opacity === "0") return false;
-      return true;
-    },
-    target
-  );
+  return await browser.execute((t: unknown) => {
+    // 选择器字符串 → 取首个匹配；元素句柄 → webdriverio 已还原成 DOM 节点
+    const el = (typeof t === "string" ? document.querySelector(t) : t) as HTMLElement | null;
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    const style = getComputedStyle(el);
+    if (style.display === "none") return false;
+    if (style.visibility === "hidden") return false;
+    if (style.opacity === "0") return false;
+    return true;
+  }, target);
 }
 
 /**
  * 判断某选择器的首个元素是否「已渲染」：存在 + 非零尺寸 + 未被隐藏（display/visibility/opacity）
  */
-export async function isRendered(
-  browser: Browser,
-  selector: string
-): Promise<boolean> {
+export async function isRendered(browser: Browser, selector: string): Promise<boolean> {
   return await renderedCheck(browser, selector);
 }
 
@@ -104,10 +98,7 @@ export async function isRendered(
  * 用于选择器没法用 CSS 表达的句柄（文本选择器如 `.action-label=打开文件夹`、
  * XPath 取到的节点）：webdriverio 会把句柄序列化成 WebElement 引用传进页面。
  */
-export async function isRenderedElement(
-  browser: Browser,
-  element: unknown
-): Promise<boolean> {
+export async function isRenderedElement(browser: Browser, element: unknown): Promise<boolean> {
   return await renderedCheck(browser, element);
 }
 
@@ -136,9 +127,7 @@ export async function waitForRendered(
     if ((await el.isExisting()) && (await isRenderedElement(browser, el))) return;
     await browser.pause(100);
   }
-  throw new Error(
-    `waitForRendered: "${selector}" still not rendered after ${timeout}ms`
-  );
+  throw new Error(`waitForRendered: "${selector}" still not rendered after ${timeout}ms`);
 }
 
 /**
@@ -227,8 +216,7 @@ export async function readText(
     if (matches(last)) return last;
     await browser.pause(interval);
   }
-  const want =
-    expected === undefined ? "非空文本" : `"${String(expected)}"`;
+  const want = expected === undefined ? "非空文本" : `"${String(expected)}"`;
   throw new Error(
     `readText: "${selector}" 未在 ${timeout}ms 内变为 ${want}（最后读到：${JSON.stringify(last)}）`
   );
@@ -308,7 +296,7 @@ function directEval<T>(script: unknown, args: unknown[], windowLabel: string): P
         res.on("data", (c: Buffer) => chunks.push(c));
         res.on("end", () => {
           const text = Buffer.concat(chunks).toString("utf8");
-          let body: { value?: unknown; undef?: boolean; error?: string } = {};
+          let body: { value?: unknown; undef?: boolean; error?: string };
           try {
             body = text ? JSON.parse(text) : {};
           } catch {
@@ -409,9 +397,7 @@ export async function waitForInBrowser<T = unknown>(
     if (last) return last as T;
     await browser.pause(interval);
   }
-  const errorNote = lastError
-    ? `（最后一次 execute 报错：${String(lastError)}）`
-    : "";
+  const errorNote = lastError ? `（最后一次 execute 报错：${String(lastError)}）` : "";
   throw new Error(
     `waitForInBrowser: ${message} 未在 ${Date.now() - start}ms（基础预算 ${timeout}ms）内满足` +
       `${errorNote}（最后一次结果：${JSON.stringify(last)}）`

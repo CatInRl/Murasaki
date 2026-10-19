@@ -133,16 +133,12 @@ export const usePersistenceStore = defineStore("persistence", () => {
 
   /** 获取最近打开的文件夹列表（最多 5 条） */
   function getRecentFolders(limit = 5): RecentEntry[] {
-    return recentEntries.value
-      .filter((e) => e.type === "folder")
-      .slice(0, limit);
+    return recentEntries.value.filter((e) => e.type === "folder").slice(0, limit);
   }
 
   /** 获取最近打开的文件列表（最多 5 条） */
   function getRecentFiles(limit = 5): RecentEntry[] {
-    return recentEntries.value
-      .filter((e) => e.type === "file")
-      .slice(0, limit);
+    return recentEntries.value.filter((e) => e.type === "file").slice(0, limit);
   }
 
   // ===== Tabs =====

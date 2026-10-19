@@ -1,0 +1,17 @@
+dist
+node_modules
+public
+murasaki-ui-design
+src-tauri/target
+src-tauri/gen
+coverage
+.appdata
+.scratch
+.sscratch
+e2e/.workspace*
+e2e/scripts
+e2e/*.cjs
+e2e/specs/inspect.spec.ts
+package-lock.json
+CHANGELOG.md
+*.md

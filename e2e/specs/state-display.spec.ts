@@ -49,7 +49,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     // 清空最近打开记录，确保 WelcomePage 的 EmptyState（"暂无最近文件"）能渲染
     // resetPersistenceSettings 只重置 settings，不清理 recentEntries
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const persistence = pinia._s.get("persistence");
       if (persistence) {
@@ -99,13 +99,13 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     // 触发搜索：查询一个不存在的内容
     // 先 visible=true 挂载统一搜索条（挂载会 clear 旧查询），再设置关键词
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
     await browser.pause(200);
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.setQuery("zzz_no_match_keyword_xyz_12345");
       Promise.resolve(search.search())
@@ -141,15 +141,13 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     // 切换到大纲视图（通过 App.vue 暴露的 test hook）
     // Sidebar 切换按钮使用 aria-label 而非 textContent，DOM 文本匹配无法命中
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__setSidebarView__("outline");
     });
     await browser.pause(500);
 
     // 大纲面板应显示 EmptyState（OutlinePanel.vue 第 44-49 行）
-    const empty = await browser.$(
-      ".outline-pane .empty-state, [class*='outline'] .empty-state"
-    );
+    const empty = await browser.$(".outline-pane .empty-state, [class*='outline'] .empty-state");
     await waitForPresent(
       browser,
       ".outline-pane .empty-state, [class*='outline'] .empty-state",
@@ -171,7 +169,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     // 通过 store 直接置 loading=true 模拟加载中（绕过实际异步读取）
     // 同时清空 fileTree 以满足 FileTree.vue 的 v-if 条件：loading && fileTree.length === 0
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const ws = window.__pinia__._s.get("workspace");
       ws.loading = true;
       ws.fileTree = [];
@@ -184,7 +182,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     // —— 实际场景下 FileTree Skeleton 只在首次 openWorkspace 期间短暂出现
     // 此测试通过手动设置 loading=true + fileTree=[] + workspacePath!=null 模拟
     await browser.execute((path: string) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const ws = window.__pinia__._s.get("workspace");
       ws.workspacePath = path;
       ws.loading = true;
@@ -202,7 +200,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
 
     // 清理：恢复正常状态
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const ws = window.__pinia__._s.get("workspace");
       ws.loading = false;
     });
@@ -215,13 +213,13 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
 
     // 先 visible=true 挂载统一搜索条（挂载会 clear 旧查询），再模拟加载中
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
     await browser.pause(200);
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.query = "简介";
       search.loading = true;
@@ -237,7 +235,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
 
     // 清理
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.loading = false;
       search.query = "";
@@ -257,7 +255,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
 
     // 切换到大纲视图（通过 App.vue 暴露的 test hook）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       window.__setSidebarView__("outline");
     });
     await browser.pause(300);
@@ -266,14 +264,10 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     // 由于 useOutline 的 loading 是组件内部 ref，无法直接访问
     // 退而求其次：验证 OutlinePanel 的 Skeleton 组件能正确渲染（通过断言 .skeleton 类存在性）
     // —— 实际加载很快，难以稳定抓取；此用例作为弱断言，验证组件结构正确
-    const outlinePane = await browser.$(
-      ".outline-pane, [class*='outline']"
-    );
+    const outlinePane = await browser.$(".outline-pane, [class*='outline']");
     expect(await outlinePane.isExisting()).toBe(true);
     // 大纲项应存在（intro.md 有标题）
-    const items = await browser.$$(
-      ".outline-pane .outline-item, [class*='outline'] .outline-item"
-    );
+    const items = await browser.$$(".outline-pane .outline-item, [class*='outline'] .outline-item");
     expect(items.length).toBeGreaterThan(0);
   });
 
@@ -306,13 +300,13 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
     await ensureSplitMode(browser);
 
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.visible = true;
     });
     await browser.pause(200);
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.query = "测试";
       search.loading = true;
@@ -327,7 +321,7 @@ describe("状态展示三兄弟（EmptyState / Skeleton / ErrorState）", () => 
 
     // 清理
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const search = window.__pinia__._s.get("search");
       search.loading = false;
       search.query = "";

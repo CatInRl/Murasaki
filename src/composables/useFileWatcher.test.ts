@@ -33,11 +33,7 @@ vi.mock("../stores/useTabsStore", () => ({
 
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  useFileWatcher,
-  shouldRefreshTree,
-  type FileChangePayload,
-} from "./useFileWatcher";
+import { useFileWatcher, shouldRefreshTree, type FileChangePayload } from "./useFileWatcher";
 
 const mockedListen = listen as unknown as ReturnType<typeof vi.fn>;
 const mockedInvoke = invoke as unknown as ReturnType<typeof vi.fn>;
@@ -195,9 +191,7 @@ describe("useFileWatcher 事件编排", () => {
 
     // 关键：不能因为「路径与上次相同」跳过 —— 必须先停后启拿一个盯新目录的新 watcher
     expect(mockedInvoke).toHaveBeenCalledWith("stop_watching", { path: "C:/ws" });
-    expect(
-      mockedInvoke.mock.calls.filter(([cmd]) => cmd === "start_watching")
-    ).toHaveLength(2);
+    expect(mockedInvoke.mock.calls.filter(([cmd]) => cmd === "start_watching")).toHaveLength(2);
     // 且顺序必须是「先停后启」（Rust 侧 start_watching 对同路径会幂等早返回）
     expect(mockedInvoke.mock.calls.map(([cmd]) => cmd).slice(-2)).toEqual([
       "stop_watching",

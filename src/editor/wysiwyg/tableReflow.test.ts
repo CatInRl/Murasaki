@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { parseTable, reflowTable, displayWidth, addColumn, removeColumn, addRow, removeRow, setAlignment, setCell } from "./tableReflow";
+import {
+  parseTable,
+  reflowTable,
+  displayWidth,
+  addColumn,
+  removeColumn,
+  addRow,
+  removeRow,
+  setAlignment,
+  setCell,
+} from "./tableReflow";
 
 // 源示例取自 high-fi UX：补空格对齐到中文显示宽度
 const source = [
@@ -65,7 +75,11 @@ describe("reflowTable", () => {
   function expectPipeAligned(out: string) {
     // 每个内部管道符的"显示宽度位置" = 其左侧前缀的累计显示宽
     const posSets = out.split("\n").map((l) =>
-      [...l.matchAll(/\|/g)].map((m) => m.index!).slice(1, -1).map((i) => displayWidth(l.slice(0, i))).join(","),
+      [...l.matchAll(/\|/g)]
+        .map((m) => m.index!)
+        .slice(1, -1)
+        .map((i) => displayWidth(l.slice(0, i)))
+        .join(",")
     );
     for (let i = 1; i < posSets.length; i++) {
       expect(posSets[i]).toBe(posSets[0]);
@@ -81,13 +95,17 @@ describe("reflowTable", () => {
   });
 
   it("中文（显示宽度 2）正确参与列宽计算并对齐", () => {
-    const t = parseTable(["| 列 | x |", "|---|---|", "| 字 | 值 |", "| 很长的字 | 1 |"].join("\n"))!;
+    const t = parseTable(
+      ["| 列 | x |", "|---|---|", "| 字 | 值 |", "| 很长的字 | 1 |"].join("\n")
+    )!;
     const out = reflowTable(t);
     expectPipeAligned(out);
   });
 
   it("含 emoji 等非 BMP 字符的列仍按显示宽度对齐", () => {
-    const t = parseTable(["| 表情 | 值 |", "|------|---|", "| 😀 | 1 |", "| 普通文字 | 2 |"].join("\n"))!;
+    const t = parseTable(
+      ["| 表情 | 值 |", "|------|---|", "| 😀 | 1 |", "| 普通文字 | 2 |"].join("\n")
+    )!;
     expectPipeAligned(reflowTable(t));
   });
 
@@ -153,12 +171,14 @@ describe("setCell", () => {
 });
 
 describe("结构性操作", () => {
-  const t = parseTable([
-    "| 功能 | 状态 | 负责人 |",
-    "|:---|:---:|---:|",
-    "| 就地编辑 | 进行中 | UI 组 |",
-    "| 行列增删 | 待办 | 引擎组 |",
-  ].join("\n"))!;
+  const t = parseTable(
+    [
+      "| 功能 | 状态 | 负责人 |",
+      "|:---|:---:|---:|",
+      "| 就地编辑 | 进行中 | UI 组 |",
+      "| 行列增删 | 待办 | 引擎组 |",
+    ].join("\n")
+  )!;
 
   it("addColumn：在中第 1 列前插入空列，对齐同步插入 l，往返有效", () => {
     const out = addColumn(t, 1);

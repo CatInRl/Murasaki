@@ -1,11 +1,11 @@
+use crate::errors::CommandError;
+use crate::i18n;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
 use tauri::menu::{
-    CheckMenuItemBuilder, MenuBuilder, MenuItemKind, MenuItemBuilder, SubmenuBuilder,
+    CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, MenuItemKind, SubmenuBuilder,
 };
-use crate::i18n;
-use crate::errors::CommandError;
+use tauri::{AppHandle, Manager};
 
 /// 菜单操作失败：内部错误 + 原始细节（细节只进日志 / 参数，不直接展示给用户）
 fn menu_error(err: impl std::fmt::Display) -> CommandError {
@@ -151,7 +151,12 @@ pub fn apply_checked_for_window(app: &AppHandle, label: &str) -> Result<(), Comm
     )?;
     set_checked_by_ids(
         &menu,
-        &["mode-source", "mode-split", "mode-wysiwyg", "mode-presentation"],
+        &[
+            "mode-source",
+            "mode-split",
+            "mode-wysiwyg",
+            "mode-presentation",
+        ],
         &format!("mode-{}", ui.mode),
     )?;
     set_checked_by_ids(
@@ -163,22 +168,16 @@ pub fn apply_checked_for_window(app: &AppHandle, label: &str) -> Result<(), Comm
 
 /// 构建应用主菜单
 /// 在 setup 与 update_recent_menu 时共用，保证菜单结构一致
-pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, Box<dyn std::error::Error>> {
+pub fn build_app_menu(
+    app: &AppHandle,
+) -> Result<tauri::menu::Menu<tauri::Wry>, Box<dyn std::error::Error>> {
     let state = app.state::<RecentMenuState>();
     let folders = state.folders.lock().map_err(menu_error)?.clone();
     let files = state.files.lock().map_err(menu_error)?.clone();
-    let lang = state
-        .current_language
-        .lock()
-        .map_err(menu_error)?
-        .clone();
+    let lang = state.current_language.lock().map_err(menu_error)?.clone();
     // 按 menu.json 的实际点号 key 查询当前语言文案
     let mt = |key: &str| i18n::menu_text(&lang, key);
-    let overrides = state
-        .shortcut_overrides
-        .lock()
-        .map_err(menu_error)?
-        .clone();
+    let overrides = state.shortcut_overrides.lock().map_err(menu_error)?.clone();
     // 解析菜单项的实际快捷键提示：
     // - 无覆盖 → 使用默认 accelerator
     // - Some(Some(a)) → 使用用户覆盖的 accelerator
@@ -193,68 +192,190 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
 
     // === File menu ===
     let mut file_builder = SubmenuBuilder::new(app, mt("fileMenu"))
-        .text("new-file", i18n::with_accel(mt("file.newFile"), &accel("new-file", "CmdOrCtrl+N")))
+        .text(
+            "new-file",
+            i18n::with_accel(mt("file.newFile"), &accel("new-file", "CmdOrCtrl+N")),
+        )
         .text("new-folder", mt("file.newFolder"))
         .separator()
-        .text("open-file", i18n::with_accel(mt("file.openFile"), &accel("open-file", "CmdOrCtrl+O")))
-        .text("open-folder", i18n::with_accel(mt("file.openFolder"), &accel("open-folder", "CmdOrCtrl+Shift+O")))
+        .text(
+            "open-file",
+            i18n::with_accel(mt("file.openFile"), &accel("open-file", "CmdOrCtrl+O")),
+        )
+        .text(
+            "open-folder",
+            i18n::with_accel(
+                mt("file.openFolder"),
+                &accel("open-folder", "CmdOrCtrl+Shift+O"),
+            ),
+        )
         .separator();
 
     // "最近打开" 双子菜单：最近文件夹 + 最近文件
     // build_recent_submenu 会更新 id_to_path 映射
-    let recent_folders_submenu = build_recent_submenu(app, mt("recentFolders"), mt("noRecent"), &folders, "recent-folder", &state.id_to_path)?;
-    let recent_files_submenu = build_recent_submenu(app, mt("recentFiles"), mt("noRecent"), &files, "recent-file", &state.id_to_path)?;
+    let recent_folders_submenu = build_recent_submenu(
+        app,
+        mt("recentFolders"),
+        mt("noRecent"),
+        &folders,
+        "recent-folder",
+        &state.id_to_path,
+    )?;
+    let recent_files_submenu = build_recent_submenu(
+        app,
+        mt("recentFiles"),
+        mt("noRecent"),
+        &files,
+        "recent-file",
+        &state.id_to_path,
+    )?;
     file_builder = file_builder
         .item(&recent_folders_submenu)
         .item(&recent_files_submenu)
         .separator()
-        .text("save", i18n::with_accel(mt("file.save"), &accel("save", "CmdOrCtrl+S")))
-        .text("save-as", i18n::with_accel(mt("file.saveAs"), &accel("save-as", "CmdOrCtrl+Shift+S")))
+        .text(
+            "save",
+            i18n::with_accel(mt("file.save"), &accel("save", "CmdOrCtrl+S")),
+        )
+        .text(
+            "save-as",
+            i18n::with_accel(mt("file.saveAs"), &accel("save-as", "CmdOrCtrl+Shift+S")),
+        )
         .separator()
         .text("export-html", mt("file.exportHtml"))
         .text("export-pdf", mt("file.exportPdf"))
         .text("copy-rich-text", mt("file.copyRichText"))
         .separator()
-        .text("close-tab", i18n::with_accel(mt("file.closeTab"), &accel("close-tab", "CmdOrCtrl+W")))
-        .text("reload-file", i18n::with_accel(mt("file.reloadFile"), &accel("reload-file", "CmdOrCtrl+R")))
+        .text(
+            "close-tab",
+            i18n::with_accel(mt("file.closeTab"), &accel("close-tab", "CmdOrCtrl+W")),
+        )
+        .text(
+            "reload-file",
+            i18n::with_accel(mt("file.reloadFile"), &accel("reload-file", "CmdOrCtrl+R")),
+        )
         .text("close-workspace", mt("file.closeWorkspace"))
         .separator()
         .text("settings", mt("file.settings"))
         .separator()
-        .text("quit", i18n::with_accel(mt("file.quit"), &accel("quit", "CmdOrCtrl+Q")));
+        .text(
+            "quit",
+            i18n::with_accel(mt("file.quit"), &accel("quit", "CmdOrCtrl+Q")),
+        );
 
     let file_menu = file_builder.build()?;
 
     // === Edit menu ===
     let edit_menu = SubmenuBuilder::new(app, mt("editMenu"))
-        .text("undo", i18n::with_accel(mt("edit.undo"), &accel("undo", "CmdOrCtrl+Z")))
-        .text("redo", i18n::with_accel(mt("edit.redo"), &accel("redo", "CmdOrCtrl+Y")))
+        .text(
+            "undo",
+            i18n::with_accel(mt("edit.undo"), &accel("undo", "CmdOrCtrl+Z")),
+        )
+        .text(
+            "redo",
+            i18n::with_accel(mt("edit.redo"), &accel("redo", "CmdOrCtrl+Y")),
+        )
         .separator()
-        .text("cut", i18n::with_accel(mt("edit.cut"), &accel("cut", "CmdOrCtrl+X")))
-        .text("copy", i18n::with_accel(mt("edit.copy"), &accel("copy", "CmdOrCtrl+C")))
-        .text("paste", i18n::with_accel(mt("edit.paste"), &accel("paste", "CmdOrCtrl+V")))
-        .text("select-all", i18n::with_accel(mt("edit.selectAll"), &accel("select-all", "CmdOrCtrl+A")))
+        .text(
+            "cut",
+            i18n::with_accel(mt("edit.cut"), &accel("cut", "CmdOrCtrl+X")),
+        )
+        .text(
+            "copy",
+            i18n::with_accel(mt("edit.copy"), &accel("copy", "CmdOrCtrl+C")),
+        )
+        .text(
+            "paste",
+            i18n::with_accel(mt("edit.paste"), &accel("paste", "CmdOrCtrl+V")),
+        )
+        .text(
+            "select-all",
+            i18n::with_accel(mt("edit.selectAll"), &accel("select-all", "CmdOrCtrl+A")),
+        )
         .separator()
-        .text("find", i18n::with_accel(mt("edit.find"), &accel("find", "CmdOrCtrl+F")))
-        .text("replace", i18n::with_accel(mt("edit.replace"), &accel("replace", "CmdOrCtrl+H")))
-        .text("find-in-files", i18n::with_accel(mt("edit.findInFiles"), &accel("find-in-files", "CmdOrCtrl+Shift+F")))
+        .text(
+            "find",
+            i18n::with_accel(mt("edit.find"), &accel("find", "CmdOrCtrl+F")),
+        )
+        .text(
+            "replace",
+            i18n::with_accel(mt("edit.replace"), &accel("replace", "CmdOrCtrl+H")),
+        )
+        .text(
+            "find-in-files",
+            i18n::with_accel(
+                mt("edit.findInFiles"),
+                &accel("find-in-files", "CmdOrCtrl+Shift+F"),
+            ),
+        )
         .build()?;
 
     // === Paragraph menu ===
     let paragraph_menu = SubmenuBuilder::new(app, mt("paragraphMenu"))
-        .text("heading-1", i18n::with_accel(mt("paragraph.heading1"), &accel("heading-1", "CmdOrCtrl+1")))
-        .text("heading-2", i18n::with_accel(mt("paragraph.heading2"), &accel("heading-2", "CmdOrCtrl+2")))
-        .text("heading-3", i18n::with_accel(mt("paragraph.heading3"), &accel("heading-3", "CmdOrCtrl+3")))
-        .text("heading-4", i18n::with_accel(mt("paragraph.heading4"), &accel("heading-4", "CmdOrCtrl+4")))
-        .text("heading-5", i18n::with_accel(mt("paragraph.heading5"), &accel("heading-5", "CmdOrCtrl+5")))
-        .text("heading-6", i18n::with_accel(mt("paragraph.heading6"), &accel("heading-6", "CmdOrCtrl+6")))
-        .text("normal", i18n::with_accel(mt("paragraph.normal"), &accel("normal", "CmdOrCtrl+0")))
+        .text(
+            "heading-1",
+            i18n::with_accel(mt("paragraph.heading1"), &accel("heading-1", "CmdOrCtrl+1")),
+        )
+        .text(
+            "heading-2",
+            i18n::with_accel(mt("paragraph.heading2"), &accel("heading-2", "CmdOrCtrl+2")),
+        )
+        .text(
+            "heading-3",
+            i18n::with_accel(mt("paragraph.heading3"), &accel("heading-3", "CmdOrCtrl+3")),
+        )
+        .text(
+            "heading-4",
+            i18n::with_accel(mt("paragraph.heading4"), &accel("heading-4", "CmdOrCtrl+4")),
+        )
+        .text(
+            "heading-5",
+            i18n::with_accel(mt("paragraph.heading5"), &accel("heading-5", "CmdOrCtrl+5")),
+        )
+        .text(
+            "heading-6",
+            i18n::with_accel(mt("paragraph.heading6"), &accel("heading-6", "CmdOrCtrl+6")),
+        )
+        .text(
+            "normal",
+            i18n::with_accel(mt("paragraph.normal"), &accel("normal", "CmdOrCtrl+0")),
+        )
         .separator()
-        .text("code-block", i18n::with_accel(mt("paragraph.codeBlock"), &accel("code-block", "CmdOrCtrl+Shift+K")))
-        .text("blockquote", i18n::with_accel(mt("paragraph.blockquote"), &accel("blockquote", "CmdOrCtrl+Shift+Q")))
-        .text("unordered-list", i18n::with_accel(mt("paragraph.unorderedList"), &accel("unordered-list", "CmdOrCtrl+Shift+]")))
-        .text("ordered-list", i18n::with_accel(mt("paragraph.orderedList"), &accel("ordered-list", "CmdOrCtrl+Shift+[")))
-        .text("task-list", i18n::with_accel(mt("paragraph.taskList"), &accel("task-list", "CmdOrCtrl+Shift+X")))
+        .text(
+            "code-block",
+            i18n::with_accel(
+                mt("paragraph.codeBlock"),
+                &accel("code-block", "CmdOrCtrl+Shift+K"),
+            ),
+        )
+        .text(
+            "blockquote",
+            i18n::with_accel(
+                mt("paragraph.blockquote"),
+                &accel("blockquote", "CmdOrCtrl+Shift+Q"),
+            ),
+        )
+        .text(
+            "unordered-list",
+            i18n::with_accel(
+                mt("paragraph.unorderedList"),
+                &accel("unordered-list", "CmdOrCtrl+Shift+]"),
+            ),
+        )
+        .text(
+            "ordered-list",
+            i18n::with_accel(
+                mt("paragraph.orderedList"),
+                &accel("ordered-list", "CmdOrCtrl+Shift+["),
+            ),
+        )
+        .text(
+            "task-list",
+            i18n::with_accel(
+                mt("paragraph.taskList"),
+                &accel("task-list", "CmdOrCtrl+Shift+X"),
+            ),
+        )
         .separator()
         .text("horizontal-rule", mt("paragraph.horizontalRule"))
         .text("insert-table", mt("paragraph.insertTable"))
@@ -314,7 +435,10 @@ pub fn build_app_menu(app: &AppHandle) -> Result<tauri::menu::Menu<tauri::Wry>, 
         .separator()
         .text(
             "toggle-statusbar",
-            i18n::with_accel(mt("view.statusBar"), &accel("toggle-statusbar", "Alt+Shift+S")),
+            i18n::with_accel(
+                mt("view.statusBar"),
+                &accel("toggle-statusbar", "Alt+Shift+S"),
+            ),
         )
         .text(
             "fullscreen",
@@ -420,9 +544,7 @@ fn build_recent_submenu(
             map.insert(id.clone(), path.clone());
             // 菜单项标题显示路径的 basename
             let label = path_label(path);
-            let item = MenuItemBuilder::new(label)
-                .id(id)
-                .build(app)?;
+            let item = MenuItemBuilder::new(label).id(id).build(app)?;
             builder = builder.item(&item);
         }
     }
@@ -554,7 +676,12 @@ pub fn set_mode_checked(
         return Ok(());
     }
 
-    let mode_ids = ["mode-source", "mode-split", "mode-wysiwyg", "mode-presentation"];
+    let mode_ids = [
+        "mode-source",
+        "mode-split",
+        "mode-wysiwyg",
+        "mode-presentation",
+    ];
     let menu = app.menu().ok_or_else(menu_unavailable)?;
     set_checked_by_ids(&menu, &mode_ids, &mode_id)
 }
@@ -609,10 +736,7 @@ pub fn update_shortcut_labels(
     overrides: HashMap<String, Option<String>>,
 ) -> Result<(), CommandError> {
     {
-        let mut current = state
-            .shortcut_overrides
-            .lock()
-            .map_err(menu_error)?;
+        let mut current = state.shortcut_overrides.lock().map_err(menu_error)?;
         *current = overrides;
     }
     let menu = build_app_menu(&app).map_err(menu_error)?;

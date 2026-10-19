@@ -1,7 +1,11 @@
 import { defineStore } from "pinia";
 import { ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type EventTarget as TauriEventTarget, type UnlistenFn } from "@tauri-apps/api/event";
+import {
+  listen,
+  type EventTarget as TauriEventTarget,
+  type UnlistenFn,
+} from "@tauri-apps/api/event";
 import { currentWindowLabel } from "../utils/windowContext";
 import { parseCommandError, type CommandErrorInfo } from "../utils/commandError";
 import type {
@@ -263,10 +267,7 @@ export const useSearchStore = defineStore("search", () => {
         resultsQuery.value = currentQuery;
         cancelled.value = true;
         matchedFiles.value = resp.contentResults.length;
-        matchedCount.value = resp.contentResults.reduce(
-          (sum, r) => sum + r.matches.length,
-          0
-        );
+        matchedCount.value = resp.contentResults.reduce((sum, r) => sum + r.matches.length, 0);
         return resp;
       }
       // 用权威结果覆盖（保证与 Rust 端最终状态一致，避免增量事件丢失/乱序）
@@ -274,10 +275,7 @@ export const useSearchStore = defineStore("search", () => {
       resultsQuery.value = currentQuery;
       truncated.value = resp.truncated;
       // 同步 matchedCount（若 Rust 端最终与增量累计不一致，以权威为准）
-      const totalAuthoritative = resp.contentResults.reduce(
-        (sum, r) => sum + r.matches.length,
-        0
-      );
+      const totalAuthoritative = resp.contentResults.reduce((sum, r) => sum + r.matches.length, 0);
       matchedCount.value = totalAuthoritative;
       matchedFiles.value = resp.contentResults.length;
       return resp;

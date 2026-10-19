@@ -49,54 +49,57 @@ describe("Murasaki 启动 smoke 测试", () => {
 
     const waitStartedAt = Date.now();
     try {
-      await browser.waitUntil(async () => {
-        diag.iterations += 1;
+      await browser.waitUntil(
+        async () => {
+          diag.iterations += 1;
 
-        const cleanupStartedAt = Date.now();
-        try {
-          await closeAllTabs(browser);
-          await closeWorkspace(browser);
-          diag.cleanupError = "（本轮未抛错）";
-        } catch (err) {
-          // 不再静默吞掉：清场失败本身就是最关键的诊断信息（#290）
-          diag.cleanupError = err instanceof Error ? err.message : String(err);
-          console.warn("[smoke] 前置清理失败:", err);
-        }
-        diag.cleanupMs = Date.now() - cleanupStartedAt;
+          const cleanupStartedAt = Date.now();
+          try {
+            await closeAllTabs(browser);
+            await closeWorkspace(browser);
+            diag.cleanupError = "（本轮未抛错）";
+          } catch (err) {
+            // 不再静默吞掉：清场失败本身就是最关键的诊断信息（#290）
+            diag.cleanupError = err instanceof Error ? err.message : String(err);
+            console.warn("[smoke] 前置清理失败:", err);
+          }
+          diag.cleanupMs = Date.now() - cleanupStartedAt;
 
-        const snap = await browser.execute(() => {
-          // @ts-ignore
-          const pinia = window.__pinia__;
-          const tabsStore = pinia._s.get("tabs");
-          const dialogStore = pinia._s.get("dialog");
-          return {
-            count: tabsStore.tabs.length,
-            // 只留前 5 个，避免错误信息过长；content 只取长度（可能很大）
-            items: tabsStore.tabs.slice(0, 5).map((t: any) => ({
-              path: t.path,
-              isDirty: t.isDirty,
-              hasExternalChange: t.hasExternalChange,
-              contentLength: typeof t.content === "string" ? t.content.length : -1,
-            })),
-            restoring: tabsStore.restoring === true,
-            queuedDialogs: dialogStore?.queue?.length ?? 0,
-          };
-        });
-        diag.tabs = `count=${snap.count} items=${JSON.stringify(snap.items)}`;
-        diag.restoring = String(snap.restoring);
-        diag.dialogs = String(snap.queuedDialogs);
+          const snap = await browser.execute(() => {
+            // @ts-ignore: E2E 运行时注入，类型不可静态推导
+            const pinia = window.__pinia__;
+            const tabsStore = pinia._s.get("tabs");
+            const dialogStore = pinia._s.get("dialog");
+            return {
+              count: tabsStore.tabs.length,
+              // 只留前 5 个，避免错误信息过长；content 只取长度（可能很大）
+              items: tabsStore.tabs.slice(0, 5).map((t: any) => ({
+                path: t.path,
+                isDirty: t.isDirty,
+                hasExternalChange: t.hasExternalChange,
+                contentLength: typeof t.content === "string" ? t.content.length : -1,
+              })),
+              restoring: tabsStore.restoring === true,
+              queuedDialogs: dialogStore?.queue?.length ?? 0,
+            };
+          });
+          diag.tabs = `count=${snap.count} items=${JSON.stringify(snap.items)}`;
+          diag.restoring = String(snap.restoring);
+          diag.dialogs = String(snap.queuedDialogs);
 
-        if (snap.count !== 0) {
-          diag.reason = "tabs 未清空";
-          return false;
-        }
-        const hasWelcome = await browser.$(".welcome-page").isExisting();
-        if (!hasWelcome) {
-          diag.reason = "tabs 已空但欢迎页不在 DOM";
-          return false;
-        }
-        return true;
-      }, { timeout: 20000 });
+          if (snap.count !== 0) {
+            diag.reason = "tabs 未清空";
+            return false;
+          }
+          const hasWelcome = await browser.$(".welcome-page").isExisting();
+          if (!hasWelcome) {
+            diag.reason = "tabs 已空但欢迎页不在 DOM";
+            return false;
+          }
+          return true;
+        },
+        { timeout: 20000 }
+      );
     } catch (err) {
       // 两种情况都走到这里：条件轮询到超时，或某一轮回调自身抛错（如驱动命令失败）。
       // 把 reject 原文带上，否则会把后者误读成「一直没等到」。

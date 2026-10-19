@@ -50,7 +50,11 @@ export function parseTable(source: string): TableModel | null {
   let sepIndex = -1;
   for (let i = 1; i < lines.length; i++) {
     const parts = splitCells(lines[i]);
-    if (parts.length >= 1 && parts.every((a) => isSeparator(a)) && parts.some((a) => a.includes("-"))) {
+    if (
+      parts.length >= 1 &&
+      parts.every((a) => isSeparator(a)) &&
+      parts.some((a) => a.includes("-"))
+    ) {
       sepIndex = i;
       break;
     }

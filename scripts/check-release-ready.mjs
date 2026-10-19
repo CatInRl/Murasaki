@@ -47,7 +47,11 @@ function checkVersions(version) {
   const packageVersion = readJson("package.json").version;
   const cargoVersion = readCargoVersion();
   const tauriVersion = readJson("src-tauri/tauri.conf.json").version;
-  const versions = { "package.json": packageVersion, "Cargo.toml": cargoVersion, "tauri.conf.json": tauriVersion };
+  const versions = {
+    "package.json": packageVersion,
+    "Cargo.toml": cargoVersion,
+    "tauri.conf.json": tauriVersion,
+  };
   const mismatched = Object.entries(versions).filter(([, v]) => v !== version);
   if (mismatched.length > 0) {
     fail(
@@ -61,7 +65,8 @@ function checkVersions(version) {
 async function checkRuns(sha) {
   const token = process.env.GITHUB_TOKEN;
   const repo = process.env.GITHUB_REPOSITORY;
-  if (!token || !repo || !sha) fail("缺少 GITHUB_TOKEN / GITHUB_REPOSITORY / GITHUB_SHA，无法校验 CI");
+  if (!token || !repo || !sha)
+    fail("缺少 GITHUB_TOKEN / GITHUB_REPOSITORY / GITHUB_SHA，无法校验 CI");
   const maxWait = Number(process.env.MAX_WAIT_SECONDS ?? 2400) * 1000;
   const deadline = Date.now() + maxWait;
 
