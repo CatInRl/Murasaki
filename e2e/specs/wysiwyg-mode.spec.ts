@@ -173,9 +173,7 @@ describe("WYSIWYG 模式切换", () => {
     // "# 大标题\n\n正文内容\n" 中 position 7 是 "正"
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const pinia = window.__pinia__;
-      const editorBridge = pinia._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         view.dispatch({
           selection: { anchor: 7, head: 7 },
@@ -192,7 +190,7 @@ describe("WYSIWYG 模式切换", () => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (!view) return { error: "no editorView" };
       const state = view.state;
       // 检查 DOM 中的 hide 元素
@@ -235,9 +233,7 @@ describe("WYSIWYG 模式切换", () => {
     // "- 项目一\n- 项目二\n- 项目三\n\n" = 22 chars
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const pinia = window.__pinia__;
-      const editorBridge = pinia._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         view.dispatch({
           selection: { anchor: 22, head: 22 },
@@ -315,7 +311,7 @@ describe("WYSIWYG 模式切换", () => {
     // 光标移到正文（脱离 mermaid 段落）→ 该块被替换为 MermaidWidget
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const view = window.__pinia__._s.get("editorBridge").editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         const pos = view.state.doc.toString().indexOf("正文");
         view.dispatch({

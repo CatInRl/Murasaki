@@ -69,8 +69,7 @@ describe("编辑器工具栏", () => {
     // 将光标设置到 position 2（"正"之后）
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const editorBridge = window.__pinia__._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         view.dispatch({
           selection: { anchor: 2, head: 2 },
@@ -102,8 +101,7 @@ describe("编辑器工具栏", () => {
 
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const editorBridge = window.__pinia__._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         view.dispatch({
           selection: { anchor: 2, head: 2 },
@@ -135,8 +133,7 @@ describe("编辑器工具栏", () => {
     // 将光标设置到行首
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const editorBridge = window.__pinia__._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         view.dispatch({
           selection: { anchor: 0, head: 0 },
@@ -167,8 +164,7 @@ describe("编辑器工具栏", () => {
 
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const editorBridge = window.__pinia__._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         view.dispatch({
           selection: { anchor: 0, head: 0 },

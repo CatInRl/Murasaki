@@ -155,9 +155,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // "# 大标题\n\n正文内容\n" 中 position 7 是 "正"
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const pinia = window.__pinia__;
-      const editorBridge = pinia._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         view.dispatch({
           selection: { anchor: 7, head: 7 },
@@ -174,7 +172,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (!view) return { error: "no editorView" };
       const state = view.state;
       const hideEls = view.dom.querySelectorAll(".murasaki-wysiwyg-mark-hide");
@@ -204,9 +202,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // 移动光标到标题段（position 0 = "#"），使标题段成为光标所在段落
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const pinia = window.__pinia__;
-      const editorBridge = pinia._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         view.dispatch({
           selection: { anchor: 0, head: 0 },
@@ -220,9 +216,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // 诊断
     const diag = await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const pinia = window.__pinia__;
-      const editorBridge = pinia._s.get("editorBridge");
-      const view = editorBridge.editorView;
+      const view = window.__editorRef__?.getView();
       if (!view) return { error: "no editorView" };
       const state = view.state;
       const hideEls = view.dom.querySelectorAll(".murasaki-wysiwyg-mark-hide");

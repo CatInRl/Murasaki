@@ -47,8 +47,7 @@ async function setWysiwygMode(browser: Browser): Promise<void> {
 async function setCursor(browser: Browser, pos: number): Promise<void> {
   await browser.execute((p: number) => {
     // @ts-ignore: E2E 运行时注入，类型不可静态推导
-    const editorBridge = window.__pinia__._s.get("editorBridge");
-    const view = editorBridge.editorView;
+    const view = window.__editorRef__?.getView();
     if (view) {
       view.dispatch({
         selection: { anchor: p, head: p },
@@ -116,7 +115,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 简化：把光标放到文档末尾
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const view = window.__pinia__._s.get("editorBridge").editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         const end = view.state.doc.length;
         view.dispatch({ selection: { anchor: end, head: end } });
@@ -161,7 +160,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 光标移到文档末尾
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const view = window.__pinia__._s.get("editorBridge").editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         const end = view.state.doc.length;
         view.dispatch({ selection: { anchor: end, head: end } });
@@ -203,7 +202,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 光标移到文档末尾
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const view = window.__pinia__._s.get("editorBridge").editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         const end = view.state.doc.length;
         view.dispatch({ selection: { anchor: end, head: end } });
@@ -245,7 +244,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 光标移到文档末尾
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const view = window.__pinia__._s.get("editorBridge").editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         const end = view.state.doc.length;
         view.dispatch({ selection: { anchor: end, head: end } });
@@ -288,7 +287,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 光标移到文档末尾
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const view = window.__pinia__._s.get("editorBridge").editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         const end = view.state.doc.length;
         view.dispatch({ selection: { anchor: end, head: end } });
@@ -328,7 +327,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 光标移到文档末尾
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const view = window.__pinia__._s.get("editorBridge").editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         const end = view.state.doc.length;
         view.dispatch({ selection: { anchor: end, head: end } });
@@ -357,7 +356,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 光标移到文档末尾
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const view = window.__pinia__._s.get("editorBridge").editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         const end = view.state.doc.length;
         view.dispatch({ selection: { anchor: end, head: end } });
@@ -386,7 +385,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 光标移到文档末尾
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const view = window.__pinia__._s.get("editorBridge").editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         const end = view.state.doc.length;
         view.dispatch({ selection: { anchor: end, head: end } });
@@ -487,7 +486,7 @@ describe("WYSIWYG 块级 widget + Bold 立即渲染", () => {
     // 光标移到结尾段，让 mermaid 围栏以 widget 形式渲染
     await browser.execute(() => {
       // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const view = window.__pinia__._s.get("editorBridge").editorView;
+      const view = window.__editorRef__?.getView();
       if (view) {
         const end = view.state.doc.length;
         view.dispatch({ selection: { anchor: end, head: end } });
