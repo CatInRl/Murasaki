@@ -16,10 +16,39 @@ on:
 
 permissions:
   contents: write # 创建 Release 与上传资源所需
+  checks: read # 发布前校验 tag 提交的 CI 结果（#446）
 
 jobs:
+  # === 发布前门禁（版本一致性 + CI 结果，issue #446）===
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: 解析版本号
+        id: vars
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: 校验版本号与 CI 结果
+        env:
+          TAG: ${{ steps.vars.outputs.tag }}
+          # tag 触发时必须等 Test workflow 全绿；手动触发（测试构建流程）跳过
+          REQUIRE_CHECKS: ${{ github.event_name == 'push' && '1' || '0' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check-release-ready.mjs
+
   # === 创建 Release 草稿 ===
   create-release:
+    needs: verify
     runs-on: ubuntu-latest
     outputs:
       release-upload-url: ${{ steps.create-release.outputs.upload_url }}
@@ -108,7 +137,7 @@ jobs:
           tag_name: ${{ steps.vars.outputs.tag }}
           name: Murasaki ${{ steps.vars.outputs.tag }}
           body_path: ${{ steps.notes.outputs.filepath }}
-          draft: false
+          draft: true
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -126,7 +155,7 @@ jobs:
             args: "--target aarch64-apple-darwin"
           - platform: macos-latest
             args: "--target x86_64-apple-darwin"
-          - platform: ubuntu-22.04
+          - platform: ubuntu-24.04
             args: ""
 
     runs-on: ${{ matrix.platform }}
@@ -149,7 +178,7 @@ jobs:
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: 安装依赖（Linux 系统库）
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -182,12 +211,30 @@ jobs:
           releaseBody: ${{ needs.create-release.outputs.release-body }}
           args: ${{ matrix.args }}
 
-  # === 发布完成通知 ===
+  # === 产物校验并转正 Release（#446）===
   finalize:
     needs: [create-release, build]
     runs-on: ubuntu-latest
     steps:
-      - name: 发布完成
+      - name: 校验产物完整后发布
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.create-release.outputs.tag }}
         run: |
-          echo "✅ Release ${{ needs.create-release.outputs.release-id }} 已发布"
-          echo "查看: https://github.com/${{ github.repository }}/releases"
+          ASSETS=$(gh release view "$TAG" --repo "${{ github.repository }}" --json assets --jq '.assets[].name')
+          COUNT=$(echo "$ASSETS" | grep -c . || true)
+          echo "Release $TAG 产物数：$COUNT"
+          echo "$ASSETS"
+          # 四个平台至少各一个产物（Windows / mac arm64 / mac x64 / Linux）
+          if [ "$COUNT" -lt 4 ]; then
+            echo "✖ 产物不足（$COUNT < 4），Release 保持草稿"
+            exit 1
+          fi
+          if ! echo "$ASSETS" | grep -q '^latest\.json$'; then
+            echo "✖ 缺少 latest.json（自动更新清单），Release 保持草稿"
+            exit 1
+          fi
+          # 全部产物就绪后才转正，避免用户下载到半成品
+          gh release edit "$TAG" --repo "${{ github.repository }}" --draft=false
+          echo "✓ Release $TAG 已发布"
+          echo "查看: https://github.com/${{ github.repository }}/releases/tag/$TAG"
