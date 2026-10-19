@@ -35,7 +35,11 @@ pub struct WindowRegistry {
 fn normalize_path(path: &str) -> String {
     let unified = path.replace('\\', "/");
     let trimmed = unified.trim_end_matches('/');
-    let result = if trimmed.is_empty() { unified.as_str() } else { trimmed };
+    let result = if trimmed.is_empty() {
+        unified.as_str()
+    } else {
+        trimmed
+    };
     if cfg!(windows) {
         result.to_lowercase()
     } else {
@@ -217,8 +221,10 @@ pub fn is_editor_window(label: &str) -> bool {
 /// 清理某窗口在各全局状态里的残留（窗口销毁时调用）。
 pub fn cleanup_window_state(app: &AppHandle, label: &str) {
     app.state::<WindowRegistry>().remove(label);
-    app.state::<super::watcher::WatcherState>().remove_window(label);
-    app.state::<super::menu::RecentMenuState>().remove_window_ui(label);
+    app.state::<super::watcher::WatcherState>()
+        .remove_window(label);
+    app.state::<super::menu::RecentMenuState>()
+        .remove_window_ui(label);
 }
 
 /// 前端调用：在**新窗口**中打开路径（「打开文件夹」入口）。
@@ -246,12 +252,21 @@ pub async fn open_path_in_new_window(app: AppHandle, path: String) -> Result<Str
 }
 
 /// 前端调用：上报/清除本窗口的工作区（`null` = 已关闭工作区）
+///
+/// 只维护注册表，不改窗口标题：标题统一由前端按「工作区名 / 当前文件名」计算
+/// 后经 [`set_window_title`] 设置（#442），避免两处写入互相覆盖。
 #[tauri::command]
 pub fn set_window_workspace(window: WebviewWindow, app: AppHandle, path: Option<String>) {
     app.state::<WindowRegistry>()
-        .set_workspace(window.label(), path.clone());
-    // 标题跟随工作区（issue #380）：任务栏按「目录名 — Murasaki」分辨多窗口
-    let title = window_title_for_workspace(path.as_deref());
+        .set_workspace(window.label(), path);
+}
+
+/// 前端调用：设置本窗口标题（#442）。
+///
+/// 无工作区的窗口此前统一叫「Murasaki」，多窗口下任务栏无法区分。
+/// 标题由前端统一计算：有工作区用目录名，否则用当前标签名。
+#[tauri::command]
+pub fn set_window_title(window: WebviewWindow, title: String) {
     let _ = window.set_title(&title);
 }
 

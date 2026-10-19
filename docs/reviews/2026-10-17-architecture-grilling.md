@@ -102,8 +102,53 @@
 - 绕行：`integrated_code_mode` 的 `Exec` → `await tools.Shell({ command, cwd })`。
 - 子代理通常拿不到可用 shell：做 diff 评审时，主代理先把 `git diff <base>` 落成临时文件，子代理用 `Read` 读取。
 
-## 七、评审结论摘要（Phase 1）
+## 八、0.11.0 实施中的补充决策（批次三～五）
 
-- Standards 轴：0 硬性违规；6 条判断题已修（草稿竞态、旧草稿残留、监听泄漏、默认模式重置、测试断言过弱、disposed 守卫）。
-- Spec 轴：ADR 措辞已收紧；增加的生产 adapter 属 Phase 2 预置、未接线；命名 `openEditorSession` 保留（含磁盘读取，异步动作）。
-- 验证：1110 单测通过 / `vue-tsc` 0 错误 / 构建成功。
+> 本节记录 #436–#443 落地时临时做出的取舍，避免后续复盘时重新争论。
+
+### #437 路径白名单
+
+- **读写分级**：工作区 / 应用数据目录给读写；用户刚选中的「单个文件」只授只读（所在目录不整棵放行）。
+- **asset scope 跟随授权**：`grant_*` 同时扩 `asset_protocol_scope`，否则预览里的本地图片会 404。
+- **E2E 目录**：从 `current_dir()` 向上探测 3 层并整棵授权，仅 E2E 模式生效。
+
+### #438 文件监听防抖
+
+- **静默 150ms / 上限 250ms / 50ms tick**：连续事件尾部合并，既不漏也不无限延后。
+- **合并线程在 map 插入之后再启动**：避免窗口关闭时留下孤儿线程。
+- **`is_ignored` 只看相对段**：不误伤路径中含 `node_modules` 字样的普通目录。
+
+### #439 搜索后端
+
+- **抽出 `scan_workspace`**：生产与测试共用同一份扫描逻辑，避免测试复制实现。
+- **事件定向 `emit_to(label)`**：多窗口下正文结果不串窗口。
+- **`cancelled` 与 `truncated` 分流**：取消不提示「结果过多」。
+
+### #440 PDF 隐藏窗口
+
+- **`destroy()` 而非 `close()`**：`CloseRequested` 会被退出拦截器拦下，`close()` 必然残留。
+- **退出看门狗加代际号**：旧的看门狗不能误伤新一轮退出；超时 120s。
+- **`PDF_EXPORT_LABEL_PREFIX` 单一来源**：窗口计数 / 退出判断 / 拦截器共用。
+
+### #441 空态与搜索失败反馈
+
+- **错误存结构化 `{ code, params }`**：文案在渲染时按当前语言生成，切语言跟随。
+- **在途搜索加 token 守卫**：旧请求的响应与 `finally` 不得覆盖新搜索；`clear()` 主动复位 `loading`。
+- **取消语义**：保留已扫到的部分结果并标记 `cancelled`，不当作权威全集。
+- **错误 / 无工作区做成横幅**：不遮蔽标签与最近文件命中。
+
+### #442 快捷键与多窗口
+
+- **多窗口标签恢复策略（明确）**：每个窗口按 `state:<label>` 落盘，但**只有主窗口在下次启动时恢复**；其它窗口是临时会话。本次补单测与文档，不改落盘格式。
+- **设置页冻结后台**：`inert` + 主动 blur 冻结应用外壳（命令拦截挡不住 CodeMirror 的编辑器级快捷键与直接输入）；取消关闭时必须 `cancel_close` 复位 Rust 的 `ClosingState`。
+- **窗口标题单一来源**：Rust `set_window_workspace` 只维护注册表，标题统一由前端按「工作区名 / 当前文件名」计算后经 `set_window_title` 推送。
+- **查找面板本地化**：`EditorState.phrases` 通过 Compartment 注入；面板文案在构造时写死，切语言时先关闭已打开面板。
+
+### #443 静态质量门禁
+
+- **ESLint flat config**：`js.recommended + typescript-eslint.recommended + vue flat/recommended`；排版类 Vue 规则关闭交给 Prettier；`no-undef` 对 TS 关闭（由 tsc 负责）。
+- **不引入 `eslint-config-prettier`**：手动关闭冲突的排版规则，依赖更少；后续若新增冲突再补。
+- **全仓一次性 Prettier 格式化**：207 个文件，纯机械改动；`public/`、`murasaki-ui-design/`、生成物一律忽略。
+- **e2e `@ts-ignore` 处理**：`src` 的 8 处通过 `src/e2e-hooks.d.ts` 声明 window 钩子后**全部删除**；e2e 存量 420 处统一补说明（`allow-with-description`），后续再分批消除。
+- **CI**：frontend 增加 `lint` / `format:check` / `typecheck:e2e`；rust 增加 `cargo fmt --check` 与 `cargo clippy -D warnings`，并显式安装 `rustfmt, clippy` 组件。
+- **e2e tsconfig**：补 `noEmit` 防止误生成 `.js`；`.gitignore` 兜底 `e2e/**/*.js`。

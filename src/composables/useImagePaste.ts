@@ -222,7 +222,9 @@ export function useImagePaste(options: UseImagePasteOptions): UseImagePaste {
   /**
    * 从剪贴板事件中提取图片 blob 并转为字节数组
    */
-  async function extractImageBytes(e: ClipboardEvent): Promise<{ bytes: Uint8Array; ext: string } | null> {
+  async function extractImageBytes(
+    e: ClipboardEvent
+  ): Promise<{ bytes: Uint8Array; ext: string } | null> {
     const items = e.clipboardData?.items;
     if (!items) return null;
     for (const item of items) {

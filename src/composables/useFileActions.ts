@@ -42,8 +42,16 @@ export interface FileActionsDeps {
     removeRecent: (path: string) => Promise<void>;
   };
   dialog: {
-    alert: (opts: { message: string; variant?: "info" | "warning" | "error"; title?: string }) => void;
-    confirm: (opts: { message: string; danger?: boolean; confirmText?: string }) => Promise<boolean>;
+    alert: (opts: {
+      message: string;
+      variant?: "info" | "warning" | "error";
+      title?: string;
+    }) => void;
+    confirm: (opts: {
+      message: string;
+      danger?: boolean;
+      confirmText?: string;
+    }) => Promise<boolean>;
   };
   /** toast 反馈（PDF 导出成功/失败、打开失败兜底提示、拖入打不开的文件提示） */
   toast: {
@@ -63,7 +71,8 @@ export interface FileActionsDeps {
  * 从 App.vue 提取，保持原有行为不变。
  */
 export function useFileActions(deps: FileActionsDeps) {
-  const { tabsStore, workspace, fileOps, persistence, dialog, toast, activeTab, currentTheme } = deps;
+  const { tabsStore, workspace, fileOps, persistence, dialog, toast, activeTab, currentTheme } =
+    deps;
   const t = i18n.global.t.bind(i18n.global);
 
   /**
@@ -204,7 +213,10 @@ export function useFileActions(deps: FileActionsDeps) {
       await tabsStore.saveTab(activeTab.value.id);
     } catch (err) {
       console.error("保存失败:", err);
-      dialog.alert({ message: t("common.error.saveFailed", { error: formatCommandError(err) }), variant: "error" });
+      dialog.alert({
+        message: t("common.error.saveFailed", { error: formatCommandError(err) }),
+        variant: "error",
+      });
     }
   }
 
@@ -221,7 +233,10 @@ export function useFileActions(deps: FileActionsDeps) {
         await persistence.addRecent(selected, "file");
       } catch (err) {
         console.error("另存为失败:", err);
-        dialog.alert({ message: t("common.error.saveAsFailed", { error: formatCommandError(err) }), variant: "error" });
+        dialog.alert({
+          message: t("common.error.saveAsFailed", { error: formatCommandError(err) }),
+          variant: "error",
+        });
       }
     }
   }
@@ -245,7 +260,10 @@ export function useFileActions(deps: FileActionsDeps) {
       await tabsStore.reloadFromDisk(path);
     } catch (err) {
       console.error("重新加载失败:", err);
-      dialog.alert({ message: t("common.error.reloadFailed", { error: formatCommandError(err) }), variant: "error" });
+      dialog.alert({
+        message: t("common.error.reloadFailed", { error: formatCommandError(err) }),
+        variant: "error",
+      });
     }
   }
 
@@ -363,7 +381,10 @@ export function useFileActions(deps: FileActionsDeps) {
             await persistence.removeRecent(path);
           }
         } else {
-          dialog.alert({ message: t("common.error.openWorkspaceFailed", { error: formatCommandError(err) }), variant: "error" });
+          dialog.alert({
+            message: t("common.error.openWorkspaceFailed", { error: formatCommandError(err) }),
+            variant: "error",
+          });
         }
       }
     } else {

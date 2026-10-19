@@ -352,9 +352,7 @@ async function mountHighlighted(name: string): Promise<HTMLElement> {
 
 /** 读取表格单元格的对齐方式（multimd-table 输出 inline style） */
 function cellAlign(cell: Element): string {
-  const declared = /text-align:\s*(left|center|right)/.exec(
-    cell.getAttribute("style") ?? ""
-  );
+  const declared = /text-align:\s*(left|center|right)/.exec(cell.getAttribute("style") ?? "");
   return declared?.[1] ?? cell.getAttribute("align") ?? "";
 }
 
@@ -367,12 +365,8 @@ describe("1. 表格渲染", () => {
   it("1.1 渲染 <table> 包含 thead 与 tbody", () => {
     const container = mount("table");
     expect(container.querySelectorAll("table").length).toBeGreaterThanOrEqual(1);
-    expect(
-      container.querySelectorAll("table > thead").length
-    ).toBeGreaterThanOrEqual(1);
-    expect(
-      container.querySelectorAll("table > tbody").length
-    ).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll("table > thead").length).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll("table > tbody").length).toBeGreaterThanOrEqual(1);
   });
 
   it("1.2 表头单元格 <th> 数量正确", () => {
@@ -390,9 +384,9 @@ describe("1. 表格渲染", () => {
     const container = mount("table");
     const firstTable = container.querySelectorAll("table")[0];
     expect(firstTable.querySelectorAll("tbody tr")).toHaveLength(3);
-    const cells = Array.from(
-      firstTable.querySelectorAll("tbody tr:first-child td")
-    ).map((td) => td.textContent);
+    const cells = Array.from(firstTable.querySelectorAll("tbody tr:first-child td")).map(
+      (td) => td.textContent
+    );
     expect(cells).toEqual(["Murasaki", "0.1.0", "开发中"]);
   });
 
@@ -414,23 +408,17 @@ describe("2. 数学公式 (KaTeX)", () => {
   it("2.1 行内公式渲染为 KaTeX", () => {
     const container = mount("math");
     // KaTeX 渲染会生成 .katex 元素（2 个行内 + 2 个块级）
-    expect(
-      container.querySelectorAll(".katex").length
-    ).toBeGreaterThanOrEqual(2);
+    expect(container.querySelectorAll(".katex").length).toBeGreaterThanOrEqual(2);
   });
 
   it("2.2 块级公式渲染为 display mode", () => {
     const container = mount("math");
-    expect(
-      container.querySelectorAll(".katex-display").length
-    ).toBeGreaterThanOrEqual(2);
+    expect(container.querySelectorAll(".katex-display").length).toBeGreaterThanOrEqual(2);
   });
 
   it("2.3 公式包含 MathML 注音（.katex-mathml）", () => {
     const container = mount("math");
-    expect(
-      container.querySelectorAll(".katex-mathml").length
-    ).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll(".katex-mathml").length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -447,31 +435,23 @@ describe("3. 代码块", () => {
 
   it("3.2 代码块渲染为 <pre><code>", async () => {
     const container = await mountHighlighted("code");
-    expect(
-      container.querySelectorAll("pre code").length
-    ).toBeGreaterThanOrEqual(3); // rust + ts + json
+    expect(container.querySelectorAll("pre code").length).toBeGreaterThanOrEqual(3); // rust + ts + json
   });
 
   it("3.3 代码块被 Shiki 高亮（pre.shiki）且语言标签齐全", async () => {
     const container = await mountHighlighted("code");
-    expect(
-      container.querySelectorAll("pre.shiki").length
-    ).toBeGreaterThanOrEqual(3);
-    const labels = Array.from(
-      container.querySelectorAll(".code-lang-label")
-    ).map((el) => el.textContent);
+    expect(container.querySelectorAll("pre.shiki").length).toBeGreaterThanOrEqual(3);
+    const labels = Array.from(container.querySelectorAll(".code-lang-label")).map(
+      (el) => el.textContent
+    );
     expect(labels).toEqual(["rust", "typescript", "json"]);
   });
 
   it("3.4 Rust 代码块包含 token 高亮 <span>，且代码文本完整", async () => {
     const container = await mountHighlighted("code");
     // Shiki 高亮会生成 <span>（不断言具体颜色，只断言结构与文本）
-    expect(
-      container.querySelectorAll("pre.shiki span").length
-    ).toBeGreaterThanOrEqual(5);
-    const codeText = Array.from(
-      container.querySelectorAll("pre.shiki code")
-    )
+    expect(container.querySelectorAll("pre.shiki span").length).toBeGreaterThanOrEqual(5);
+    const codeText = Array.from(container.querySelectorAll("pre.shiki code"))
       .map((el) => el.textContent)
       .join("\n");
     expect(codeText).toContain("fn main()");
@@ -489,19 +469,18 @@ describe("4. Mermaid 图表（仅占位；SVG 渲染仍由 e2e 覆盖）", () =>
 
   it("4.2 流程图/时序图/Gantt 源码分别保留在占位容器中", () => {
     const container = mount("mermaid");
-    const blocks = Array.from(
-      container.querySelectorAll<HTMLElement>(".mermaid")
-    ).map((el) => el.textContent ?? "");
+    const blocks = Array.from(container.querySelectorAll<HTMLElement>(".mermaid")).map(
+      (el) => el.textContent ?? ""
+    );
     expect(blocks[0]).toContain("graph LR");
     expect(blocks[1]).toContain("sequenceDiagram");
     expect(blocks[2]).toContain("gantt");
   });
 
   it("4.3 非法 mermaid 语法不抛错，仍生成占位容器", () => {
-    const { html } = renderer.render(
-      "```mermaid\nthis is not valid mermaid syntax\n```",
-      { filePath: "/ws/render/bad-mermaid.md" }
-    );
+    const { html } = renderer.render("```mermaid\nthis is not valid mermaid syntax\n```", {
+      filePath: "/ws/render/bad-mermaid.md",
+    });
     const container = document.createElement("div");
     container.innerHTML = html;
     document.body.appendChild(container);
@@ -557,9 +536,7 @@ describe("6. 任务列表", () => {
   it("6.1 渲染 <input type=checkbox>", () => {
     const container = mount("tasklist");
     // 待办 3 个 + 嵌套任务 3 个（顶层任务本身也是任务项）
-    expect(
-      container.querySelectorAll("input[type='checkbox']")
-    ).toHaveLength(6);
+    expect(container.querySelectorAll("input[type='checkbox']")).toHaveLength(6);
   });
 
   it("6.2 已完成项 checkbox 为 checked", () => {
@@ -580,12 +557,8 @@ describe("6. 任务列表", () => {
   it("6.3 任务项 li 含 task-list-item 类与 label", () => {
     const container = mount("tasklist");
     expect(container.querySelectorAll("li.task-list-item")).toHaveLength(6);
-    expect(
-      container.querySelectorAll("li.task-list-item label").length
-    ).toBe(6);
-    expect(container.querySelector("li.task-list-item")?.textContent).toContain(
-      "已完成项"
-    );
+    expect(container.querySelectorAll("li.task-list-item label").length).toBe(6);
+    expect(container.querySelector("li.task-list-item")?.textContent).toContain("已完成项");
   });
 });
 
@@ -618,9 +591,7 @@ describe("7. Frontmatter 卡片", () => {
     expect(text).toMatch(/2026.*26/);
     expect(text).toContain("CatInRl");
     // tags 渲染为徽章
-    const tags = Array.from(container.querySelectorAll(".fm-tag")).map(
-      (el) => el.textContent
-    );
+    const tags = Array.from(container.querySelectorAll(".fm-tag")).map((el) => el.textContent);
     expect(tags).toEqual(["测试", "笔记", "murasaki"]);
   });
 
@@ -637,16 +608,12 @@ describe("7. Frontmatter 卡片", () => {
 describe("8. 引用块", () => {
   it("8.1 简单引用渲染为 <blockquote>", () => {
     const container = mount("quote");
-    expect(
-      container.querySelectorAll("blockquote").length
-    ).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll("blockquote").length).toBeGreaterThanOrEqual(1);
   });
 
   it("8.2 嵌套引用渲染为 blockquote > blockquote", () => {
     const container = mount("quote");
-    expect(
-      container.querySelectorAll("blockquote blockquote").length
-    ).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll("blockquote blockquote").length).toBeGreaterThanOrEqual(1);
     // 「更深层」仍在嵌套引用内（与外层引用不串层）
     const nested = container.querySelector("blockquote blockquote");
     expect(nested?.textContent).toContain("内层引用");
@@ -655,12 +622,8 @@ describe("8. 引用块", () => {
 
   it("8.3 引用内可包含其他 Markdown 语法", () => {
     const container = mount("quote");
-    expect(
-      container.querySelectorAll("blockquote strong").length
-    ).toBeGreaterThanOrEqual(1);
-    expect(
-      container.querySelectorAll("blockquote ul").length
-    ).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll("blockquote strong").length).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll("blockquote ul").length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -678,12 +641,8 @@ describe("9. 列表", () => {
 
   it("9.3 嵌套列表存在 ul/ol 相互嵌套结构", () => {
     const container = mount("list");
-    expect(
-      container.querySelectorAll("ul ul").length
-    ).toBeGreaterThanOrEqual(1);
-    expect(
-      container.querySelectorAll("ul ol").length
-    ).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll("ul ul").length).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll("ul ol").length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -699,26 +658,20 @@ describe("10. 链接", () => {
   it("10.2 外部 URL 链接渲染为 <a>", () => {
     const container = mount("link");
     expect(
-      container.querySelectorAll(
-        "a[href='https://github.com/CatInRl/Murasaki']"
-      )
+      container.querySelectorAll("a[href='https://github.com/CatInRl/Murasaki']")
     ).toHaveLength(1);
   });
 
   it("10.3 自动链接渲染为 <a>", () => {
     const container = mount("link");
-    const anchor = container.querySelector<HTMLAnchorElement>(
-      "a[href='https://tauri.app']"
-    );
+    const anchor = container.querySelector<HTMLAnchorElement>("a[href='https://tauri.app']");
     expect(anchor).not.toBeNull();
     expect(anchor?.textContent).toBe("https://tauri.app");
   });
 
   it("10.4 锚点链接保留原 href", () => {
     const container = mount("link");
-    const anchors = Array.from(
-      container.querySelectorAll<HTMLAnchorElement>("a[href^='#']")
-    );
+    const anchors = Array.from(container.querySelectorAll<HTMLAnchorElement>("a[href^='#']"));
     expect(anchors.length).toBeGreaterThanOrEqual(1);
     // markdown-it 可能对中文锚点做 URL 编码，解码后应还原为原文
     expect(anchors.map((a) => decodeURIComponent(a.getAttribute("href") ?? ""))).toContain(
@@ -735,22 +688,16 @@ describe("11. 图片渲染", () => {
     // ADR-0015：相对路径按 filePath 解析后经 convertFileSrc 改写为 asset 协议 URL
     const logo = images.find((img) => img.getAttribute("src")?.endsWith("logo.png"));
     expect(logo).toBeDefined();
-    expect(logo?.getAttribute("src")).toBe(
-      "asset://localhost//ws/render/assets/logo.png"
-    );
+    expect(logo?.getAttribute("src")).toBe("asset://localhost//ws/render/assets/logo.png");
     expect(logo?.getAttribute("alt")).toBe("占位图");
   });
 
   it("11.2 带标题图片含 title 属性", () => {
     const container = mount("image");
-    const img = container.querySelector<HTMLImageElement>(
-      "img[src$='screenshot.png']"
-    );
+    const img = container.querySelector<HTMLImageElement>("img[src$='screenshot.png']");
     expect(img).not.toBeNull();
     expect(img?.getAttribute("title")).toBe("Murasaki 截图");
-    expect(img?.getAttribute("src")).toBe(
-      "asset://localhost//ws/render/assets/screenshot.png"
-    );
+    expect(img?.getAttribute("src")).toBe("asset://localhost//ws/render/assets/screenshot.png");
     expect(img?.getAttribute("alt")).toBe("Murasaki 界面");
   });
 
@@ -769,9 +716,7 @@ describe("12. 标题与分隔线", () => {
   it("12.1 渲染 h1-h6 全部 6 个层级", () => {
     const container = mount("heading");
     for (let i = 1; i <= 6; i++) {
-      expect(
-        container.querySelectorAll(`h${i}`).length
-      ).toBeGreaterThanOrEqual(1);
+      expect(container.querySelectorAll(`h${i}`).length).toBeGreaterThanOrEqual(1);
     }
     expect(container.querySelector("h1")?.textContent).toBe("一级标题");
   });
@@ -798,9 +743,7 @@ describe("13. 行内格式", () => {
 
   it("13.3 删除线渲染为 <del> 或 <s>", () => {
     const container = mount("inline");
-    expect(
-      container.querySelectorAll("del, s").length
-    ).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll("del, s").length).toBeGreaterThanOrEqual(1);
     expect(container.querySelector("del, s")?.textContent).toBe("删除线");
   });
 
@@ -822,9 +765,7 @@ describe("14. 综合渲染", () => {
     // Mermaid 只能断言占位（SVG 渲染仍由 e2e 覆盖）
     expect(container.querySelectorAll(".mermaid").length).toBeGreaterThanOrEqual(1);
     expect(container.querySelectorAll("blockquote").length).toBeGreaterThanOrEqual(1);
-    expect(
-      container.querySelectorAll("input[type='checkbox']").length
-    ).toBeGreaterThanOrEqual(1);
+    expect(container.querySelectorAll("input[type='checkbox']").length).toBeGreaterThanOrEqual(1);
     expect(container.querySelectorAll("strong").length).toBeGreaterThanOrEqual(1);
     expect(container.querySelectorAll("em").length).toBeGreaterThanOrEqual(1);
   });

@@ -5,11 +5,11 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::errors::{CommandError, ErrorCode};
+use notify::event::ModifyKind;
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
-use notify::event::ModifyKind;
-use notify::{Watcher, RecursiveMode, EventKind, RecommendedWatcher};
-use crate::errors::{CommandError, ErrorCode};
 
 /// 静默期（毫秒）：最后一次事件后安静这么久才发，`git checkout` 这类连续爆发
 /// 会被整段合并成一批。
@@ -377,7 +377,10 @@ mod tests {
 
     #[test]
     fn test_classify_ignored_events() {
-        assert_eq!(classify_event(&EventKind::Access(notify::event::AccessKind::Read)), None);
+        assert_eq!(
+            classify_event(&EventKind::Access(notify::event::AccessKind::Read)),
+            None
+        );
         assert_eq!(classify_event(&EventKind::Other), None);
     }
 
@@ -465,7 +468,10 @@ mod tests {
     fn is_ignored_only_checks_path_below_root() {
         // 工作区本身位于 node_modules 下：不能因为祖先目录名吞掉所有事件
         let root = Path::new("/repo/node_modules/pkg");
-        assert!(!is_ignored(root, Path::new("/repo/node_modules/pkg/docs/a.md")));
+        assert!(!is_ignored(
+            root,
+            Path::new("/repo/node_modules/pkg/docs/a.md")
+        ));
         assert!(is_ignored(
             root,
             Path::new("/repo/node_modules/pkg/node_modules/dep/index.js")

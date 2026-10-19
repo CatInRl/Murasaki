@@ -14,7 +14,11 @@ export interface TabsStoreLike {
     lastMtime: number | null;
   } | null;
   reloadFromDisk: (path: string) => Promise<unknown>;
-  applyExternalResolution: (path: string, mode: "load-disk" | "keep-local", content?: string) => Promise<unknown>;
+  applyExternalResolution: (
+    path: string,
+    mode: "load-disk" | "keep-local",
+    content?: string
+  ) => Promise<unknown>;
   markExternalChange: (path: string, marked: boolean) => void;
   writeMergedContent: (filePath: string, mergedContent: string) => Promise<unknown>;
 }
@@ -68,9 +72,15 @@ export function useCompareWindow(deps: CompareWindowDeps) {
     if (mtime === null) {
       tabsStore.markExternalChange(path, true);
       if (!tab.isDirty) {
-        dialog.alert({ message: t("common.dialog.fileDeletedExternal", { path }), variant: "warning" });
+        dialog.alert({
+          message: t("common.dialog.fileDeletedExternal", { path }),
+          variant: "warning",
+        });
       } else {
-        dialog.alert({ message: t("common.dialog.fileDeletedExternalDraftKept", { path }), variant: "warning" });
+        dialog.alert({
+          message: t("common.dialog.fileDeletedExternalDraftKept", { path }),
+          variant: "warning",
+        });
       }
       return;
     }
@@ -114,7 +124,10 @@ export function useCompareWindow(deps: CompareWindowDeps) {
       await tabsStore.writeMergedContent(filePath, mergedContent);
     } catch (err) {
       console.error("保存合并结果失败:", err);
-      dialog.alert({ message: t("common.error.saveMergeFailed", { error: formatCommandError(err) }), variant: "error" });
+      dialog.alert({
+        message: t("common.error.saveMergeFailed", { error: formatCommandError(err) }),
+        variant: "error",
+      });
     }
     compareState.value = { ...compareState.value, visible: false };
   }

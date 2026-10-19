@@ -35,10 +35,11 @@ function makeDeps(
   } = {}
 ): { deps: AppStartupDeps; calls: string[]; initialized: Ref<boolean> } {
   const calls: string[] = [];
-  const record = (name: string) => vi.fn(async () => {
-    calls.push(name);
-    if (options.failAt === name) throw new Error(`fail at ${name}`);
-  });
+  const record = (name: string) =>
+    vi.fn(async () => {
+      calls.push(name);
+      if (options.failAt === name) throw new Error(`fail at ${name}`);
+    });
   const initialized = ref(false);
   let currentSettings = settingsOf(options.settings);
   const deps: AppStartupDeps = {

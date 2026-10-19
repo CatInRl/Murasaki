@@ -66,8 +66,12 @@ onMounted(async () => {
   draft.value = { ...persistence.settings };
   snapshot.value = { ...persistence.settings };
   // E2E test hook：release 构建后 dynamic import 不可用，暴露纯函数供测试调用
-  // @ts-ignore
-  window.__settingsLogic__ = { fieldsForCategory, isDirty, isCategoryDirty, restoreCategoryDefaults };
+  window.__settingsLogic__ = {
+    fieldsForCategory,
+    isDirty,
+    isCategoryDirty,
+    restoreCategoryDefaults,
+  };
 });
 
 function selectCategory(cat: SettingsCategory): void {
@@ -101,20 +105,25 @@ function handleRestoreDefault(): void {
  * - 不保存：直接关闭
  * - 取消：留在设置页
  *
+ * 返回 false 表示用户取消（调用方据此中止关窗 / 退出，#442）。
  * 通过 emit "close" 通知父组件（App.vue）隐藏设置页（单入口路由）
  */
-async function handleClose(): Promise<void> {
+async function handleClose(): Promise<boolean> {
   if (isDirty(draft.value, snapshot.value)) {
     const choice = await dialog.unsavedChanges({
       message: t("settings.unsavedMessage"),
     });
-    if (choice === "cancel") return;
+    if (choice === "cancel") return false;
     if (choice === "save") {
       await handleSave();
     }
   }
   emitClose("close");
+  return true;
 }
+
+// 供 App.vue 在关窗 / 退出前调用（#442）：与点「关闭」共用同一套未保存确认
+defineExpose({ requestClose: handleClose });
 </script>
 
 <template>
@@ -129,7 +138,7 @@ async function handleClose(): Promise<void> {
           @click="selectCategory('general')"
         >
           <Settings :size="16" />
-          <span>{{ $t('settings.categories.general') }}</span>
+          <span>{{ $t("settings.categories.general") }}</span>
         </button>
         <button
           type="button"
@@ -138,7 +147,7 @@ async function handleClose(): Promise<void> {
           @click="selectCategory('editor')"
         >
           <Type :size="16" />
-          <span>{{ $t('settings.categories.editor') }}</span>
+          <span>{{ $t("settings.categories.editor") }}</span>
         </button>
         <button
           type="button"
@@ -147,7 +156,7 @@ async function handleClose(): Promise<void> {
           @click="selectCategory('shortcuts')"
         >
           <Keyboard :size="16" />
-          <span>{{ $t('settings.categories.shortcuts') }}</span>
+          <span>{{ $t("settings.categories.shortcuts") }}</span>
         </button>
       </div>
     </nav>
@@ -155,18 +164,9 @@ async function handleClose(): Promise<void> {
     <!-- Content -->
     <div class="settings-content">
       <div class="settings-content-inner">
-        <GeneralPanel
-          v-if="activeCategory === 'general'"
-          v-model="draft"
-        />
-        <EditorPanel
-          v-else-if="activeCategory === 'editor'"
-          v-model="draft"
-        />
-        <ShortcutPanel
-          v-else-if="activeCategory === 'shortcuts'"
-          v-model="draft"
-        />
+        <GeneralPanel v-if="activeCategory === 'general'" v-model="draft" />
+        <EditorPanel v-else-if="activeCategory === 'editor'" v-model="draft" />
+        <ShortcutPanel v-else-if="activeCategory === 'shortcuts'" v-model="draft" />
       </div>
 
       <!-- Footer -->
@@ -177,7 +177,7 @@ async function handleClose(): Promise<void> {
           :disabled="!currentCategoryDirty"
           @click="handleRestoreDefault"
         >
-          {{ $t('settings.footer.restoreDefaults') }}
+          {{ $t("settings.footer.restoreDefaults") }}
         </button>
         <button
           class="secondary-button"
@@ -185,7 +185,7 @@ async function handleClose(): Promise<void> {
           style="margin-left: auto"
           @click="handleClose"
         >
-          {{ $t('settings.footer.close') }}
+          {{ $t("settings.footer.close") }}
         </button>
         <button
           class="primary-button"
@@ -193,7 +193,7 @@ async function handleClose(): Promise<void> {
           :disabled="saving || !dirty"
           @click="handleSave"
         >
-          {{ saving ? $t('settings.footer.saving') : $t('settings.footer.save') }}
+          {{ saving ? $t("settings.footer.saving") : $t("settings.footer.save") }}
         </button>
       </div>
     </div>

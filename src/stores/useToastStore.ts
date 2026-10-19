@@ -16,13 +16,7 @@ import { ref } from "vue";
  * 所有变体均可选 action（如撤销、重试、查看），点击触发回调并关闭吐司。
  */
 
-export type ToastVariant =
-  | "success"
-  | "info"
-  | "warning"
-  | "error"
-  | "progress"
-  | "deleted";
+export type ToastVariant = "success" | "info" | "warning" | "error" | "progress" | "deleted";
 
 export interface ToastAction {
   label: string;
@@ -89,11 +83,7 @@ export const useToastStore = defineStore("toast", () => {
     }
   }
 
-  function push(
-    variant: ToastVariant,
-    title: string,
-    opts?: ToastOptions
-  ): string {
+  function push(variant: ToastVariant, title: string, opts?: ToastOptions): string {
     const id = nextId();
     const duration = opts?.duration ?? DEFAULT_DURATION[variant];
     const toast: Toast = {
@@ -143,10 +133,7 @@ export const useToastStore = defineStore("toast", () => {
     }
   }
 
-  function update(
-    id: string,
-    patch: Partial<Omit<Toast, "id" | "variant" | "createdAt">>
-  ): void {
+  function update(id: string, patch: Partial<Omit<Toast, "id" | "variant" | "createdAt">>): void {
     const toast = toasts.value.find((t) => t.id === id);
     if (!toast) return;
     Object.assign(toast, patch);

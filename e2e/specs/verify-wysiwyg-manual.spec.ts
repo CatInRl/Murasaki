@@ -32,14 +32,16 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
   it("步骤1: 打开设置页（单入口路由，非空白）", async () => {
     // 先重置：emit navigate "editor" 确保初始无设置页残留
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "navigate",
-        payload: "editor",
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "navigate",
+          payload: "editor",
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     });
     await browser.pause(300);
 
@@ -51,7 +53,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // 用 setTimeout 延迟 done() 让 IPC 消息发送
     await browser.executeAsync((done: (res: unknown) => void) => {
       try {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         window.__TAURI_INTERNALS__.invoke("open_settings");
       } catch {
         // 忽略
@@ -73,7 +75,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
   it("步骤2: 切换到 WYSIWYG 模式并保存（emit settings://saved 运行时生效）", async () => {
     // 1. updateSettings 写盘 + 更新内存 + Rust 缓存
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const persistence = pinia._s.get("persistence");
       Promise.resolve(persistence.updateSettings({ editorMode: "wysiwyg" }))
@@ -84,21 +86,24 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
 
     // 2. emit settings://saved 触发主窗口 loadSettings（模拟设置窗口保存）
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "settings://saved",
-        payload: { settings: { editorMode: "wysiwyg" } },
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "settings://saved",
+          payload: { settings: { editorMode: "wysiwyg" } },
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     });
     await browser.pause(500);
 
     // 3. 验证 persistence.settings.editorMode === "wysiwyg"
-    const mode = await browser.execute(() =>
-      // @ts-ignore
-      window.__pinia__._s.get("persistence").settings.editorMode
+    const mode = await browser.execute(
+      () =>
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        window.__pinia__._s.get("persistence").settings.editorMode
     );
     expect(mode).toBe("wysiwyg");
   });
@@ -106,14 +111,16 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
   it("步骤3: 关闭设置页并验证编辑器进入 WYSIWYG 模式", async () => {
     // 关闭设置页（navigate to editor）
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
-      window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-        event: "navigate",
-        payload: "editor",
-      }).then(
-        () => done(null),
-        (err: unknown) => done(err ? String(err) : null)
-      );
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      window.__TAURI_INTERNALS__
+        .invoke("plugin:event|emit", {
+          event: "navigate",
+          payload: "editor",
+        })
+        .then(
+          () => done(null),
+          (err: unknown) => done(err ? String(err) : null)
+        );
     });
     await browser.pause(300);
 
@@ -122,9 +129,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     expect(await settingsShell.isExisting()).toBe(false);
 
     // 准备含 markdown 语法（标题 + 正文）的测试文件
-    wsPath = resetWorkspace([
-      { path: "wysiwyg-test.md", content: "# 大标题\n\n正文内容\n" },
-    ]);
+    wsPath = resetWorkspace([{ path: "wysiwyg-test.md", content: "# 大标题\n\n正文内容\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\wysiwyg-test.md`);
 
@@ -133,9 +138,10 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     await waitForPresent(browser, ".editor-pane", 10000);
 
     // 验证 editorBridge.editorMode === "wysiwyg"
-    const mode = await browser.execute(() =>
-      // @ts-ignore
-      window.__pinia__._s.get("editorBridge").editorMode
+    const mode = await browser.execute(
+      () =>
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        window.__pinia__._s.get("editorBridge").editorMode
     );
     expect(mode).toBe("wysiwyg");
 
@@ -148,7 +154,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
     // 移动光标到正文段（position 7 = "正"之前），使标题段脱离光标所在段落
     // "# 大标题\n\n正文内容\n" 中 position 7 是 "正"
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
       const view = editorBridge.editorView;
@@ -165,7 +171,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
 
     // 诊断：检查 editorView 状态和装饰
     const diag = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
       const view = editorBridge.editorView;
@@ -197,7 +203,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
   it("步骤5: 验证光标进入段后标记显示（dim）", async () => {
     // 移动光标到标题段（position 0 = "#"），使标题段成为光标所在段落
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
       const view = editorBridge.editorView;
@@ -213,7 +219,7 @@ describe("WYSIWYG 模式真实用户路径验证", () => {
 
     // 诊断
     const diag = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const editorBridge = pinia._s.get("editorBridge");
       const view = editorBridge.editorView;

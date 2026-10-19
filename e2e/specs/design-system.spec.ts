@@ -14,8 +14,21 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
-import { openWorkspace, closeWorkspace, openFileInTab, closeAllTabs, waitForPinia, resetPersistenceSettings } from "../helpers/store";
-import { isRendered, readText, textOfElement, waitForPresent, waitForInBrowser } from "../helpers/wait";
+import {
+  openWorkspace,
+  closeWorkspace,
+  openFileInTab,
+  closeAllTabs,
+  waitForPinia,
+  resetPersistenceSettings,
+} from "../helpers/store";
+import {
+  isRendered,
+  readText,
+  textOfElement,
+  waitForPresent,
+  waitForInBrowser,
+} from "../helpers/wait";
 import { IS_MACOS, toAppPath } from "../helpers/platform";
 
 let browser: Browser;
@@ -33,8 +46,16 @@ describe("设计系统", () => {
   beforeEach(async () => {
     await resetPersistenceSettings(browser);
     const wsPath = resetWorkspace(defaultFixtureFiles());
-    try { await closeAllTabs(browser); } catch { /* ignore */ }
-    try { await closeWorkspace(browser); } catch { /* ignore */ }
+    try {
+      await closeAllTabs(browser);
+    } catch {
+      /* ignore */
+    }
+    try {
+      await closeWorkspace(browser);
+    } catch {
+      /* ignore */
+    }
     // 打开工作区确保 StatusBar / 侧栏等 DOM 稳定渲染
     // （前序 spec 可能将 statusBarVisible 切换为 false，打开工作区不直接重置它，
     //  但状态栏内的图标渲染依赖 StatusBar 组件挂载，配合下方 waitUntil 保证存在）
@@ -42,14 +63,15 @@ describe("设计系统", () => {
     await waitForPresent(browser, ".file-tree", 10000);
     // 显式恢复状态栏可见（前序 spec 的 Alt+Shift+S 可能隐藏状态栏且未恢复）
     await browser.execute(() => {
-      // @ts-ignore
-      const pinia = window.__pinia__;
       // 状态栏显隐通过 keydown 切换；这里通过派发 Alt+Shift+S 让 App.vue 重置
       // 但若已可见则不要再切，先检测 .status-bar 是否存在
       if (!document.querySelector(".status-bar")) {
         const ev = new KeyboardEvent("keydown", {
-          key: "s", bubbles: true, cancelable: true,
-          altKey: true, shiftKey: true,
+          key: "s",
+          bubbles: true,
+          cancelable: true,
+          altKey: true,
+          shiftKey: true,
         });
         window.dispatchEvent(ev);
       }
@@ -115,7 +137,9 @@ describe("设计系统", () => {
   });
 
   it("欢迎页显示快捷键提示", async () => {
-    const hints = await browser.$$(".welcome-page .shortcut-hint");
+    const hints = (await browser.$$(
+      ".welcome-page .shortcut-hint"
+    )) as unknown as WebdriverIO.ElementArray;
     expect(hints.length).toBeGreaterThanOrEqual(3);
 
     // macOS 按 #341 的平台转换显示 ⌘ 变体，期望值按平台取
@@ -134,9 +158,7 @@ describe("设计系统", () => {
     // 侧边栏仅在 hasWorkspace || hasTabs 时渲染。
     // 先打开工作区 + 文件（创建 tab），再关闭工作区 → 侧边栏仍可见，
     // FileTree 因 !hasWorkspace 显示 EmptyState。
-    const wsPath = resetWorkspace([
-      { path: "temp.md", content: "# 临时\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "temp.md", content: "# 临时\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\temp.md`);
     await closeWorkspace(browser);
@@ -147,13 +169,13 @@ describe("设计系统", () => {
     // isDisplayed() 在本栈下会持久性误判（见 helpers/wait.ts 头部），改用 isRendered
     expect(await isRendered(browser, ".file-tree .empty-state")).toBe(true);
 
-    expect(await readText(browser, ".file-tree .empty-state .empty-title", "未打开工作区")).toBe("未打开工作区");
+    expect(await readText(browser, ".file-tree .empty-state .empty-title", "未打开工作区")).toBe(
+      "未打开工作区"
+    );
   });
 
   it("EmptyState 有虚线边框", async () => {
-    const wsPath = resetWorkspace([
-      { path: "temp.md", content: "# 临时\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "temp.md", content: "# 临时\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\temp.md`);
     await closeWorkspace(browser);
@@ -170,9 +192,7 @@ describe("设计系统", () => {
   });
 
   it("EmptyState 有操作按钮", async () => {
-    const wsPath = resetWorkspace([
-      { path: "temp.md", content: "# 临时\n" },
-    ]);
+    const wsPath = resetWorkspace([{ path: "temp.md", content: "# 临时\n" }]);
     await openWorkspace(browser, wsPath);
     await openFileInTab(browser, `${wsPath}\\temp.md`);
     await closeWorkspace(browser);
@@ -180,7 +200,9 @@ describe("设计系统", () => {
 
     await waitForPresent(browser, ".file-tree .empty-state .empty-action", 10000);
     expect(await isRendered(browser, ".file-tree .empty-state .empty-action")).toBe(true);
-    expect(await readText(browser, ".file-tree .empty-state .empty-action", "打开文件夹")).toBe("打开文件夹");
+    expect(await readText(browser, ".file-tree .empty-state .empty-action", "打开文件夹")).toBe(
+      "打开文件夹"
+    );
   });
 
   it("文件树选中底色的半透明覆盖层跟随 --murasaki-primary-soft（color-mix 生效）", async () => {
@@ -189,10 +211,13 @@ describe("设计系统", () => {
     await browser.pause(500);
 
     // 通过 store 选中节点（与 misc-visual 同一手法）
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      window.__pinia__._s.get("workspace").selectedFilePath = path;
-    }, toAppPath(`${wsPath}\\intro.md`));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        window.__pinia__._s.get("workspace").selectedFilePath = path;
+      },
+      toAppPath(`${wsPath}\\intro.md`)
+    );
     await waitForPresent(browser, ".file-tree .node-row.is-selected", 10000);
 
     // 选中底色带 120ms 过渡，读太早会拿到过渡中的中间值；轮询到与

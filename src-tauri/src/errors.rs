@@ -140,7 +140,10 @@ mod tests {
     fn io_at_carries_path_and_detail() {
         let err = CommandError::io_at(&io::Error::from(io::ErrorKind::NotFound), "C:/ws/a.md");
         assert_eq!(err.code, ErrorCode::NotFound);
-        assert_eq!(err.params.get("path").map(String::as_str), Some("C:/ws/a.md"));
+        assert_eq!(
+            err.params.get("path").map(String::as_str),
+            Some("C:/ws/a.md")
+        );
         assert!(err.params.contains_key("detail"));
     }
 

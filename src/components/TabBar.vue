@@ -71,12 +71,9 @@ function scrollActiveTabIntoView(): void {
 }
 
 // 激活 tab 变化 / tab 数量变化时，把激活 tab 滚动到可见区域
-watch(
-  [activeTabId, () => tabs.value.length],
-  () => {
-    void nextTick(scrollActiveTabIntoView);
-  }
-);
+watch([activeTabId, () => tabs.value.length], () => {
+  void nextTick(scrollActiveTabIntoView);
+});
 
 // 窗口缩放（/ tab 栏宽度变化）时，tab 可能横向溢出，激活 tab 可能被推出可视区。
 // 用 ResizeObserver 监听容器宽度变化，确保激活 tab 始终可见、可选中与关闭。
@@ -138,9 +135,7 @@ function onTabKeydown(e: KeyboardEvent, index: number): void {
 
 /** 把焦点移到目标标签（tabindex=-1 的元素仍可编程聚焦），并滚入可视区 */
 function focusTabAt(index: number): void {
-  const el = tabsListRef.value?.querySelector<HTMLElement>(
-    `.tab-item[data-tab-index="${index}"]`
-  );
+  const el = tabsListRef.value?.querySelector<HTMLElement>(`.tab-item[data-tab-index="${index}"]`);
   el?.focus();
   el?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
@@ -178,7 +173,12 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
 
   const hasPath = !!tab.path;
   const items: MenuItem[] = [
-    { label: t("editor.tabBar.close"), icon: X, shortcut: formatShortcutForDisplay("Ctrl+W") ?? "", action: () => emit("close-tab", tab.id) },
+    {
+      label: t("editor.tabBar.close"),
+      icon: X,
+      shortcut: formatShortcutForDisplay("Ctrl+W") ?? "",
+      action: () => emit("close-tab", tab.id),
+    },
     { label: t("editor.tabBar.closeOthers"), action: () => emit("close-others", tab.id) },
     { label: t("editor.tabBar.closeRight"), action: () => emit("close-right", tab.id) },
     { label: t("editor.tabBar.closeLeft"), action: () => emit("close-left", tab.id) },
@@ -193,7 +193,11 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
         try {
           await fileOps.copyAbsolutePath(tab.path);
         } catch (err) {
-          void dialog.alert({ title: t("common.dialog.errorTitle"), message: t("common.error.copyPathFailed", { error: String(err) }), variant: "error" });
+          void dialog.alert({
+            title: t("common.dialog.errorTitle"),
+            message: t("common.error.copyPathFailed", { error: String(err) }),
+            variant: "error",
+          });
         }
       },
     },
@@ -206,7 +210,11 @@ function onContextMenu(e: MouseEvent, tab: Tab): void {
         try {
           await fileOps.revealInExplorer(tab.path);
         } catch (err) {
-          void dialog.alert({ title: t("common.dialog.errorTitle"), message: t("common.error.revealFailed", { error: String(err) }), variant: "error" });
+          void dialog.alert({
+            title: t("common.dialog.errorTitle"),
+            message: t("common.error.revealFailed", { error: String(err) }),
+            variant: "error",
+          });
         }
       },
     },
@@ -343,13 +351,19 @@ function onPanelKeydown(e: KeyboardEvent): void {
         <svg
           v-if="!isOutOfWorkspace(tab)"
           class="tab-icon"
-          width="13" height="13" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="8" y1="13" x2="16" y2="13"/>
-          <line x1="8" y1="17" x2="14" y2="17"/>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="8" y1="13" x2="16" y2="13" />
+          <line x1="8" y1="17" x2="14" y2="17" />
         </svg>
         <ArrowUpRight v-else class="tab-icon" :size="13" :stroke-width="2" aria-hidden="true" />
         <span class="tab-title">{{ tabsStore.getTabTitle(tab, t("common.untitled")) }}</span>
@@ -364,9 +378,18 @@ function onPanelKeydown(e: KeyboardEvent): void {
           :aria-label="$t('editor.tabBar.closeTabAria')"
           @click="onCloseTab($event, tab.id)"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
       </div>
@@ -396,7 +419,12 @@ function onPanelKeydown(e: KeyboardEvent): void {
         </button>
       </template>
 
-      <div ref="panelRef" class="all-tabs-panel" data-testid="all-tabs-panel" @keydown="onPanelKeydown">
+      <div
+        ref="panelRef"
+        class="all-tabs-panel"
+        data-testid="all-tabs-panel"
+        @keydown="onPanelKeydown"
+      >
         <input
           ref="searchInputRef"
           v-model="tabQuery"
@@ -408,7 +436,7 @@ function onPanelKeydown(e: KeyboardEvent): void {
         <NScrollbar class="all-tabs-scroll" :style="{ maxHeight: '320px' }">
           <div class="all-tabs-list" role="listbox">
             <p v-if="filteredEntries.length === 0" class="all-tabs-empty">
-              {{ $t('editor.tabBar.allTabsEmpty') }}
+              {{ $t("editor.tabBar.allTabsEmpty") }}
             </p>
             <div
               v-for="(entry, i) in filteredEntries"
@@ -429,7 +457,7 @@ function onPanelKeydown(e: KeyboardEvent): void {
               />
               <span class="all-tabs-text">
                 <span class="all-tabs-title">{{ entry.title }}</span>
-                <span class="all-tabs-subtitle">{{ entry.subtitle ?? $t('common.untitled') }}</span>
+                <span class="all-tabs-subtitle">{{ entry.subtitle ?? $t("common.untitled") }}</span>
               </span>
               <span v-if="entry.isDirty" class="dirty-dot" aria-hidden="true"></span>
               <button
@@ -439,9 +467,18 @@ function onPanelKeydown(e: KeyboardEvent): void {
                 :aria-label="$t('editor.tabBar.closeTabAria')"
                 @click="onCloseEntry($event, entry)"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/>
-                  <line x1="6" y1="6" x2="18" y2="18"/>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </div>
@@ -458,9 +495,18 @@ function onPanelKeydown(e: KeyboardEvent): void {
       :aria-label="$t('editor.tabBar.newTab')"
       @click="onNewTab"
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19"/>
-        <line x1="5" y1="12" x2="19" y2="12"/>
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
       </svg>
     </button>
   </div>
@@ -564,9 +610,10 @@ function onPanelKeydown(e: KeyboardEvent): void {
   padding: 0;
   opacity: 0;
   margin-left: 2px;
-  transition: opacity var(--murasaki-duration-fast) var(--murasaki-ease),
-              background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    opacity var(--murasaki-duration-fast) var(--murasaki-ease),
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 
 .tab-item:hover .close-btn {
@@ -592,9 +639,10 @@ function onPanelKeydown(e: KeyboardEvent): void {
   cursor: pointer;
   flex-shrink: 0;
   padding: 0;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease),
-              transform var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease),
+    transform var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 
 .new-tab-btn:hover {
@@ -623,8 +671,9 @@ function onPanelKeydown(e: KeyboardEvent): void {
   border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 
 .all-tabs-btn:hover,
@@ -743,9 +792,10 @@ function onPanelKeydown(e: KeyboardEvent): void {
   cursor: pointer;
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity var(--murasaki-duration-fast) var(--murasaki-ease),
-              background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    opacity var(--murasaki-duration-fast) var(--murasaki-ease),
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 
 .all-tabs-item:hover .all-tabs-close,

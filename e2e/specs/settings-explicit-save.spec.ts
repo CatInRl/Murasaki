@@ -28,14 +28,16 @@ let wsPath: string;
 /** 切换到设置页（通过 navigate 事件） */
 async function navigateToSettings(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
-    window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-      event: "navigate",
-      payload: "settings",
-    }).then(
-      () => done(null),
-      (err: unknown) => done(err ? String(err) : null)
-    );
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
+    window.__TAURI_INTERNALS__
+      .invoke("plugin:event|emit", {
+        event: "navigate",
+        payload: "settings",
+      })
+      .then(
+        () => done(null),
+        (err: unknown) => done(err ? String(err) : null)
+      );
   });
   await browser.pause(500);
 }
@@ -43,14 +45,16 @@ async function navigateToSettings(browser: Browser): Promise<void> {
 /** 切换回编辑器视图 */
 async function navigateToEditor(browser: Browser): Promise<void> {
   await browser.executeAsync((done: (res: unknown) => void) => {
-    // @ts-ignore
-    window.__TAURI_INTERNALS__.invoke("plugin:event|emit", {
-      event: "navigate",
-      payload: "editor",
-    }).then(
-      () => done(null),
-      (err: unknown) => done(err ? String(err) : null)
-    );
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
+    window.__TAURI_INTERNALS__
+      .invoke("plugin:event|emit", {
+        event: "navigate",
+        payload: "editor",
+      })
+      .then(
+        () => done(null),
+        (err: unknown) => done(err ? String(err) : null)
+      );
   });
   await browser.pause(300);
 }
@@ -101,7 +105,7 @@ describe("设置显式 Save 模型", () => {
     await navigateToEditor(browser);
   });
 
-  it("每个分类有 \"恢复默认\" 按钮", async () => {
+  it('每个分类有 "恢复默认" 按钮', async () => {
     await navigateToSettings(browser);
 
     // 常规分类
@@ -121,10 +125,15 @@ describe("设置显式 Save 模型", () => {
 
     // 常规分类下有两个下拉：界面语言 + 图片插入方式（后者为本 issue 新增）
     const optionValues = await browser.execute(() => {
-      // @ts-ignore
-      const all = Array.from(document.querySelectorAll(".settings-shell select")) as HTMLSelectElement[];
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      const all = Array.from(
+        document.querySelectorAll(".settings-shell select")
+      ) as HTMLSelectElement[];
       const target = all[1];
-      return { count: all.length, values: target ? Array.from(target.options).map((o) => o.value) : [] };
+      return {
+        count: all.length,
+        values: target ? Array.from(target.options).map((o) => o.value) : [],
+      };
     });
     expect((optionValues as any).count).toBeGreaterThanOrEqual(2);
     expect((optionValues as any).values).toEqual(["file", "base64"]);
@@ -156,20 +165,27 @@ describe("设置显式 Save 模型", () => {
 
     // 1. 启动 unsavedChanges（不阻塞会话）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const dialog = pinia._s.get("dialog");
       (window as any).__testResult = null;
-      dialog.unsavedChanges({ message: "测试未保存" })
-        .then((res: string) => { (window as any).__testResult = { ok: true, res }; })
-        .catch((err: unknown) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
+      dialog
+        .unsavedChanges({ message: "测试未保存" })
+        .then((res: string) => {
+          (window as any).__testResult = { ok: true, res };
+        })
+        .catch((err: unknown) => {
+          (window as any).__testResult = { ok: false, error: err ? String(err) : null };
+        });
     });
 
     // 2. 等待对话框出现
     await waitForPresent(browser, ".dialog-overlay", 5000);
 
     // 验证对话框包含三按钮
-    const buttons = await browser.$$(".dialog-overlay button");
+    const buttons = (await browser.$$(
+      ".dialog-overlay button"
+    )) as unknown as WebdriverIO.ElementArray;
     // 读文案走 textOfElement（句柄 + textContent），别用 getText()——它对按钮这类小文本节点会返回空串；
     // 元素句柄仍用于后面的点击
     const buttonTexts: string[] = [];
@@ -189,7 +205,7 @@ describe("设置显式 Save 模型", () => {
     if (!clicked) {
       // 回退：通过 store 调用 unsavedDiscard
       await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const dialog = pinia._s.get("dialog");
         dialog.unsavedDiscard();
@@ -197,25 +213,30 @@ describe("设置显式 Save 模型", () => {
     }
 
     // 3. 轮询结果
-    await browser.waitUntil(
-      async () => await browser.execute(() => (window as any).__testResult),
-      { timeout: 5000, interval: 100 }
-    );
+    await browser.waitUntil(async () => await browser.execute(() => (window as any).__testResult), {
+      timeout: 5000,
+      interval: 100,
+    });
     const result = await browser.execute(() => (window as any).__testResult);
     expect((result as any).ok).toBe(true);
     expect((result as any).res).toBe("discard");
   });
 
-  it("dialog.unsavedChanges 选择 \"保存\" 返回 save", async () => {
+  it('dialog.unsavedChanges 选择 "保存" 返回 save', async () => {
     // 1. 启动 unsavedChanges（不阻塞会话）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const dialog = pinia._s.get("dialog");
       (window as any).__testResult = null;
-      dialog.unsavedChanges({ message: "测试保存" })
-        .then((res: string) => { (window as any).__testResult = { ok: true, res }; })
-        .catch((err: unknown) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
+      dialog
+        .unsavedChanges({ message: "测试保存" })
+        .then((res: string) => {
+          (window as any).__testResult = { ok: true, res };
+        })
+        .catch((err: unknown) => {
+          (window as any).__testResult = { ok: false, error: err ? String(err) : null };
+        });
     });
 
     // 2. 等待对话框出现
@@ -234,7 +255,7 @@ describe("设置显式 Save 模型", () => {
     }
     if (!clicked) {
       await browser.execute(() => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const pinia = window.__pinia__;
         const dialog = pinia._s.get("dialog");
         dialog.unsavedSave();
@@ -242,10 +263,10 @@ describe("设置显式 Save 模型", () => {
     }
 
     // 3. 轮询结果
-    await browser.waitUntil(
-      async () => await browser.execute(() => (window as any).__testResult),
-      { timeout: 5000, interval: 100 }
-    );
+    await browser.waitUntil(async () => await browser.execute(() => (window as any).__testResult), {
+      timeout: 5000,
+      interval: 100,
+    });
     const result = await browser.execute(() => (window as any).__testResult);
     expect((result as any).ok).toBe(true);
     expect((result as any).res).toBe("save");
@@ -254,13 +275,18 @@ describe("设置显式 Save 模型", () => {
   it("dialog.unsavedChanges Escape 取消返回 cancel", async () => {
     // 1. 启动 unsavedChanges（不阻塞会话）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const pinia = window.__pinia__;
       const dialog = pinia._s.get("dialog");
       (window as any).__testResult = null;
-      dialog.unsavedChanges({ message: "测试取消" })
-        .then((res: string) => { (window as any).__testResult = { ok: true, res }; })
-        .catch((err: unknown) => { (window as any).__testResult = { ok: false, error: err ? String(err) : null }; });
+      dialog
+        .unsavedChanges({ message: "测试取消" })
+        .then((res: string) => {
+          (window as any).__testResult = { ok: true, res };
+        })
+        .catch((err: unknown) => {
+          (window as any).__testResult = { ok: false, error: err ? String(err) : null };
+        });
     });
 
     // 2. 等待对话框出现
@@ -268,18 +294,17 @@ describe("设置显式 Save 模型", () => {
 
     // 在 dialog overlay 上派发 Escape keydown 事件
     await browser.execute(() => {
-      const el = document.querySelector('.dialog-overlay');
-      el?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      const el = document.querySelector(".dialog-overlay");
+      el?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     });
 
     // 3. 轮询结果
-    await browser.waitUntil(
-      async () => await browser.execute(() => (window as any).__testResult),
-      { timeout: 5000, interval: 100 }
-    );
+    await browser.waitUntil(async () => await browser.execute(() => (window as any).__testResult), {
+      timeout: 5000,
+      interval: 100,
+    });
     const result = await browser.execute(() => (window as any).__testResult);
     expect((result as any).ok).toBe(true);
     expect((result as any).res).toBe("cancel");
   });
-
 });

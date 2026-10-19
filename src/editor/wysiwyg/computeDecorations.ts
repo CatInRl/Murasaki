@@ -248,7 +248,9 @@ function getCursorLineRange(doc: string, pos: number): { from: number; to: numbe
  * 有序列表非 1 开头（如 5.）按 CommonMark 属于段落延续，不视为边界。
  */
 export function startsBlockLine(line: string): boolean {
-  return /^ {0,3}(?:```|~~~|#{1,6}(?:[ \t]|$)|>(?:[ \t]|$)|[-*+][ \t]|1\.[ \t]|(?:\*{3,}|-{3,}|_{3,})[ \t]*$|<[a-zA-Z!/])/.test(line);
+  return /^ {0,3}(?:```|~~~|#{1,6}(?:[ \t]|$)|>(?:[ \t]|$)|[-*+][ \t]|1\.[ \t]|(?:\*{3,}|-{3,}|_{3,})[ \t]*$|<[a-zA-Z!/])/.test(
+    line
+  );
 }
 
 /**
@@ -330,10 +332,7 @@ function extractFencedCode(node: SyntaxNode, doc: string): { lang: string; code:
 }
 
 /** 从 Link/Image 节点提取锚文本与 URL（仅行内式 `[text](url)` 能提取）。 */
-function extractAnchorData(
-  node: SyntaxNode,
-  doc: string
-): { text: string; url: string } | null {
+function extractAnchorData(node: SyntaxNode, doc: string): { text: string; url: string } | null {
   const marks = node.getChildren("LinkMark");
   if (marks.length < 2) return null;
   const text = doc.slice(marks[0].to, marks[1].from);
@@ -371,7 +370,7 @@ function findMathRanges(
     if (inAnyCodeRange(from, to, codeRanges)) continue;
     result.push({ from, to, expr: m[1], displayMode: true });
   }
-  const inlineRe = /\$([^\$\n]+?)\$/g;
+  const inlineRe = /\$([^$\n]+?)\$/g;
   if (recomputeWindow) inlineRe.lastIndex = recomputeWindow.from;
   while ((m = inlineRe.exec(doc)) !== null) {
     if (m.index >= scanTo) break;
@@ -561,10 +560,22 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
               if (inParagraph) {
                 // 段内：dim ListMark + TaskMarker（可编辑原始 markdown）
                 decos.push({ type: "mark", from, to, kind: "dim", markType: name });
-                decos.push({ type: "mark", from: taskMarker.from, to: taskMarker.to, kind: "dim", markType: "TaskMarker" });
+                decos.push({
+                  type: "mark",
+                  from: taskMarker.from,
+                  to: taskMarker.to,
+                  kind: "dim",
+                  markType: "TaskMarker",
+                });
               } else {
                 // 离开段：把 ListMark + TaskMarker 一起替换为 checkbox widget
-                decos.push({ type: "replace", from, to: taskMarker.to, widget: "taskCheckbox", checked });
+                decos.push({
+                  type: "replace",
+                  from,
+                  to: taskMarker.to,
+                  widget: "taskCheckbox",
+                  checked,
+                });
               }
               return;
             }
@@ -634,7 +645,11 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
           textTo = mark ? mark.from : to;
         }
         // 去掉末尾换行符，避免 decoration 覆盖行尾空白
-        while (textTo > textFrom && (doc.charCodeAt(textTo - 1) === 10 || doc.charCodeAt(textTo - 1) === 13)) textTo--;
+        while (
+          textTo > textFrom &&
+          (doc.charCodeAt(textTo - 1) === 10 || doc.charCodeAt(textTo - 1) === 13)
+        )
+          textTo--;
         if (textTo > textFrom) {
           decos.push({
             type: "render",
@@ -698,8 +713,7 @@ export function computeDecorations(input: ComputeInput): ComputedDeco[] {
   // 光标离开 frontmatter 范围 → 渲染为样式化卡片 widget；光标进入 → 显示原始文本可编辑
   if (fmRange) {
     if (intersectsWindow(fmRange.from, fmRange.to, recomputeWindow)) {
-      const cursorInRange =
-        selectionHead >= fmRange.from && selectionHead <= fmRange.to;
+      const cursorInRange = selectionHead >= fmRange.from && selectionHead <= fmRange.to;
       if (!cursorInRange) {
         decos.push({
           type: "blockWidget",

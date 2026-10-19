@@ -39,8 +39,7 @@ export function toViewportCoords(
   // 导致贴近左上角拖入被误判为无效、回退到「插入当前光标」（issue #288 审查）
   if (x < 0 || y < 0) return null;
 
-  const dpr =
-    Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
+  const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
 
   const viewX = x / dpr;
   const viewY = y / dpr;

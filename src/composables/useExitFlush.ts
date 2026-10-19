@@ -94,10 +94,7 @@ export interface ExitFlushOptions {
  * 退出落盘接线：注册给 `app-close-requested` 事件使用。
  * 重复触发（用户连点关闭）只执行一次 —— 但如果用户选了「取消」，要复位让下次还能触发。
  */
-export function useExitFlush(
-  tabsStore: ExitFlushStoreSlice,
-  options: ExitFlushOptions = {}
-) {
+export function useExitFlush(tabsStore: ExitFlushStoreSlice, options: ExitFlushOptions = {}) {
   let inFlight = false;
 
   async function onExitRequested(): Promise<void> {
@@ -133,8 +130,7 @@ export function useExitFlush(
       await Promise.race([
         flushUnsavedOnExit({
           tabs: tabsStore.tabs,
-          saveDraft: (path, content, knownMtime) =>
-            fileSystem.saveDraft(path, content, knownMtime),
+          saveDraft: (path, content, knownMtime) => fileSystem.saveDraft(path, content, knownMtime),
           deleteDraft: (path) => fileSystem.deleteDraft(path),
           persist: () => tabsStore.persist(),
           writeDrafts,
@@ -149,7 +145,9 @@ export function useExitFlush(
       } catch (err) {
         // 兜底：Rust 侧未能关闭时强制销毁本窗口，保证窗口关得掉
         console.error("[Murasaki] close_window 失败，强制销毁窗口:", err);
-        void getCurrentWebviewWindow().destroy().catch(() => {});
+        void getCurrentWebviewWindow()
+          .destroy()
+          .catch(() => {});
       }
     }
   }

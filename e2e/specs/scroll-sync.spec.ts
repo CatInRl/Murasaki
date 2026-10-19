@@ -133,7 +133,7 @@ describe("编辑器预览双向滚动同步", () => {
     // 通过 __editorRef__.scrollToLine 滚动编辑器到文档底部
     // EditorView 未暴露在 window 上，故使用 SourceEditor 暴露的 scrollToLine
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const ref = window.__editorRef__;
       if (!ref) return done("no editor ref");
       try {
@@ -201,15 +201,16 @@ describe("编辑器预览双向滚动同步", () => {
 
     // 滚动编辑器
     await browser.executeAsync((done: (res: unknown) => void) => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const view = window.__editorRef__?.getView?.();
       if (!view) return done("no editor view");
       try {
         const midLine = Math.floor(view.state.doc.lines / 2);
         const midPos = view.state.doc.line(midLine).from;
         view.dispatch({
-          effects: (window as any).EditorView?.scrollIntoView?.(midPos, { y: "start" })
-            ?? view.state.scrollIntoView(midPos),
+          effects:
+            (window as any).EditorView?.scrollIntoView?.(midPos, { y: "start" }) ??
+            view.state.scrollIntoView(midPos),
         });
         done(null);
       } catch (e) {

@@ -2,16 +2,46 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { EditorState, Compartment, Transaction, Extension } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab, selectAll } from "@codemirror/commands";
-import { indentOnInput, bracketMatching, foldGutter, foldKeymap, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import {
+  EditorView,
+  keymap,
+  lineNumbers,
+  highlightActiveLine,
+  drawSelection,
+} from "@codemirror/view";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  selectAll,
+} from "@codemirror/commands";
+import {
+  indentOnInput,
+  bracketMatching,
+  foldGutter,
+  foldKeymap,
+  HighlightStyle,
+  syntaxHighlighting,
+} from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { languageForFile } from "../editor/language";
 import { isMarkdownFile } from "../utils/fileKind";
 import { basename } from "../utils/path";
-import { searchKeymap, highlightSelectionMatches, openSearchPanel } from "@codemirror/search";
-import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import {
+  searchKeymap,
+  highlightSelectionMatches,
+  openSearchPanel,
+  searchPanelOpen,
+  closeSearchPanel,
+} from "@codemirror/search";
+import {
+  autocompletion,
+  completionKeymap,
+  closeBrackets,
+  closeBracketsKeymap,
+} from "@codemirror/autocomplete";
 import { tags } from "@lezer/highlight";
 import {
   Scissors,
@@ -48,21 +78,48 @@ import type { EditorMode } from "../types";
  */
 const murasakiHighlightStyle = HighlightStyle.define([
   // Headings: purple-700, bold
-  { tag: tags.heading1, color: "var(--murasaki-purple-700)", fontWeight: "700", fontSize: "1.25em" },
-  { tag: tags.heading2, color: "var(--murasaki-purple-700)", fontWeight: "700", fontSize: "1.15em" },
-  { tag: tags.heading3, color: "var(--murasaki-purple-600)", fontWeight: "600", fontSize: "1.05em" },
-  { tag: [tags.heading4, tags.heading5, tags.heading6], color: "var(--murasaki-purple-600)", fontWeight: "600" },
+  {
+    tag: tags.heading1,
+    color: "var(--murasaki-purple-700)",
+    fontWeight: "700",
+    fontSize: "1.25em",
+  },
+  {
+    tag: tags.heading2,
+    color: "var(--murasaki-purple-700)",
+    fontWeight: "700",
+    fontSize: "1.15em",
+  },
+  {
+    tag: tags.heading3,
+    color: "var(--murasaki-purple-600)",
+    fontWeight: "600",
+    fontSize: "1.05em",
+  },
+  {
+    tag: [tags.heading4, tags.heading5, tags.heading6],
+    color: "var(--murasaki-purple-600)",
+    fontWeight: "600",
+  },
   // ATX heading markers (#, ##): purple-400
   { tag: tags.heading, color: "var(--murasaki-purple-400)" },
   // Emphasis — 语义 token，随主题切换（颜色与预览 .markdown-body em/strong/del 一致）
   { tag: tags.strong, color: "var(--murasaki-ink)", fontWeight: "700" },
   { tag: tags.emphasis, color: "var(--murasaki-ink)", fontStyle: "italic" },
-  { tag: tags.strikethrough, color: "var(--murasaki-muted-foreground)", textDecoration: "line-through" },
+  {
+    tag: tags.strikethrough,
+    color: "var(--murasaki-muted-foreground)",
+    textDecoration: "line-through",
+  },
   // Links
   { tag: tags.link, color: "var(--murasaki-purple-700)", textDecoration: "underline" },
   { tag: tags.url, color: "var(--murasaki-state-info)" },
   // Inline code & code blocks
-  { tag: tags.monospace, color: "var(--murasaki-purple-800)", backgroundColor: "var(--murasaki-primary-soft)" },
+  {
+    tag: tags.monospace,
+    color: "var(--murasaki-purple-800)",
+    backgroundColor: "var(--murasaki-primary-soft)",
+  },
   // Lists: purple marker
   { tag: tags.list, color: "var(--murasaki-purple-600)" },
   // Quotes: purple-600 italic
@@ -264,7 +321,7 @@ const hostRef = ref<HTMLDivElement | null>(null);
 const viewRef = shallowRef<EditorView | null>(null);
 
 const contextMenu = useContextMenuStore();
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 // 标记正在进行外部值同步（避免 dispatch 触发 update:modelValue 污染 dirty 状态）
 let isApplyingExternalValue = false;
@@ -286,6 +343,8 @@ const fontComp = new Compartment();
 const languageComp = new Compartment();
 // 快捷键覆盖：settings.shortcuts 变化时重建编辑器快捷键 keymap（shortcutComp）
 const shortcutComp = new Compartment();
+// CodeMirror 内建查找/替换面板文案（#442）：默认英文，随界面语言重建
+const searchPhrasesComp = new Compartment();
 // 快捷键覆盖表（响应式：设置保存后自动更新）
 const { overrides } = useShortcuts();
 
@@ -293,6 +352,32 @@ const { overrides } = useShortcuts();
 // 未命名新文件默认按 markdown 处理（与 App.vue 约定一致）；实时读 props，切换文件无需重建扩展。
 function isMarkdownDoc(): boolean {
   return props.currentFilePath ? isMarkdownFile(props.currentFilePath) : true;
+}
+
+/**
+ * CodeMirror 内建查找/替换面板的短语（#442）。
+ * key 是 @codemirror/search 内部 `state.phrase(...)` 的原文，不能改写。
+ */
+function buildSearchPhrases(): Record<string, string> {
+  return {
+    Find: t("editor.searchPanel.find"),
+    Replace: t("editor.searchPanel.replace"),
+    next: t("editor.searchPanel.next"),
+    previous: t("editor.searchPanel.previous"),
+    all: t("editor.searchPanel.all"),
+    "match case": t("editor.searchPanel.matchCase"),
+    regexp: t("editor.searchPanel.regexp"),
+    "by word": t("editor.searchPanel.byWord"),
+    replace: t("editor.searchPanel.replaceOne"),
+    "replace all": t("editor.searchPanel.replaceAll"),
+    close: t("editor.searchPanel.close"),
+    "current match": t("editor.searchPanel.currentMatch"),
+    "on line": t("editor.searchPanel.onLine"),
+    "replaced $ matches": t("editor.searchPanel.replacedMatches"),
+    "replaced match on line $": t("editor.searchPanel.replacedMatchOnLine"),
+    "Go to line": t("editor.searchPanel.goToLine"),
+    go: t("editor.searchPanel.go"),
+  };
 }
 
 function buildExtensions() {
@@ -319,6 +404,8 @@ function buildExtensions() {
     // 快捷键扩展（高优先级，避免被 defaultKeymap 拦截；含 Enter 引用块换行处理）
     // 由设置中的快捷键覆盖动态生成，settings://saved 后通过 shortcutComp 重建
     shortcutComp.of(buildEditorShortcutExtension(overrides.value, { isMarkdown: isMarkdownDoc })),
+    // 查找/替换面板文案（#442）
+    searchPhrasesComp.of(EditorState.phrases.of(buildSearchPhrases())),
     // 语言高亮：markdown 走 GFM，其他文本/代码文件走解析出的 CodeMirror 语言
     languageComp.of(buildLanguageExtension()),
     lineNumbersComp.of(props.showLineNumbers ? lineNumbers() : []),
@@ -332,10 +419,7 @@ function buildExtensions() {
     // isEnabled / isMarkdown 为实时谓词（读取 props 响应式值），开关/文件切换无需重建扩展
     fullwidthToMarkdownExtension({
       isEnabled: () => props.fullwidthToMarkdown,
-      isMarkdown: () =>
-        props.currentFilePath
-          ? isMarkdownFile(props.currentFilePath)
-          : true, // 未命名新文件默认按 markdown 处理（与 App.vue 约定一致）
+      isMarkdown: () => (props.currentFilePath ? isMarkdownFile(props.currentFilePath) : true), // 未命名新文件默认按 markdown 处理（与 App.vue 约定一致）
     }),
     foldGutter({ openText: "▾", closedText: "▸" }),
     murasakiTheme,
@@ -541,7 +625,7 @@ watch(
           isApplyingExternalValue = false;
         }
       }
-      // 确保 wysiwygComp + fontComp + shortcutComp 与当前配置一致（issue #115）
+      // 确保 wysiwygComp + fontComp + shortcutComp + searchPhrasesComp 与当前配置一致（issue #115）
       // cached state 可能在不同配置下缓存，setState 恢复后需重新应用当前配置
       view.dispatch({
         effects: [
@@ -550,6 +634,7 @@ watch(
           shortcutComp.reconfigure(
             buildEditorShortcutExtension(overrides.value, { isMarkdown: isMarkdownDoc })
           ),
+          searchPhrasesComp.reconfigure(EditorState.phrases.of(buildSearchPhrases())),
         ],
       });
     } else {
@@ -641,16 +726,24 @@ watch(
   }
 );
 
+// 界面语言切换 → 重建查找/替换面板短语（#442）
+// 面板文案在构造时写死、不随 facet 更新，只能关掉；下次打开即为新语言
+watch(locale, () => {
+  const view = viewRef.value;
+  if (!view) return;
+  if (searchPanelOpen(view.state)) closeSearchPanel(view);
+  view.dispatch({
+    effects: searchPhrasesComp.reconfigure(EditorState.phrases.of(buildSearchPhrases())),
+  });
+});
+
 // 字体设置变更（大小/行高/字体族）→ 重新应用 fontComp
 // 通过 Compartment.reconfigure 动态切换，不销毁编辑器实例
-watch(
-  [() => props.fontSize, () => props.lineHeight, () => props.fontFamily],
-  () => {
-    viewRef.value?.dispatch({
-      effects: fontComp.reconfigure(buildFontTheme()),
-    });
-  }
-);
+watch([() => props.fontSize, () => props.lineHeight, () => props.fontFamily], () => {
+  viewRef.value?.dispatch({
+    effects: fontComp.reconfigure(buildFontTheme()),
+  });
+});
 
 // 当前文件路径变更（切 tab / 重命名）→ 更新模块级状态并触发 WYSIWYG 重算 + 语言重配
 // ImageWidget 在 toDOM 时读取 currentFilePath 解析相对图片路径（ADR-0015）
@@ -675,16 +768,57 @@ function onContextMenu(e: MouseEvent): void {
 
 function buildEditorMenuItems(): MenuItem[] {
   return [
-    { label: t("common.cut"), icon: Scissors, shortcut: formatShortcutForDisplay("Ctrl+X") ?? "", action: () => runExecCommand("cut") },
-    { label: t("common.copy"), icon: Copy, shortcut: formatShortcutForDisplay("Ctrl+C") ?? "", action: () => runExecCommand("copy") },
-    { label: t("common.paste"), icon: ClipboardPaste, shortcut: formatShortcutForDisplay("Ctrl+V") ?? "", action: () => runExecCommand("paste") },
-    { label: t("editor.contextMenu.selectAll"), icon: TextSelect, shortcut: formatShortcutForDisplay("Ctrl+A") ?? "", action: () => runSelectAll() },
+    {
+      label: t("common.cut"),
+      icon: Scissors,
+      shortcut: formatShortcutForDisplay("Ctrl+X") ?? "",
+      action: () => runExecCommand("cut"),
+    },
+    {
+      label: t("common.copy"),
+      icon: Copy,
+      shortcut: formatShortcutForDisplay("Ctrl+C") ?? "",
+      action: () => runExecCommand("copy"),
+    },
+    {
+      label: t("common.paste"),
+      icon: ClipboardPaste,
+      shortcut: formatShortcutForDisplay("Ctrl+V") ?? "",
+      action: () => runExecCommand("paste"),
+    },
+    {
+      label: t("editor.contextMenu.selectAll"),
+      icon: TextSelect,
+      shortcut: formatShortcutForDisplay("Ctrl+A") ?? "",
+      action: () => runSelectAll(),
+    },
     { separator: true },
-    { label: t("editor.contextMenu.findReplace"), icon: Search, shortcut: formatShortcutForDisplay("Ctrl+F") ?? "", action: () => runFindReplace() },
-    { label: t("editor.toolbar.insertTable"), icon: Table, action: () => emit("context-action", "insert-table") },
-    { label: t("editor.contextMenu.link"), icon: LinkIcon, action: () => emit("context-action", "insert-link") },
-    { label: t("editor.contextMenu.image"), icon: ImageIcon, action: () => emit("context-action", "insert-image") },
-    { label: t("editor.contextMenu.pastePlainText"), icon: Clipboard, action: () => runPastePlainText() },
+    {
+      label: t("editor.contextMenu.findReplace"),
+      icon: Search,
+      shortcut: formatShortcutForDisplay("Ctrl+F") ?? "",
+      action: () => runFindReplace(),
+    },
+    {
+      label: t("editor.toolbar.insertTable"),
+      icon: Table,
+      action: () => emit("context-action", "insert-table"),
+    },
+    {
+      label: t("editor.contextMenu.link"),
+      icon: LinkIcon,
+      action: () => emit("context-action", "insert-link"),
+    },
+    {
+      label: t("editor.contextMenu.image"),
+      icon: ImageIcon,
+      action: () => emit("context-action", "insert-image"),
+    },
+    {
+      label: t("editor.contextMenu.pastePlainText"),
+      icon: Clipboard,
+      action: () => runPastePlainText(),
+    },
   ];
 }
 

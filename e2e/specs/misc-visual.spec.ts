@@ -168,16 +168,19 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
     // 选中 intro.md 节点（通过 store 设置 selectedFilePath）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const ws = window.__pinia__._s.get("workspace");
       ws.selectedFilePath = null; // 先清空
     });
     await browser.pause(100);
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      const ws = window.__pinia__._s.get("workspace");
-      ws.selectedFilePath = path;
-    }, toAppPath(`${wsPath}\\intro.md`));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        const ws = window.__pinia__._s.get("workspace");
+        ws.selectedFilePath = path;
+      },
+      toAppPath(`${wsPath}\\intro.md`)
+    );
     await browser.pause(300);
 
     // 应有 .is-selected 节点
@@ -195,11 +198,14 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
     await browser.pause(500);
 
     // 选中 intro.md
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      const ws = window.__pinia__._s.get("workspace");
-      ws.selectedFilePath = path;
-    }, toAppPath(`${wsPath}\\intro.md`));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        const ws = window.__pinia__._s.get("workspace");
+        ws.selectedFilePath = path;
+      },
+      toAppPath(`${wsPath}\\intro.md`)
+    );
     await browser.pause(300);
 
     // 获取选中节点的计算样式
@@ -229,26 +235,33 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
     await browser.pause(300);
 
     // 选中 intro.md
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      const ws = window.__pinia__._s.get("workspace");
-      ws.selectedFilePath = path;
-    }, toAppPath(`${wsPath}\\intro.md`));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        const ws = window.__pinia__._s.get("workspace");
+        ws.selectedFilePath = path;
+      },
+      toAppPath(`${wsPath}\\intro.md`)
+    );
     await browser.pause(300);
 
-    let selected = await browser.$(".file-tree .node-row.is-selected");
+    const selected = await browser.$(".file-tree .node-row.is-selected");
     expect(await selected.isExisting()).toBe(true);
 
     // 切换到 notes.md
-    await browser.execute((path: string) => {
-      // @ts-ignore
-      const ws = window.__pinia__._s.get("workspace");
-      ws.selectedFilePath = path;
-    }, toAppPath(`${wsPath}\\notes.md`));
+    await browser.execute(
+      (path: string) => {
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        const ws = window.__pinia__._s.get("workspace");
+        ws.selectedFilePath = path;
+      },
+      toAppPath(`${wsPath}\\notes.md`)
+    );
     await browser.pause(300);
 
     // 应仍有且仅有一个 .is-selected（应为 notes.md）
-    const selectedCount = await browser.$$(".file-tree .node-row.is-selected").then((els) => els.length);
+    const selectedEls = await browser.$$(".file-tree .node-row.is-selected");
+    const selectedCount = selectedEls.length;
     expect(selectedCount).toBe(1);
   });
 
@@ -256,7 +269,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
   it("persistence.settings.showLineNumbers 默认为 true", async () => {
     const showLineNumbers = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const persistence = window.__pinia__._s.get("persistence");
       return persistence.settings.showLineNumbers;
     });
@@ -280,7 +293,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
     // 关闭行号
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const persistence = window.__pinia__._s.get("persistence");
       return persistence.updateSettings({ showLineNumbers: false });
     });
@@ -292,7 +305,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
     // 恢复（避免影响后续测试）
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const persistence = window.__pinia__._s.get("persistence");
       return persistence.updateSettings({ showLineNumbers: true });
     });
@@ -303,7 +316,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
   it("persistence.settings.softWrap 默认为 true", async () => {
     const softWrap = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const persistence = window.__pinia__._s.get("persistence");
       return persistence.settings.softWrap;
     });
@@ -344,7 +357,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
     // 关闭软折行
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const persistence = window.__pinia__._s.get("persistence");
       return persistence.updateSettings({ softWrap: false });
     });
@@ -363,7 +376,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
     // 恢复
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const persistence = window.__pinia__._s.get("persistence");
       return persistence.updateSettings({ softWrap: true });
     });
@@ -374,7 +387,7 @@ describe("视觉对齐杂项（设置分类 / 文件树选中态 / 行号 / 软�
 
   it("默认编辑器模式为 split（preset 默认值）", async () => {
     const editorMode = await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const persistence = window.__pinia__._s.get("persistence");
       return persistence.settings.editorMode;
     });

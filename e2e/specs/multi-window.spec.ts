@@ -29,18 +29,17 @@ let mainHandle: string;
 
 /** 调用 Rust 命令在新窗口打开路径，返回新窗口 label */
 async function openInNewWindow(path: string): Promise<string> {
-  return browser.executeAsync(
-    (p: string, done: (res: unknown) => void) => {
+  return browser
+    .executeAsync((p: string, done: (res: unknown) => void) => {
       window.__TAURI_INTERNALS__
         .invoke("open_path_in_new_window", { path: p })
         .then((label: string) => done({ label }))
         .catch((err: unknown) => done({ error: String(err) }));
-    },
-    path
-  ).then((r: any) => {
-    if (r?.error) throw new Error(`open_path_in_new_window failed: ${r.error}`);
-    return r.label as string;
-  });
+    }, path)
+    .then((r: any) => {
+      if (r?.error) throw new Error(`open_path_in_new_window failed: ${r.error}`);
+      return r.label as string;
+    });
 }
 
 /** 当前 WebView 的窗口 label（兼容多种 metadata 形态） */
@@ -48,10 +47,7 @@ async function currentLabel(): Promise<string | null> {
   return browser.execute(() => {
     const md = window.__TAURI_INTERNALS__?.metadata ?? {};
     return (
-      md.currentWindow?.label ??
-      md.currentWebviewWindow?.label ??
-      md.currentWebview?.label ??
-      null
+      md.currentWindow?.label ?? md.currentWebviewWindow?.label ?? md.currentWebview?.label ?? null
     );
   });
 }
@@ -148,10 +144,10 @@ describe("多窗口多工作区", () => {
     expect(label.length).toBeGreaterThan(0);
     expect(label).not.toBe("main");
 
-    await browser.waitUntil(
-      async () => (await browser.getWindowHandles()).length > before.length,
-      { timeout: 30000, interval: 500 }
-    );
+    await browser.waitUntil(async () => (await browser.getWindowHandles()).length > before.length, {
+      timeout: 30000,
+      interval: 500,
+    });
 
     // 切到新窗口并等待其前端就绪
     const handles = await browser.getWindowHandles();
@@ -174,10 +170,10 @@ describe("多窗口多工作区", () => {
 
   it("同一目录再次打开 → 聚焦已有窗口，不重复开窗", async () => {
     await openInNewWindow(wsPath);
-    await browser.waitUntil(
-      async () => (await browser.getWindowHandles()).length === 2,
-      { timeout: 30000, interval: 500 }
-    );
+    await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2, {
+      timeout: 30000,
+      interval: 500,
+    });
     const afterFirst = await browser.getWindowHandles();
     const wsWindow = afterFirst.find((h) => h !== mainHandle)!;
     await browser.switchToWindow(wsWindow);
@@ -196,14 +192,12 @@ describe("多窗口多工作区", () => {
 
   it("close_window 只关闭本窗口，主窗口仍在", async () => {
     await openInNewWindow(wsPath);
-    await browser.waitUntil(
-      async () => (await browser.getWindowHandles()).length === 2,
-      { timeout: 30000, interval: 500 }
-    );
+    await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2, {
+      timeout: 30000,
+      interval: 500,
+    });
 
-    const wsWindow = (await browser.getWindowHandles()).find(
-      (h) => h !== mainHandle
-    )!;
+    const wsWindow = (await browser.getWindowHandles()).find((h) => h !== mainHandle)!;
     await browser.switchToWindow(wsWindow);
     await waitForPiniaInCurrentWindow(browser, 30000);
 
@@ -221,10 +215,10 @@ describe("多窗口多工作区", () => {
         // waitUntil（句柄数归一）与主窗口存活检查。
       });
 
-    await browser.waitUntil(
-      async () => (await browser.getWindowHandles()).length === 1,
-      { timeout: 15000, interval: 500 }
-    );
+    await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 1, {
+      timeout: 15000,
+      interval: 500,
+    });
 
     // 切回主窗口，__pinia__ 仍可用（主窗口未被连带退出）
     await browser.switchToWindow(mainHandle);

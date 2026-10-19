@@ -41,5 +41,5 @@ export default defineConfig({
     globalSetup: resolve(e2eRoot, "setup.ts"),
     globals: true,
     isolate: false,
-  }
+  },
 });

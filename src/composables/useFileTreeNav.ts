@@ -1,12 +1,4 @@
-import {
-  computed,
-  inject,
-  provide,
-  ref,
-  type ComputedRef,
-  type InjectionKey,
-  type Ref,
-} from "vue";
+import { computed, inject, provide, ref, type ComputedRef, type InjectionKey, type Ref } from "vue";
 
 /**
  * 文件树键盘导航上下文（FileTree → TreeNode 通过 provide/inject 共享）
@@ -38,9 +30,7 @@ export interface FileTreeNavOptions {
   visiblePaths: ComputedRef<string[]>;
 }
 
-const TREE_NAV_KEY: InjectionKey<FileTreeNavContext> = Symbol(
-  "murasaki:file-tree-nav"
-);
+const TREE_NAV_KEY: InjectionKey<FileTreeNavContext> = Symbol("murasaki:file-tree-nav");
 
 const FALLBACK: FileTreeNavContext = {
   focusPath: computed(() => null),
@@ -52,9 +42,7 @@ const FALLBACK: FileTreeNavContext = {
 };
 
 /** 创建并注入文件树导航上下文（在 `FileTree.vue` 的 setup 中调用一次） */
-export function provideFileTreeNav(
-  options: FileTreeNavOptions
-): FileTreeNavContext {
+export function provideFileTreeNav(options: FileTreeNavOptions): FileTreeNavContext {
   const { expandedPaths, visiblePaths } = options;
   const activePath = ref<string | null>(null);
   const rows = new Map<string, HTMLElement>();

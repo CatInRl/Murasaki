@@ -48,7 +48,7 @@ function normLevel(level: number): number {
 <template>
   <div class="outline-panel">
     <div class="outline-toolbar">
-      <span class="toolbar-title">{{ $t('editor.outline.title') }}</span>
+      <span class="toolbar-title">{{ $t("editor.outline.title") }}</span>
     </div>
 
     <NScrollbar class="outline-scroll">
@@ -126,8 +126,9 @@ function normLevel(level: number): number {
   cursor: pointer;
   font-size: 13px;
   color: var(--murasaki-ink-2);
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease);
   overflow: hidden;
   position: relative;
 }
@@ -146,8 +147,9 @@ function normLevel(level: number): number {
   border-radius: 50%;
   background: var(--murasaki-ink-3);
   flex-shrink: 0;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              transform var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    transform var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .outline-item:hover .outline-dot {
   transform: scale(1.25);

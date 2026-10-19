@@ -51,17 +51,15 @@ export function useEditorNavigation(deps: EditorNavDeps) {
   }
 
   function insertMarkdownAtCursor(text: string): void {
-    const view = editorRef.value?.getView() as
-      | {
-          focus: () => void;
-          state: { selection: { main: { from: number; to: number } } };
-          dispatch: (spec: {
-            changes: { from: number; to: number; insert: string };
-            selection: { anchor: number };
-            userEvent: string;
-          }) => void;
-        }
-      | null;
+    const view = editorRef.value?.getView() as {
+      focus: () => void;
+      state: { selection: { main: { from: number; to: number } } };
+      dispatch: (spec: {
+        changes: { from: number; to: number; insert: string };
+        selection: { anchor: number };
+        userEvent: string;
+      }) => void;
+    } | null;
     if (!view) return;
     view.focus();
     const sel = view.state.selection.main;
@@ -113,13 +111,11 @@ export function useEditorNavigation(deps: EditorNavDeps) {
 
   function onTableInsertConfirm(rows: number, cols: number): void {
     tableDialogVisible.value = false;
-    const view = editorRef.value?.getView() as
-      | {
-          focus: () => void;
-          state: unknown;
-          dispatch: (spec: unknown) => void;
-        }
-      | null;
+    const view = editorRef.value?.getView() as {
+      focus: () => void;
+      state: unknown;
+      dispatch: (spec: unknown) => void;
+    } | null;
     if (view) {
       insertTable(view as never, rows, cols);
       editorRef.value?.focus();

@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from "vue";
 import { storeToRefs } from "pinia";
-import {
-  NConfigProvider,
-} from "naive-ui";
+import { NConfigProvider } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import EditorPane from "./components/EditorPane.vue";
@@ -86,30 +84,32 @@ const { t } = useI18n();
 // ===== 草稿冲突裁决（#425）=====
 // 草稿基线与磁盘 mtime 不一致时，让用户选择「保留草稿」还是「加载磁盘版本」，
 // 而不是静默丢弃草稿。取消 = 用磁盘内容打开，草稿文件保留。
-tabsStore.setDraftConflictResolver(async ({ path, diskContent, draftContent, diskMtime, draftSavedAt }) => {
-  const preview = (text: string): string => {
-    const line = text.split(/\r?\n/).find((item) => item.trim().length > 0) ?? "";
-    return line.length > 40 ? `${line.slice(0, 40)}…` : line;
-  };
-  const formatTime = (ms: number): string => (ms > 0 ? new Date(ms).toLocaleString() : "");
+tabsStore.setDraftConflictResolver(
+  async ({ path, diskContent, draftContent, diskMtime, draftSavedAt }) => {
+    const preview = (text: string): string => {
+      const line = text.split(/\r?\n/).find((item) => item.trim().length > 0) ?? "";
+      return line.length > 40 ? `${line.slice(0, 40)}…` : line;
+    };
+    const formatTime = (ms: number): string => (ms > 0 ? new Date(ms).toLocaleString() : "");
 
-  const choice = await dialog.unsavedChanges({
-    title: t("common.dialog.draftConflictTitle"),
-    message: t("common.dialog.draftConflictMessage", {
-      name: basename(path),
-      diskTime: formatTime(diskMtime),
-      diskPreview: preview(diskContent),
-      draftTime: formatTime(draftSavedAt),
-      draftPreview: preview(draftContent),
-    }),
-    saveText: t("common.dialog.draftConflictKeep"),
-    discardText: t("common.dialog.draftConflictLoadDisk"),
-    cancelText: t("common.dialog.draftConflictLater"),
-  });
-  if (choice === "save") return "keep-draft";
-  if (choice === "discard") return "load-disk";
-  return "cancel";
-});
+    const choice = await dialog.unsavedChanges({
+      title: t("common.dialog.draftConflictTitle"),
+      message: t("common.dialog.draftConflictMessage", {
+        name: basename(path),
+        diskTime: formatTime(diskMtime),
+        diskPreview: preview(diskContent),
+        draftTime: formatTime(draftSavedAt),
+        draftPreview: preview(draftContent),
+      }),
+      saveText: t("common.dialog.draftConflictKeep"),
+      discardText: t("common.dialog.draftConflictLoadDisk"),
+      cancelText: t("common.dialog.draftConflictLater"),
+    });
+    if (choice === "save") return "keep-draft";
+    if (choice === "discard") return "load-disk";
+    return "cancel";
+  }
+);
 
 // ===== 主题 =====
 const currentTheme = ref(DEFAULT_THEME);
@@ -132,6 +132,31 @@ const activeContent = computed({
 });
 
 const currentFilePath = computed(() => activeTab.value?.path ?? null);
+
+/**
+ * 窗口标题（#442）：有工作区用工作区名，否则用当前标签名。
+ * 多窗口下「无工作区」窗口此前都叫 Murasaki，任务栏与窗口切换器无法区分。
+ */
+const windowTitle = computed(() => {
+  const base = workspace.hasWorkspace
+    ? workspace.workspaceName
+    : activeTab.value
+      ? tabsStore.getTabTitle(activeTab.value, t("common.untitled"))
+      : "";
+  return base ? `${base} — Murasaki` : "Murasaki";
+});
+
+watch(
+  windowTitle,
+  (title) => {
+    void invoke("set_window_title", { title }).catch((err: unknown) =>
+      console.warn("同步窗口标题失败:", err)
+    );
+  },
+  // 启动后立即推一次权威标题：Rust 只负责建窗时的初始标题，
+  // 工作区恢复失败等场景不会再有人来纠正
+  { immediate: true }
+);
 
 // ===== 当前文件类型（issue 0.x：非 md 文件强制源码模式）=====
 // 无路径（未命名新文件）默认按 markdown 处理
@@ -201,17 +226,42 @@ async function onSelectMode(mode: EditorMode): Promise<void> {
 // 切 tab 时更新 editor bridge 的文档路径
 // 用 flush: 'post' 确保在 SourceEditor.onMounted（registerView(view, null)）之后触发，
 // 否则首次打开 tab 时 EditorPane 挂载会重置 activeDocPath 为 null。
-watch(currentFilePath, (path) => {
-  editorBridge.updateDocPath(path);
-}, { flush: 'post' });
+watch(
+  currentFilePath,
+  (path) => {
+    editorBridge.updateDocPath(path);
+  },
+  { flush: "post" }
+);
 
 // ===== 文件操作 composable（磁盘 IO 类入口）=====
 const {
-  openFile, openFileViaDialog, openPathInNewWindow, saveCurrentFile, saveAsCurrentFile,
-  reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, onNewTab, onNewFile,
-  onOpenFolder, onOpenFile, onOpenRecent, notifyUnsupportedFiles, notifyIgnoredFolders,
+  openFile,
+  openFileViaDialog,
+  openPathInNewWindow,
+  saveCurrentFile,
+  saveAsCurrentFile,
+  reloadCurrentFile,
+  exportCurrentHtml,
+  exportCurrentPdf,
+  onNewTab,
+  onNewFile,
+  onOpenFolder,
+  onOpenFile,
+  onOpenRecent,
+  notifyUnsupportedFiles,
+  notifyIgnoredFolders,
   openWithDefaultApp,
-} = useFileActions({ tabsStore, workspace, fileOps, persistence, dialog, toast: toastStore, activeTab, currentTheme });
+} = useFileActions({
+  tabsStore,
+  workspace,
+  fileOps,
+  persistence,
+  dialog,
+  toast: toastStore,
+  activeTab,
+  currentTheme,
+});
 
 // ===== 拖放打开（原生 drag-drop，issue #92）=====
 // 单个目录 → 走「打开文件夹」同一路径（同目录已开则聚焦，否则新窗口）；文件 → 当前窗口逐个开标签。
@@ -239,15 +289,16 @@ const { copyRichText } = useCopyRichText({
 });
 
 // ===== 对比窗口 + 外部修改处理 composable（三选一对话框改走 dialog store）=====
-const {
-  compareState,
-  handleExternalChange,
-  onCompareSave, onCompareUseExternal, onCompareClose,
-} = useCompareWindow({ tabsStore, dialog });
+const { compareState, handleExternalChange, onCompareSave, onCompareUseExternal, onCompareClose } =
+  useCompareWindow({ tabsStore, dialog });
 
 // ===== Tab 关闭逻辑 composable（对话框改走 dialog store）=====
 const {
-  onCloseTabRequest, onCloseOthers, onCloseRight, onCloseLeft, onCloseAllTabs,
+  onCloseTabRequest,
+  onCloseOthers,
+  onCloseRight,
+  onCloseLeft,
+  onCloseAllTabs,
   saveBeforeClose,
 } = useTabClose({ tabsStore, dialog, workspace });
 
@@ -295,6 +346,12 @@ function selectSidebarView(view: SidebarView): void {
     return;
   }
   expandSidebar(view);
+}
+
+/** WelcomePage 的「新建文件」入口（#442）：与菜单一致，先让文件树内联命名框可见 */
+function onNewFileFromWelcome(): void {
+  if (workspace.hasWorkspace) selectSidebarView("files");
+  onNewFile();
 }
 
 // ===== 状态栏 / 全屏 =====
@@ -347,15 +404,66 @@ function onPreviewImage(path: string): void {
 
 // ===== 设置页（单入口路由，在主窗口内通过 navigate 事件切换） =====
 const settingsVisible = ref(false);
+const settingsRef = ref<InstanceType<typeof SettingsApp> | null>(null);
+
+/**
+ * 设置页关闭 / 退出前先让设置页处理未保存草稿（#442）。
+ * 返回 false 表示用户选择「取消」（或确认过程本身出错）。
+ *
+ * 确认期间复用同一个 Promise：连按 Ctrl+Q / 关窗请求与退出请求叠加时，
+ * 不会向对话框队列压入第二张「设置未保存」确认框。
+ */
+let settingsCloseRequest: Promise<boolean> | null = null;
+
+async function confirmSettingsClosed(): Promise<boolean> {
+  if (!settingsVisible.value) return true;
+  if (settingsCloseRequest) return settingsCloseRequest;
+  settingsCloseRequest = (async () => {
+    try {
+      // 刚由 navigate 事件切到设置页时组件可能尚未挂载，等一拍再取 ref
+      await nextTick();
+      return (await settingsRef.value?.requestClose()) ?? true;
+    } catch (err) {
+      // 保存 / 弹窗异常按「取消」处理：宁可关不掉，也不要静默丢稿
+      console.error("[Murasaki] 设置页关闭确认失败，按取消处理:", err);
+      return false;
+    } finally {
+      settingsCloseRequest = null;
+    }
+  })();
+  return settingsCloseRequest;
+}
+
+/**
+ * 退出应用（菜单 / Ctrl+Q）。设置页打开时先走它的未保存确认，
+ * 否则 Ctrl+Q 会静默丢掉设置草稿（#442）。
+ */
+async function quitApp(): Promise<void> {
+  if (!(await confirmSettingsClosed())) return;
+  try {
+    await invoke("quit_app");
+  } catch (err) {
+    console.error("退出失败:", err);
+  }
+}
 
 async function openSettings(): Promise<void> {
   try {
     await invoke("open_settings");
   } catch (err) {
     console.error("打开设置窗口失败:", err);
-    dialog.alert({ message: t("common.error.openSettingsFailed", { error: formatCommandError(err) }), variant: "error" });
+    dialog.alert({
+      message: t("common.error.openSettingsFailed", { error: formatCommandError(err) }),
+      variant: "error",
+    });
   }
 }
+
+// 设置页出现时把焦点从编辑器移走：只靠按键拦截挡不住 CodeMirror 的
+// 编辑器级快捷键（Ctrl+F / Ctrl+B）与直接输入（#442）
+watch(settingsVisible, (visible) => {
+  if (visible) editorRef.value?.getView()?.contentDOM.blur();
+});
 
 // ===== 更新检查（T1.1 / ADR-0012）=====
 const updateDialogVisible = ref(false);
@@ -426,6 +534,23 @@ const { onExitRequested } = useExitFlush(tabsStore, {
   resolveUnsaved: resolveUnsavedOnExit,
 });
 
+/**
+ * 关窗 / 退出入口（#442）：设置页覆盖时先确认它的未保存草稿。
+ * 取消时必须显式 cancel_close —— Rust 侧已登记本窗口的关闭流程，
+ * 不复位的话下次点关闭会被直接吞掉。
+ */
+async function onExitRequestedWithSettings(): Promise<void> {
+  if (!(await confirmSettingsClosed())) {
+    try {
+      await invoke("cancel_close");
+    } catch (err) {
+      console.error("[Murasaki] cancel_close 失败:", err);
+    }
+    return;
+  }
+  await onExitRequested();
+}
+
 /** 启动编排句柄：onBeforeUnmount 时统一撤销监听与后台任务 */
 let startup: AppStartupHandle | null = null;
 
@@ -436,29 +561,34 @@ function exposeTestHooks(): void {
   // 注意：editorRef 是 Vue ref，EditorPane 用 v-else 渲染（无 tab 时不挂载）
   // 所以必须用动态 getter，否则注册时 editorRef.value 还是 null
   // 同时暴露 undo/redo：release 构建后浏览器内 dynamic import 路径不可用
-  // @ts-ignore
   window.__editorRef__ = {
     getView: () => editorRef.value?.getView() ?? null,
     scrollToLine: (line: number) => editorRef.value?.scrollToLine(line),
     focus: () => editorRef.value?.focus(),
     undo: () => {
       const view = editorRef.value?.getView();
-      if (view) { view.focus(); cmUndo(view); }
+      if (view) {
+        view.focus();
+        cmUndo(view);
+      }
     },
     redo: () => {
       const view = editorRef.value?.getView();
-      if (view) { view.focus(); cmRedo(view); }
+      if (view) {
+        view.focus();
+        cmRedo(view);
+      }
     },
   };
   // E2E test hooks：release 构建后 dynamic import 不可用，暴露纯函数/设置器供测试调用
-  // @ts-ignore
   window.__exportHtml__ = exportHtml;
-  // @ts-ignore
-  window.__setTheme__ = (theme: string) => { currentTheme.value = theme; };
-  // @ts-ignore
-  window.__setSidebarView__ = (view: SidebarView) => { sidebarView.value = view; };
+  window.__setTheme__ = (theme: string) => {
+    currentTheme.value = theme;
+  };
+  window.__setSidebarView__ = (view: SidebarView) => {
+    sidebarView.value = view;
+  };
   // 暴露 settingsLogic 纯函数：设置窗口未打开时主窗口也能被 E2E 测试访问到
-  // @ts-ignore
   window.__settingsLogic__ = {
     fieldsForCategory,
     isDirty,
@@ -517,7 +647,7 @@ onMounted(async () => {
     teardownDragDrop,
     setConflictResolver: () => fileOps.setConflictResolver(askConflict),
     clearConflictResolver: () => fileOps.setConflictResolver(null),
-    onExitRequested,
+    onExitRequested: onExitRequestedWithSettings,
     openPath: (path, type) => {
       void onOpenPath(path, type);
     },
@@ -526,7 +656,6 @@ onMounted(async () => {
     },
     // E2E 就绪信号：必须晚于「恢复设置 / 工作区 / 标签」（#315）
     markAppReady: () => {
-      // @ts-ignore
       window.__appReady__ = true;
     },
     exposeTestHooks,
@@ -588,18 +717,13 @@ const imagePaste = useImagePaste({
  * 外部拖入图片 → 插入当前窗口编辑器（issue #288，由 useDragDrop 的原生拖放链路调用）。
  * `position` 是 Tauri 给的窗口物理像素落点，换算/回退光标都在 composable 内处理。
  */
-function onDropImages(
-  paths: string[],
-  position: { x: number; y: number } | null
-): Promise<void> {
+function onDropImages(paths: string[], position: { x: number; y: number } | null): Promise<void> {
   return imagePaste.insertDroppedImages(paths, position).then(() => undefined);
 }
 
 // ===== 编辑器导航/插入 composable =====
-const {
-  onJumpToLine, onDropImagePath,
-  onEditorContextAction, onTableInsertConfirm,
-} = useEditorNavigation({ editorRef, imagePaste, tableDialogVisible, dialog });
+const { onJumpToLine, onDropImagePath, onEditorContextAction, onTableInsertConfirm } =
+  useEditorNavigation({ editorRef, imagePaste, tableDialogVisible, dialog });
 
 // ===== 全屏切换 =====
 async function toggleFullscreen(): Promise<void> {
@@ -620,17 +744,36 @@ async function toggleFullscreen(): Promise<void> {
 // 快捷键系统：读取 settings.shortcuts 覆盖，提供全局 keydown 匹配
 const { matchGlobalKeydown } = useShortcuts();
 const { handleMenuEvent, onKeyDown } = useCommands({
-  onNewTab, openFileViaDialog, saveCurrentFile, saveAsCurrentFile,
-  reloadCurrentFile, exportCurrentHtml, exportCurrentPdf, copyRichText,
+  onNewTab,
+  openFileViaDialog,
+  saveCurrentFile,
+  saveAsCurrentFile,
+  reloadCurrentFile,
+  exportCurrentHtml,
+  exportCurrentPdf,
+  copyRichText,
   onCloseTabRequest,
-  workspace, tabsStore, searchStore, fileOps, dialog,
-  editorRef, currentTheme, selectSidebarView, statusBarVisible,
-  tableDialogVisible, allTabsOpen,
-  openSettings, toggleFullscreen,
+  workspace,
+  tabsStore,
+  searchStore,
+  fileOps,
+  dialog,
+  editorRef,
+  currentTheme,
+  selectSidebarView,
+  statusBarVisible,
+  tableDialogVisible,
+  allTabsOpen,
+  openSettings,
+  toggleFullscreen,
   updater: { check: checkForUpdate },
   matchGlobalKeydown,
   setEditorMode: onSelectMode,
-  zoomIn, zoomOut, zoomReset,
+  zoomIn,
+  zoomOut,
+  zoomReset,
+  isSettingsVisible: () => settingsVisible.value,
+  quitApp,
 });
 
 // ===== 拖拽/命令行打开文件或文件夹（issue #92 / #113）=====
@@ -723,12 +866,21 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   },
   initialized,
 });
-
 </script>
 
 <template>
-  <NConfigProvider :theme="naiveTheme" :theme-overrides="naiveThemeOverrides" :locale="null" :date-locale="null">
-    <div class="murasaki-shell" :class="{ 'has-sidebar': workspace.hasWorkspace || tabsStore.hasTabs }">
+  <NConfigProvider
+    :theme="naiveTheme"
+    :theme-overrides="naiveThemeOverrides"
+    :locale="null"
+    :date-locale="null"
+  >
+    <!-- 设置页覆盖时整个应用外壳 inert：键盘焦点、点击与编辑器快捷键都到不了背后文档（#442） -->
+    <div
+      class="murasaki-shell"
+      :class="{ 'has-sidebar': workspace.hasWorkspace || tabsStore.hasTabs }"
+      :inert="settingsVisible ? true : undefined"
+    >
       <!-- Sidebar: 文件树 / 大纲 -->
       <aside
         v-if="workspace.hasWorkspace || tabsStore.hasTabs"
@@ -746,8 +898,19 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :aria-label="$t('editor.sidebar.filesTabAria')"
             @click="expandSidebar('files')"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
+              />
             </svg>
           </button>
           <button
@@ -758,13 +921,22 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :aria-label="$t('editor.sidebar.outlineTabAria')"
             @click="expandSidebar('outline')"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="8" y1="6" x2="21" y2="6"/>
-              <line x1="8" y1="12" x2="21" y2="12"/>
-              <line x1="8" y1="18" x2="21" y2="18"/>
-              <line x1="3" y1="6" x2="3.01" y2="6"/>
-              <line x1="3" y1="12" x2="3.01" y2="12"/>
-              <line x1="3" y1="18" x2="3.01" y2="18"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
             </svg>
           </button>
           <div class="sidebar-rail-spacer"></div>
@@ -775,8 +947,17 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :aria-label="$t('editor.sidebar.expandSidebar')"
             @click="expandRail"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="9 18 15 12 9 6"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
         </div>
@@ -799,8 +980,17 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             :aria-label="$t('editor.sidebar.collapseSidebar')"
             @click="collapseSidebar"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
           <!-- 右缘拖拽调宽把手 -->
@@ -835,7 +1025,7 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
             v-if="!tabsStore.hasTabs"
             @open-folder="onOpenFolder"
             @open-file="onOpenFile"
-            @new-file="onNewFile"
+            @new-file="onNewFileFromWelcome"
             @open-recent="onOpenRecent"
             @open-settings="openSettings"
           />
@@ -895,19 +1085,28 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
     <Teleport to="body">
       <div v-if="dropDragging" class="murasaki-drop-overlay" aria-hidden="true">
         <div class="murasaki-drop-overlay-card">
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            width="34"
+            height="34"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M12 3v12" />
             <path d="m7 10 5 5 5-5" />
             <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
           </svg>
-          <div class="murasaki-drop-overlay-title">{{ $t('common.drop.overlayTitle') }}</div>
-          <div class="murasaki-drop-overlay-hint">{{ $t('common.drop.overlayHint') }}</div>
+          <div class="murasaki-drop-overlay-title">{{ $t("common.drop.overlayTitle") }}</div>
+          <div class="murasaki-drop-overlay-hint">{{ $t("common.drop.overlayHint") }}</div>
         </div>
       </div>
     </Teleport>
 
     <!-- 设置页（单入口路由，覆盖主窗口） -->
-    <SettingsApp v-if="settingsVisible" @close="settingsVisible = false" />
+    <SettingsApp v-if="settingsVisible" ref="settingsRef" @close="settingsVisible = false" />
 
     <!-- 对话框容器（Ticket #66，含 conflict/alert/confirm/prompt/unsaved 五类） -->
     <DialogContainer />
@@ -1010,8 +1209,9 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
   padding: 0;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .murasaki-sidebar-collapse:hover {
   background: var(--murasaki-neutral-200);
@@ -1039,8 +1239,9 @@ const { syncNow: syncRecentMenu } = useRecentMenuSync({
   border-radius: var(--murasaki-radius-sm);
   cursor: pointer;
   padding: 0;
-  transition: background var(--murasaki-duration-fast) var(--murasaki-ease),
-              color var(--murasaki-duration-fast) var(--murasaki-ease);
+  transition:
+    background var(--murasaki-duration-fast) var(--murasaki-ease),
+    color var(--murasaki-duration-fast) var(--murasaki-ease);
 }
 .sidebar-rail-btn:hover {
   background: var(--murasaki-neutral-200);

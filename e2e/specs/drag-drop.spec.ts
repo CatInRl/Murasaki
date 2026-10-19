@@ -45,10 +45,7 @@ let wsPath: string;
 let mainHandle: string;
 
 type DragEventName =
-  | "tauri://drag-enter"
-  | "tauri://drag-over"
-  | "tauri://drag-drop"
-  | "tauri://drag-leave";
+  "tauri://drag-enter" | "tauri://drag-over" | "tauri://drag-drop" | "tauri://drag-leave";
 
 /** 通过 Tauri 事件插件派发一个原生 drag-drop 事件（见文件头注释） */
 async function emitDragEvent(
@@ -89,7 +86,7 @@ async function tabPaths(): Promise<(string | null)[]> {
 /** 当前窗口的工作区路径 */
 async function workspacePath(): Promise<string | null> {
   return browser.execute(() => {
-    // @ts-ignore
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
     const pinia = window.__pinia__;
     return pinia._s.get("workspace")?.workspacePath ?? null;
   });
@@ -172,7 +169,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await emitDragEvent(browser, "tauri://drag-leave", {}).catch(() => {});
     // 清空吐司：拖入打不开的文件会弹提示，上一个用例的提示不该影响下一条的断言
     await browser.execute(() => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const toast = window.__pinia__._s.get("toast");
       if (toast) toast.dismissAll();
     });
@@ -187,7 +184,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     const opened = await waitForInBrowser(
       browser,
       (p: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return (tabs.tabs ?? []).some((t: { path: string | null }) => t.path === p);
       },
@@ -206,10 +203,10 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await dropPaths(browser, [wsPath]);
 
     // 目录 → 走「打开文件夹」路径 → 新开窗口
-    await browser.waitUntil(
-      async () => (await browser.getWindowHandles()).length > before.length,
-      { timeout: 30000, interval: 500 }
-    );
+    await browser.waitUntil(async () => (await browser.getWindowHandles()).length > before.length, {
+      timeout: 30000,
+      interval: 500,
+    });
     const handles = await browser.getWindowHandles();
     const newHandle = handles.find((h) => !before.includes(h));
     expect(newHandle).toBeDefined();
@@ -223,7 +220,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     const ok = await waitForInBrowser(
       browser,
       (p: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return window.__pinia__._s.get("workspace")?.workspacePath === p;
       },
       [wsPath],
@@ -282,7 +279,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await waitForInBrowser(
       browser,
       (want: number) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return (window.__pinia__._s.get("tabs")?.tabs ?? []).length === want;
       },
       [files.length],
@@ -308,7 +305,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await waitForInBrowser(
       browser,
       (want: number) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         return (window.__pinia__._s.get("tabs")?.tabs ?? []).length === want;
       },
       [1],
@@ -387,7 +384,7 @@ describe("拖拽打开（原生 drag-drop）", () => {
     await waitForInBrowser(
       browser,
       (p: string) => {
-        // @ts-ignore
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
         const tabs = window.__pinia__._s.get("tabs");
         return (tabs.tabs ?? []).some((t: { path: string | null }) => t.path === p);
       },

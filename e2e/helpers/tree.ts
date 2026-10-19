@@ -24,7 +24,7 @@ export async function waitForTreeSettled(b: Browser): Promise<void> {
   await waitForInBrowser(
     b,
     () => {
-      // @ts-ignore
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
       const ws = window.__pinia__._s.get("workspace");
       return ws.loading === false;
     },

@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   Code2,
@@ -390,7 +383,9 @@ function groupChip(kind: SearchGroupKind): "tabs" | "recent" | null {
   return null;
 }
 
-const shortcutLabel = computed(() => formatShortcutForDisplay(effective.value["global-search"] ?? "Ctrl+P"));
+const shortcutLabel = computed(() =>
+  formatShortcutForDisplay(effective.value["global-search"] ?? "Ctrl+P")
+);
 
 // 打开时：聚焦输入框 + 清空上一次查询（空查询默认态）
 onMounted(() => {
@@ -416,7 +411,12 @@ watch(
 
 <template>
   <div class="gsb-overlay" @click.self="onClose">
-    <div class="gsb" role="dialog" :aria-label="t('editor.searchBar.aria')" @keydown="onRootKeydown">
+    <div
+      class="gsb"
+      role="dialog"
+      :aria-label="t('editor.searchBar.aria')"
+      @keydown="onRootKeydown"
+    >
       <!-- 输入行 -->
       <div class="gsb__input">
         <span class="gsb__searchicon">
@@ -464,7 +464,7 @@ watch(
             />
             <span class="gsb-switch__thumb"></span>
           </span>
-          <span class="gsb-optcode">.*</span>&nbsp;{{ t('editor.searchBar.optRegex') }}
+          <span class="gsb-optcode">.*</span>&nbsp;{{ t("editor.searchBar.optRegex") }}
         </label>
         <label class="gsb-opt">
           <span class="gsb-switch">
@@ -476,7 +476,7 @@ watch(
             />
             <span class="gsb-switch__thumb"></span>
           </span>
-          <span class="gsb-optcode">Aa</span>&nbsp;{{ t('editor.searchBar.optCase') }}
+          <span class="gsb-optcode">Aa</span>&nbsp;{{ t("editor.searchBar.optCase") }}
         </label>
         <label class="gsb-opt">
           <span class="gsb-switch">
@@ -488,9 +488,9 @@ watch(
             />
             <span class="gsb-switch__thumb"></span>
           </span>
-          <span class="gsb-optcode">|w|</span>&nbsp;{{ t('editor.searchBar.optWord') }}
+          <span class="gsb-optcode">|w|</span>&nbsp;{{ t("editor.searchBar.optWord") }}
         </label>
-        <span class="gsb__options-note">{{ t('editor.searchBar.optionsNote') }}</span>
+        <span class="gsb__options-note">{{ t("editor.searchBar.optionsNote") }}</span>
       </div>
 
       <!-- 结果区 -->
@@ -502,24 +502,24 @@ watch(
           role="alert"
         >
           <TriangleAlert :size="16" class="gsb__notice__icon" aria-hidden="true" />
-          <span class="gsb__notice__text">{{ t('editor.searchBar.searchFailed') }}</span>
+          <span class="gsb__notice__text">{{ t("editor.searchBar.searchFailed") }}</span>
           <span class="gsb__hint">{{ errorMessage }}</span>
           <button class="gsb__action" type="button" @click="retrySearch">
-            {{ t('common.retry') }}
+            {{ t("common.retry") }}
           </button>
         </div>
         <!-- 未打开工作区：内容搜索不可用，但标签 / 最近文件仍可命中 -->
         <div v-if="showNoWorkspace" class="gsb__notice">
           <FolderX :size="16" class="gsb__notice__icon" aria-hidden="true" />
-          <span class="gsb__notice__text">{{ t('editor.searchBar.noWorkspace') }}</span>
-          <span class="gsb__hint">{{ t('editor.searchBar.noWorkspaceHint') }}</span>
+          <span class="gsb__notice__text">{{ t("editor.searchBar.noWorkspace") }}</span>
+          <span class="gsb__hint">{{ t("editor.searchBar.noWorkspaceHint") }}</span>
         </div>
 
         <!-- 空态 -->
         <div v-if="showEmpty" class="gsb__empty">
           <SearchX :size="20" class="gsb__empty-icon" aria-hidden="true" />
-          <span>{{ t('editor.searchBar.emptyNoResults') }}</span>
-          <span class="gsb__hint">{{ t('editor.searchBar.emptyHint') }}</span>
+          <span>{{ t("editor.searchBar.emptyNoResults") }}</span>
+          <span class="gsb__hint">{{ t("editor.searchBar.emptyHint") }}</span>
         </div>
 
         <!-- 分组 -->
@@ -532,7 +532,11 @@ watch(
             <div
               v-for="item in g.items"
               :key="item.id"
-              :ref="(el) => { if (el) itemEls[item.id] = el as HTMLElement; }"
+              :ref="
+                (el) => {
+                  if (el) itemEls[item.id] = el as HTMLElement;
+                }
+              "
               class="gsb__item"
               :class="{ 'is-active': isActiveItem(item) }"
               :title="item.path ?? item.title"
@@ -551,7 +555,10 @@ watch(
                   <span v-else-if="titleLead(item.path) === 'html'" class="gsb-html-icon">
                     <Code2 :size="13" aria-hidden="true" />
                   </span>
-                  <template v-for="(seg, sIdx) in splitSegments(item.title, item.ranges)" :key="sIdx">
+                  <template
+                    v-for="(seg, sIdx) in splitSegments(item.title, item.ranges)"
+                    :key="sIdx"
+                  >
                     <mark v-if="seg.matched" class="gsb-hl">{{ seg.text }}</mark>
                     <template v-else>{{ seg.text }}</template>
                   </template>
@@ -560,7 +567,13 @@ watch(
                 <span v-if="item.snippet !== undefined" class="gsb__snippet">
                   <span class="gsb__snippet__ln">{{ item.lineNumber }}</span>
                   <span class="gsb__snippet__text">
-                    <template v-for="(seg, pIdx) in splitSegments(item.snippet ?? '', item.snippetRanges ?? [])" :key="pIdx">
+                    <template
+                      v-for="(seg, pIdx) in splitSegments(
+                        item.snippet ?? '',
+                        item.snippetRanges ?? []
+                      )"
+                      :key="pIdx"
+                    >
                       <mark v-if="seg.matched" class="gsb-hl">{{ seg.text }}</mark>
                       <template v-else>{{ seg.text }}</template>
                     </template>
@@ -569,10 +582,10 @@ watch(
               </span>
               <span class="gsb__item__meta">
                 <span v-if="groupChip(g.kind) === 'tabs'" class="gsb-chip gsb-chip--tab">
-                  {{ t('editor.searchBar.chipOpen') }}
+                  {{ t("editor.searchBar.chipOpen") }}
                 </span>
                 <span v-else-if="groupChip(g.kind) === 'recent'" class="gsb-chip">
-                  {{ t('editor.searchBar.chipRecent') }}
+                  {{ t("editor.searchBar.chipRecent") }}
                 </span>
               </span>
             </div>
@@ -589,7 +602,7 @@ watch(
             <span class="gsb__spinner" aria-hidden="true"></span>
             <span>{{ progressText }}</span>
             <button class="gsb__action" type="button" @click="cancelContentSearch">
-              {{ t('editor.search.cancelSearch') }}
+              {{ t("editor.search.cancelSearch") }}
             </button>
           </div>
         </template>
@@ -598,20 +611,23 @@ watch(
       <!-- 已取消：结果不完整，与「无结果 / 已截断」区分 -->
       <div v-if="searchStore.cancelled" class="gsb__cancelled">
         <Info :size="12" class="gsb__cancelled__icon" aria-hidden="true" />
-        <span>{{ t('editor.searchBar.searchCancelled') }}</span>
+        <span>{{ t("editor.searchBar.searchCancelled") }}</span>
       </div>
 
       <!-- 截断提示 -->
       <div v-if="searchStore.truncated" class="gsb__truncate">
         <TriangleAlert :size="12" class="gsb__truncate__icon" aria-hidden="true" />
-        <span>{{ t('editor.searchBar.truncated') }}</span>
+        <span>{{ t("editor.searchBar.truncated") }}</span>
       </div>
 
       <!-- 底部提示 -->
       <div class="gsb__footer">
-        <span class="gsb-kbd__combo"><kbd class="gsb-kbd">↑</kbd><kbd class="gsb-kbd">↓</kbd></span>&nbsp;{{ t('editor.searchBar.hintSelect') }}
-        <span class="gsb-kbd__combo"><kbd class="gsb-kbd">⏎</kbd></span>&nbsp;{{ t('editor.searchBar.hintOpen') }}
-        <span class="gsb-kbd__combo"><kbd class="gsb-kbd">Esc</kbd></span>&nbsp;{{ t('editor.searchBar.hintClose') }}
+        <span class="gsb-kbd__combo"><kbd class="gsb-kbd">↑</kbd><kbd class="gsb-kbd">↓</kbd></span
+        >&nbsp;{{ t("editor.searchBar.hintSelect") }}
+        <span class="gsb-kbd__combo"><kbd class="gsb-kbd">⏎</kbd></span
+        >&nbsp;{{ t("editor.searchBar.hintOpen") }}
+        <span class="gsb-kbd__combo"><kbd class="gsb-kbd">Esc</kbd></span
+        >&nbsp;{{ t("editor.searchBar.hintClose") }}
         <Loader2
           v-if="searchStore.loading"
           :size="11"
@@ -619,7 +635,7 @@ watch(
           aria-hidden="true"
         />
         <span class="gsb__footer__count">
-          {{ t('editor.searchBar.resultCount', { count: flatEntries.length }) }}
+          {{ t("editor.searchBar.resultCount", { count: flatEntries.length }) }}
         </span>
       </div>
     </div>
@@ -653,8 +669,14 @@ watch(
 }
 
 @keyframes gsb-in {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* —— 输入行 —— */
@@ -688,7 +710,9 @@ watch(
   font: inherit;
   font-size: 14px;
 }
-.gsb__input input::placeholder { color: var(--murasaki-ink-3); }
+.gsb__input input::placeholder {
+  color: var(--murasaki-ink-3);
+}
 .gsb__optbtn {
   display: inline-flex;
   align-items: center;
@@ -702,8 +726,14 @@ watch(
   cursor: pointer;
   flex: 0 0 auto;
 }
-.gsb__optbtn:hover { background: var(--murasaki-muted); color: var(--murasaki-ink-2); }
-.gsb__optbtn.is-on { background: var(--murasaki-purple-100); color: var(--murasaki-purple-700); }
+.gsb__optbtn:hover {
+  background: var(--murasaki-muted);
+  color: var(--murasaki-ink-2);
+}
+.gsb__optbtn.is-on {
+  background: var(--murasaki-purple-100);
+  color: var(--murasaki-purple-700);
+}
 .gsb__clear {
   display: inline-flex;
   align-items: center;
@@ -717,7 +747,10 @@ watch(
   cursor: pointer;
   flex: 0 0 auto;
 }
-.gsb__clear:hover { background: var(--murasaki-muted); color: var(--murasaki-ink-2); }
+.gsb__clear:hover {
+  background: var(--murasaki-muted);
+  color: var(--murasaki-ink-2);
+}
 
 /* kbd */
 .gsb-kbd {
@@ -737,7 +770,11 @@ watch(
   border-bottom-width: 2px;
   border-radius: var(--murasaki-radius-sm);
 }
-.gsb-kbd__combo { display: inline-flex; align-items: center; gap: 3px; }
+.gsb-kbd__combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
 
 /* —— 高级选项行 —— */
 .gsb__options {
@@ -748,7 +785,9 @@ watch(
   background: var(--murasaki-surface);
   border-bottom: 1px solid var(--murasaki-border);
 }
-.gsb__options.is-open { display: flex; }
+.gsb__options.is-open {
+  display: flex;
+}
 .gsb-opt {
   display: inline-flex;
   align-items: center;
@@ -758,7 +797,9 @@ watch(
   cursor: pointer;
   user-select: none;
 }
-.gsb-opt:hover { color: var(--murasaki-ink); }
+.gsb-opt:hover {
+  color: var(--murasaki-ink);
+}
 .gsb-optcode {
   font-family: var(--murasaki-font-mono);
   font-size: 11px;
@@ -791,7 +832,9 @@ watch(
   margin: 0;
   cursor: pointer;
 }
-.gsb-switch:focus-within { box-shadow: 0 0 0 2px var(--murasaki-ring); }
+.gsb-switch:focus-within {
+  box-shadow: 0 0 0 2px var(--murasaki-ring);
+}
 .gsb-switch__thumb {
   position: absolute;
   top: 2px;
@@ -804,8 +847,12 @@ watch(
   transition: transform var(--murasaki-duration-fast);
   pointer-events: none;
 }
-.gsb-switch input:checked + .gsb-switch__thumb { transform: translateX(13px); }
-.gsb-switch:has(input:checked) { background: var(--murasaki-primary); }
+.gsb-switch input:checked + .gsb-switch__thumb {
+  transform: translateX(13px);
+}
+.gsb-switch:has(input:checked) {
+  background: var(--murasaki-primary);
+}
 
 /* —— 结果区 —— */
 .gsb__results {
@@ -813,8 +860,13 @@ watch(
   overflow-y: auto;
   padding: 4px;
 }
-.gsb__results::-webkit-scrollbar { width: 8px; }
-.gsb__results::-webkit-scrollbar-thumb { background: var(--murasaki-neutral-300); border-radius: 4px; }
+.gsb__results::-webkit-scrollbar {
+  width: 8px;
+}
+.gsb__results::-webkit-scrollbar-thumb {
+  background: var(--murasaki-neutral-300);
+  border-radius: 4px;
+}
 
 .gsb__group-label {
   display: flex;
@@ -847,19 +899,32 @@ watch(
   cursor: pointer;
   transition: background var(--murasaki-duration-fast) var(--murasaki-ease);
 }
-.gsb__item:hover { background: var(--murasaki-primary-soft); }
-.gsb__item.is-active { background: var(--murasaki-primary-soft); }
-.gsb__item.is-active .gsb__item__title { color: var(--murasaki-primary); font-weight: 500; }
+.gsb__item:hover {
+  background: var(--murasaki-primary-soft);
+}
+.gsb__item.is-active {
+  background: var(--murasaki-primary-soft);
+}
+.gsb__item.is-active .gsb__item__title {
+  color: var(--murasaki-primary);
+  font-weight: 500;
+}
 .gsb__item.is-active .gsb__item__sub,
-.gsb__item.is-active .gsb__snippet { color: var(--murasaki-ink-2); }
+.gsb__item.is-active .gsb__snippet {
+  color: var(--murasaki-ink-2);
+}
 
 .gsb__item__icon {
   display: inline-flex;
   flex: 0 0 auto;
   color: var(--murasaki-ink-3);
 }
-.gsb__item__icon--tabs { color: var(--murasaki-purple-600); }
-.gsb__item__icon--content { color: var(--murasaki-purple-600); }
+.gsb__item__icon--tabs {
+  color: var(--murasaki-purple-600);
+}
+.gsb__item__icon--content {
+  color: var(--murasaki-purple-600);
+}
 
 .gsb__item__body {
   flex: 1;
@@ -959,9 +1024,18 @@ watch(
   background: var(--murasaki-muted);
   white-space: nowrap;
 }
-.gsb-chip--tab { background: var(--murasaki-purple-100); color: var(--murasaki-purple-700); }
-.gsb__item.is-active .gsb-chip--tab { background: var(--murasaki-purple-600); color: var(--murasaki-primary-foreground); }
-.gsb__item.is-active .gsb-chip { background: var(--murasaki-purple-100); color: var(--murasaki-purple-700); }
+.gsb-chip--tab {
+  background: var(--murasaki-purple-100);
+  color: var(--murasaki-purple-700);
+}
+.gsb__item.is-active .gsb-chip--tab {
+  background: var(--murasaki-purple-600);
+  color: var(--murasaki-primary-foreground);
+}
+.gsb__item.is-active .gsb-chip {
+  background: var(--murasaki-purple-100);
+  color: var(--murasaki-purple-700);
+}
 
 /* —— 空态 / 加载态 —— */
 .gsb__empty,
@@ -974,8 +1048,13 @@ watch(
   color: var(--murasaki-ink-3);
   font-size: 13px;
 }
-.gsb__empty-icon { color: var(--murasaki-ink-3); }
-.gsb__hint { font-size: 11px; color: var(--murasaki-ink-3); }
+.gsb__empty-icon {
+  color: var(--murasaki-ink-3);
+}
+.gsb__hint {
+  font-size: 11px;
+  color: var(--murasaki-ink-3);
+}
 
 /* 横幅提示（错误 / 未打开工作区）：不阻断下方本地命中分组 */
 .gsb__notice {
@@ -995,10 +1074,19 @@ watch(
   border-color: color-mix(in srgb, var(--murasaki-state-error) 30%, transparent);
   background: color-mix(in srgb, var(--murasaki-state-error) 8%, transparent);
 }
-.gsb__notice__icon { color: var(--murasaki-ink-3); flex: 0 0 auto; }
-.gsb__notice--error .gsb__notice__icon { color: var(--murasaki-state-error); }
-.gsb__notice__text { font-weight: 500; }
-.gsb__notice .gsb__action { margin-left: auto; }
+.gsb__notice__icon {
+  color: var(--murasaki-ink-3);
+  flex: 0 0 auto;
+}
+.gsb__notice--error .gsb__notice__icon {
+  color: var(--murasaki-state-error);
+}
+.gsb__notice__text {
+  font-weight: 500;
+}
+.gsb__notice .gsb__action {
+  margin-left: auto;
+}
 .gsb__spinner {
   width: 16px;
   height: 16px;
@@ -1007,7 +1095,11 @@ watch(
   border-top-color: var(--murasaki-primary);
   animation: gsb-spin 0.7s linear infinite;
 }
-@keyframes gsb-spin { to { transform: rotate(360deg); } }
+@keyframes gsb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 /* 结果区内的按钮（重试 / 取消扫描） */
 .gsb__action {
   padding: 4px 12px;
@@ -1035,7 +1127,10 @@ watch(
   font-size: 11px;
   color: var(--murasaki-ink-2);
 }
-.gsb__cancelled__icon { color: var(--murasaki-ink-3); flex: 0 0 auto; }
+.gsb__cancelled__icon {
+  color: var(--murasaki-ink-3);
+  flex: 0 0 auto;
+}
 
 /* —— 截断提示 —— */
 .gsb__truncate {
@@ -1050,7 +1145,10 @@ watch(
   font-size: 11px;
   color: var(--murasaki-ink-2);
 }
-.gsb__truncate__icon { color: var(--murasaki-state-warning); flex: 0 0 auto; }
+.gsb__truncate__icon {
+  color: var(--murasaki-state-warning);
+  flex: 0 0 auto;
+}
 
 /* —— 底部提示 —— */
 .gsb__footer {
@@ -1063,7 +1161,11 @@ watch(
   font-size: 11px;
   color: var(--murasaki-ink-3);
 }
-.gsb__footer .gsb-kbd { min-width: 16px; height: 16px; font-size: 9px; }
+.gsb__footer .gsb-kbd {
+  min-width: 16px;
+  height: 16px;
+  font-size: 9px;
+}
 .gsb__footer__spinner {
   animation: gsb-spin 1s linear infinite;
   color: var(--murasaki-primary);

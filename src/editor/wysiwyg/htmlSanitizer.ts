@@ -45,7 +45,7 @@ import DOMPurify from "dompurify";
  * 对 img 等 DATA_URI_TAGS 的 src 走单独放行分支，不经此正则。
  */
 const ALLOWED_URI_REGEXP =
-  /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix|asset):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
+  /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix|asset):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i;
 
 /**
  * 净化 HTML 字符串，清除 XSS payload 并保留白名单标签。
@@ -66,7 +66,16 @@ export function sanitizeInlineHtml(html: string): string {
     RETURN_DOM_FRAGMENT: false,
     // 禁用表单相关标签（防钓鱼 + markdown 渲染无表单需求）
     // 不含 input：task list 复选框需要 <input type="checkbox">
-    FORBID_TAGS: ["form", "button", "select", "textarea", "fieldset", "legend", "option", "optgroup"],
+    FORBID_TAGS: [
+      "form",
+      "button",
+      "select",
+      "textarea",
+      "fieldset",
+      "legend",
+      "option",
+      "optgroup",
+    ],
     // 允许 SVG <script> 被 DOMPurify 自动移除（默认行为）
     // 保留 <a href> 与 <img src>，DOMPurify 默认会清除 javascript: 协议
     // 允许 data: URI（Base64 图片合法）

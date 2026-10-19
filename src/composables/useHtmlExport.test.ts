@@ -4,11 +4,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   convertFileSrc: (path: string) => `asset://localhost/${path}`,
 }));
 
-import {
-  getMarkdownRenderer,
-  getCurrentFilePath,
-  setCurrentFilePath,
-} from "./useMarkdownRenderer";
+import { getMarkdownRenderer, getCurrentFilePath, setCurrentFilePath } from "./useMarkdownRenderer";
 import { exportHtml } from "./useHtmlExport";
 
 /**

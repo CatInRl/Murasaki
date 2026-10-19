@@ -69,7 +69,10 @@ export function useTabClose(deps: TabCloseDeps) {
         await tabsStore.saveTab(tabId);
         return true;
       } catch (err) {
-        await dialog.alert({ message: t("common.error.saveFailed", { error: formatCommandError(err) }), variant: "error" });
+        await dialog.alert({
+          message: t("common.error.saveFailed", { error: formatCommandError(err) }),
+          variant: "error",
+        });
         return false;
       }
     }
@@ -83,7 +86,10 @@ export function useTabClose(deps: TabCloseDeps) {
       await tabsStore.saveTabAs(tabId, selected);
       return true;
     } catch (err) {
-      await dialog.alert({ message: t("common.error.saveAsFailed", { error: formatCommandError(err) }), variant: "error" });
+      await dialog.alert({
+        message: t("common.error.saveAsFailed", { error: formatCommandError(err) }),
+        variant: "error",
+      });
       return false;
     }
   }

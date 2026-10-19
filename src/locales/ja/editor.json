@@ -84,6 +84,25 @@
     "scanning": "スキャン中… {matched} 件の一致を検出",
     "resultSummary": "{files} ファイル / {matches} 件の一致"
   },
+  "searchPanel": {
+    "find": "検索",
+    "replace": "置換",
+    "next": "次へ",
+    "previous": "前へ",
+    "all": "すべて",
+    "matchCase": "大文字と小文字を区別",
+    "regexp": "正規表現",
+    "byWord": "単語単位",
+    "replaceOne": "置換",
+    "replaceAll": "すべて置換",
+    "close": "閉じる",
+    "currentMatch": "現在の一致",
+    "onLine": "行",
+    "replacedMatches": "$ 件を置換しました",
+    "replacedMatchOnLine": "$ 行目の一致を置換しました",
+    "goToLine": "行へ移動",
+    "go": "移動"
+  },
   "searchBar": {
     "placeholder": "ファイル、タブ、内容を検索…",
     "aria": "全体検索",

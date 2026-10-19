@@ -8,9 +8,10 @@ describe("utils/commandError", () => {
   });
 
   it("解析结构化错误", () => {
-    expect(
-      parseCommandError({ code: "not_found", params: { path: "C:/ws/a.md" } })
-    ).toEqual({ code: "not_found", params: { path: "C:/ws/a.md" } });
+    expect(parseCommandError({ code: "not_found", params: { path: "C:/ws/a.md" } })).toEqual({
+      code: "not_found",
+      params: { path: "C:/ws/a.md" },
+    });
   });
 
   it("params 缺失时归一为空对象", () => {
@@ -35,9 +36,9 @@ describe("utils/commandError", () => {
   });
 
   it("按 code 渲染文案并追加路径", () => {
-    expect(
-      formatCommandError({ code: "not_found", params: { path: "C:/ws/a.md" } })
-    ).toBe("找不到文件或目录：C:/ws/a.md");
+    expect(formatCommandError({ code: "not_found", params: { path: "C:/ws/a.md" } })).toBe(
+      "找不到文件或目录：C:/ws/a.md"
+    );
   });
 
   it("io 错误附带系统原文", () => {
@@ -50,9 +51,9 @@ describe("utils/commandError", () => {
   });
 
   it("internal 的细节不展示给用户", () => {
-    expect(
-      formatCommandError({ code: "internal", params: { detail: "menu: boom" } })
-    ).toBe("内部错误");
+    expect(formatCommandError({ code: "internal", params: { detail: "menu: boom" } })).toBe(
+      "内部错误"
+    );
   });
 
   it("未知 code 回退到 unknown 文案", () => {
