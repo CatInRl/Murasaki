@@ -38,6 +38,8 @@ export async function openEditorSession(
     store,
     initialContent = "",
     draftDebounceMs = DEFAULT_DRAFT_DEBOUNCE_MS,
+    cursor,
+    scroll,
     onChange,
     onDraftError,
   } = options;
@@ -81,6 +83,8 @@ export async function openEditorSession(
     baselineMtime,
     pendingConflict,
     draftDebounceMs,
+    cursor,
+    scroll,
     onChange,
     onDraftError,
   });
@@ -123,6 +127,10 @@ interface CreateSessionParams {
   baselineMtime: number | null;
   pendingConflict: ConflictInfo | null;
   draftDebounceMs: number;
+  /** 恢复上次会话时的光标位置（跨重启恢复） */
+  cursor?: CursorPosition;
+  /** 恢复上次会话时的滚动位置（跨重启恢复） */
+  scroll?: ScrollPosition;
   onChange?: () => void;
   onDraftError?: (error: unknown) => void;
 }
@@ -135,8 +143,8 @@ function createSession(params: CreateSessionParams): EditorSession {
   let baselineContent = params.baselineContent;
   let baselineMtime = params.baselineMtime;
   let pendingConflict = params.pendingConflict;
-  let cursor: CursorPosition = { line: 1, ch: 0 };
-  let scroll: ScrollPosition = { x: 0, y: 0 };
+  let cursor: CursorPosition = params.cursor ?? { line: 1, ch: 0 };
+  let scroll: ScrollPosition = params.scroll ?? { x: 0, y: 0 };
   let disposed = false;
 
   let draftTimer: ReturnType<typeof setTimeout> | null = null;
@@ -229,6 +237,11 @@ function createSession(params: CreateSessionParams): EditorSession {
   function setScroll(position: ScrollPosition): void {
     if (disposed) return;
     scroll = { ...position };
+  }
+
+  function setCursor(position: CursorPosition): void {
+    if (disposed) return;
+    cursor = { ...position };
   }
 
   async function saveTo(target: string): Promise<SaveResult> {
@@ -379,6 +392,7 @@ function createSession(params: CreateSessionParams): EditorSession {
     snapshot,
     setContent,
     setScroll,
+    setCursor,
     save,
     saveAs,
     resolveConflict,

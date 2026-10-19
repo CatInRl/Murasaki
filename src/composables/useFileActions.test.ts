@@ -43,7 +43,6 @@ function makeTab(overrides: Partial<Tab> = {}): Tab {
     content: "# Hello\n\nworld",
     lastMtime: null,
     isDirty: false,
-    hasExternalChange: false,
     cursor: { line: 1, ch: 0 },
     scroll: { x: 0, y: 0 },
     ...overrides,

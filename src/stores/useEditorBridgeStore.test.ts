@@ -38,21 +38,17 @@ describe("useEditorBridgeStore", () => {
     });
   });
 
-  describe("updateDocPath 与 editorMode 解耦", () => {
-    it("切换文档路径不影响 editorMode", () => {
+  describe("已删除的死状态（ADR-0022 Phase 3）", () => {
+    // 这两个字段过去只有写入、没有读取。留一个断言防止它们被"顺手加回来"：
+    // 编辑器句柄应由编辑会话（src/editor/session/）或组件自身持有，
+    // 再往 store 里存一份只会产生会过期的副本。
+    it("不再暴露 editorView / activeDocPath", () => {
       const store = useEditorBridgeStore();
-      store.setEditorMode("wysiwyg");
-      store.updateDocPath("/some/path.md");
-      expect(store.activeDocPath).toBe("/some/path.md");
-      expect(store.editorMode).toBe("wysiwyg");
-    });
-
-    it("切换 editorMode 不影响 activeDocPath", () => {
-      const store = useEditorBridgeStore();
-      store.updateDocPath("/keep/this.md");
-      store.setEditorMode("source");
-      expect(store.activeDocPath).toBe("/keep/this.md");
-      expect(store.editorMode).toBe("source");
+      expect(Object.keys(store)).not.toContain("editorView");
+      expect(Object.keys(store)).not.toContain("activeDocPath");
+      expect(Object.keys(store)).not.toContain("updateDocPath");
+      expect(Object.keys(store)).not.toContain("registerView");
+      expect(Object.keys(store)).not.toContain("unregisterView");
     });
   });
 });

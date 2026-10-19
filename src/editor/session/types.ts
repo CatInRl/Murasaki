@@ -83,6 +83,8 @@ export interface EditorSession {
   snapshot(): SessionSnapshot;
   setContent(text: string): void;
   setScroll(position: ScrollPosition): void;
+  /** 由宿主的编辑器事件上报光标（跨重启恢复用） */
+  setCursor(position: CursorPosition): void;
   save(): Promise<SaveResult>;
   saveAs(path: string): Promise<SaveResult>;
   resolveConflict(choice: ConflictChoice): void;
@@ -114,6 +116,10 @@ export interface OpenSessionOptions {
   initialContent?: string;
   /** 草稿自动写入的防抖时长，默认 2000ms */
   draftDebounceMs?: number;
+  /** 恢复上次会话时的光标位置（跨重启恢复） */
+  cursor?: CursorPosition;
+  /** 恢复上次会话时的滚动位置（跨重启恢复） */
+  scroll?: ScrollPosition;
   /** 内容 / 脏态变化的通知，供持久化模块做防抖落盘 */
   onChange?: () => void;
   /** 草稿写入失败的通知，供上层提示用户 */

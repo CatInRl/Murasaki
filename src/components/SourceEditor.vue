@@ -57,6 +57,8 @@ import {
 import { buildEditorShortcutExtension, useShortcuts } from "../shortcuts/useShortcuts";
 import { formatShortcutForDisplay } from "../shortcuts/shortcutsLogic";
 import { useEditorBridgeStore } from "../stores/useEditorBridgeStore";
+import { useTabsStore } from "../stores/useTabsStore";
+import type { EditorAdapter } from "../editor/session/types";
 import { useContextMenuStore } from "../stores/useContextMenuStore";
 import type { MenuItem } from "../stores/useContextMenuStore";
 import { wysiwygExtensions, recomputeWysiwygEffect } from "../editor/wysiwyg/wysiwygPlugin";
@@ -326,9 +328,10 @@ const { t, locale } = useI18n();
 // 标记正在进行外部值同步（避免 dispatch 触发 update:modelValue 污染 dirty 状态）
 let isApplyingExternalValue = false;
 
-// per-tab EditorState 缓存：切 tab 时保存当前 state（含 undo 栈），切回时恢复
-// 解决单 EditorView 共享 undo 栈导致跨 tab undo 撤销错误的问题
-const stateCache = new Map<string, EditorState>();
+// per-tab EditorState（含 undo 栈）**由编辑会话持有**（ADR-0022 Phase 3）：
+// 过去这里有一个 `stateCache: Map<tabId, EditorState>` 且从不淘汰 ——
+// 开多少标签就留下多少份完整编辑状态，内存单调增长。
+// 现在换入/换出都走会话的 attachEditor / detachEditor。
 let lastTabId: string | null = null;
 
 // 用 Compartment 让配置可在运行时切换
@@ -495,12 +498,15 @@ onMounted(() => {
   viewRef.value = view;
   // 初始化 lastTabId，避免首次切 tab 时被 watch modelValue 误处理
   lastTabId = props.tabId ?? null;
+  // 首次挂载就把当前 tab 绑到它的会话上：会话第一次 attachEditor 会用
+  // replaceDoc 灌入内容，之后切走时 detachEditor 会把含 undo 栈的 state 存回会话。
+  // 不在这里绑的话，「打开第一个 tab」的场景要等到第一次切 tab 才建立关联。
   if (props.tabId) {
-    stateCache.set(props.tabId, view.state);
+    useTabsStore()
+      .getEditorBinding(props.tabId)
+      ?.attachEditor(buildAdapter(view, { onAfterMount: () => {} }));
   }
   emit("ready", view);
-  // 注册到 editor bridge
-  useEditorBridgeStore().registerView(view);
   // 监听 WYSIWYG 链接 widget 的内部跳转事件（Ctrl+Click 相对 .md 路径）
   // LinkWidget.dispatchEvent 发出自定义事件，这里接收后透传给父组件
   hostRef.value.addEventListener("murasaki-open-internal", ((e: CustomEvent) => {
@@ -581,15 +587,58 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  if (viewRef.value) {
-    useEditorBridgeStore().unregisterView(viewRef.value);
+  // 卸载前把编辑状态交还给会话（含 undo 栈），否则下次挂载会丢掉这些标签的历史
+  if (lastTabId) {
+    useTabsStore().getEditorBinding(lastTabId)?.detachEditor();
   }
   viewRef.value?.destroy();
   viewRef.value = null;
-  stateCache.clear();
 });
 
-// 切 tab（tabId 变化）→ 替换整个 EditorState（保留 per-tab undo 栈）
+/**
+ * 构造给编辑会话用的 adapter（ADR-0022 Phase 3）。
+ *
+ * 组件里只有一个常驻的 `EditorView`，会话持有的是它的 `EditorState`（含 undo 栈）：
+ * - `getState` / `setState` 直接读写同一个 view
+ * - `replaceDoc` 用于会话首次挂载（尚未有存档状态）
+ * - 换入状态后必须重新应用本组件的各个 compartment（WYSIWYG / 字体 / 快捷键 /
+ *   查找面板短语）—— 存档里的 state 可能是在别的配置下存下的（issue #115）
+ */
+function buildAdapter(view: EditorView, opts: { onAfterMount: () => void }): EditorAdapter {
+  const adapter: EditorAdapter = {
+    mount: () => {},
+    destroy: () => {},
+    getState: () => view.state,
+    setState: (state: unknown) => {
+      view.setState(state as EditorState);
+      applyCompartmentsAfterStateSwap();
+      opts.onAfterMount();
+    },
+    replaceDoc: (text: string) => {
+      view.setState(EditorState.create({ doc: text, extensions: buildExtensions() }));
+      opts.onAfterMount();
+    },
+    setMode: () => {},
+    onSelectionChange: () => () => {},
+  };
+  return adapter;
+}
+
+/** 换入 EditorState 后，把与当前设置相关的 compartment 重新对齐 */
+function applyCompartmentsAfterStateSwap(): void {
+  viewRef.value?.dispatch({
+    effects: [
+      wysiwygComp.reconfigure(props.editorMode === "wysiwyg" ? wysiwygExtensions : []),
+      fontComp.reconfigure(buildFontTheme()),
+      shortcutComp.reconfigure(
+        buildEditorShortcutExtension(overrides.value, { isMarkdown: isMarkdownDoc })
+      ),
+      searchPhrasesComp.reconfigure(EditorState.phrases.of(buildSearchPhrases())),
+    ],
+  });
+}
+
+// 切 tab（tabId 变化）→ 换入目标 tab 的编辑状态（含 undo 栈）
 // watch modelValue（tabId 不变）→ dispatch changes 同步外部修改（不进入 undo 栈）
 // 两条路径分开处理：切 tab 时不能 dispatch，否则 CodeMirror 的 undo 假设 doc 连续性被打破，
 // 会导致 undo 撤销错误内容（用户切回 Tab A 按 undo 会撤销 Tab B 的输入）
@@ -598,53 +647,47 @@ watch(
   (newTabId, oldTabId) => {
     const view = viewRef.value;
     if (!view) return;
-    // 保存当前 tab 的 state（含 undo 栈）
+    const tabsStore = useTabsStore();
+
+    // 1) 旧 tab 的编辑状态（含 undo 栈）交还给它的会话
     if (oldTabId) {
-      stateCache.set(oldTabId, view.state);
+      tabsStore.getEditorBinding(oldTabId)?.detachEditor();
     }
     if (!newTabId) {
       // 无激活 tab（不应发生，但容错）
       return;
     }
-    // 加载新 tab 的 state
-    const cached = stateCache.get(newTabId);
-    if (cached) {
-      // 先 setState 恢复 cached（含 undo 栈）
-      view.setState(cached);
-      // 检查 cached doc 是否与 modelValue 一致（外部修改可能已更新 store.content）
-      const cachedDoc = cached.doc.toString();
-      if (cachedDoc !== props.modelValue) {
-        // 外部在切走期间改了内容：dispatch 同步（不污染 undo 栈）
-        isApplyingExternalValue = true;
-        try {
-          view.dispatch({
-            changes: { from: 0, to: cachedDoc.length, insert: props.modelValue },
-            annotations: Transaction.addToHistory.of(false),
-          });
-        } finally {
-          isApplyingExternalValue = false;
-        }
-      }
-      // 确保 wysiwygComp + fontComp + shortcutComp + searchPhrasesComp 与当前配置一致（issue #115）
-      // cached state 可能在不同配置下缓存，setState 恢复后需重新应用当前配置
-      view.dispatch({
-        effects: [
-          wysiwygComp.reconfigure(props.editorMode === "wysiwyg" ? wysiwygExtensions : []),
-          fontComp.reconfigure(buildFontTheme()),
-          shortcutComp.reconfigure(
-            buildEditorShortcutExtension(overrides.value, { isMarkdown: isMarkdownDoc })
-          ),
-          searchPhrasesComp.reconfigure(EditorState.phrases.of(buildSearchPhrases())),
-        ],
-      });
-    } else {
-      // 首次进入此 tab：创建新 state
-      const newState = EditorState.create({
-        doc: props.modelValue,
-        extensions: buildExtensions(),
-      });
-      view.setState(newState);
+
+    // 2) 换入新 tab 的状态。会话首次 `attachEditor` 会用 replaceDoc 灌入内容，
+    //    之后（用户切回来）则是 setState 恢复，undo 栈随之恢复。
+    const session = tabsStore.getEditorBinding(newTabId);
+    if (!session) {
+      // 没有会话（理论上不该发生）→ 退回就地新建，至少保证内容正确
+      view.setState(EditorState.create({ doc: props.modelValue, extensions: buildExtensions() }));
+      lastTabId = newTabId;
+      return;
     }
+
+    session.attachEditor(
+      buildAdapter(view, {
+        // 换入后若内容与 store 不一致（切走期间外部改过 / 加载了磁盘版本），补一次同步。
+        // 不进 undo 栈：这是外部改动，不该被用户的 Ctrl+Z 撤销。
+        onAfterMount: () => {
+          const current = view.state.doc.toString();
+          if (current === props.modelValue) return;
+          isApplyingExternalValue = true;
+          try {
+            view.dispatch({
+              changes: { from: 0, to: current.length, insert: props.modelValue },
+              annotations: Transaction.addToHistory.of(false),
+            });
+          } finally {
+            isApplyingExternalValue = false;
+          }
+        },
+      })
+    );
+
     lastTabId = newTabId;
   }
 );

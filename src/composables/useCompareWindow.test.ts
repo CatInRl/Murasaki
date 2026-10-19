@@ -34,7 +34,7 @@ function makeTabsStore() {
     })),
     reloadFromDisk: vi.fn(async () => {}),
     applyExternalResolution: vi.fn(async () => {}),
-    markExternalChange: vi.fn(),
+
     writeMergedContent: vi.fn(async () => {}),
   };
 }

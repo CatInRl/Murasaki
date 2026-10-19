@@ -217,7 +217,9 @@ describe("useTabsStore", () => {
       expect(tab.isDirty).toBe(true);
     });
 
-    it("keep-local 置位外部修改标记；load-disk 清除它", async () => {
+    it("keep-local 保留本地内容与脏态；load-disk 换回磁盘内容并清除脏态", async () => {
+      // 曾是「置位/清除 hasExternalChange」的断言。Phase 3 删掉了那个字段
+      // （它只有写入、没有读取），这里改为断言用户真正可感知的部分：内容与脏态。
       const { fileSystem } = await import("../services/fileSystem");
       const store = useTabsStore();
       const tab = await store.openFile("C:\\docs\\a.md");
@@ -227,20 +229,26 @@ describe("useTabsStore", () => {
       );
 
       await store.applyExternalResolution("C:\\docs\\a.md", "keep-local");
-      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(true);
+      const afterKeep = store.getTabByPath("C:\\docs\\a.md");
+      expect(afterKeep?.content).toBe("本地未保存的修改");
+      expect(afterKeep?.isDirty).toBe(true);
 
       await store.applyExternalResolution("C:\\docs\\a.md", "load-disk", "磁盘新内容");
-      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(false);
+      const afterLoad = store.getTabByPath("C:\\docs\\a.md");
+      expect(afterLoad?.content).toBe("磁盘新内容");
+      expect(afterLoad?.isDirty).toBe(false);
     });
 
-    it("reloadFromDisk 后清除外部修改标记（H4 契约）", async () => {
+    it("reloadFromDisk 后内容与磁盘一致且不脏（H4 契约）", async () => {
       const store = useTabsStore();
-      await store.openFile("C:\\docs\\a.md");
-      store.markExternalChange("C:\\docs\\a.md", true);
-      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(true);
+      const tab = await store.openFile("C:\\docs\\a.md");
+      store.updateContent(tab.id, "本地改动");
+      expect(store.getTabByPath("C:\\docs\\a.md")?.isDirty).toBe(true);
 
       await store.reloadFromDisk("C:\\docs\\a.md");
-      expect(store.getTabByPath("C:\\docs\\a.md")?.hasExternalChange).toBe(false);
+      const reloaded = store.getTabByPath("C:\\docs\\a.md");
+      expect(reloaded?.isDirty).toBe(false);
+      expect(reloaded?.content).toBe(`content of ${"C:\\docs\\a.md"}`);
     });
   });
 
@@ -671,6 +679,83 @@ describe("useTabsStore", () => {
       // 关闭后 tab 已不在列表，读点拿不到它
       expect(store.tabs).toHaveLength(0);
       expect(store.getTabById(tab.id)).toBeNull();
+    });
+  });
+
+  // ADR-0022 Phase 3（#450）：撤销历史改由会话持有后，关闭标签必须真正释放。
+  describe("会话生命周期与光标/滚动（#450）", () => {
+    it("关闭 20 个标签后会话全部释放（不再单调增长）", async () => {
+      const store = useTabsStore();
+      const ids: string[] = [];
+      for (let i = 0; i < 20; i++) {
+        const tab = await store.openFile(`C:\\docs\\f${i}.md`);
+        ids.push(tab.id);
+      }
+      expect(store.tabs).toHaveLength(20);
+      // 每个标签都拿得到会话（编辑器 seam 可用）
+      for (const id of ids) {
+        expect(store.getEditorBinding(id)).not.toBeNull();
+      }
+
+      for (const id of ids) {
+        await store.doCloseTab(id, { keepDraft: false });
+      }
+
+      expect(store.tabs).toHaveLength(0);
+      // 关键断言：关闭后所有会话都已释放，读完即 null
+      for (const id of ids) {
+        expect(store.getEditorBinding(id)).toBeNull();
+      }
+    });
+
+    it("clearAll 同样释放全部会话", async () => {
+      const store = useTabsStore();
+      const a = await store.openFile("C:\\docs\\a.md");
+      store.newTab();
+      expect(store.getEditorBinding(a.id)).not.toBeNull();
+
+      store.clearAll();
+
+      expect(store.getEditorBinding(a.id)).toBeNull();
+    });
+
+    it("光标位置随事件更新，并写进持久化快照", async () => {
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+      expect(tab.cursor).toEqual({ line: 1, ch: 0 });
+
+      store.updateCursor(tab.id, { line: 7, ch: 3 });
+
+      expect(store.getTabById(tab.id)?.cursor).toEqual({ line: 7, ch: 3 });
+      await store.persist();
+      const saved = saveTabsSpy.mock.lastCall?.[0] as unknown as Array<{ cursor: unknown }>;
+      expect(saved[0].cursor).toEqual({ line: 7, ch: 3 });
+    });
+
+    it("滚动位置随上报更新，并写进持久化快照", async () => {
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md");
+
+      store.updateScroll(tab.id, { x: 0, y: 480 });
+
+      expect(store.getTabById(tab.id)?.scroll).toEqual({ x: 0, y: 480 });
+      await store.persist();
+      const saved = saveTabsSpy.mock.lastCall?.[0] as unknown as Array<{ scroll: unknown }>;
+      expect(saved[0].scroll).toEqual({ x: 0, y: 480 });
+    });
+
+    it("恢复会话时把持久化的光标/滚动带进会话（跨重启恢复）", async () => {
+      const store = useTabsStore();
+      const tab = await store.openFile("C:\\docs\\a.md", {
+        cursor: { line: 12, ch: 4 },
+        scroll: { x: 0, y: 900 },
+      });
+
+      const binding = store.getEditorBinding(tab.id);
+      expect(binding?.snapshot().cursor).toEqual({ line: 12, ch: 4 });
+      expect(binding?.snapshot().scroll).toEqual({ x: 0, y: 900 });
+      // tab 上的副本也要一致，否则 tabs.json 下次写回去又是初始值
+      expect(store.getTabById(tab.id)?.cursor).toEqual({ line: 12, ch: 4 });
     });
   });
 });
