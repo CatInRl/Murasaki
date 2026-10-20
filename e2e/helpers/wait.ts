@@ -427,9 +427,22 @@ export async function actUntil(
     attempts?: number;
     perAttemptTimeoutMs?: number;
     message?: string;
+    /**
+     * 失败时采集现场的回调（#496）。
+     *
+     * helper 不该知道具体业务 DOM，但「动作做了 3 次都没效果」这句话本身没有
+     * 诊断价值 —— 是目标元素没渲染、还是点到了没反应，修法完全不同。由调用方
+     * 提供现场快照，helper 只负责把它拼进错误信息。
+     */
+    onFailure?: () => Promise<string>;
   } = {}
 ): Promise<void> {
-  const { attempts = 3, perAttemptTimeoutMs = 4000, message = "动作未产生预期结果" } = options;
+  const {
+    attempts = 3,
+    perAttemptTimeoutMs = 4000,
+    message = "动作未产生预期结果",
+    onFailure,
+  } = options;
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
@@ -444,5 +457,16 @@ export async function actUntil(
     }
   }
 
-  throw new Error(`actUntil: ${message}（已重试 ${attempts} 次，每次 ${perAttemptTimeoutMs}ms）`);
+  let context = "";
+  if (onFailure) {
+    try {
+      context = `\n现场：${await onFailure()}`;
+    } catch (err) {
+      context = `\n现场采集失败：${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  throw new Error(
+    `actUntil: ${message}（已重试 ${attempts} 次，每次 ${perAttemptTimeoutMs}ms）${context}`
+  );
 }

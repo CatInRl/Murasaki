@@ -37,6 +37,35 @@ async function readTabsState(b: Browser): Promise<{ count: number; activePath: s
   });
 }
 
+/**
+ * 失败现场（#496）：点了几次都没打开文件时，到底是「结果条目没渲染」还是
+ * 「点了但没反应」，修法完全不同。把两边的证据一次性打出来。
+ */
+async function describeSearchState(b: Browser): Promise<string> {
+  return b.execute(() => {
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
+    const pinia = window.__pinia__._s;
+    const searchStore = pinia.get("search");
+    const tabs = pinia.get("tabs");
+    const panel = document.querySelector(".gsb") as HTMLElement | null;
+    const items = Array.from(document.querySelectorAll(".gsb__item"));
+    const rect = panel?.getBoundingClientRect();
+    return JSON.stringify({
+      // 渲染侧：条目到底在不在 DOM 里
+      panelInDom: Boolean(panel),
+      panelSize: rect ? `${Math.round(rect.width)}x${Math.round(rect.height)}` : null,
+      itemCount: items.length,
+      firstItemText: (items[0]?.textContent ?? "").trim().slice(0, 40) || null,
+      // store 侧：搜索本身有没有结果
+      resultsCount: (searchStore?.results?.length ?? null) as number | null,
+      searchVisible: (searchStore?.visible ?? null) as boolean | null,
+      // 结果侧：tab 有没有开出来
+      tabCount: tabs.tabs.length as number,
+      activePath: (tabs.activeTab?.path ?? null) as string | null,
+    });
+  });
+}
+
 describe("跨文件搜索结果跳转", () => {
   beforeAll(async () => {
     browser = await createSession();
@@ -157,12 +186,28 @@ describe("跨文件搜索结果跳转", () => {
     // `const item = await browser.$(".gsb__item"); await item.click()`，
     // 既没在点击前重新等元素，也没吞异常 —— 一旦元素当时不在（慢 runner 上结果还在重渲染），
     // `.click()` 直接抛 "element wasn't found" 终止用例，"重试 3 次"一次都没生效。
+    //
+    // 目标条目必须**按文件名定位**，不能默认点第一个（#496）：`abc123` 同时命中
+    // `file-a.md` 与 `sub/file-c.md`，而后端结果顺序来自 `read_dir` 的遍历顺序 ——
+    // NTFS 与 ext4 的目录项顺序不同，Linux 上「第一个」未必是 file-a，
+    // 于是点了第一个却断言 file-a，重试多少次都不会成功。
     await actUntil(
       browser,
       async () => {
         await waitForPresent(browser, ".gsb__item", 5000);
-        const item = await browser.$(".gsb__item");
-        await item.click();
+        // 先在 DOM 里定位目标条目的索引（条目文本是「图标字形 + 文件名分段」的多行
+        // 形式，形如 "M\nfile-a\n.md"，所以先去掉所有空白再比对）
+        const index = await browser.execute((name: string) => {
+          const items = Array.from(document.querySelectorAll(".gsb__item"));
+          const strip = (s: string): string => s.replace(/\s/g, "");
+          return items.findIndex((el) => strip(el.textContent ?? "").includes(name));
+        }, "file-a.md");
+        if (index < 0) {
+          throw new Error("搜索结果里没有 file-a.md，无法点击目标条目");
+        }
+        // 用 XPath 取第 N 个条目再点击：避免把 $$ 的返回元素在 TS 侧当句柄传来传去
+        const target = await browser.$(`(//*[contains(@class,"gsb__item")])[${index + 1}]`);
+        await target.click();
       },
       async () => {
         const s = await readTabsState(browser);
@@ -172,10 +217,10 @@ describe("跨文件搜索结果跳转", () => {
         attempts: 3,
         perAttemptTimeoutMs: 3000,
         message: "点击搜索结果后未打开 file-a.md",
+        onFailure: () => describeSearchState(browser),
       }
     );
 
-    // 验证 tab 已打开且为内容命中的文件之一（首个内容命中是 file-a）
     const tabsState = await readTabsState(browser);
     expect(tabsState.count).toBeGreaterThanOrEqual(1);
     expect(tabsState.activePath).toContain("file-a.md");
