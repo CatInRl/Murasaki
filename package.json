@@ -48,7 +48,7 @@
     "codemirror": "^6.0.2",
     "diff-match-patch": "^1.0.5",
     "dompurify": "^3.4.16",
-    "katex": "^0.18.9",
+    "katex": "^0.18.10",
     "lucide-vue-next": "^0.577.0",
     "markdown-it": "^14.3.2",
     "markdown-it-abbr": "^2.0.0",
