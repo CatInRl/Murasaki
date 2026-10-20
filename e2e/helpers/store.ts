@@ -74,17 +74,116 @@ export async function waitForPinia(browser: Browser, timeout = 30000): Promise<v
     deadline += slowCallExtension(probeStart);
     await browser.pause(500);
   }
-  // 超时：诊断信息
-  const title = await browser.getTitle().catch(() => "<unknown>");
-  const state = await browser.execute(() => document.readyState).catch(() => "<unknown>");
+  // 超时：诊断信息（#493：光有 title/readyState 分不清「空白 webview」和「前端没渲染」）
+  const diag = await collectWebviewDiagnostics(browser);
   const handles = await browser.getWindowHandles().catch(() => []);
-  const errorNote = lastProbeError ? ` 最后一次探针报错：${String(lastProbeError)}。` : "";
+  const errorNote = lastProbeError ? `\n  最后一次探针报错：${String(lastProbeError)}` : "";
   throw new Error(
-    `waitForPinia 超时 (${Date.now() - start}ms，基础预算 ${timeout}ms)：__pinia__ 未暴露。` +
-      `${errorNote}` +
-      ` title="${title}", readyState="${state}", handles=${handles.length}.` +
-      ` 可能原因：上一次测试遗留 WebView2 窗口状态（如 settings 窗口）。`
+    `waitForPinia 超时 (${Date.now() - start}ms，基础预算 ${timeout}ms)：__pinia__ 未暴露。\n` +
+      formatWebviewDiagnostics(diag, handles.length) +
+      errorNote
   );
+}
+
+/** webview 现场诊断快照（#493） */
+export interface WebviewDiagnostics {
+  title: string;
+  url: string | null;
+  readyState: string | null;
+  /** body 的 innerHTML 长度：区分「有 DOM 但没渲染」与「完全空白」 */
+  bodyLen: number | null;
+  /** console 环形缓冲；null = 没注入（initialization_script 未生效） */
+  logs: Array<{ level: string; msg: string }> | null;
+  /** 采集本身失败的原因（webview 崩溃 / execute 抛错） */
+  error: string | null;
+}
+
+/**
+ * 采集当前窗口的 webview 现场。
+ *
+ * 为什么不只报 title：`waitForPinia` 超时的现场至少有三种形态，修法完全不同，
+ * 但以前只能看到一个 `title=""`：
+ *
+ * | URL | body 长度 | 含义 |
+ * |---|---|---|
+ * | `about:blank` / 空 | 0 | session 拿到的是**空白 webview**，不是应用窗口（driver 侧问题） |
+ * | 应用 URL | 0 | 前端 bundle 没渲染（启动崩了，看 console） |
+ * | 应用 URL | >0 | 有 DOM 但 `__pinia__` 没挂上（`main.ts` 挂载顺序问题） |
+ */
+async function collectWebviewDiagnostics(browser: Browser): Promise<WebviewDiagnostics> {
+  const title = await browser.getTitle().catch(() => "<unknown>");
+  const probed = await browser
+    .execute(() => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      const buf = (window as any).__murasakiConsoleBuffer__;
+      return {
+        url: String(location.href ?? ""),
+        readyState: document.readyState,
+        bodyLen: document.body ? document.body.innerHTML.length : 0,
+        logs: buf ? buf.slice(-100).map((l: any) => ({ level: l.level, msg: l.msg })) : null,
+      };
+    })
+    .catch((err) => ({ failed: String(err) }));
+
+  if ("failed" in probed) {
+    return {
+      title,
+      url: null,
+      readyState: null,
+      bodyLen: null,
+      logs: null,
+      error: probed.failed,
+    };
+  }
+  return {
+    title,
+    url: probed.url,
+    readyState: probed.readyState,
+    bodyLen: probed.bodyLen,
+    logs: probed.logs,
+    error: null,
+  };
+}
+
+/** 把现场诊断格式化成多行，并给出**可直接照着查**的形态判读 */
+function formatWebviewDiagnostics(diag: WebviewDiagnostics, handleCount: number): string {
+  if (diag.error !== null) {
+    return (
+      `  当前窗口：title="${diag.title}"，handles=${handleCount}\n` +
+      `  诊断采集失败（execute 抛错，webview 可能已崩溃）：${diag.error}`
+    );
+  }
+
+  const url = diag.url ?? "<unknown>";
+  const lines = [
+    `  当前窗口：title="${diag.title}"，url="${url}"，readyState="${diag.readyState}"，body 长度 ${diag.bodyLen}，handles=${handleCount}`,
+  ];
+
+  // 形态判读：这三条是 #493 的核心 —— 让失败自己说明属于哪一类
+  const isBlankUrl = url === "" || url === "about:blank" || url.startsWith("about:");
+  if (isBlankUrl) {
+    lines.push(
+      "  判读：URL 是空白页 → session 附着到的不是应用窗口（driver 侧 / 窗口选择问题），不是前端启动失败"
+    );
+  } else if (diag.bodyLen === 0) {
+    lines.push("  判读：URL 是应用页但 body 为空 → 前端 bundle 没渲染，重点看下面的 console 报错");
+  } else {
+    lines.push(
+      "  判读：URL 与 DOM 都正常 → 页面渲染了但 __pinia__ 没挂上，重点看 main.ts 的挂载顺序与 console"
+    );
+  }
+
+  if (diag.logs === null) {
+    lines.push("  __murasakiConsoleBuffer__ 未注入（initialization_script 未生效？）");
+  } else if (diag.logs.length === 0) {
+    lines.push("  webview console 缓冲为空（页面脚本未产生任何输出）");
+  } else {
+    lines.push(`  webview console（最近 ${diag.logs.length} 条）：`);
+    for (const log of diag.logs) {
+      lines.push(`    [${log.level}] ${log.msg}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -139,36 +238,13 @@ export async function waitForPiniaInCurrentWindow(
     deadline += slowCallExtension(probeStart);
     await browser.pause(500);
   }
-  // 超时：收集 webview 内的诊断信息（#371）—— console 缓冲由 Rust 侧
-  // initialization_script 在任何页面脚本前注入，能反映 __pinia__ 初始化全程
-  const title = await browser.getTitle().catch(() => "<unknown>");
-  let detail = `title="${title}"`;
-  const diag = await browser
-    .execute(() => {
-      // @ts-ignore: E2E 运行时注入，类型不可静态推导
-      const buf = (window as any).__murasakiConsoleBuffer__;
-      return {
-        readyState: document.readyState,
-        logs: buf ? buf.slice(-100) : null,
-      };
-    })
-    .catch(() => null);
-  if (!diag) {
-    detail += "，诊断信息收集失败（execute 抛错，webview 可能已崩溃）";
-  } else {
-    detail += `，readyState="${diag.readyState}"`;
-    if (diag.logs === null) {
-      detail += "，__murasakiConsoleBuffer__ 未注入（initialization_script 未生效？）";
-    } else if (diag.logs.length > 0) {
-      detail +=
-        `，webview console（最近 ${diag.logs.length} 条）：\n` +
-        diag.logs.map((l: any) => `  [${l.level}] ${l.msg}`).join("\n");
-    } else {
-      detail += "，webview console 缓冲为空（页面脚本未产生任何输出）";
-    }
-  }
+  // 超时：诊断信息（#371 / #493）—— console 缓冲由 Rust 侧 initialization_script
+  // 在任何页面脚本前注入，能反映 __pinia__ 初始化全程
+  const diag = await collectWebviewDiagnostics(browser);
+  const handles = await browser.getWindowHandles().catch(() => []);
   throw new Error(
-    `waitForPiniaInCurrentWindow 超时 (${timeout}ms)：当前句柄未暴露 __pinia__。${detail}`
+    `waitForPiniaInCurrentWindow 超时 (${timeout}ms)：当前句柄未暴露 __pinia__。\n` +
+      formatWebviewDiagnostics(diag, handles.length)
   );
 }
 
