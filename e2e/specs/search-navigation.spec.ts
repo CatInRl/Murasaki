@@ -19,11 +19,23 @@ import {
   dismissAllDialogs,
   resetPersistenceSettings,
 } from "../helpers/store";
-import { isRendered, textOfElement, waitForPresent } from "../helpers/wait";
+import { actUntil, isRendered, textOfElement, waitForPresent } from "../helpers/wait";
 import { resolve } from "node:path";
 
 let browser: Browser;
 let wsPath: string;
+
+/** 读当前 tabs 状态（数量 + 活动标签路径） */
+async function readTabsState(b: Browser): Promise<{ count: number; activePath: string | null }> {
+  return b.execute(() => {
+    // @ts-ignore: E2E 运行时注入，类型不可静态推导
+    const tabs = window.__pinia__._s.get("tabs");
+    return {
+      count: tabs.tabs.length as number,
+      activePath: (tabs.activeTab?.path ?? null) as string | null,
+    };
+  });
+}
 
 describe("跨文件搜索结果跳转", () => {
   beforeAll(async () => {
@@ -139,34 +151,34 @@ describe("跨文件搜索结果跳转", () => {
     await waitForPresent(browser, ".gsb__item", 10000);
 
     // 点击结果项打开文件。openFile 是 async 的 IPC 链（read_text_file + get_file_mtime），
-    // WebKitWebDriver 上每条命令都更慢，固定 sleep 等不到 tab；按 #273 的有界重派发手法：
-    // 点击后短窗轮询 tabs store，未打开则重取句柄再点，共 3 次。
-    const attempts = 3;
-    let tabsState: { count: number; activePath: string | null } | null = null;
-    for (let attempt = 1; attempt <= attempts && !tabsState; attempt++) {
-      const item = await browser.$(".gsb__item");
-      await item.click();
-      const deadline = Date.now() + 3000;
-      while (Date.now() < deadline) {
-        await browser.pause(300);
-        const s = await browser.execute(() => {
-          // @ts-ignore: E2E 运行时注入，类型不可静态推导
-          const tabs = window.__pinia__._s.get("tabs");
-          return {
-            count: tabs.tabs.length as number,
-            activePath: (tabs.activeTab?.path ?? null) as string | null,
-          };
-        });
-        if (s.count >= 1 && (s.activePath ?? "").includes("file-a.md")) {
-          tabsState = s;
-          break;
-        }
+    // WebKitWebDriver 上每条命令都更慢，固定 sleep 等不到 tab；按 #273 的有界重派发手法。
+    //
+    // 用 actUntil 而不是手写循环（#491）：手写版每轮直接
+    // `const item = await browser.$(".gsb__item"); await item.click()`，
+    // 既没在点击前重新等元素，也没吞异常 —— 一旦元素当时不在（慢 runner 上结果还在重渲染），
+    // `.click()` 直接抛 "element wasn't found" 终止用例，"重试 3 次"一次都没生效。
+    await actUntil(
+      browser,
+      async () => {
+        await waitForPresent(browser, ".gsb__item", 5000);
+        const item = await browser.$(".gsb__item");
+        await item.click();
+      },
+      async () => {
+        const s = await readTabsState(browser);
+        return s.count >= 1 && (s.activePath ?? "").includes("file-a.md");
+      },
+      {
+        attempts: 3,
+        perAttemptTimeoutMs: 3000,
+        message: "点击搜索结果后未打开 file-a.md",
       }
-    }
+    );
+
     // 验证 tab 已打开且为内容命中的文件之一（首个内容命中是 file-a）
-    expect(tabsState).not.toBeNull();
-    expect(tabsState!.count).toBeGreaterThanOrEqual(1);
-    expect(tabsState!.activePath).toContain("file-a.md");
+    const tabsState = await readTabsState(browser);
+    expect(tabsState.count).toBeGreaterThanOrEqual(1);
+    expect(tabsState.activePath).toContain("file-a.md");
   });
 
   it("统一搜索条可见性切换", async () => {
