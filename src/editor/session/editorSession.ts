@@ -97,16 +97,24 @@ export async function openEditorSession(
  *
  * 调用方（如新建标签）是同步入口，不值得为它引入 await；
  * 未命名会话没有磁盘基线（基线为空串），脏态由内容比较自然得出。
+ *
+ * **必须传 store**：会话虽然还没有路径，但「另存为」要立刻写盘并取 mtime
+ *（`saveTo` 的第一步就是 `store.writeText`）。早先这里传 `null`，导致未命名 tab
+ * 的另存为必定失败、弹出「另存为失败」—— 因为没有路径，代码里的草稿/读取分支
+ * 都不会用到 store，所以那个 `null` 一路没人发现，直到用户真的去保存新文件。
+ * 没有路径时 `scheduleDraft` / `flushDraft` 都已按 `currentPath === null` 早退，
+ * 因此传入 store 不会产生任何草稿写入。
  */
 export function createUntitledSession(
   id: string,
+  store: DocumentStore,
   initialContent = "",
   hooks: Pick<OpenSessionOptions, "onChange" | "onDraftError"> = {}
 ): EditorSession {
   return createSession({
     id,
     path: null,
-    store: null,
+    store,
     content: initialContent,
     baselineContent: "",
     baselineMtime: null,
@@ -120,7 +128,10 @@ export function createUntitledSession(
 interface CreateSessionParams {
   id: string;
   path: string | null;
-  /** 未命名会话没有磁盘能力，传 null */
+  /**
+   * 磁盘能力。未命名会话也要传真实 store —— 「另存为」要用它写盘并取 mtime。
+   * 允许为 null 只是为了保留「会话完全没有磁盘能力」这一防御性分支（见 `saveTo`）。
+   */
   store: DocumentStore | null;
   content: string;
   baselineContent: string;
@@ -249,7 +260,7 @@ function createSession(params: CreateSessionParams): EditorSession {
       return { kind: "failed", error: new Error("session disposed") };
     }
     if (store === null) {
-      return { kind: "failed", error: new Error("untitled session has no document store") };
+      return { kind: "failed", error: new Error("session has no document store") };
     }
     const previousPath = currentPath;
     try {

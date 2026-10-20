@@ -309,8 +309,13 @@ export const useTabsStore = defineStore("tabs", () => {
     // 未命名会话没有磁盘基线（baseline 为空串），
     // 因此 isDirty = content !== "" = initialContent.length > 0，与原逻辑一致
     const id = genId();
+    // 未命名会话也要带 store：它虽然还没有路径，但「另存为」要立刻写盘并取 mtime。
+    // 传 null 会让新文件的第一次保存必定失败（#494）。
     const { session, revision } = createTrackedSession(id, (onChange) =>
-      createUntitledSession(id, initialContent, { onChange, onDraftError: notifyDraftError })
+      createUntitledSession(id, documentStore, initialContent, {
+        onChange,
+        onDraftError: notifyDraftError,
+      })
     );
     sessions.set(id, session);
     const tab: Tab = materializeLive(

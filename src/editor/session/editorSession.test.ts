@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { openEditorSession } from "./editorSession";
+import { createUntitledSession, openEditorSession } from "./editorSession";
 import type {
   CursorPosition,
   DocumentStore,
@@ -296,6 +296,45 @@ describe("保存", () => {
     const result = await session.save();
 
     expect(result.kind).toBe("failed");
+  });
+
+  // #494：未命名会话（新建标签）必须能另存为 —— 这正是用户「新建文件后保存报错」的路径。
+  // 旧实现的 createUntitledSession 把 store 传成 null，saveTo 第一步就失败了。
+  describe("未命名会话的另存为（#494）", () => {
+    it("另存为会写盘、切到新路径并清掉脏态", async () => {
+      const store = new MemoryStore();
+      const session = createUntitledSession("t1", store, "新文件内容");
+
+      expect(session.snapshot().path).toBeNull();
+      expect(session.snapshot().isDirty).toBe(true);
+
+      const result = await session.saveAs("/workspace/新文件.md");
+
+      expect(result.kind).toBe("saved");
+      expect(store.files.get("/workspace/新文件.md")?.content).toBe("新文件内容");
+      expect(session.snapshot().path).toBe("/workspace/新文件.md");
+      expect(session.snapshot().isDirty).toBe(false);
+    });
+
+    it("另存为后继续编辑会写草稿到新路径", async () => {
+      const store = new MemoryStore();
+      const session = createUntitledSession("t1", store, "内容");
+
+      await session.saveAs("/a.md");
+      session.setContent("内容改过了");
+      await session.flushDraft();
+
+      expect(store.drafts.get("/a.md")?.content).toBe("内容改过了");
+    });
+
+    it("还没有路径时不会写草稿（store 非 null 也不能提前落盘）", async () => {
+      const store = new MemoryStore();
+      const session = createUntitledSession("t1", store, "草稿内容");
+
+      await session.flushDraft();
+
+      expect(store.drafts.size).toBe(0);
+    });
   });
 });
 
