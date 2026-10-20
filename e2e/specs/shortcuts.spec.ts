@@ -120,6 +120,36 @@ async function statusbarHidden(browser: Browser): Promise<boolean> {
   return browser.execute(() => !document.querySelector(".status-bar"));
 }
 
+/**
+ * 把状态栏恢复成「可见」（#488）。
+ *
+ * 为什么要专门做这件事：状态栏可见性是 `App.vue` 里的组件内 `ref`
+ *（`statusBarVisible = ref(true)`），不在任何 store 里、也不持久化，
+ * 切换它的唯一入口是快捷键 `toggle-statusbar`。于是同一文件里两个
+ *「Alt+Shift+S 切换状态栏」用例只要有一次按键丢失（macOS 内嵌 WebDriver 的
+ * 按键注入本就不稳），状态栏就会停在隐藏，**下一个用例**在
+ * `expect(statusbarHidden).toBe(false)` 这一步失败 —— 失败的是受害者，
+ * 元凶是上一条用例没把状态还原。
+ *
+ * 这与 `beforeEach` 里 `__setSidebarView__("files")` 处理的是同一类问题
+ *（sidebarView 也是 App.vue 的组件内 ref）。区别是状态栏没有对应钩子，
+ * 只能通过默认快捷键还原，所以要有界重试：按键本身也可能丢。
+ */
+async function ensureStatusBarVisible(browser: Browser): Promise<void> {
+  if (!(await statusbarHidden(browser))) return;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await pressShortcut(browser, "s", { alt: true, shift: true });
+    await browser.pause(300);
+    if (!(await statusbarHidden(browser))) return;
+  }
+
+  throw new Error(
+    "状态栏未能恢复可见：已按默认绑定 Alt+Shift+S 重试 3 次。" +
+      "若前序用例把 toggle-statusbar 绑定改成了别的键，这里会一直失败 —— 请先重置快捷键覆盖。"
+  );
+}
+
 describe("快捷键", () => {
   beforeAll(async () => {
     browser = await createSession();
@@ -155,6 +185,9 @@ describe("快捷键", () => {
     await ensureSplitMode(browser);
     // 最后清除所有残留对话框/toast（前序 spec 可能遗留 dirty tab 对话框遮挡）
     await dismissAllDialogs(browser);
+    // 状态栏可见性也是「不会被自动重置」的组件内状态：上一条用例若把状态栏
+    // 藏起来（按键丢失时尤其容易），本条用例第一步就会莫名失败（#488）。
+    await ensureStatusBarVisible(browser);
   });
 
   // ============ M4: Ctrl+W 关闭当前 tab ============
