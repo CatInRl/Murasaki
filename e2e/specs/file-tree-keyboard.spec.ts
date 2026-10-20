@@ -22,7 +22,7 @@ import {
   resetPersistenceSettings,
   getTabsState,
 } from "../helpers/store";
-import { waitForPresent, waitForRendered } from "../helpers/wait";
+import { actUntil, waitForPresent, waitForRendered } from "../helpers/wait";
 import { waitForTreeSettled } from "../helpers/tree";
 
 let browser: Browser;
@@ -225,23 +225,30 @@ describe("文件树键盘导航", () => {
   });
 
   it("Enter 打开文件到 tab", async () => {
-    // 把焦点移到第一个文件行
-    const fileIndex = await browser.execute(() =>
-      Array.from(document.querySelectorAll('[role="treeitem"]')).findIndex(
-        (el) => !el.querySelector(".node-arrow")
-      )
+    // 有界重派发（actUntil）：focus() 作用在树上，而树可能在这一刻被刷新重建 ——
+    // 节点脱离文档后焦点会退回 body，后续 Enter 就没有接收者，
+    // 表现是「按了 Enter 但没开 tab」，等满 10s 才失败（本地实测 retry 才通过）。
+    await actUntil(
+      browser,
+      async () => {
+        await waitForTreeSettled(browser);
+        // 每轮重新定位目标行：行索引在重建后可能变化
+        const fileIndex = await browser.execute(() =>
+          Array.from(document.querySelectorAll('[role="treeitem"]')).findIndex(
+            (el) => !el.querySelector(".node-arrow")
+          )
+        );
+        expect(fileIndex).toBeGreaterThanOrEqual(0);
+        await browser.execute((i: number) => {
+          const el = document.querySelectorAll('[role="treeitem"]')[i] as HTMLElement;
+          el.focus();
+        }, fileIndex);
+        await browser.pause(200);
+        await pressTreeKey(browser, "Enter");
+      },
+      async () => (await getTabsState(browser)).tabs.length > 0,
+      { message: "在文件树上按 Enter 后未打开任何 tab" }
     );
-    expect(fileIndex).toBeGreaterThanOrEqual(0);
-    await browser.execute((i: number) => {
-      const el = document.querySelectorAll('[role="treeitem"]')[i] as HTMLElement;
-      el.focus();
-    }, fileIndex);
-    await browser.pause(200);
-
-    await pressTreeKey(browser, "Enter");
-    await browser.waitUntil(async () => (await getTabsState(browser)).tabs.length > 0, {
-      timeout: 10000,
-    });
   });
 
   it("Shift+F10 在焦点行弹出右键菜单", async () => {

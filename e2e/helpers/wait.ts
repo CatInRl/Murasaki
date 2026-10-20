@@ -403,3 +403,46 @@ export async function waitForInBrowser<T = unknown>(
       `${errorNote}（最后一次结果：${JSON.stringify(last)}）`
   );
 }
+
+/**
+ * 有界重派发：反复执行一个「作用在 DOM 上的动作」，直到它产生预期结果。
+ *
+ * 为什么需要：有些动作用在**随时会被重建的节点**上 —— 文件树在工作区刚打开、
+ * 文件监听触发刷新、树把目标滚入视区时都会整体重渲染。此时「取句柄 → 点击」
+ * 里的句柄可能已脱离文档：点击落到已移除的节点上不会有任何反应，
+ * `focus()` 同理（焦点丢回 body，后续按键就没人接）。表现是「点了/按了，但什么
+ * 都没发生」，等满超时才失败 —— 看起来像随机失败，其实是动作没送达。
+ *
+ * 这与 `context-menu.spec.ts`（#273）和 `file-tree-keyboard.spec.ts` 的 Shift+F10
+ * （#310）用的是同一个手法，只是抽成通用 helper，避免每处各写一遍循环。
+ *
+ * **有界**：默认 3 次 × 每次 4s 预算。不要无限重试 —— 真坏了应该快速失败，
+ * 而不是把 CI 拖成超时。
+ */
+export async function actUntil(
+  browser: Browser,
+  action: () => Promise<void>,
+  predicate: () => Promise<boolean>,
+  options: {
+    attempts?: number;
+    perAttemptTimeoutMs?: number;
+    message?: string;
+  } = {}
+): Promise<void> {
+  const { attempts = 3, perAttemptTimeoutMs = 4000, message = "动作未产生预期结果" } = options;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      await action();
+    } catch {
+      // 动作本身失败（句柄失效等）不直接判死：下一轮会重新取句柄再试
+    }
+    const deadline = Date.now() + perAttemptTimeoutMs;
+    while (Date.now() < deadline) {
+      if (await predicate()) return;
+      await browser.pause(150);
+    }
+  }
+
+  throw new Error(`actUntil: ${message}（已重试 ${attempts} 次，每次 ${perAttemptTimeoutMs}ms）`);
+}
