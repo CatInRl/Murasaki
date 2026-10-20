@@ -11,6 +11,7 @@ import type { Browser } from "webdriverio";
 import { createSession, closeSession } from "../helpers/driver";
 import { resetWorkspace, defaultFixtureFiles } from "../helpers/fixtures";
 import {
+  callStoreAction,
   openWorkspace,
   closeWorkspace,
   closeAllTabs,
@@ -21,6 +22,8 @@ import {
   dismissAllDialogs,
 } from "../helpers/store";
 import { isRendered, readText, waitForPresent, waitForAbsent } from "../helpers/wait";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 let browser: Browser;
 
@@ -288,5 +291,40 @@ describe("多 Tab 管理", () => {
       return tabs.activeTab?.isDirty;
     });
     expect(isDirty).toBe(false);
+  });
+
+  // #494：未命名标签（新建文件）另存为必须真正写盘。
+  // 旧实现里未命名会话的 store 是 null，saveTo 第一步就返回失败 ——
+  // 用户看到的是「另存为失败」的弹窗，文件根本没落盘。
+  it("未命名标签另存为会真正写盘（#494）", async () => {
+    const wsPath = resetWorkspace(defaultFixtureFiles());
+    await openWorkspace(browser, wsPath);
+    await closeAllTabs(browser);
+
+    // 新建一个未命名标签并写入内容
+    const tabId = await browser.execute(() => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      const tabs = window.__pinia__._s.get("tabs");
+      const tab = tabs.newTab("另存为的内容");
+      return tab.id as string;
+    });
+
+    const target = resolve(wsPath, "saved-as.md");
+    // callStoreAction 在动作抛错时会直接 throw，因此能走到下一行就说明保存成功
+    await callStoreAction(browser, "tabs", "saveTabAs", tabId, target);
+
+    // 磁盘上确实有这个文件，且内容就是标签里的内容
+    expect(existsSync(target)).toBe(true);
+    expect(readFileSync(target, "utf-8")).toBe("另存为的内容");
+
+    // 标签的路径已回填、不再是未命名
+    const after = await browser.execute((id: string) => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      const tabs = window.__pinia__._s.get("tabs");
+      const tab = tabs.tabs.find((t: any) => t.id === id);
+      return tab ? { path: tab.path, isDirty: tab.isDirty } : null;
+    }, tabId);
+    expect(after?.path).toBe(target.replace(/\\/g, "\\"));
+    expect(after?.isDirty).toBe(false);
   });
 });

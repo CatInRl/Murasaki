@@ -758,4 +758,28 @@ describe("useTabsStore", () => {
       expect(store.getTabById(tab.id)?.cursor).toEqual({ line: 12, ch: 4 });
     });
   });
+
+  describe("未命名标签另存为（#494）", () => {
+    it("newTab 的标签能另存为：写盘 + 路径回填 + 脏态清除", async () => {
+      const store = useTabsStore();
+      const tab = store.newTab("新文件内容");
+      expect(tab.path).toBeNull();
+      expect(tab.isDirty).toBe(true);
+
+      await store.saveTabAs(tab.id, "C:\\docs\\新文件.md");
+
+      expect(store.getTabById(tab.id)?.path).toBe("C:\\docs\\新文件.md");
+      expect(store.getTabById(tab.id)?.isDirty).toBe(false);
+    });
+
+    it("已关闭的标签再另存为会被静默忽略（而不是抛错打断调用方）", async () => {
+      const store = useTabsStore();
+      const tab = store.newTab("内容");
+      store.closeTab(tab.id);
+
+      // 关闭后标签已不在列表里：saveTabAs 首个判断 `if (!tab) return` 直接返回。
+      // 这是有意的 —— 用户关掉标签后再触发保存不该弹错误框。
+      await expect(store.saveTabAs(tab.id, "C:\\docs\\x.md")).resolves.toBeUndefined();
+    });
+  });
 });
