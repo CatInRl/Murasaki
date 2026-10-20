@@ -80,8 +80,9 @@ describe("编辑器工具栏", () => {
     await browser.pause(200);
 
     // 点击 Bold 按钮
-    const boldBtn = await browser.$('.tb-btn[title="加粗"]');
+    // 先等出现、再取句柄：$() 对不存在的元素不抛错，先取会让等待白做（#320）
     await waitForPresent(browser, '.tb-btn[title="加粗"]', 5000);
+    const boldBtn = await browser.$('.tb-btn[title="加粗"]');
     await boldBtn.click();
     await browser.pause(300);
 
@@ -111,8 +112,8 @@ describe("编辑器工具栏", () => {
     });
     await browser.pause(200);
 
-    const italicBtn = await browser.$('.tb-btn[title="斜体"]');
     await waitForPresent(browser, '.tb-btn[title="斜体"]', 5000);
+    const italicBtn = await browser.$('.tb-btn[title="斜体"]');
     await italicBtn.click();
     await browser.pause(300);
 
@@ -144,8 +145,8 @@ describe("编辑器工具栏", () => {
     await browser.pause(200);
 
     // 点击 H1 按钮
-    const h1Btn = await browser.$('.tb-btn[title="标题 1"]');
     await waitForPresent(browser, '.tb-btn[title="标题 1"]', 5000);
+    const h1Btn = await browser.$('.tb-btn[title="标题 1"]');
     await h1Btn.click();
     await browser.pause(300);
 
@@ -174,8 +175,8 @@ describe("编辑器工具栏", () => {
     });
     await browser.pause(200);
 
-    const listBtn = await browser.$('.tb-btn[title="无序列表"]');
     await waitForPresent(browser, '.tb-btn[title="无序列表"]', 5000);
+    const listBtn = await browser.$('.tb-btn[title="无序列表"]');
     await listBtn.click();
     await browser.pause(300);
 
