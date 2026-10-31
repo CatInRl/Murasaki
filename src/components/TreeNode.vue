@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from "vue";
+import { ref, computed, watch, onBeforeUnmount, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   Pencil,
@@ -110,6 +110,50 @@ const renameValue = ref("");
 const creating = ref(false);
 const creatingType = ref<"file" | "directory">("file");
 const creatingName = ref("");
+
+/**
+ * 提交中标记，用于吃掉「同一动作被触发两次」（#503）。
+ *
+ * 输入框上同时绑了 `@keyup.enter` 和 `@blur`：按回车先触发一次提交，紧接着
+ * 提交成功把输入框卸载，`blur` 又触发第二次。第二次会拿同一个新名字再跑一遍
+ * `renamePath` —— 此时目标名已经存在（就是我们刚改出来的），于是又弹一次
+ * 「覆盖」对话框；再确认覆盖就会删掉刚生成的文件，最终报错。
+ */
+let submitting = false;
+
+/** 新建输入框的 ref：聚焦由代码显式完成，不依赖 `autofocus`（#504） */
+const createInputRef = ref<{ focus: () => void } | null>(null);
+
+/**
+ * 聚焦新建输入框（#504）。
+ *
+ * 为什么不能只靠 `autofocus`：新建行是在目录展开区里**新插入**的节点，而触发它的
+ * 是右键菜单（Teleport 浮层）—— 菜单关闭时会把焦点还给触发元素，正好盖掉刚生效的
+ * `autofocus`；若此刻目录还没展开、或正处在展开过渡中，元素不可聚焦，`autofocus`
+ * 会静默失败且不再重试。
+ *
+ * 所以这里在若干帧内反复尝试，直到焦点确实落在输入框上（有界，不会一直抢焦点）。
+ */
+async function focusCreateInput(): Promise<void> {
+  for (let i = 0; i < 6; i++) {
+    await nextTick();
+    createInputRef.value?.focus();
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement) return;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
+}
+
+/** 打开「新建」输入框：先确保目录展开（否则行根本没渲染），再聚焦 */
+function startCreating(type: "file" | "directory"): void {
+  if (props.node.type === "directory") {
+    fileTreeNav.setExpanded(props.node.path, true);
+  }
+  creatingType.value = type;
+  creatingName.value = "";
+  creating.value = true;
+  void focusCreateInput();
+}
 
 function toggle(): void {
   if (props.node.type === "directory") {
@@ -306,20 +350,12 @@ function buildMenuItems(): MenuItem[] {
     items.push({
       label: t("common.newFile"),
       icon: FilePlus,
-      action: () => {
-        creatingType.value = "file";
-        creatingName.value = "";
-        creating.value = true;
-      },
+      action: () => startCreating("file"),
     });
     items.push({
       label: t("common.newFolder"),
       icon: FolderPlus,
-      action: () => {
-        creatingType.value = "directory";
-        creatingName.value = "";
-        creating.value = true;
-      },
+      action: () => startCreating("directory"),
     });
   }
 
@@ -434,11 +470,13 @@ function buildMenuItems(): MenuItem[] {
 
 // ===== 提交重命名 =====
 async function submitRename(): Promise<void> {
+  if (submitting) return;
   const newName = renameValue.value.trim();
   if (!newName || newName === props.node.name) {
     renaming.value = false;
     return;
   }
+  submitting = true;
   try {
     await fileOps.renamePath(props.node.path, newName);
   } catch (err) {
@@ -447,6 +485,7 @@ async function submitRename(): Promise<void> {
       variant: "error",
     });
   } finally {
+    submitting = false;
     renaming.value = false;
   }
 }
@@ -458,11 +497,13 @@ function cancelRename(): void {
 
 // ===== 提交新建 =====
 async function submitCreating(): Promise<void> {
+  if (submitting) return;
   const name = creatingName.value.trim();
   if (!name) {
     creating.value = false;
     return;
   }
+  submitting = true;
   try {
     if (creatingType.value === "file") {
       await fileOps.createFile(props.node.path, name);
@@ -479,6 +520,7 @@ async function submitCreating(): Promise<void> {
       variant: "error",
     });
   } finally {
+    submitting = false;
     creating.value = false;
     creatingName.value = "";
   }
@@ -704,6 +746,7 @@ function cancelCreating(): void {
         <polyline points="14 2 14 8 20 8" />
       </svg>
       <NInput
+        ref="createInputRef"
         v-model:value="creatingName"
         size="tiny"
         autofocus

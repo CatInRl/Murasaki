@@ -27,6 +27,7 @@ import {
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { languageForFile } from "../editor/language";
+import { linkClickExtension, noCtrlClickAddsSelection } from "../editor/linkClick";
 import { isMarkdownFile } from "../utils/fileKind";
 import { basename } from "../utils/path";
 import {
@@ -383,6 +384,16 @@ function buildSearchPhrases(): Record<string, string> {
   };
 }
 
+/** 用系统浏览器打开外部链接（#505）；失败时退回 window.open */
+async function openExternalUrl(url: string): Promise<void> {
+  try {
+    const { open } = await import("@tauri-apps/plugin-shell");
+    await open(url);
+  } catch {
+    window.open(url, "_blank");
+  }
+}
+
 function buildExtensions() {
   return [
     history(),
@@ -425,6 +436,18 @@ function buildExtensions() {
       isMarkdown: () => (props.currentFilePath ? isMarkdownFile(props.currentFilePath) : true), // 未命名新文件默认按 markdown 处理（与 App.vue 约定一致）
     }),
     foldGutter({ openText: "▾", closedText: "▸" }),
+    // 链接跳转（#505）：Ctrl/Cmd+点击源码里的 [text](url) 打开；
+    // 同时关掉 CM 默认的「Ctrl+点击加选区」，否则会变成多光标而不是跳转
+    noCtrlClickAddsSelection,
+    linkClickExtension({
+      openExternal: (url) => {
+        void openExternalUrl(url);
+      },
+      openInternal: (path) => {
+        // 与应用内其它入口一致：交给父组件决定怎么打开（相对 .md 在新标签打开）
+        emit("open-internal", path);
+      },
+    }),
     murasakiTheme,
     syntaxHighlighting(murasakiHighlightStyle),
     EditorView.updateListener.of((update) => {
