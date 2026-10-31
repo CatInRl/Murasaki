@@ -759,6 +759,75 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     expect(readFileSync(notesPath, "utf-8")).toBe(introContent);
   });
 
+  // ===== 临时探针 =====
+  it("根目录新建文件：输入框自动获得焦点（#504）", async () => {
+    // 在文件树空白区域右键
+    await browser.execute(() => {
+      const tree = document.querySelector(".file-tree") as HTMLElement | null;
+      if (!tree) throw new Error("找不到 .file-tree");
+      tree.dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, clientX: 50, clientY: 400 })
+      );
+    });
+    await waitForPresent(browser, ".murasaki-context-menu", 3000);
+    await clickContextMenuItem(browser, "新建文件");
+    await waitForPresent(browser, ".root-creating-row input", 5000);
+    const focused = await browser.execute(() => {
+      const el = document.activeElement as HTMLElement | null;
+      return { tag: el?.tagName ?? null, inRoot: Boolean(el?.closest(".root-creating-row")) };
+    });
+    await browser.execute(() => {
+      const input = document.querySelector(".root-creating-row input") as HTMLInputElement | null;
+      input?.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", bubbles: true }));
+    });
+    expect(focused.inRoot).toBe(true);
+  });
+
+  it("重命名覆盖：目标文件已打开时也能正确替换", async () => {
+    const introPath = resolve(wsPath, "intro.md");
+    const notesPath = resolve(wsPath, "notes.md");
+    // 先把目标文件 notes.md 打开成标签
+    await callStoreAction(browser, "tabs", "openFile", notesPath.replace(/\\/g, "/"));
+    await browser.pause(300);
+
+    await browser.execute(() => {
+      const pinia = window.__pinia__;
+      const fileOps = pinia._s.get("fileOps");
+      const dialog = pinia._s.get("dialog");
+      fileOps.setConflictResolver(
+        async (targetPath: string, operation: string, sourcePath?: string) =>
+          dialog.conflict({
+            filename: targetPath.split(/[\\/]/).pop() ?? "",
+            sourcePath,
+            operation: operation as any,
+          })
+      );
+    });
+
+    await openTreeNodeContextMenu(browser, "intro.md");
+    await clickContextMenuItem(browser, "重命名");
+    await waitForPresent(browser, ".rename-row input", 5000);
+    await browser.execute((name: string) => {
+      const input = document.querySelector(".rename-row input") as HTMLInputElement | null;
+      if (!input) throw new Error("no input");
+      input.value = name;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+    }, "notes.md");
+    await waitForPresent(browser, ".dialog-overlay", 5000);
+    const danger = await browser.$(".dialog-footer .dialog-btn.danger");
+    await danger.click();
+    await browser.pause(1500);
+    // 对话框应保持关闭，且文件确实被替换（目标原本正被标签打开）
+    const dialogs = await browser.execute(
+      () => document.querySelectorAll(".dialog-overlay").length
+    );
+    expect(dialogs).toBe(0);
+    expect({ introExists: existsSync(introPath), notesExists: existsSync(notesPath) }).toEqual({
+      introExists: false,
+      notesExists: true,
+    });
+  });
   // ===== 清理：移除冲突 resolver，避免污染后续 spec =====
   afterAll(async () => {
     if (browser) {
