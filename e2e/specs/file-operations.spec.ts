@@ -680,6 +680,154 @@ describe("文件树右键菜单 + 文件操作安全", () => {
     expect(existsSync(resolve(wsPath, "two"))).toBe(true);
   });
 
+  // ===== 内联输入框：走真实 UI 路径（#503 / #504）=====
+
+  /**
+   * 点右键菜单里的某一项（按文案匹配）。
+   * 调用前菜单必须已经出现（`openTreeNodeContextMenu` 内部已 waitForPresent）。
+   */
+  async function clickContextMenuItem(b: Browser, label: string): Promise<void> {
+    const items = await b.$$(".murasaki-context-menu-item");
+    for (const item of items) {
+      const text = (await textOfElement(b, await item.$(".murasaki-context-menu-label"))).trim();
+      if (text === label) {
+        await item.click();
+        return;
+      }
+    }
+    throw new Error(`右键菜单里没有「${label}」`);
+  }
+
+  it("新建文件：输入框出现后自动获得焦点（#504）", async () => {
+    await openTreeNodeContextMenu(browser, "sub");
+    await clickContextMenuItem(browser, "新建文件");
+    await waitForPresent(browser, ".creating-row input", 5000);
+
+    // 右键菜单关闭时会抢焦点，focusCreateInput() 在若干帧内重试；
+    // 这里用轮询等它落定，而不是 sleep 一个固定值
+    const focused = await waitForInBrowser(
+      browser,
+      () => {
+        const el = document.activeElement as HTMLElement | null;
+        return Boolean(el && el.tagName === "INPUT" && el.closest(".creating-row"));
+      },
+      [],
+      { timeout: 3000, message: "新建文件输入框获得焦点" }
+    )
+      .then(() => true)
+      .catch(() => false);
+
+    // 收尾：Esc 取消，避免残留输入框影响后续用例
+    await browser.execute(() => {
+      const input = document.querySelector(".creating-row input") as HTMLInputElement | null;
+      input?.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", bubbles: true }));
+    });
+
+    expect(focused).toBe(true);
+  });
+
+  it("重命名到已存在文件：走 UI 选择覆盖后成功，且不会再弹第二次对话框（#503）", async () => {
+    const introPath = resolve(wsPath, "intro.md");
+    const notesPath = resolve(wsPath, "notes.md");
+    const introContent = readFileSync(introPath, "utf-8");
+
+    await openTreeNodeContextMenu(browser, "intro.md");
+    await clickContextMenuItem(browser, "重命名");
+    await waitForPresent(browser, ".rename-row input", 5000);
+
+    // 在输入框里输入新名字并回车。回车会触发 submitRename，随后输入框卸载又触发
+    // 一次 blur → 第二次 submitRename（这正是 #503 的成因）
+    await browser.execute((name: string) => {
+      const input = document.querySelector(".rename-row input") as HTMLInputElement | null;
+      if (!input) throw new Error("找不到重命名输入框");
+      input.value = name;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+    }, "notes.md");
+
+    // 冲突对话框 → 选「覆盖」
+    await waitForPresent(browser, ".dialog-overlay", 5000);
+    const overwriteBtn = await browser.$(".dialog-footer .dialog-btn.danger");
+    await overwriteBtn.click();
+
+    // 关键断言：覆盖之后对话框必须**关掉并保持关闭** —— 重复提交会让冲突对话框
+    // 再弹一次（此时目标就是刚改出来的文件），随后删掉它并报「文件已存在」
+    await waitForAbsent(browser, ".dialog-overlay", 5000);
+
+    // 重命名成功：notes.md 内容即原 intro.md，intro.md 已不存在
+    expect(existsSync(introPath)).toBe(false);
+    expect(readFileSync(notesPath, "utf-8")).toBe(introContent);
+  });
+
+  // ===== 临时探针 =====
+  it("根目录新建文件：输入框自动获得焦点（#504）", async () => {
+    // 在文件树空白区域右键
+    await browser.execute(() => {
+      const tree = document.querySelector(".file-tree") as HTMLElement | null;
+      if (!tree) throw new Error("找不到 .file-tree");
+      tree.dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, clientX: 50, clientY: 400 })
+      );
+    });
+    await waitForPresent(browser, ".murasaki-context-menu", 3000);
+    await clickContextMenuItem(browser, "新建文件");
+    await waitForPresent(browser, ".root-creating-row input", 5000);
+    const focused = await browser.execute(() => {
+      const el = document.activeElement as HTMLElement | null;
+      return { tag: el?.tagName ?? null, inRoot: Boolean(el?.closest(".root-creating-row")) };
+    });
+    await browser.execute(() => {
+      const input = document.querySelector(".root-creating-row input") as HTMLInputElement | null;
+      input?.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", bubbles: true }));
+    });
+    expect(focused.inRoot).toBe(true);
+  });
+
+  it("重命名覆盖：目标文件已打开时也能正确替换", async () => {
+    const introPath = resolve(wsPath, "intro.md");
+    const notesPath = resolve(wsPath, "notes.md");
+    // 先把目标文件 notes.md 打开成标签
+    await callStoreAction(browser, "tabs", "openFile", notesPath.replace(/\\/g, "/"));
+    await browser.pause(300);
+
+    await browser.execute(() => {
+      const pinia = window.__pinia__;
+      const fileOps = pinia._s.get("fileOps");
+      const dialog = pinia._s.get("dialog");
+      fileOps.setConflictResolver(
+        async (targetPath: string, operation: string, sourcePath?: string) =>
+          dialog.conflict({
+            filename: targetPath.split(/[\\/]/).pop() ?? "",
+            sourcePath,
+            operation: operation as any,
+          })
+      );
+    });
+
+    await openTreeNodeContextMenu(browser, "intro.md");
+    await clickContextMenuItem(browser, "重命名");
+    await waitForPresent(browser, ".rename-row input", 5000);
+    await browser.execute((name: string) => {
+      const input = document.querySelector(".rename-row input") as HTMLInputElement | null;
+      if (!input) throw new Error("no input");
+      input.value = name;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+    }, "notes.md");
+    await waitForPresent(browser, ".dialog-overlay", 5000);
+    const danger = await browser.$(".dialog-footer .dialog-btn.danger");
+    await danger.click();
+    await browser.pause(1500);
+    // 对话框应保持关闭，且文件确实被替换（目标原本正被标签打开）
+    const dialogs = await browser.execute(
+      () => document.querySelectorAll(".dialog-overlay").length
+    );
+    expect(dialogs).toBe(0);
+    expect({ introExists: existsSync(introPath), notesExists: existsSync(notesPath) }).toEqual({
+      introExists: false,
+      notesExists: true,
+    });
+  });
   // ===== 清理：移除冲突 resolver，避免污染后续 spec =====
   afterAll(async () => {
     if (browser) {
