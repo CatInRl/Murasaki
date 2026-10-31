@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RotateCw, FolderOpen, FilePlus, FolderPlus, Clipboard } from "lucide-vue-next";
 import { NScrollbar, NButton, NInput } from "naive-ui";
@@ -107,6 +107,33 @@ function onTreeKeydown(e: KeyboardEvent): void {
 // ===== 空白区域右键菜单（在工作区根目录新建/粘贴/在资源管理器中打开） =====
 const rootCreatingName = ref("");
 
+/** 根目录新建输入框的 ref：聚焦由代码显式完成，不依赖 autofocus（#504） */
+const rootCreateInputRef = ref<{ focus: () => void } | null>(null);
+
+/**
+ * 聚焦根目录新建输入框（#504）。
+ *
+ * 只靠 `autofocus` 不够：触发它的是右键菜单（Teleport 浮层），菜单关闭时会把焦点
+ * 还给触发元素，正好盖掉刚生效的 autofocus。所以在若干帧内反复尝试，直到焦点确实
+ * 落在输入框上（有界，不会一直抢焦点）。
+ */
+async function focusRootCreateInput(): Promise<void> {
+  for (let i = 0; i < 6; i++) {
+    await nextTick();
+    rootCreateInputRef.value?.focus();
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement) return;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
+}
+
+/** 打开根目录新建输入框并聚焦 */
+function startRootCreating(type: "file" | "directory"): void {
+  fileOps.beginRootCreate(type);
+  rootCreatingName.value = "";
+  void focusRootCreateInput();
+}
+
 function onEmptyContextMenu(e: MouseEvent): void {
   const root = workspace.workspacePath;
   if (!root) return;
@@ -114,18 +141,12 @@ function onEmptyContextMenu(e: MouseEvent): void {
     {
       label: t("common.newFile"),
       icon: FilePlus,
-      action: () => {
-        fileOps.beginRootCreate("file");
-        rootCreatingName.value = "";
-      },
+      action: () => startRootCreating("file"),
     },
     {
       label: t("common.newFolder"),
       icon: FolderPlus,
-      action: () => {
-        fileOps.beginRootCreate("directory");
-        rootCreatingName.value = "";
-      },
+      action: () => startRootCreating("directory"),
     },
     { separator: true },
     {
@@ -279,6 +300,7 @@ function retryLoad(): void {
             <polyline points="14 2 14 8 20 8" />
           </svg>
           <NInput
+            ref="rootCreateInputRef"
             v-model:value="rootCreatingName"
             size="tiny"
             autofocus
@@ -300,7 +322,7 @@ function retryLoad(): void {
           :description="$t('editor.fileTree.emptyFolderDesc')"
           :action-text="$t('common.newFile')"
           :action-icon="FilePlus"
-          @action="fileOps.beginRootCreate('file')"
+          @action="startRootCreating('file')"
           :secondary-action-text="$t('editor.fileTree.openFolder')"
           @secondary-action="onOpenWorkspace"
         />
