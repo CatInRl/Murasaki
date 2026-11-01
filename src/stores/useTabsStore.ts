@@ -805,29 +805,39 @@ export const useTabsStore = defineStore("tabs", () => {
     }, 0);
   }
 
-  /** 退出前把全部脏会话的草稿强制落盘（useExitFlush 调它） */
+  /**
+   * 退出前把全部脏会话的草稿强制落盘（useExitFlush 调它）
+   *
+   * **并行**（#520）：useExitFlush 把整段落盘包在 3 秒超时里，逐个 await 会让耗时
+   * 随标签数线性增长 —— 开十几个脏标签就可能撞满 3 秒，超时后窗口照样销毁，而草稿
+   * 没写/没清完。并行后总耗时约等于最慢的那一个。
+   */
   async function flushAllDrafts(): Promise<number> {
+    const dirty = tabs.value
+      .map((tab) => sessions.get(tab.id))
+      .filter((s): s is EditorSession => Boolean(s) && s!.snapshot().isDirty);
+    const results = await Promise.allSettled(dirty.map((session) => session.flushDraft()));
     let failed = 0;
-    for (const tab of tabs.value) {
-      const session = sessions.get(tab.id);
-      if (!session || !session.snapshot().isDirty) continue;
-      try {
-        await session.flushDraft();
-      } catch (err) {
+    for (const r of results) {
+      if (r.status === "rejected") {
         failed++;
-        console.error("[Murasaki] 退出前保存草稿失败:", err);
+        console.error("[Murasaki] 退出前保存草稿失败:", r.reason);
       }
     }
     return failed;
   }
 
-  /** 退出前「不保存」：清掉全部会话的草稿（useExitFlush 调它） */
+  /**
+   * 退出前「不保存」：清掉全部会话的草稿（useExitFlush 调它）
+   *
+   * 同样并行（#520）：这条路径决定「下次启动会不会把内容复活」，
+   * 被超时截断的后果比写草稿失败更严重。
+   */
   async function discardAllDrafts(): Promise<void> {
-    for (const tab of tabs.value) {
-      const session = sessions.get(tab.id);
-      if (!session || !session.snapshot().isDirty) continue;
-      await session.dispose({ draft: "discard" }).catch(() => {});
-    }
+    const dirty = tabs.value
+      .map((tab) => sessions.get(tab.id))
+      .filter((s): s is EditorSession => Boolean(s) && s!.snapshot().isDirty);
+    await Promise.allSettled(dirty.map((session) => session.dispose({ draft: "discard" })));
   }
 
   /**

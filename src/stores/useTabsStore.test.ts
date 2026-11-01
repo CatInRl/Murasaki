@@ -782,4 +782,36 @@ describe("useTabsStore", () => {
       await expect(store.saveTabAs(tab.id, "C:\\docs\\x.md")).resolves.toBeUndefined();
     });
   });
+
+  describe("退出前草稿清理是并行的（#520）", () => {
+    it("三个脏标签的草稿删除会同时发起", async () => {
+      // barrier：只有三个删除都**已经开始**才放行。串行实现（逐个 await）永远
+      // 等不到第三个，测试会在超时处失败 —— 这条用例专门锁住「并行」这个性质，
+      // 因为串行 + 3 秒总超时会让草稿清不完、下次启动内容复活。
+      let started = 0;
+      let release!: () => void;
+      const allStarted = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const fs = (await import("../services/fileSystem")).fileSystem as unknown as {
+        deleteDraft: (path: string) => Promise<void>;
+      };
+      fs.deleteDraft = vi.fn(async () => {
+        started++;
+        if (started === 3) release();
+        await allStarted;
+      });
+
+      const store = useTabsStore();
+      const a = await store.openFile("C:\\docs\\a.md");
+      const b = await store.openFile("C:\\docs\\b.md");
+      const d = await store.openFile("C:\\docs\\c.md");
+      store.getEditorBinding(a.id)!.setContent("改过的 a");
+      store.getEditorBinding(b.id)!.setContent("改过的 b");
+      store.getEditorBinding(d.id)!.setContent("改过的 c");
+
+      await expect(store.discardAllDrafts()).resolves.toBeUndefined();
+      expect(started).toBe(3);
+    });
+  });
 });
