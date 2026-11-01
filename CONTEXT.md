@@ -21,13 +21,14 @@ murasaki/
 ├── recent.json                # 最近打开记录（{ files: [], folders: [] }）
 ├── tabs.json                  # 打开的 tab 列表
 │                              # 字段：{ path, lastMtime, cursor: {line, ch}, scroll: {x, y}, active }
-└── drafts/                    # 未保存草稿目录
+└── drafts/                    # 崩溃兜底草稿目录
     └── <sha1-of-path>         # 每 tab 一份草稿，无后缀
 ```
 
 - `settings.json` / `recent.json` / `tabs.json` 通过 Tauri `tauri-plugin-store` 读写。
 - 草稿通过 `fs` plugin 直接操作文件，内容为 markdown 文本。
 - 路径用 SHA-1 哈希作为草稿文件名，避免路径中非法字符问题。
+- **草稿（draft）**：编辑期间周期写入的恢复快照，**只用于崩溃 / 强杀后的恢复**。正常关闭（三种入口）不依赖草稿，并会清理该 tab 的残留草稿 —— 详见 [关闭确认](#关闭确认-close-confirmation)。
 
 ### 退出落盘 (Flush on Exit)
 
@@ -38,12 +39,24 @@ murasaki/
   - 选「保存」逐个写回（已命名写盘、未命名另存为），任一取消或失败即**中止退出**；
   - 选「取消」中止退出：窗口不关、也不落盘，且下次仍能触发；
   - 无 dirty tab 则不打搅，直接走下一步。
-- 随后：所有脏且已命名的 tab 落盘草稿 → 持久化 settings 与本窗口的 tabs，最后调用 `close_window` 销毁本窗口。关掉最后一个窗口时由 Rust 侧 `exit_if_no_other_windows` 退出应用。
+- 随后：持久化 settings 与本窗口的 tabs，最后调用 `close_window` 销毁本窗口。关掉最后一个窗口时由 Rust 侧 `exit_if_no_other_windows` 退出应用。
 - 菜单「退出」走 `quit_app`：通知所有窗口各自处理（因此多窗口下每个窗口各自弹自己的确认），最后一个关完才退出。
 - 落盘有 3 秒超时兜底（`Promise.race`），超时也强制关闭，避免关不掉窗口。
-- 未命名 tab（`path === null`）没有磁盘位置、不写草稿；但**正文随 `tabs.json` 保留，下次启动会恢复**（`useTabsStore.restore()` 用 `persisted.content` 重建）。
+- 未命名 tab（`path === null`）没有磁盘位置、不写草稿；其正文随 `tabs.json` 保留（`useTabsStore.restore()` 用 `persisted.content` 重建），因此**崩溃兜底精度 = 最后一次 `tabs.json` 落盘**。
 
-详见 [ADR-0017](docs/adr/0017-close-interception-with-draft-flush-on-exit.md)、[ADR-0018](docs/adr/0018-multi-window-multi-workspace.md)。
+详见 [ADR-0017](docs/adr/0017-close-interception-with-draft-flush-on-exit.md)、[ADR-0018](docs/adr/0018-multi-window-multi-workspace.md)、[ADR-0023](docs/adr/0023-drafts-are-crash-recovery-only.md)。
+
+### 关闭确认 (Close Confirmation)
+
+三种关闭入口共用同一套语义 —— **关闭单个标签**、**批量关闭标签**、**关窗 / 退出**：
+
+- **未保存修改（dirty）**：内存内容 ≠ 上次磁盘基线。只有存在 dirty 标签时才打扰用户，否则静默关闭。
+- 有 dirty 时弹**一次汇总确认**（「保存全部并关闭」/「不保存关闭」/「取消」），附文件名清单；不做逐项勾选。
+- **保存**：逐个真写盘（已命名直接保存、未命名走另存为）；任一取消或失败即**中止关闭**，不做部分关闭。
+- **不保存 = 真丢弃**：不写文件、不留草稿，并清除该 tab 已有的草稿；未命名标签的正文一并清空。
+- **取消**：中止关闭，标签 / 窗口保持原样，下次仍可触发。
+
+**关闭工作区 ≠ 关闭标签**：关闭或切换工作区只清工作区状态，已打开的标签仍保留、仍可编辑，因此不触发关闭确认。
 
 ## 多窗口 (Multi-Window)
 
@@ -64,7 +77,7 @@ murasaki/
 
 ### 关闭语义 (Window Closing)
 
-关闭任一窗口只关该窗口，该窗口的未保存内容静默落盘；**关掉最后一个窗口才退出应用**（没有「主窗口」特殊语义）。
+关闭任一窗口只关该窗口，该窗口的未保存改动按 [关闭确认](#关闭确认-close-confirmation) 处理；**关掉最后一个窗口才退出应用**（没有「主窗口」特殊语义）。
 
 ## 菜单结构 (Menu Structure)
 
