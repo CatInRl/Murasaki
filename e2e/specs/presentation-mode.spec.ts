@@ -646,4 +646,66 @@ describe("演示模式", () => {
       { timeout: 5000 }
     );
   });
+
+  // ===== HTML 文件缩放（#518）=====
+
+  /** 读 HTML 预览的缩放现场：外层容器 zoom、子文档根元素 zoom、子文档内 h1 的渲染高度 */
+  async function readHtmlZoomState(
+    b: Browser
+  ): Promise<{ wrapperZoom: string | null; docZoom: string | null; h1Height: number | null }> {
+    return b.execute(() => {
+      const wrap = document.querySelector(".preview-zoom") as HTMLElement | null;
+      const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
+      const doc = fr?.contentDocument;
+      const h1 = doc?.querySelector("h1") as HTMLElement | null;
+      return {
+        wrapperZoom: wrap ? getComputedStyle(wrap).zoom : null,
+        docZoom: doc ? getComputedStyle(doc.documentElement).zoom : null,
+        h1Height: h1 ? Math.round(h1.getBoundingClientRect().height) : null,
+      };
+    });
+  }
+
+  it("HTML 文件的缩放作用在子文档上，内容真的放大（#518）", async () => {
+    await openWorkspace(browser, wsPath);
+    await openFileInTab(browser, `${wsPath}\\page.html`);
+    await waitForPresent(browser, ".html-iframe", 10000);
+    await browser.pause(400);
+
+    const before = await readHtmlZoomState(browser);
+
+    await browser.execute(() => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      return window.__pinia__._s.get("persistence").updateSettings({ presentationZoom: 150 });
+    });
+
+    // 缩放必须落到 iframe 的子文档根元素上（外层容器缩放对 iframe 无效）
+    await waitForInBrowser(
+      browser,
+      () => {
+        const fr = document.querySelector(".html-iframe") as HTMLIFrameElement | null;
+        const doc = fr?.contentDocument;
+        return Boolean(doc) && getComputedStyle(doc!.documentElement).zoom === "1.5";
+      },
+      [],
+      { timeout: 5000, message: "HTML 子文档根元素 zoom 变为 1.5" }
+    );
+
+    const after = await readHtmlZoomState(browser);
+
+    // 内容真的变大（约 1.5 倍），而不只是状态变化
+    expect(before.h1Height).not.toBeNull();
+    expect(after.h1Height).not.toBeNull();
+    expect(after.h1Height!).toBeGreaterThanOrEqual(before.h1Height! * 1.3);
+
+    // 外层容器不再缩放：对外层设 zoom 只会让 iframe 的 width:100% 按缩放后的
+    // 包含块解析，表现为「内部文字重新换行」而不是放大（#518 的根因）
+    expect(after.wrapperZoom).toBe("1");
+
+    // 复位，避免影响后续用例
+    await browser.execute(() => {
+      // @ts-ignore: E2E 运行时注入，类型不可静态推导
+      return window.__pinia__._s.get("persistence").updateSettings({ presentationZoom: 100 });
+    });
+  });
 });
