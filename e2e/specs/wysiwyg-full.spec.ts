@@ -1213,4 +1213,64 @@ describe("WYSIWYG 模式全量测试", () => {
       expect(mermaids.length).toBeGreaterThanOrEqual(2);
     });
   });
+
+  // ===== 全选选区（#514）=====
+  describe("Ctrl+A 全选的选区绘制", () => {
+    it("首字符是隐藏标记时，选区矩形不应出现哨兵量级的高度", async () => {
+      // 文档以 `# 标题` 开头：`#` 是隐藏标记。旧实现用 display:none 隐藏它，
+      // 导致 view.coordsAtPos(0) 返回 null，CodeMirror 的 drawSelection 把
+      // top=1e9 / bottom=-1e9 的哨兵值写进选区矩形（实测高度 33554428px），
+      // 全选时出现一条巨大的错误高亮。
+      await setContentAndWait(
+        browser,
+        "# 标题\n\n段落一 **粗体** [链接](https://example.com)\n\n```js\nconst a = 1;\n```\n\n最后一段"
+      );
+
+      const result = await browser.execute(() => {
+        // @ts-ignore: E2E 运行时注入，类型不可静态推导
+        const view = window.__editorRef__?.getView();
+        if (!view) throw new Error("编辑器视图不可用");
+        view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } });
+        void document.body.offsetHeight;
+
+        const docStartCoordsNull = view.coordsAtPos(0) === null;
+        const rects = Array.from(document.querySelectorAll(".cm-selectionBackground")).map(
+          (el) => ({
+            styleHeight: (el as HTMLElement).style.height,
+            styleTop: (el as HTMLElement).style.top,
+            measured: (el as HTMLElement).getBoundingClientRect().height,
+          })
+        );
+        return { docStartCoordsNull, rects };
+      });
+
+      // 文档起点必须有可测量的坐标
+      expect(result.docStartCoordsNull).toBe(false);
+      expect(result.rects.length).toBeGreaterThan(0);
+      // 不允许出现哨兵量级（1e9）的 top / height
+      for (const r of result.rects) {
+        expect(Math.abs(parseFloat(r.styleHeight) || 0)).toBeLessThan(100000);
+        expect(Math.abs(parseFloat(r.styleTop) || 0)).toBeLessThan(100000);
+        expect(r.measured).toBeGreaterThan(0);
+        expect(r.measured).toBeLessThan(100000);
+      }
+    });
+
+    it("隐藏标记不再撑高所在行（行高与整篇一致）", async () => {
+      await setContentAndWait(browser, "# 标题\n\n段落一 **粗体**\n\n普通段落");
+
+      const heights = await browser.execute(() =>
+        Array.from(document.querySelectorAll(".cm-line")).map((l) =>
+          Math.round(l.getBoundingClientRect().height)
+        )
+      );
+
+      // 含隐藏标记的行不应比普通段落行（26px 左右）高出一大截；
+      // 只写 width:0 而不给显式高度时，inline-block 会按自身行高参与排版，
+      // 把标题行撑到 39px、含粗体的行撑到 58px（实测）。
+      const max = Math.max(...heights);
+      const min = Math.min(...heights);
+      expect(max - min).toBeLessThanOrEqual(10);
+    });
+  });
 });
