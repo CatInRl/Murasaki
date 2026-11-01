@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 interface Props {
   /** 原始 HTML 内容 */
   source?: string;
+  /** 缩放百分比（100 = 不缩放）；作用到子文档根元素，等价浏览器缩放（#518） */
+  zoom?: number;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   source: "",
+  zoom: 100,
 });
 
 const emit = defineEmits<{
@@ -48,10 +51,31 @@ function attachFrameListeners(): void {
   // 只排除明确的 about:blank，其它 location 一律挂载，避免个别引擎对 srcdoc 文档
   // 的 location 报法不同（如空串）导致永远不挂。
   if (doc.location?.href === "about:blank") return;
+  applyZoom(doc);
   if (doc.documentElement.dataset[ATTACH_FLAG] === "1") return;
   doc.addEventListener("wheel", (ev) => emit("inner-wheel", ev), { passive: false });
   doc.addEventListener("keydown", (ev) => emit("inner-keydown", ev));
   doc.documentElement.dataset[ATTACH_FLAG] = "1";
+}
+
+/**
+ * 把缩放写进 **子文档根元素**（#518）。
+ *
+ * 为什么不能只在外层容器上 `zoom`：iframe 的内容是独立文档，外层 zoom 只会让
+ * iframe 的 `width: 100%` 按缩放后的包含块解析 —— 实测 zoom=1.5 时 iframe 盒子
+ * 尺寸 433×679 一点没变，内部 `h1` 反而从 386px 被挤到 247px，用户看到的是
+ * 「文字重新换行」而不是「放大」。
+ *
+ * 写到子文档根元素上就是浏览器缩放的效果：内容整体放大、视口按比例变窄。
+ * srcdoc 每次变化都会换一份文档，所以跟随 `attachFrameListeners` 的幂等轮询一起
+ * 重新应用（已设置过就跳过，避免每 100ms 触发一次样式重算）。
+ */
+function applyZoom(doc: Document): void {
+  const percent = Number.isFinite(props.zoom) ? props.zoom : 100;
+  const value = percent === 100 ? "" : String(percent / 100);
+  const root = doc.documentElement as HTMLElement;
+  if (root.style.zoom === value) return;
+  root.style.zoom = value;
 }
 
 function onFrameLoad(): void {
@@ -81,6 +105,15 @@ function stopAttachPoll(): void {
     attachPollTimer = null;
   }
 }
+
+// 缩放变化时立即应用（轮询兜底是 100ms，切换缩放没必要等一轮）
+watch(
+  () => props.zoom,
+  () => {
+    const doc = frameRef.value?.contentDocument;
+    if (doc) applyZoom(doc);
+  }
+);
 
 onMounted(startAttachPoll);
 onBeforeUnmount(stopAttachPoll);

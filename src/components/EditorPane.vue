@@ -96,11 +96,16 @@ const zoomApplies = computed(() => zoomAppliesTo(props.editorMode));
  * 「缩放后的包含块」解析，`width: 100%` 就已经填满，再除一次等于重复补偿，
  * 放大后预览会缩成面板的 1/z 宽（issue #337）。逻辑抽在 `presentationZoomStyle`。
  *
+ * **HTML 预览不能走这条**（#518）：它的内容是 iframe 里的独立文档，外层 `zoom`
+ * 只改变 iframe 的包含块宽度 —— 实测 zoom=1.5 时 iframe 盒子尺寸一点没变
+ * （433×679），内部 `h1` 反而被挤窄（386px→247px），用户看到的是「文字重新换行」
+ * 而不是「放大」。HTML 的缩放由 HtmlPreview 作用到子文档根元素上（等价浏览器缩放）。
+ *
  * 缩放快捷键是 global（不分模式），#405 又把 iframe 内事件回接进来了 —— 出口若只认
  * 演示模式，分屏下就成了「入口开、出口关」：状态在变、内容不动（issue #412）。
  */
 const zoomStyle = computed<Record<string, string> | undefined>(() =>
-  zoomApplies.value ? presentationZoomStyle(props.zoom) : undefined
+  zoomApplies.value && !isHtml.value ? presentationZoomStyle(props.zoom) : undefined
 );
 
 /** Ctrl+滚轮缩放（有预览区的模式接管，preventDefault 拦截 WebView2 浏览器缩放） */
@@ -414,6 +419,7 @@ defineExpose({
             v-else
             ref="previewRef"
             :source="modelValue"
+            :zoom="zoomApplies ? zoom : 100"
             @inner-wheel="onWheel"
             @inner-keydown="onInnerKeydown"
           />
