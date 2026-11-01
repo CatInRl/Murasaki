@@ -1150,8 +1150,30 @@ const emojiSourceReplacer = ViewPlugin.fromClass(
  * 直接匹配 widget 内的原生 HTML 标签和工具类。
  */
 export const wysiwygTheme = EditorView.theme({
+  /**
+   * 隐藏的 markdown 标记（标题 `#`、粗体 `**` 等）。
+   *
+   * **不能用 `display: none`**（#514）：`display: none` 的元素没有布局盒，于是
+   * 文档起点若正好是隐藏标记（例如 `# 标题` 的 `#`），`view.coordsAtPos(0)` 会
+   * 返回 `null`。CodeMirror 的 `drawSelection` 用 `top = 1e9 / bottom = -1e9` 作
+   * 初值再靠 `coordsAtPos` 收敛 —— 取不到坐标时哨兵值会原样写进选区矩形的
+   * `top` / `height`，表现就是 **Ctrl+A 全选时多出一条几十兆像素高的错误高亮**
+   *（实测 styleHeight 为 1e9px、top 为 -1e9px）。
+   *
+   * 改成「零宽但仍占盒子」：视觉上依然不可见，但位置可被测量，coordsAtPos 正常返回。
+   * `height: 1em` + `line-height: 1` 是实测出来的必要组合 —— 只写 width:0 会让
+   * inline-block 以自身行高参与排版，把所在行撑高（标题 31px→39px、含粗体的行
+   * 26px→58px）；显式给高度后行高与原样一致。
+   */
   ".murasaki-wysiwyg-mark-hide": {
-    display: "none",
+    display: "inline-block",
+    width: "0",
+    height: "1em",
+    lineHeight: "1",
+    overflow: "hidden",
+    opacity: "0",
+    pointerEvents: "none",
+    verticalAlign: "baseline",
   },
   ".murasaki-wysiwyg-mark-dim": {
     opacity: "0.4",
