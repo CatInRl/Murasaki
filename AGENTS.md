@@ -222,9 +222,9 @@ milestone 可以并存（例如 `0.9.5` 与 `1.0.0` 各挂各的 issue），但*
 
 完整 changelog 详见 [CHANGELOG.md](CHANGELOG.md)。版本发布时必须同步更新该文件。
 
-### 当前版本：0.11.1（2026-10-20）
+### 当前版本：0.12.0（2026-11-03）
 
-补丁版：修复新建文件（未命名标签）后保存必定失败（详见 [CHANGELOG.md](CHANGELOG.md)）。
+界面缺陷修复：HTML 预览缩放真正生效、全选高亮不再错位、新建文件后输入框自动聚焦；新增 Ctrl/Cmd+点击打开链接（详见 [CHANGELOG.md](CHANGELOG.md)）。
 
 ## 需要帮助时
 
